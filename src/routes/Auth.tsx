@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabaseClient'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -23,6 +23,30 @@ export function Auth() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  const navigate = useNavigate()
+
+  // Handle token fragments after email confirmation (access_token in URL hash)
+  useEffect(() => {
+    const hash = window.location.hash
+    if (hash && hash.includes('access_token')) {
+      const params = new URLSearchParams(hash.slice(1))
+      const access_token = params.get('access_token')
+      const refresh_token = params.get('refresh_token')
+      if (access_token && refresh_token) {
+        void (async () => {
+          try {
+            const { error } = await supabase.auth.setSession({ access_token, refresh_token })
+            if (!error) navigate('/dashboard', { replace: true })
+          } catch (_) {
+            // ignore
+          } finally {
+            // Clean the hash from the URL
+            history.replaceState(null, '', window.location.pathname)
+          }
+        })()
+      }
+    }
+  }, [navigate])
 
   const {
     register,
