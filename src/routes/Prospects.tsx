@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import CsvMapper from '@/components/upload/CsvMapper'
 
 export default function Prospects() {
   return (
@@ -9,18 +10,18 @@ export default function Prospects() {
           <h1 className="text-3xl font-bold">Prospects</h1>
           <p className="text-muted-foreground">Manage your prospect database and upload new contacts.</p>
         </div>
-        <Button>Import CSV</Button>
+        <Button asChild>
+          <a href="#import">Import CSV</a>
+        </Button>
       </div>
       
-      <Card>
+      <Card id="import">
         <CardHeader>
           <CardTitle>Prospect Database</CardTitle>
           <CardDescription>All your imported prospects will appear here.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">No prospects found. Upload a CSV to get started.</p>
-          </div>
+          <CsvMapper />
         </CardContent>
       </Card>
     </div>

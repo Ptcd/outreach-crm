@@ -6,6 +6,7 @@ interface AuthContextType {
   user: User | null
   session: Session | null
   loading: boolean
+  orgId: string | null
   signInWithPassword: (email: string, password: string) => Promise<{ error: any }>
   signUp: (email: string, password: string) => Promise<{ error: any }>
   signOut: () => Promise<void>
@@ -21,6 +22,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [orgId, setOrgId] = useState<string | null>(null)
 
   useEffect(() => {
     // Get initial session
@@ -28,6 +30,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
+      if (session?.user) void fetchOrgId(session.user.id)
     })
 
     // Listen for auth changes
@@ -36,6 +39,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setSession(session)
         setUser(session?.user ?? null)
         setLoading(false)
+        if (session?.user) void fetchOrgId(session.user.id)
 
         // Create profile and org on first login
         if (event === 'SIGNED_IN' && session?.user) {
@@ -80,8 +84,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (profileError) throw profileError
       }
+      // cache org id
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('org_id')
+          .eq('id', user.id)
+          .single()
+        if (data?.org_id) setOrgId(data.org_id)
+      } catch (err) {
+        console.error('Error fetching org id:', err)
+      }
     } catch (error) {
       console.error('Error creating user profile:', error)
+    }
+  }
+
+  const fetchOrgId = async (userId: string) => {
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('org_id')
+        .eq('id', userId)
+        .single()
+      if (data?.org_id) setOrgId(data.org_id)
+    } catch (err) {
+      console.error('Error retrieving org id:', err)
     }
   }
 
@@ -101,6 +129,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     user,
     session,
     loading,
+    orgId,
     signInWithPassword,
     signUp,
     signOut,
