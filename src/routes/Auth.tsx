@@ -22,6 +22,7 @@ export function Auth() {
   const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
 
   const {
     register,
@@ -38,6 +39,7 @@ export function Auth() {
 
   const onSubmit = async (data: AuthForm) => {
     setError(null)
+    setInfo(null)
     setLoading(true)
 
     try {
@@ -57,9 +59,7 @@ export function Auth() {
           }
         } else {
           // If email confirmations are on, session will be null
-          if (!signUpData.session) {
-            setError('Check your email to confirm your account, then sign in.')
-          }
+          if (!signUpData.session) setInfo('Check your email to confirm your account, then sign in.')
         }
       } else {
         const { error: signInError } = await signInWithPassword(data.email, data.password)
@@ -67,6 +67,28 @@ export function Auth() {
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const resendConfirmation = async () => {
+    setLoading(true)
+    setError(null)
+    setInfo(null)
+    try {
+      const email = (document.getElementById('email') as HTMLInputElement)?.value
+      if (!email) {
+        setError('Enter your email above first.')
+        return
+      }
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: `${window.location.origin}/auth` },
+      })
+      if (error) setError(error.message)
+      else setInfo('Confirmation email sent. Check your inbox and spam folder.')
     } finally {
       setLoading(false)
     }
@@ -111,12 +133,21 @@ export function Auth() {
                 <p className="text-sm text-destructive">{errors.password.message}</p>
               )}
             </div>
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            {info && <p className="text-sm text-green-600">{info}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Please wait...' : isSignUp ? 'Sign Up' : 'Sign In'}
             </Button>
+            {isSignUp && (
+              <button
+                type="button"
+                onClick={resendConfirmation}
+                className="w-full text-sm text-muted-foreground hover:text-primary"
+                disabled={loading}
+              >
+                Resend confirmation email
+              </button>
+            )}
             <div className="text-center">
               <button
                 type="button"
