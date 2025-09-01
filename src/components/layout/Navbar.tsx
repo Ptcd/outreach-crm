@@ -18,9 +18,9 @@ export function Navbar() {
   if (!user) return null
 
   return (
-    <nav className="border-b bg-background">
-      <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
+    <nav className="nav">
+      <div className="container">
+        <div className="flex h-12 items-center justify-between">
           <div className="flex items-center space-x-8">
             <Link to="/dashboard" className="text-xl font-bold">
               Outreach CRM
@@ -30,12 +30,7 @@ export function Navbar() {
                 <Link
                   key={item.name}
                   to={item.href}
-                  className={cn(
-                    "text-sm font-medium transition-colors hover:text-primary",
-                    location.pathname === item.href
-                      ? "text-primary"
-                      : "text-muted-foreground"
-                  )}
+                  className={cn('text-sm', location.pathname === item.href ? 'active' : '')}
                 >
                   {item.name}
                 </Link>
