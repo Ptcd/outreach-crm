@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
+import { supabase } from '@/lib/supabaseClient'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -40,12 +41,29 @@ export function Auth() {
     setLoading(true)
 
     try {
-      const { error } = isSignUp
-        ? await signUp(data.email, data.password)
-        : await signInWithPassword(data.email, data.password)
-
-      if (error) {
-        setError(error.message)
+      if (isSignUp) {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: data.email,
+          password: data.password,
+          options: { emailRedirectTo: `${window.location.origin}/auth` },
+        })
+        if (signUpError) {
+          // If user already exists, try sign in path
+          if ((signUpError as any).status === 400 || signUpError.message.toLowerCase().includes('exists')) {
+            const { error: signInErr } = await signInWithPassword(data.email, data.password)
+            if (signInErr) setError(signInErr.message)
+          } else {
+            setError(signUpError.message)
+          }
+        } else {
+          // If email confirmations are on, session will be null
+          if (!signUpData.session) {
+            setError('Check your email to confirm your account, then sign in.')
+          }
+        }
+      } else {
+        const { error: signInError } = await signInWithPassword(data.email, data.password)
+        if (signInError) setError(signInError.message)
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred')
