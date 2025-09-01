@@ -1,14 +1,25 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabaseClient'
 
 function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const navigate = useNavigate()
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    // Placeholder: auth wiring will be added later
-    // eslint-disable-next-line no-console
-    console.log('Login submit', { email, password })
+    setError(null)
+    setLoading(true)
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    setLoading(false)
+    if (signInError) {
+      setError(signInError.message)
+      return
+    }
+    navigate('/')
   }
 
   return (
@@ -40,8 +51,9 @@ function Login() {
               required
             />
           </div>
-          <button type="submit" className="w-full bg-blue-600 text-white rounded-md py-2 hover:bg-blue-700">
-            Sign In
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white rounded-md py-2 hover:bg-blue-700 disabled:opacity-60">
+            {loading ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
       </div>

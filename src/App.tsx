@@ -1,23 +1,68 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { useAuth } from '@/providers/AuthProvider'
+import { AppShell } from '@/components/layout/AppShell'
+import { Auth } from '@/routes/Auth'
+import Dashboard from '@/routes/Dashboard'
+import Prospects from '@/routes/Prospects'
+import Campaigns from '@/routes/Campaigns'
+import Tasks from '@/routes/Tasks'
+import Settings from '@/routes/Settings'
 import './App.css'
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import Prospects from './pages/Prospects'
-import Tasks from './pages/Tasks'
-import Conversions from './pages/Conversions'
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  }
+  
+  if (!user) {
+    return <Navigate to="/auth" replace />
+  }
+  
+  return <AppShell>{children}</AppShell>
+}
 
 function App() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/prospects" element={<Prospects />} />
-        <Route path="/tasks" element={<Tasks />} />
-        <Route path="/conversions" element={<Conversions />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </div>
+    <Routes>
+      <Route path="/auth" element={<Auth />} />
+      <Route path="/dashboard" element={
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/prospects" element={
+        <ProtectedRoute>
+          <Prospects />
+        </ProtectedRoute>
+      } />
+      <Route path="/campaigns" element={
+        <ProtectedRoute>
+          <Campaigns />
+        </ProtectedRoute>
+      } />
+      <Route path="/tasks" element={
+        <ProtectedRoute>
+          <Tasks />
+        </ProtectedRoute>
+      } />
+      <Route path="/settings" element={
+        <ProtectedRoute>
+          <Settings />
+        </ProtectedRoute>
+      } />
+      <Route path="/" element={
+        user ? <Navigate to="/dashboard" replace /> : <Navigate to="/auth" replace />
+      } />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
 
