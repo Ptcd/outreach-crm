@@ -7,6 +7,7 @@ import Prospects from '@/routes/Prospects'
 import Campaigns from '@/routes/Campaigns'
 import Tasks from '@/routes/Tasks'
 import Settings from '@/routes/Settings'
+import DebugEnv from './debug-env'
 import './App.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -32,6 +33,7 @@ function App() {
 
   return (
     <Routes>
+      <Route path="/debug" element={<DebugEnv />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/dashboard" element={
         <ProtectedRoute>
