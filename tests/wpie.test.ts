@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { PGlite } from '@electric-sql/pglite'
 import { describe, expect, it } from 'vitest'
@@ -6,7 +6,10 @@ import { GATE_ITEMS, HARD_STOPS, STAGES, gateSuggestion, type GateScores } from 
 import { isoToLocalInput, localInputToIso, todayLocal } from '@/lib/format'
 import { SUPABASE_STUB } from './supabaseStub'
 
-const MIGRATION = readFileSync(path.resolve(__dirname, '../supabase/migrations/0001_wpie_live.sql'), 'utf8')
+// Every migration, in order (0001 schema, 0002 gate round 2, ...).
+const MIGRATIONS_DIR = path.resolve(__dirname, '../supabase/migrations')
+const MIGRATION = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort()
+  .map((f) => readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8')).join('\n')
 
 function enumValues(name: string): string[] {
   const m = MIGRATION.match(new RegExp(`create type public\\.${name} as enum \\(([\\s\\S]*?)\\);`))

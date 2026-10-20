@@ -1,13 +1,16 @@
 // Applies supabase/migrations/0001_wpie_live.sql to an in-memory Postgres (PGlite)
 // with a small stand-in for Supabase's auth schema and roles, then checks the
 // triggers, the gate rule, the scoreboard views and row-level security.
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { PGlite } from '@electric-sql/pglite'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { SUPABASE_STUB } from './supabaseStub'
 
-const MIGRATION = readFileSync(path.resolve(__dirname, '../supabase/migrations/0001_wpie_live.sql'), 'utf8')
+// Every migration, in order (0001 schema, 0002 gate round 2, ...).
+const MIGRATIONS_DIR = path.resolve(__dirname, '../supabase/migrations')
+const MIGRATION = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort()
+  .map((f) => readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8')).join('\n')
 
 
 const COLIN = { sub: '00000000-0000-0000-0000-00000000000c', email: 'colin@example.com' }

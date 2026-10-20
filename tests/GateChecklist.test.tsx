@@ -25,7 +25,7 @@ describe('GateChecklist', () => {
     expect(summary()).toContain('Total 10/12')
     expect(summary()).toContain('Walk it')
 
-    fireEvent.click(screen.getByLabelText(/Listed with an agent/))
+    fireEvent.click(screen.getByLabelText(/Listed, or signed anything/))
     expect(summary()).toContain("Don't walk")
 
     fireEvent.click(screen.getByRole('button', { name: 'Save gate score' }))

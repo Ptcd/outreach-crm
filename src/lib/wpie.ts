@@ -76,8 +76,8 @@ export const GATE_ITEMS: GateItem[] = [
     id: 'flexibility',
     label: 'Flexibility',
     scale: [
-      'Held firm, or never tested',
-      'Price held, but open on terms or timing you will use',
+      'Held firm on a market number, or never tested',
+      'Price held, but open on terms or timing you will use, or a firm floor resting on a real need (payoff plus arrears)',
       'Moved, or clearly open to hearing well under their number',
     ],
   },
@@ -103,10 +103,12 @@ export const GATE_ITEMS: GateItem[] = [
 
 export const HARD_STOPS: { id: string; label: string }[] = [
   { id: 'dnc_or_no_contact', label: 'Asked to be removed, or hostile' },
-  { id: 'listed_active', label: 'Listed with an agent, or under contract with someone else' },
+  { id: 'listed_active', label: 'Listed, or signed anything with another buyer (no written cancellation)' },
   { id: 'no_authority', label: 'Estate or company with nobody who can sign' },
-  { id: 'elderly_without_family', label: 'Elderly owner, named family member not invited' },
-  { id: 'hold_lane_no_financials', label: 'Hold lane: no rent roll or basic figures before the visit' },
+  { id: 'elderly_without_family', label: 'Older, seriously ill or any memory trouble, and named family not invited' },
+  { id: 'sheriff_inside_14_days', label: 'Behind on payments: sale less than 14 days out' },
+  { id: 'payoff_above_number', label: 'Behind on payments: payoff plus arrears above my number' },
+  { id: 'hold_lane_no_financials', label: 'Hold lane: no written rent roll for 5+ units (2-4 units: rent list on my call is enough)' },
 ]
 
 export type GateScores = Record<GateItem['id'], number>
