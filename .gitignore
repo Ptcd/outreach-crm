@@ -8,3 +8,5 @@ coverage/
 .vscode/
 
 .vercel
+.env.*
+!.env.example

@@ -1,16 +1,12 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
+const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables!')
-  console.error('VITE_SUPABASE_URL:', supabaseUrl ? 'SET' : 'MISSING')
-  console.error('VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'SET' : 'MISSING')
-  console.error('Available env vars:', Object.keys(import.meta.env))
-  throw new Error('Missing required Supabase environment variables')
-}
+/** True when the Vercel / local env has both Supabase settings. */
+export const supabaseConfigured = Boolean(url && anonKey)
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-
+// When the settings are missing the app shows a setup screen instead of crashing.
+export const supabase: SupabaseClient = supabaseConfigured
+  ? createClient(url!, anonKey!, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } })
+  : (null as unknown as SupabaseClient)

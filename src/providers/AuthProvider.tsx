@@ -1,151 +1,88 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import type { User, Session } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabaseClient'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import type { Session, User } from '@supabase/supabase-js'
+import { supabase, supabaseConfigured } from '@/lib/supabaseClient'
+import type { TeamMember } from '@/lib/types'
 
 interface AuthContextType {
   user: User | null
   session: Session | null
+  member: TeamMember | null // null = signed in but not on the team (or still loading)
   loading: boolean
-  orgId: string | null
-  signInWithPassword: (email: string, password: string) => Promise<{ error: any }>
-  signUp: (email: string, password: string) => Promise<{ error: any }>
+  isOwner: boolean
+  sendMagicLink: (email: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-interface AuthProviderProps {
-  children: ReactNode
-}
-
-export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null)
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [orgId, setOrgId] = useState<string | null>(null)
+  const [member, setMember] = useState<TeamMember | null>(null)
+  const [loading, setLoading] = useState(supabaseConfigured)
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-      if (session?.user) void fetchOrgId(session.user.id)
-    })
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session)
-        setUser(session?.user ?? null)
+    if (!supabaseConfigured) return
+    let alive = true
+    const load = async (s: Session | null) => {
+      setSession(s)
+      if (!s?.user?.email) {
+        setMember(null)
         setLoading(false)
-        if (session?.user) void fetchOrgId(session.user.id)
-
-        // Create profile and org on first login
-        if (event === 'SIGNED_IN' && session?.user) {
-          await ensureUserProfile(session.user)
-        }
+        return
       }
-    )
-
-    return () => subscription.unsubscribe()
+      const { data } = await supabase
+        .from('team_members')
+        .select('email, role, person, display_name')
+        .eq('email', s.user.email.toLowerCase())
+        .maybeSingle()
+      if (!alive) return
+      setMember((data as TeamMember | null) ?? null)
+      setLoading(false)
+    }
+    supabase.auth.getSession().then(({ data }) => load(data.session))
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      // defer: calling Supabase inside this callback can deadlock the auth client
+      setTimeout(() => void load(s), 0)
+    })
+    return () => {
+      alive = false
+      sub.subscription.unsubscribe()
+    }
   }, [])
 
-  const ensureUserProfile = async (user: User) => {
-    try {
-      // Check if profile exists
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-
-      if (!profile) {
-        // Create org first
-        const { data: org, error: orgError } = await supabase
-          .from('orgs')
-          .insert({
-            name: `${user.email}'s Organization`,
-            owner: user.id,
-          })
-          .select()
-          .single()
-
-        if (orgError) throw orgError
-
-        // Create profile
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: user.id,
-            org_id: org.id,
-            email: user.email,
-          })
-
-        if (profileError) throw profileError
-      }
-      // cache org id
-      try {
-        const { data } = await supabase
-          .from('profiles')
-          .select('org_id')
-          .eq('id', user.id)
-          .single()
-        if (data?.org_id) setOrgId(data.org_id)
-      } catch (err) {
-        console.error('Error fetching org id:', err)
-      }
-    } catch (error) {
-      console.error('Error creating user profile:', error)
-    }
-  }
-
-  const fetchOrgId = async (userId: string) => {
-    try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('org_id')
-        .eq('id', userId)
-        .single()
-      if (data?.org_id) setOrgId(data.org_id)
-    } catch (err) {
-      console.error('Error retrieving org id:', err)
-    }
-  }
-
-  const signInWithPassword = async (email: string, password: string) => {
-    return await supabase.auth.signInWithPassword({ email, password })
-  }
-
-  const signUp = async (email: string, password: string) => {
-    return await supabase.auth.signUp({ email, password })
+  const sendMagicLink = async (email: string) => {
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim().toLowerCase(),
+      // only people Colin has added in Supabase can sign in; no self sign-up
+      options: { shouldCreateUser: false, emailRedirectTo: window.location.origin },
+    })
+    return { error: error ? error.message : null }
   }
 
   const signOut = async () => {
     await supabase.auth.signOut()
   }
 
-  const value = {
-    user,
-    session,
-    loading,
-    orgId,
-    signInWithPassword,
-    signUp,
-    signOut,
-  }
-
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={{
+        user: session?.user ?? null,
+        session,
+        member,
+        loading,
+        isOwner: member?.role === 'owner',
+        sendMagicLink,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
-  }
-  return context
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be used within an AuthProvider')
+  return ctx
 }

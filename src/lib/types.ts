@@ -1,112 +1,204 @@
-export interface User {
-  id: string
-  email?: string
-  created_at?: string
+// Row shapes for supabase/migrations/0001_wpie_live.sql.
+
+export type LeadStage =
+  | 'postcard_mailed' | 'opener_queued' | 'opener_sent' | 'reply_received' | 'ai_qualifying'
+  | 'handoff' | 'colin_call' | 'walk_decision' | 'walkthrough_booked' | 'offer' | 'follow_up'
+  | 'under_contract' | 'closed_won' | 'dead' | 'closed_no_contact' | 'dnc' | 'data_fix'
+  | 'mail_only' | 'human_owned'
+
+export type Lane = 'hold' | 'flip'
+export type Person = 'colin' | 'thalia'
+export type Role = 'owner' | 'caller'
+export type GateDecision = 'walk' | 'no_walk' | 'one_more_call'
+export type DealStatus = 'offer' | 'contract' | 'closed' | 'dead'
+export type OpenerDecision = 'pending' | 'approved' | 'skipped'
+export type MilestoneKind = 'connect' | 'contact' | 'lead' | 'handoff' | 'handoff_held' | 'qualifying_call' | 'walk'
+
+export interface TeamMember {
+  email: string
+  role: Role
+  person: Person
+  display_name: string
 }
 
-export interface Org {
+export interface Lead {
   id: string
-  name: string
-  owner: string
+  wpie_owner_id: number | null
+  owner_name: string
+  owner_type: string | null
+  mailing_street: string | null
+  mailing_city: string | null
+  mailing_state: string | null
+  mailing_zip: string | null
+  lane: Lane | null
+  county: string | null
+  municipality: string | null
+  property_address: string | null
+  property_zip: string | null
+  wpie_property_id: number | null
+  parcel_id: string | null
+  property_type: string | null
+  units: number | null
+  reasons_to_sell: string[]
+  score: number | null
+  mailed_on: string | null
+  mail_channel: string | null
+  stage: LeadStage
+  stage_changed_at: string
+  next_action_at: string | null
+  next_action: string | null
+  assigned_to: Person | null
+  dead_reason: string | null
+  notes: string | null
+  last_inbound_at: string | null
   created_at: string
+  updated_at: string
 }
 
-export interface Profile {
+export interface Contact {
   id: string
-  org_id: string
-  email?: string
-  created_at: string
+  lead_id: string
+  kind: 'phone' | 'email'
+  value: string
+  value_normalized: string | null
+  person_name: string | null
+  line_type: string | null
+  dnc_vendor: boolean
+  dnc_scrub: 'unknown' | 'clear' | 'dnc'
+  suppressed: boolean
+  dnc_app: boolean
+  source: string | null
+  status: 'ok' | 'bad'
+  note: string | null
 }
 
-export interface Campaign {
+export interface Message {
   id: string
-  org_id: string
-  name: string
-  sending_domain?: string
-  inbox_email?: string
-  status: string
-  created_at: string
-}
-
-export interface Prospect {
-  id: string
-  org_id: string
-  company?: string
-  contact_name?: string
-  email?: string
-  website?: string
-  phone?: string
-  city?: string
-  state?: string
-  tags?: string[]
-  created_at: string
-}
-
-export interface ProspectCampaign {
-  id: string
-  org_id: string
-  prospect_id: string
-  campaign_id: string
-  status: 'new' | 'sent' | 'opened' | 'replied' | 'interested' | 'not_interested' | 'bounce'
-  last_event_at?: string
-}
-
-export interface OutreachEvent {
-  id: number
-  org_id: string
-  campaign_id?: string
-  prospect_id?: string
-  event_type: 'sent' | 'open' | 'reply' | 'bounce' | 'unsubscribe'
-  payload?: Record<string, any>
-  occurred_at: string
+  lead_id: string
+  direction: 'in' | 'out'
+  channel: 'sms' | 'call' | 'note'
+  body: string | null
+  from_number: string | null
+  to_number: string | null
+  status: string | null
+  is_opener: boolean
+  is_opt_out: boolean
+  sent_at: string
+  seen_at: string | null
 }
 
 export interface Task {
   id: string
-  org_id: string
-  prospect_id?: string
-  title: string
-  due_at?: string
-  status: string
+  lead_id: string | null
+  due_at: string
+  kind: string
+  owner: Person
+  done_at: string | null
+  note: string | null
   created_at: string
 }
 
-export interface Conversion {
+export interface GateScore {
   id: string
-  org_id: string
-  prospect_id?: string
-  campaign_id?: string
-  mrr_cents: number
-  notes?: string
-  created_at: string
+  lead_id: string
+  reason_and_clock: number
+  decision_makers: number
+  number_and_anchor: number
+  flexibility: number
+  condition: number
+  numbers_close: number
+  hard_stops: string[]
+  total: number
+  suggested_decision: GateDecision
+  decision: GateDecision
+  note: string | null
+  decided_by_name: string | null
+  at: string
 }
 
-export interface Suppression {
+export interface Deal {
   id: string
-  org_id: string
-  email?: string
-  domain?: string
-  reason?: string
-  created_at: string
+  lead_id: string
+  status: DealStatus
+  colin_offer: number | null
+  contract_date: string | null
+  close_date: string | null
+  notes: string | null
 }
 
-export interface KpiData {
-  prospects_added: number
-  emails_sent: number
-  open_rate: number
-  reply_rate: number
-  conversions: number
-  mrr_won_cents: number
+export interface PlannedOpener {
+  id: string
+  plan_date: string
+  wpie_owner_id: number
+  attempt: number
+  lead_id: string | null
+  lane: string | null
+  template_lane: string | null
+  variant: string | null
+  phone: string | null
+  body: string
+  segments: number | null
+  scheduled_at: string | null
+  owner_name: string | null
+  property_address: string | null
+  decision: OpenerDecision
+  decided_by_name: string | null
+  decided_at: string | null
+  decision_note: string | null
 }
 
-export interface CsvMappingField {
-  csvColumn: string
-  dbField: string
+export interface Milestone {
+  id: number
+  lead_id: string
+  kind: MilestoneKind
+  at: string
 }
 
-export interface CsvImportResult {
-  total_rows: number
-  inserted: number
-  skipped: number
-  errors: string[]
+export interface ScoreboardWeek {
+  week_start: string
+  lane: string
+  openers_sent: number
+  delivered: number
+  replies: number
+  opt_outs: number
+  connects: number
+  contacts: number
+  leads: number
+  handoffs: number
+  handoffs_held: number
+  qualifying_calls: number
+  walks: number
+  contracts: number
+  closes: number
+  delivery_rate: number | null
+  reply_rate: number | null
+  opt_out_rate: number | null
+  contact_rate: number | null
+  leads_per_delivered: number | null
+  handoffs_held_rate: number | null
+  walk_rate: number | null
+  walks_per_contract: number | null
+}
+
+export interface SignalWeek {
+  week_start: string
+  signal: string
+  openers_sent: number
+  delivered: number
+  replies: number
+  opt_outs: number
+  leads: number
+  walks: number
+  contracts: number
+}
+
+export interface FollowupDebt {
+  lead_id: string
+  owner_name: string
+  property_address: string | null
+  stage: LeadStage
+  next_action_at: string
+  next_action: string | null
+  assigned_to: Person | null
+  days_late: number
 }

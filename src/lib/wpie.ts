@@ -1,0 +1,178 @@
+// WPIE vocab in plain words: pipeline stages (wpie/reply/qualification.yaml), the
+// walk gate (docs/SELLER_QUALIFICATION_LOGIC.md section b) and follow-up kinds.
+// Nothing here computes or suggests an offer, value or price.
+import type { GateDecision, LeadStage, MilestoneKind } from './types'
+
+export interface StageInfo {
+  id: LeadStage
+  label: string
+  who: 'system' | 'ai' | 'colin'
+  group: 'automatic' | 'working' | 'closed'
+}
+
+export const STAGES: StageInfo[] = [
+  { id: 'postcard_mailed', label: 'Postcard mailed', who: 'system', group: 'automatic' },
+  { id: 'opener_queued', label: 'Text planned', who: 'colin', group: 'automatic' },
+  { id: 'opener_sent', label: 'Text sent', who: 'system', group: 'automatic' },
+  { id: 'reply_received', label: 'Replied', who: 'ai', group: 'working' },
+  { id: 'ai_qualifying', label: 'Qualifying by text', who: 'ai', group: 'working' },
+  { id: 'handoff', label: 'Ready for Colin', who: 'system', group: 'working' },
+  { id: 'colin_call', label: "Colin's call", who: 'colin', group: 'working' },
+  { id: 'walk_decision', label: 'Walk decision', who: 'colin', group: 'working' },
+  { id: 'walkthrough_booked', label: 'Walk booked', who: 'colin', group: 'working' },
+  { id: 'offer', label: 'Offer', who: 'colin', group: 'working' },
+  { id: 'follow_up', label: 'Follow up later', who: 'colin', group: 'working' },
+  { id: 'under_contract', label: 'Under contract', who: 'colin', group: 'working' },
+  { id: 'human_owned', label: 'Colin texting', who: 'colin', group: 'working' },
+  { id: 'data_fix', label: 'Wrong number', who: 'system', group: 'working' },
+  { id: 'closed_won', label: 'Closed', who: 'colin', group: 'closed' },
+  { id: 'mail_only', label: 'Mail only', who: 'system', group: 'closed' },
+  { id: 'dead', label: 'Dead', who: 'system', group: 'closed' },
+  { id: 'closed_no_contact', label: 'Hostile - no contact', who: 'system', group: 'closed' },
+  { id: 'dnc', label: 'Do not contact', who: 'system', group: 'closed' },
+]
+
+export const STAGE_LABEL: Record<LeadStage, string> = Object.fromEntries(
+  STAGES.map((s) => [s.id, s.label]),
+) as Record<LeadStage, string>
+
+export const WORKING_STAGES = STAGES.filter((s) => s.group === 'working').map((s) => s.id)
+
+export interface GateItem {
+  id: 'reason_and_clock' | 'decision_makers' | 'number_and_anchor' | 'flexibility' | 'condition' | 'numbers_close'
+  label: string
+  scale: [string, string, string] // text for 0, 1, 2
+}
+
+export const GATE_ITEMS: GateItem[] = [
+  {
+    id: 'reason_and_clock',
+    label: 'Reason + clock',
+    scale: [
+      'Nothing beyond "the right price"',
+      'A reason with no date, or a date with no reason',
+      'A reason tied to selling AND a date or event forcing timing',
+    ],
+  },
+  {
+    id: 'decision_makers',
+    label: 'Decision makers',
+    scale: [
+      'Unknown who signs',
+      'Everyone named, not all available or agreed',
+      'Every signer named and at the visit or agreed to it',
+    ],
+  },
+  {
+    id: 'number_and_anchor',
+    label: 'Their number + why',
+    scale: [
+      'No number, even on your call',
+      'Number rests on a listing, online estimate, neighbour sale or other offers',
+      'Number rests on their own need, payoff or what they paid',
+    ],
+  },
+  {
+    id: 'flexibility',
+    label: 'Flexibility',
+    scale: [
+      'Held firm, or never tested',
+      'Price held, but open on terms or timing you will use',
+      'Moved, or clearly open to hearing well under their number',
+    ],
+  },
+  {
+    id: 'condition',
+    label: 'Condition',
+    scale: [
+      'Unknown, or "just paint" with a near-retail number',
+      'Vague ("needs some work")',
+      'Occupancy, main problems in their words, access known (hold: rent roll, big items)',
+    ],
+  },
+  {
+    id: 'numbers_close',
+    label: 'Numbers close',
+    scale: [
+      'Their number is beyond the gap you will close',
+      'Above your own number, inside the gap you will close on site',
+      'Their number after the flexibility test is at or under your own number',
+    ],
+  },
+]
+
+export const HARD_STOPS: { id: string; label: string }[] = [
+  { id: 'dnc_or_no_contact', label: 'Asked to be removed, or hostile' },
+  { id: 'listed_active', label: 'Listed with an agent, or under contract with someone else' },
+  { id: 'no_authority', label: 'Estate or company with nobody who can sign' },
+  { id: 'elderly_without_family', label: 'Elderly owner, named family member not invited' },
+  { id: 'hold_lane_no_financials', label: 'Hold lane: no rent roll or basic figures before the visit' },
+]
+
+export type GateScores = Record<GateItem['id'], number>
+
+export const DECISION_LABEL: Record<GateDecision, string> = {
+  walk: 'Walk it',
+  one_more_call: 'One more call first',
+  no_walk: "Don't walk",
+}
+
+export function gateTotal(s: GateScores): number {
+  return GATE_ITEMS.reduce((sum, item) => sum + (s[item.id] ?? 0), 0)
+}
+
+/** The written pass rule, the same as public.gate_suggestion() in the migration. */
+export function gateSuggestion(s: GateScores, hardStops: string[]): GateDecision {
+  const total = gateTotal(s)
+  if (hardStops.length > 0) return 'no_walk'
+  if (s.numbers_close === 0) return 'no_walk'
+  if (
+    s.decision_makers === 2 &&
+    s.numbers_close >= 1 &&
+    (s.flexibility >= 1 || s.numbers_close === 2) &&
+    (total >= 9 || (s.numbers_close === 2 && total >= 7))
+  )
+    return 'walk'
+  if (total >= 7) return 'one_more_call'
+  return 'no_walk'
+}
+
+/** After a "don't walk": follow up if there is any reason, else dead. */
+export function noWalkRoute(s: GateScores): LeadStage {
+  return s.reason_and_clock >= 1 ? 'follow_up' : 'dead'
+}
+
+export const MILESTONES: { id: MilestoneKind; label: string; hint: string }[] = [
+  { id: 'connect', label: 'Reached a person', hint: 'Anyone answered or replied' },
+  { id: 'contact', label: 'Confirmed owner', hint: 'The owner, or someone with authority' },
+  { id: 'lead', label: 'Would sell, gave a reason', hint: 'Would consider selling and said why' },
+  { id: 'handoff', label: 'Call booked for Colin', hint: 'Must-know facts captured and a call time set' },
+  { id: 'handoff_held', label: 'Booked call happened', hint: 'Connected at the booked time' },
+  { id: 'qualifying_call', label: 'Qualifying call done', hint: "Colin's call completed" },
+  { id: 'walk', label: 'Walked the property', hint: 'Walkthrough done' },
+]
+
+// Follow-up kinds from qualification.yaml (followups) plus everyday ones.
+export const TASK_KINDS: { id: string; label: string }[] = [
+  { id: 'call', label: 'Call' },
+  { id: 'text', label: 'Text (inside their thread only)' },
+  { id: 'letter', label: 'Letter' },
+  { id: 'confirm_walk', label: 'Confirm walk' },
+  { id: 'offer_thinking', label: 'Offer: thinking it over' },
+  { id: 'missed_callback', label: 'Missed callback' },
+  { id: 'talk_to_spouse', label: 'Talk to spouse' },
+  { id: 'family_call', label: 'Family call' },
+  { id: 'not_now_with_date', label: 'Not now, with a date' },
+  { id: 'not_now_no_date', label: 'Not now, no date' },
+  { id: 'listed', label: 'Listed: check after expiry' },
+  { id: 'other_buyer', label: 'Other buyer: backup check' },
+  { id: 'too_high_with_reason', label: 'Too high, with a reason' },
+  { id: 'estate_letters_pending', label: 'Estate: letters pending' },
+  { id: 'hold_lane_not_now', label: 'Hold lane: not now' },
+  { id: 'under_contract', label: 'Under contract check-in' },
+  { id: 'other', label: 'Other' },
+]
+
+export const TASK_KIND_LABEL: Record<string, string> = Object.fromEntries(TASK_KINDS.map((k) => [k.id, k.label]))
+
+export const DEAL_STATUS_LABEL = { offer: 'Offer made', contract: 'Under contract', closed: 'Closed', dead: 'Dead' }

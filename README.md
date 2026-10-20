@@ -1,87 +1,31 @@
-# React + TypeScript + Vite
+# WPIE app (branch `wpie-live`)
 
-This app is a lightweight CRM for cold email outreach built with React + Vite + TypeScript.
+The live operating layer for WPIE: Colin and Thalia work the mailed owners here.
+Vite + React + TypeScript + Tailwind + shadcn-style components + supabase-js + React Query,
+the same stack as the old outreach-crm app (kept at tag `pre-wpie-repurpose-2026-10-20`)
+so the Vercel project settings still work.
 
-Getting started:
+Pages: Today (follow-ups due, new replies, follow-up debt), Pipeline (leads by stage, lane and
+county), Lead (WPIE facts, phones with DNC flags, history, follow-ups, scoreboard checkpoints,
+the six-item walk gate, Colin's deal box), Approvals (Colin approves or skips WPIE's planned
+opener texts; sending stays in WPIE), Scoreboard (the weekly numbers from
+`docs/ACQUISITION_SYSTEM_PLAYBOOK.md` section 4), Login (email magic link).
 
-1. Install dependencies
+The app never computes or suggests an offer, value or price. Colin types his own offer into a
+deal record; the database refuses that field from anyone else.
+
+## Pieces
+
+- `supabase/migrations/0001_wpie_live.sql`: tables, views, triggers, row-level security.
+- WPIE side (other repo): `python -m wpie.live.sync push|pull` in `C:\Users\onkau\claude\real estate`.
+- `DEPLOY.md`: the remaining steps that need Colin's Supabase and Vercel accounts.
+
+## Commands
 
 ```
 npm install
-```
-
-2. Set environment variables
-
-Create a `.env` file from `.env.example` and fill in your Supabase project settings.
-
-3. Start the dev server
-
-```
-npm run dev
-```
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+npm run dev        # needs VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (see .env.example)
+npm run build      # type-check + production build
+npm test           # schema tests on an in-memory Postgres (PGlite) + component tests
+npm run db:local   # throwaway local Postgres with the migration, for testing the WPIE sync
 ```
