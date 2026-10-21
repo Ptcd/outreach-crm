@@ -117,7 +117,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     checkedFor.current = null
     clearCachedData()
-    await supabase.auth.signOut()
+    // Only this phone: everyone shares one login, so a global sign-out would sign out every phone.
+    await supabase.auth.signOut({ scope: 'local' })
   }
 
   const email = session?.user?.email?.toLowerCase()

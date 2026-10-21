@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Light only for now (Colin 2026-10-21: in phone dark mode text became unreadable). `dark:`
+   classes apply only under a .dark class, which nothing sets; the theme below stays light. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* shadcn/ui theme tokens for Tailwind v4 */
 :root {
   --background: 0 0% 100%;
@@ -48,8 +52,9 @@
 }
 
 /* Dark mode follows the phone's setting. */
-@media (prefers-color-scheme: dark) {
-  :root {
+/* Dark theme tokens, kept for a later proper dark pass; only under .dark (never set today). */
+.dark {
+  & {
     --background: 222 47% 7%;
     --foreground: 210 40% 96%;
     --card: 222 40% 11%;
@@ -70,7 +75,7 @@
     --input: 217 33% 28%;
     --ring: 213 27% 84%;
   }
-  :root { color-scheme: dark; }
+  color-scheme: dark;
 }
 
 @layer base {

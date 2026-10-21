@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
   lookups: [] as (() => Promise<{ data: unknown; error: { message: string } | null }>)[],
   calls: 0,
   listener: null as null | ((event: string, s: unknown) => void),
+  signOutArgs: [] as unknown[],
 }))
 
 vi.mock('@/lib/supabaseClient', () => ({
@@ -20,7 +21,7 @@ vi.mock('@/lib/supabaseClient', () => ({
     auth: {
       getSession: async () => ({ data: { session: state.session } }),
       onAuthStateChange: (f: (e: string, s: unknown) => void) => { state.listener = f; return { data: { subscription: { unsubscribe() {} } } } },
-      signOut: async () => {},
+      signOut: async (o: unknown) => { state.signOutArgs.push(o) },
     },
     from: () => ({
       select: () => ({ eq: () => ({ maybeSingle: () => { state.calls += 1; return (state.lookups.shift() ?? (async () => ({ data: null, error: null })))() } }) }),
@@ -87,5 +88,15 @@ describe('team check after sign-in', () => {
     mount()
     await tick()
     expect(screen.getByText('This login is not on the WPIE team list')).toBeTruthy()
+  })
+})
+
+describe('two phones on one shared login', () => {
+  it('signing out signs out only this phone, never the others', async () => {
+    state.lookups.push(async () => ({ data: null, error: null }))
+    mount()
+    await tick()
+    await act(async () => screen.getByRole('button', { name: 'Sign out' }).click())
+    expect(state.signOutArgs).toEqual([{ scope: 'local' }])
   })
 })
