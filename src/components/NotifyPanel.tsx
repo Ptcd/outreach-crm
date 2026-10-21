@@ -44,7 +44,7 @@ export function NotifyPanel() {
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        {state === 'on' && <span>Notifications are on: Sam pings you only when a reply needs you.</span>}
+        {state === 'on' && <span>Notifications are on: you get a ping only when a reply needs you.</span>}
         {state === 'off' && <Button size="sm" disabled={busy} onClick={() => void run(enablePush)}>Turn on notifications</Button>}
         {state === 'denied' && <span>Notifications are blocked. Chrome ⋮ &gt; Settings &gt; Notifications (or the lock icon) &gt; allow this site.</span>}
         {state === 'unsupported' && <span>This browser can&apos;t show notifications. Use Chrome on your phone.</span>}

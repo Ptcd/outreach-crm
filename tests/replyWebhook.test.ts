@@ -124,7 +124,7 @@ describe('reply-inbound webhook', () => {
     expect(waited).toBeGreaterThanOrEqual(45)
     expect(waited).toBeLessThanOrEqual(91)
     expect(runs.map((r) => r.sent)).toEqual([0, 1])
-    expect(tw.sends).toEqual([{ to: '+14145550177', from: '+12629996513', body: expect.stringMatching(/Fair question. I'm Sam/) }])
+    expect(tw.sends).toEqual([{ to: '+14145550177', from: '+12629996513', body: expect.stringMatching(/this is Colin Merrill/) }])
     // the catch-up timer running at the same moment finds nothing left to send
     await runReplyAgent({ rpc, env: LIVE, twilio: tw, drafter, control: await control(), redteamRows: ROWS, now: c.now })
     expect(tw.sends.length).toBe(1)

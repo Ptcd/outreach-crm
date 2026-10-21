@@ -18,7 +18,7 @@ describe('parity with wpie/reply/rules.py', () => {
 describe('red team', () => {
   it('passes every row with no missed removal', () => {
     const r = scoreRedteam(data.rows as unknown as RedteamRow[])
-    console.log(`red team: ${r.passed}/${r.total}; Sam answers ${r.handled_by_sam}, Colin ${r.to_colin}; Python ${data.python_passed}/${r.total}`)
+    console.log(`red team: ${r.passed}/${r.total}; answered automatically ${r.handled_by_sam}, to Colin ${r.to_colin}; Python ${data.python_passed}/${r.total}`)
     expect(r.failures).toEqual([])
     expect(r.missed_removals).toBe(0)
     expect(r.ok).toBe(true)

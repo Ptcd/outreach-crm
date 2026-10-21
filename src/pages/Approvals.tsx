@@ -157,24 +157,24 @@ function SendingPanel({ canDecide }: { canDecide: boolean }) {
       )}
       <div className="mt-4 border-t pt-3">
         <div className="flex items-center justify-between gap-2">
-          <p className="font-medium">Sam handles routine replies</p>
+          <p className="font-medium">Auto-answer routine replies</p>
           <Badge tone={c.routine_enabled ? 'good' : 'muted'}>{c.routine_enabled ? 'On' : 'Off'}</Badge>
         </div>
         <p className="mt-1 text-sm">
-          Removals always take effect at once. When this is on, Sam also answers wrong numbers, sold, not interested,
+          Removals always take effect at once. When this is on, the system also answers wrong numbers, sold, not interested,
           &quot;who is this&quot; and &quot;is this a bot&quot; with WPIE&apos;s fixed lines (8am-9pm). Real replies always wait for your Approve.
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
           Red-team test: {c.redteam_total ? `${c.redteam_passed}/${c.redteam_total} ${c.redteam_ok ? 'passed' : 'FAILED'}` : 'not run yet'}
           {c.redteam_version && c.redteam_version !== c.agent_rules_version ? ' (for older rules)' : ''}
-          {c.agent_last_run_at ? ` - Sam last checked ${fmtDateTime(c.agent_last_run_at)}` : ' - Sam has not run yet'}
+          {c.agent_last_run_at ? ` - last checked ${fmtDateTime(c.agent_last_run_at)}` : ' - not checked yet'}
         </p>
         {canDecide && (
           c.routine_enabled ? (
             <Button className="mt-2" variant="outline" disabled={setRoutine.isPending} onClick={() => setRoutine.mutate(false)}>Turn routine replies off</Button>
           ) : (
             <Button className="mt-2" disabled={setRoutine.isPending || !c.redteam_ok}
-              onClick={() => { if (window.confirm('Let Sam send the routine replies himself?')) setRoutine.mutate(true) }}>
+              onClick={() => { if (window.confirm('Send routine replies automatically?')) setRoutine.mutate(true) }}>
               Turn routine replies on
             </Button>
           )
@@ -184,7 +184,7 @@ function SendingPanel({ canDecide }: { canDecide: boolean }) {
         <div className="mt-4 border-t pt-3">
           <p className="font-medium">Test phone</p>
           <p className="mt-1 text-sm">
-            Text the campaign number from this phone and Sam treats you as a sample owner
+            Text the campaign number from this phone and the system treats you as a sample owner
             ({c.test_phones.length ? fmtPhone(c.test_phones[0]) : 'none set'}). Your texts show as TEST in the Inbox and never touch a real lead.
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">

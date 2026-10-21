@@ -41,8 +41,8 @@ export default function Inbox() {
       <h1 className="text-xl font-semibold">Inbox</h1>
       <NotifyPanel />
       <p className="text-sm text-muted-foreground">
-        Every seller text from the last 30 days and the coming week. Sam answers the routine ones (removals, wrong numbers,
-        not interested); anything real waits here for your Approve. Nothing is forwarded to your phone.
+        Every seller text from the last 30 days and the coming week. Routine ones (removals, wrong numbers, not interested)
+        are answered automatically; anything real waits here for your Approve.
       </p>
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1" role="tablist" aria-label="Filter">
         {[{ id: 'all' as const, label: 'All' }, ...BUCKETS].map((b) => (

@@ -9,7 +9,7 @@ import type { ReplyDraft } from '@/lib/types'
 
 const KIND_LABEL: Record<ReplyDraft['kind'], string> = {
   removal: 'Removal - phone blocked',
-  routine: 'Routine - Sam can answer',
+  routine: 'Routine - can auto-answer',
   candidate: 'Real reply - needs you',
 }
 
@@ -35,7 +35,7 @@ export function DraftBox({ d, showFrom = false }: { d: ReplyDraft; showFrom?: bo
         {d.is_test && <Badge tone="bad">TEST - your phone</Badge>}
         <Badge tone={d.kind === 'candidate' ? 'warn' : d.kind === 'removal' ? 'bad' : 'info'}>{KIND_LABEL[d.kind]}</Badge>
         <Badge tone={tone}>{DRAFT_LABEL[d.status]}</Badge>
-        {d.intent && <span className="text-xs text-muted-foreground">Sam read it as: {intentText(d.intent)}</span>}
+        {d.intent && <span className="text-xs text-muted-foreground">Read as: {intentText(d.intent)}</span>}
       </div>
       {showFrom && (
         <p className="mt-1 text-xs text-muted-foreground">From {fmtPhone(d.phone10)} to {fmtPhone(d.our_number)} - {fmtDateTime(d.inbound_at)}</p>
@@ -46,7 +46,7 @@ export function DraftBox({ d, showFrom = false }: { d: ReplyDraft; showFrom?: bo
       {open && isOwner && (
         <div className="mt-2 space-y-2">
           <label className="block text-xs font-medium text-muted-foreground">
-            {d.body ? (d.kind === 'candidate' ? "Sam's draft - edit if you like" : 'Fixed reply') : 'No draft - write the reply'}
+            {d.body ? (d.kind === 'candidate' ? 'Draft reply - edit if you like' : 'Fixed reply') : 'No draft - write the reply'}
             <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} className="mt-1" />
           </label>
           <div className="flex flex-wrap gap-2">

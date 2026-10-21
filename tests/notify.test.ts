@@ -55,8 +55,8 @@ async function vapidKeys(): Promise<{ vapid: Vapid; publicKey: CryptoKey }> {
 describe('web push', () => {
   it('encrypts so the phone can decrypt it (RFC 8291)', async () => {
     const { sub, ua, auth } = await phoneSubscription()
-    const body = await encryptPayload(enc.encode(JSON.stringify({ title: 'Sam needs you', body: 'Dale' })), sub)
-    expect(JSON.parse(await decrypt(body, ua, auth))).toEqual({ title: 'Sam needs you', body: 'Dale' })
+    const body = await encryptPayload(enc.encode(JSON.stringify({ title: 'Reply needs you', body: 'Dale' })), sub)
+    expect(JSON.parse(await decrypt(body, ua, auth))).toEqual({ title: 'Reply needs you', body: 'Dale' })
   })
 
   it('signs a VAPID token the push service can verify (RFC 8292)', async () => {
@@ -135,9 +135,9 @@ describe('messages', () => {
   const d: ClaimedDraft = { id: 'd1', kind: 'first', is_test: false, phone10: '4145550177', inbound_body: 'Maybe. Depends on the price, the roof needs work and the tenants leave in March',
     intent: 'price_first', note: 'a real conversation', body: 'Thanks - is the place still yours?', owner_name: 'DALE NOVAK', property_address: '2847 N Burleigh St',
     thread: [{ who: 'us', body: 'Hi Dale, Colin here.', at: '' }, { who: 'them', body: 'Maybe.', at: '' }] }
-  it('reads "Sam needs you / Dale, street: what they said" and opens the card', () => {
+  it('reads "Reply needs you / Dale, street: what they said" and opens the card', () => {
     const m = pushMessage(d, 'https://deals.junkcarsmequon.com')
-    expect(m.title).toBe('Sam needs you')
+    expect(m.title).toBe('Reply needs you')
     expect(m.body).toMatch(/^Dale, 2847 N Burleigh St: Maybe\. Depends on the price/)
     expect(m.body.length).toBeLessThan(100)
     expect(m.url).toBe('https://deals.junkcarsmequon.com/inbox#draft-d1')
@@ -146,9 +146,9 @@ describe('messages', () => {
   })
   it('emails the thread, the suggestion and why, with a link that only opens the card', () => {
     const e = emailFor(d, 'https://deals.junkcarsmequon.com')
-    expect(e.subject).toBe('Sam needs you: DALE NOVAK, 2847 N Burleigh St')
+    expect(e.subject).toBe('Reply needs you: DALE NOVAK, 2847 N Burleigh St')
     expect(e.text).toMatch(/Them: Maybe\./)
-    expect(e.text).toMatch(/Sam suggests: Thanks - is the place still yours\?/)
+    expect(e.text).toMatch(/Suggested reply: Thanks - is the place still yours\?/)
     expect(e.html).toMatch(/href="https:\/\/deals\.junkcarsmequon\.com\/inbox#draft-d1"/)
     expect([...e.html.matchAll(/href="([^"]+)"/g)].map((m) => m[1])).toEqual(['https://deals.junkcarsmequon.com/inbox#draft-d1'])
     expect(e.text).toMatch(/Nothing is sent from this email/)
@@ -197,8 +197,8 @@ describe('notify rules on the database', () => {
   it('one push and one email per waiting draft, never for a routine reply, never twice', async () => {
     const s = await runNotifications({ ...deps(), now: at('2026-10-22T17:00:00Z') })
     expect(s).toMatchObject({ drafts: 1, pushes_ok: 1, emails: 1 })
-    expect(pushes).toEqual([{ endpoint: 'https://push.example/0', title: 'Sam needs you' }])
-    expect(emails).toEqual(['Sam needs you: (414) 555-0177'])
+    expect(pushes).toEqual([{ endpoint: 'https://push.example/0', title: 'Reply needs you' }])
+    expect(emails).toEqual(['Reply needs you: (414) 555-0177'])
     await runNotifications({ ...deps(), now: at('2026-10-22T17:05:00Z') })
     expect(pushes.length).toBe(1)
   })
@@ -208,7 +208,7 @@ describe('notify rules on the database', () => {
     await runNotifications({ ...deps(), now: at('2026-10-22T18:30:00Z') })
     expect(pushes.length).toBe(1)
     await runNotifications({ ...deps(), now: at('2026-10-22T19:01:00Z') })
-    expect(pushes.map((p) => p.title)).toEqual(['Sam needs you', 'Still waiting: Sam needs you'])
+    expect(pushes.map((p) => p.title)).toEqual(['Reply needs you', 'Still waiting: reply needs you'])
     expect(emails.length).toBe(1)
     await runNotifications({ ...deps(), now: at('2026-10-22T23:00:00Z') })
     expect(pushes.length).toBe(2)

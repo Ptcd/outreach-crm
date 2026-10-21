@@ -47,7 +47,47 @@
   --radius: var(--radius);
 }
 
+/* Dark mode follows the phone's setting. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 96%;
+    --card: 222 40% 11%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 40% 11%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 7%;
+    --secondary: 217 33% 18%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 70%;
+    --accent: 217 33% 20%;
+    --accent-foreground: 210 40% 96%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 22%;
+    --input: 217 33% 28%;
+    --ring: 213 27% 84%;
+  }
+  :root { color-scheme: dark; }
+}
+
 @layer base {
   * { @apply border-border; }
-  body { @apply bg-background text-foreground; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    @apply bg-background text-foreground;
+    overflow-x: clip;            /* never scroll sideways (sticky bars keep working, unlike hidden) */
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Phones: body text at 16px, small print at 14px, so nothing is squinted at or zoomed. */
+  @media (max-width: 639px) {
+    .text-sm { font-size: 1rem; line-height: 1.5rem; }
+    .text-xs { font-size: 0.875rem; line-height: 1.25rem; }
+    .text-\[11px\] { font-size: 0.8125rem; }
+  }
 }
+
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.pt-safe { padding-top: env(safe-area-inset-top); }

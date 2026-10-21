@@ -1,7 +1,7 @@
 {
   "name": "WPIE",
   "short_name": "WPIE",
-  "description": "Seller texts, Sam's drafts and approvals",
+  "description": "Seller texts, draft replies and approvals",
   "start_url": "/inbox",
   "scope": "/",
   "display": "standalone",

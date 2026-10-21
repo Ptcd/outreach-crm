@@ -2,7 +2,7 @@
 // Source: WPIE repo (claude/real estate): wpie/reply/rules.py (_INTENTS = classify, the negation
 // rule, is_spanish, CARRIER_KEYWORDS) and wpie/reply/brain.py (routing regexes and the fixed lines
 // the server may send on its own), converted by tools/export_reply_prompt.py --app-dir
-// from WPIE commit 847004e on 2026-10-21 (agent Sam, owner Colin Merrill).
+// from WPIE commit 630eab5 on 2026-10-21 (agent Sam, owner Colin Merrill).
 // replyBrain.ts holds the small algorithm; tests prove it agrees with Python.
 
 import type { RegexSpec } from './replyRules.generated.ts'
@@ -56,16 +56,16 @@ export const CONDITIONAL_RE: RegexSpec = { source: "\\bunless\\b|\\bonly\\s+if\\
 export const BARE_NO_RE: RegexSpec = { source: "\\W*(?:no|nope|nah|none|not really)\\W*", flags: "i" };
 export const NOT_ANYMORE_RE: RegexSpec = { source: "^\\W*(?:no\\W+)?not\\s+any\\s*more\\W*(?=\\n?$)", flags: "i" };
 
-export const DNC_LINE = "Done - you won't hear from Colin or me again. Sorry to have bothered you.";
-export const ES_DNC_LINE = "Listo - no le volveremos a escribir. Perdón por la molestia. - Sam, asistente de Colin";
-export const HOSTILE_LINE = "Understood, and sorry to have bothered you. We won't reach out again.";
-export const WRONG_NUMBER_LINE = "Sorry about that - looks like we had the wrong number. I'll make sure you don't hear from us again. Take care.";
-export const ES_WRONG_LINE = "Perdón por la molestia - parece que tenemos el número equivocado. No le escribiremos más. - Sam, asistente de Colin";
-export const SOLD_LINE = "Congratulations, and thanks for letting me know. I'll update my notes so you don't hear from us about it. Take care.";
-export const ES_SOLD_LINE = "Felicidades, y gracias por avisarme. Ya no le escribiremos sobre la casa. - Sam, asistente de Colin";
+export const DNC_LINE = "Done - you won't hear from me again. Sorry to have bothered you.";
+export const ES_DNC_LINE = "Listo - no le volveré a escribir. Perdón por la molestia. - Colin";
+export const HOSTILE_LINE = "Understood, and sorry to have bothered you. I won't reach out again.";
+export const WRONG_NUMBER_LINE = "Sorry about that - looks like I had the wrong number. I'll make sure you don't hear from me again. Take care.";
+export const ES_WRONG_LINE = "Perdón por la molestia - parece que tengo el número equivocado. No le escribiré más. - Colin";
+export const SOLD_LINE = "Congratulations, and thanks for letting me know. I'll update my notes so you don't hear from me about it. Take care.";
+export const ES_SOLD_LINE = "Felicidades, y gracias por avisarme. Ya no le escribiré sobre la casa. - Colin";
 export const EXIT_QUESTION = "Completely understand - thanks for letting me know. Before I let you go: do you own anything else you'd ever consider selling?";
 export const CLOSE_LINE = "Got it - thanks for your time. If anything ever changes, you can always text or call this number. Take care.";
-export const ES_NO_LINE = "Entendido, gracias por avisarme. Si algo cambia, puede escribir a este número. Que le vaya bien. - Sam, asistente de Colin";
-export const WHO_LINE = "Fair question. I'm Sam, Colin Merrill's assistant - he buys houses around here himself{where}. Your address is public record and the number came from a data provider. If you'd rather not hear from us, just say so. Otherwise, is that still your place?";
-export const WHO_NOT_SELLING_LINE = "Fair question. I'm Sam, Colin Merrill's assistant - he buys houses around here himself, your address is public record and the number came from a data provider. Understood on not selling - thanks for letting me know, and take care.";
-export const BOT_LINE = "Fair question - yes, I'm an automated assistant. Colin set me up to take notes so you don't have to repeat yourself, and he calls personally on anything that goes further. Happy to keep going here, or he can just call you - whichever you prefer.";
+export const ES_NO_LINE = "Entendido, gracias por avisarme. Si algo cambia, puede escribir a este número. Que le vaya bien. - Colin";
+export const WHO_LINE = "Fair question - this is Colin Merrill. I buy houses around here myself{where}. Your address is public record and the number came from a data provider. If you'd rather not hear from me, just say so. Otherwise, is that still your place?";
+export const WHO_NOT_SELLING_LINE = "Fair question - this is Colin Merrill. I buy houses around here myself, your address is public record and the number came from a data provider. Understood on not selling - thanks for letting me know, and take care.";
+export const BOT_LINE = "Fair question - I use an automated assistant to help me keep up with texts and notes, and I handle anything that goes further myself. Happy to keep going here, or I can just call you - whichever you prefer.";
