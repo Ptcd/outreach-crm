@@ -23,7 +23,7 @@ vi.mock('@/providers/AuthProvider', () => ({
   useAuth: () => ({
     user: { id: 'u1', email: 'colin@example.com' },
     member: { email: 'colin@example.com', role: 'owner', person: 'colin', display_name: 'Colin' },
-    isOwner: true, loading: false, signOut: vi.fn(), sendMagicLink: vi.fn(),
+    isOwner: true, loading: false, signOut: vi.fn(), recovering: false, signInWithPassword: vi.fn(), sendPasswordLink: vi.fn(), setPassword: vi.fn(),
   }),
 }))
 vi.mock('@/lib/queries', () => ({
@@ -132,5 +132,21 @@ describe('pages render', () => {
     at('/scoreboard', '/scoreboard', <Scoreboard />)
     expect(screen.getByText('92.0%')).toBeTruthy()
     expect(screen.getByText('Walks per contract')).toBeTruthy()
+  })
+})
+
+describe('login with one app password', () => {
+  it('asks only for the app password, never an email', async () => {
+    const { default: Login } = await import('@/pages/Login')
+    const { container } = render(<Login />)
+    expect(screen.getByLabelText('App password')).toBeTruthy()
+    expect(container.querySelector('input[type="email"]')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Set or reset the app password' })).toBeTruthy()
+  })
+  it('sets a new password from the email link, at least 12 characters', async () => {
+    const { default: SetPassword } = await import('@/pages/SetPassword')
+    render(<SetPassword />)
+    expect(screen.getByLabelText('New password')).toBeTruthy()
+    expect(screen.getByText(/At least 12 characters/)).toBeTruthy()
   })
 })

@@ -53,6 +53,58 @@ Redirect URLs, and set it as Site URL once it is the real address. Step 3 and 4 
 Either merge `wpie-live` into `main` (replaces the old CRM; it is kept at tag
 `pre-wpie-repurpose-2026-10-20`), or Vercel > Settings > Git > Production Branch = `wpie-live`.
 
+## The address: deals.junkcarsmequon.com (Colin, 2026-10-21)
+
+Checked 2026-10-21: junkcarsmequon.com's DNS is at **Hostinger** (nameservers `ns1/ns2.dns-parking.com`),
+not Vercel. The apex points at Vercel (`76.76.21.21`) and `www` is a CNAME to `cname.vercel-dns.com`, both
+for pm-phone. In Vercel the domain belongs to the team that holds pm-phone (`team-0257d0aa`), while this
+app's project `outreach-crm` is in **"Colin's projects"**, so Vercel will ask for one extra TXT record to
+prove the subdomain is yours. Nothing was added yet: the project's production deployment is still the
+2025 CRM, so adding the name before A1 and A6 would put the old CRM on it.
+
+After A1 and A6 (the WPIE app is the project's production deployment):
+
+**D1. Vercel  [Colin signs in: vercel.com]** team "Colin's projects" > `outreach-crm` > Settings > Domains >
+Add > `deals.junkcarsmequon.com` > Add. Vercel shows the DNS records it wants: a **CNAME** for `deals` and,
+because the domain lives in the other team, a **TXT** record named `_vercel`. Leave that page open.
+
+**D2. Hostinger  [Colin signs in: hpanel.hostinger.com]** Domains > junkcarsmequon.com > DNS / Nameservers >
+DNS records. Add:
+- Type **CNAME**, Name `deals`, Target `cname.vercel-dns.com`, TTL default.
+- Type **TXT**, Name `_vercel`, Value exactly as Vercel shows it (starts `vc-domain-verify=`).
+Do not touch the existing `@` A record or `www` CNAME: those are pm-phone.
+
+**D3.** Back in Vercel, the domain turns "Valid Configuration" within a few minutes and Vercel issues the
+certificate by itself.
+
+**D4. Supabase  [Colin signs in: supabase.com]** Authentication > URL Configuration:
+Site URL `https://deals.junkcarsmequon.com`; Redirect URLs add `https://deals.junkcarsmequon.com/**`.
+(The password-setting email sends people back to that address.)
+
+## The app password (Colin, 2026-10-21: "an app password not users")
+
+The login screen asks for one password and nothing else. Under the hood it signs into ONE Supabase
+account (Colin's, owner role), so the database's access rules keep working. The password lives only in
+Supabase Auth: it is not in this repo, not in Vercel and not in the page. Anyone with the password acts as
+Colin (owner): they can approve texts and turn sending on. Separate roles for Thalia can come back later.
+
+**P1. Which account  [Colin signs in: vercel.com]** `outreach-crm` > Settings > Environment Variables > Add
+`VITE_WPIE_APP_EMAIL` = the email of Colin's Supabase login for this app (the one in `team_members` with
+role `owner`), for Production and Preview. Redeploy. This is not a secret; it keeps the email out of the
+public repo.
+
+**P2. Set the password, typed only by Colin.** Either:
+- In the app: tap **Set or reset the app password** on the login screen. A link goes to that email; open it
+  on the same device; the app shows **Set the app password** (12+ characters, twice). Done; or
+- Supabase > Authentication > Users: if the account is not there yet, **Add user > Create new user** with
+  that email, type the password, tick **Auto Confirm User**. If it is there, its menu > **Send password
+  recovery**, then as above.
+Supabase's built-in mailer only sends a few emails an hour and only to the project team's own addresses,
+which is fine for this one account.
+
+**P3.** Supabase > Authentication > Sign In / Providers > Email: keep it on (it covers passwords); keep
+"Allow new users to sign up" **off**.
+
 ## Sending from the app (WPIE docs/APP_SENDING.md)
 
 Three locks, all OFF until Colin says go:
@@ -99,7 +151,7 @@ On the laptop, `python -m wpie.live.sync pull` copies every app send into the ca
 
 Authentication > Sign In / Providers:
 
-1. Email: on. Magic link is the sign-in method; there are no passwords.
+1. Email: on. Sign-in is one shared app password (see "The app password" above).
 2. Turn **off** "Allow new users to sign up". Only people you invite can get in.
 
 Authentication > URL Configuration:
@@ -117,8 +169,8 @@ Authentication > URL Configuration:
    | Thalia's email | caller | thalia | Thalia |
 
 2. Authentication > Users > Add user > "Send invitation", once for Colin's email and once for
-   Thalia's. Each person clicks the link in the invite email once; after that they sign in from
-   the app's login page with "Email me a sign-in link".
+   Thalia's. (Superseded 2026-10-21: everyone now signs in with the one app password, which
+   uses Colin's account; see "The app password".)
 
 What each role can do (enforced in the database, not just the screens):
 

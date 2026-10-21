@@ -3,6 +3,7 @@ import { useAuth } from '@/providers/AuthProvider'
 import { supabaseConfigured } from '@/lib/supabaseClient'
 import { Layout } from '@/components/Layout'
 import Login from '@/pages/Login'
+import SetPassword from '@/pages/SetPassword'
 import Today from '@/pages/Today'
 import Pipeline from '@/pages/Pipeline'
 import LeadDetail from '@/pages/LeadDetail'
@@ -15,7 +16,7 @@ function Centered({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const { user, member, loading, signOut } = useAuth()
+  const { user, member, loading, recovering, signOut } = useAuth()
 
   if (!supabaseConfigured) {
     return (
@@ -31,12 +32,13 @@ export default function App() {
   }
   if (loading) return <Centered>Loading...</Centered>
   if (!user) return <Login />
+  if (recovering) return <SetPassword />
   if (!member) {
     return (
       <Centered>
         <div className="max-w-md space-y-3">
           <p>
-            You are signed in as {user.email}, but this email is not on the WPIE team. Ask Colin to add it.
+            This account is not on the WPIE team. Ask Colin to add it in Supabase (team_members).
           </p>
           <button className="underline" onClick={() => void signOut()}>
             Sign out

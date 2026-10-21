@@ -8,6 +8,11 @@ const url = (env.NEXT_PUBLIC_SUPABASE_URL ?? env.VITE_SUPABASE_URL) as string | 
 const anonKey = (env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
   env.VITE_SUPABASE_ANON_KEY) as string | undefined
 
+/** The one shared app account (Colin's decision 2026-10-21: "an app password not users").
+ *  Set on Vercel as VITE_WPIE_APP_EMAIL so it is not in this public repo. It is not a secret
+ *  (it ends up in the built page); the password is, and it lives only in Supabase Auth. */
+export const appLoginEmail = ((env.VITE_WPIE_APP_EMAIL ?? env.NEXT_PUBLIC_WPIE_APP_EMAIL) as string | undefined)?.trim().toLowerCase() || ''
+
 /** True when the Vercel / local env has both Supabase settings. */
 export const supabaseConfigured = Boolean(url && anonKey)
 
