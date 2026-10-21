@@ -1,12 +1,19 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { appLoginEmail, supabase, supabaseConfigured } from '@/lib/supabaseClient'
 import type { TeamMember } from '@/lib/types'
 
+/** Where the team check stands. 'checking' must never be shown as "not on the team" (2026-10-21:
+ *  Adil saw that screen while the lookup was still in flight on a phone connection). */
+export type MemberStatus = 'idle' | 'checking' | 'ok' | 'none' | 'error'
+
 interface AuthContextType {
   user: User | null
   session: Session | null
-  member: TeamMember | null // null = signed in but not on the team (or still loading)
+  member: TeamMember | null
+  memberStatus: MemberStatus
+  memberError: string | null
+  retryMember: () => void
   loading: boolean
   isOwner: boolean
   recovering: boolean // opened from a "set the app password" email: show the new-password form
@@ -18,30 +25,60 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [member, setMember] = useState<TeamMember | null>(null)
+  const [memberStatus, setMemberStatus] = useState<MemberStatus>('idle')
+  const [memberError, setMemberError] = useState<string | null>(null)
   const [loading, setLoading] = useState(supabaseConfigured)
   const [recovering, setRecovering] = useState(false)
+  const checkedFor = useRef<string | null>(null)       // the email the current member answer belongs to
+
+  const checkMember = useCallback(async (email: string) => {
+    setMemberStatus('checking')
+    setMemberError(null)
+    let last = ''
+    for (let attempt = 0; attempt < 3; attempt++) {        // a weak phone signal gets three tries
+      if (attempt) await sleep(800 * attempt)
+      const { data, error } = await supabase
+        .from('team_members')
+        .select('email, role, person, display_name')
+        .eq('email', email)
+        .maybeSingle()
+      if (!error) {
+        checkedFor.current = email
+        setMember((data as TeamMember | null) ?? null)
+        setMemberStatus(data ? 'ok' : 'none')
+        return
+      }
+      last = error.message
+    }
+    checkedFor.current = null
+    setMember(null)
+    setMemberError(last || 'no answer from the database')
+    setMemberStatus('error')
+  }, [])
 
   useEffect(() => {
     if (!supabaseConfigured) return
     let alive = true
     const load = async (s: Session | null) => {
+      if (!alive) return
       setSession(s)
-      if (!s?.user?.email) {
+      const email = s?.user?.email?.toLowerCase()
+      if (!email) {
+        checkedFor.current = null
         setMember(null)
+        setMemberStatus('idle')
         setLoading(false)
         return
       }
-      const { data } = await supabase
-        .from('team_members')
-        .select('email, role, person, display_name')
-        .eq('email', s.user.email.toLowerCase())
-        .maybeSingle()
-      if (!alive) return
-      setMember((data as TeamMember | null) ?? null)
       setLoading(false)
+      // A token refresh (hourly) or the same login again keeps the answer we already have.
+      if (checkedFor.current === email) return
+      await checkMember(email)
     }
     supabase.auth.getSession().then(({ data }) => load(data.session))
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
@@ -53,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       alive = false
       sub.subscription.unsubscribe()
     }
-  }, [])
+  }, [checkMember])
 
   // One shared app account: the login screen asks only for the app password.
   const notSetUp = 'The app account is not set up yet (VITE_WPIE_APP_EMAIL on Vercel, see DEPLOY.md).'
@@ -77,15 +114,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
+    checkedFor.current = null
     await supabase.auth.signOut()
   }
 
+  const email = session?.user?.email?.toLowerCase()
   return (
     <AuthContext.Provider
       value={{
         user: session?.user ?? null,
         session,
         member,
+        memberStatus,
+        memberError,
+        retryMember: () => { if (email) void checkMember(email) },
         loading,
         isOwner: member?.role === 'owner',
         recovering,

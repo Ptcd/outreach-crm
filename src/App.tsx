@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from '@/providers/AuthProvider'
 import { supabaseConfigured } from '@/lib/supabaseClient'
 import { Layout } from '@/components/Layout'
+import { Button } from '@/components/ui/button'
 import Login from '@/pages/Login'
 import SetPassword from '@/pages/SetPassword'
 import Today from '@/pages/Today'
@@ -12,11 +13,11 @@ import Inbox from '@/pages/Inbox'
 import Scoreboard from '@/pages/Scoreboard'
 
 function Centered({ children }: { children: React.ReactNode }) {
-  return <div className="flex min-h-screen items-center justify-center p-6 text-center text-sm">{children}</div>
+  return <div className="flex min-h-dvh items-center justify-center p-6 text-center text-base">{children}</div>
 }
 
 export default function App() {
-  const { user, member, loading, recovering, signOut } = useAuth()
+  const { user, member, memberStatus, memberError, retryMember, loading, recovering, signOut } = useAuth()
 
   if (!supabaseConfigured) {
     return (
@@ -33,16 +34,30 @@ export default function App() {
   if (loading) return <Centered>Loading...</Centered>
   if (!user) return <Login />
   if (recovering) return <SetPassword />
-  if (!member) {
+  if (memberStatus === 'checking' || memberStatus === 'idle') return <Centered>Signing you in...</Centered>
+  if (memberStatus === 'error') {
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false
     return (
       <Centered>
         <div className="max-w-md space-y-3">
-          <p>
-            This account is not on the WPIE team. Ask Colin to add it in Supabase (team_members).
-          </p>
-          <button className="underline" onClick={() => void signOut()}>
-            Sign out
-          </button>
+          <h1 className="text-lg font-semibold">Signed in, but WPIE could not load your access</h1>
+          <p>{offline ? 'This phone is offline. Check the signal or Wi-Fi, then try again.' : 'The connection dropped or the server did not answer.'}</p>
+          {memberError && <p className="text-sm text-muted-foreground">Details: {memberError}</p>}
+          <div className="flex justify-center gap-2">
+            <Button className="h-12 px-6" onClick={retryMember}>Try again</Button>
+            <Button className="h-12 px-6" variant="outline" onClick={() => void signOut()}>Sign out</Button>
+          </div>
+        </div>
+      </Centered>
+    )
+  }
+  if (memberStatus === 'none' || !member) {
+    return (
+      <Centered>
+        <div className="max-w-md space-y-3">
+          <h1 className="text-lg font-semibold">This login is not on the WPIE team list</h1>
+          <p>Signed in as {user.email}, but that address is not in the team list. Colin can add it in Supabase (team_members).</p>
+          <Button className="h-12 px-6" variant="outline" onClick={() => void signOut()}>Sign out</Button>
         </div>
       </Centered>
     )
