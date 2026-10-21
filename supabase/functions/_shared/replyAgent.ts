@@ -88,7 +88,7 @@ export async function runReplyAgent(opts: {
   if (opts.control.redteam_version !== version) {
     const r = scoreRedteam(opts.redteamRows)
     await opts.rpc('record_redteam', { p_version: version, p_passed: r.passed, p_total: r.total, p_ok: r.ok,
-      p_detail: { handled_by_sam: r.handled_by_sam, to_colin: r.to_colin, missed_removals: r.missed_removals,
+      p_detail: { handled_automatically: r.handled_automatically, to_colin: r.to_colin, missed_removals: r.missed_removals,
         failures: r.failures.slice(0, 40) }, p_now: now().toISOString() })
     s.redteam = `${r.passed}/${r.total}${r.ok ? ' passed' : ' FAILED'}`
   }

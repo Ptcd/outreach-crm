@@ -272,7 +272,7 @@ begin
    where id = p_id;
   if p_status = 'sent' and d.lead_id is not null then
     insert into public.messages (lead_id, direction, channel, body, from_number, to_number, provider_sid, source_key, status, sent_at, created_by)
-    values (d.lead_id, 'out', 'sms', d.sent_body, d.our_number, '+1' || d.phone10, p_sid, 'sam:' || d.id, 'sent', p_now, null)
+    values (d.lead_id, 'out', 'sms', d.sent_body, d.our_number, '+1' || d.phone10, p_sid, 'reply:' || d.id, 'sent', p_now, null)
     on conflict (source_key) do nothing;
   end if;
   return jsonb_build_object('ok', true);

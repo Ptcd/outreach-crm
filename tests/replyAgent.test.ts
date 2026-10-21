@@ -131,8 +131,8 @@ describe('the reply agent, end to end with no real text', () => {
     const twice = await approveReply({ rpc, env: LIVE, twilio: tw, id: cand.id, text: cand.body!, actor: 'Colin', now: () => NOON })
     expect(twice).toMatchObject({ outcome: 'refused', reason: 'already sent' })
     expect(tw.sends).toEqual([{ to: '+14145550177', body: cand.body, from: CAMPAIGN }])
-    const m = await db.query(`select source_key, provider_sid from public.messages where source_key like 'sam:%'`)
-    expect(m.rows).toEqual([{ source_key: `sam:${cand.id}`, provider_sid: 'SMr1' }])
+    const m = await db.query(`select source_key, provider_sid from public.messages where source_key like 'reply:%'`)
+    expect(m.rows).toEqual([{ source_key: `reply:${cand.id}`, provider_sid: 'SMr1' }])
   })
 
   it('a removal suppresses every phone of the owner at once, whatever the switches say', async () => {

@@ -167,7 +167,7 @@ export interface RedteamResult {
   version: string
   total: number
   passed: number
-  handled_by_sam: number
+  handled_automatically: number
   to_colin: number
   missed_removals: number
   failures: { id: string; why: string; text: string; reply: string | null }[]
@@ -183,7 +183,7 @@ const PERSONA_ADDRESS: Record<string, string> = { dale: '2847 N Burleigh St', ri
  *  allows. A row routed to Colin passes those content checks by construction (he reads
  *  and approves every such reply). ok = every row passes. */
 export function scoreRedteam(rows: RedteamRow[]): RedteamResult {
-  const out: RedteamResult = { version: rulesVersion(), total: rows.length, passed: 0, handled_by_sam: 0, to_colin: 0,
+  const out: RedteamResult = { version: rulesVersion(), total: rows.length, passed: 0, handled_automatically: 0, to_colin: 0,
     missed_removals: 0, failures: [], ok: false }
   for (const r of rows) {
     const d = decide({ inbound: r.text, priorInbound: r.setup ?? [], lastAgentText: null,
@@ -193,7 +193,7 @@ export function scoreRedteam(rows: RedteamRow[]): RedteamResult {
     if (!r.expect.removal && d.removal && !r.expect.outcomes.includes('dnc')) why.push('removal the fixture does not want')
     if (d.kind === 'candidate') out.to_colin += 1
     else {
-      out.handled_by_sam += 1
+      out.handled_automatically += 1
       const reply = d.reply ?? ''
       if (reply && r.expect.must && !new RegExp(r.expect.must, 'i').test(reply)) why.push(`missing /${r.expect.must}/`)
       if (reply && r.expect.must_not && new RegExp(r.expect.must_not, 'i').test(reply)) why.push(`has /${r.expect.must_not}/`)

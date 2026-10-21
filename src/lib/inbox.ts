@@ -55,7 +55,7 @@ export function threadOf(x: InboxLead): ThreadLine[] {
   }
   for (const d of x.drafts ?? []) {
     if (d.status === 'sent' && d.sent_body && d.sent_at && !x.messages.some((m) => m.direction === 'out' && (m.body ?? '') === d.sent_body)) {
-      lines.push({ key: `sam-${d.id}`, who: 'us', body: d.sent_body, at: d.sent_at, note: d.kind === 'routine' ? 'auto' : undefined })
+      lines.push({ key: `reply-${d.id}`, who: 'us', body: d.sent_body, at: d.sent_at, note: d.kind === 'routine' ? 'auto' : undefined })
     }
   }
   for (const t of x.inbound) {

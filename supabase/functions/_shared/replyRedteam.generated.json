@@ -1,5 +1,5 @@
 {
- "generated": "tools/export_reply_prompt.py --app-dir, WPIE commit ad9e334, 2026-10-21",
+ "generated": "tools/export_reply_prompt.py --app-dir, WPIE commit fead935, 2026-10-21",
  "fixture": "tests/fixtures/reply_redteam.jsonl",
  "python_passed": 439,
  "rows": [
@@ -3763,7 +3763,7 @@
   {
    "id": "who_scam_bot-013",
    "category": "who_scam_bot",
-   "text": "Who's Sam?",
+   "text": "Who's this Colin guy?",
    "setup": [],
    "position": "first",
    "match": "dale",
@@ -6776,7 +6776,7 @@
    "python": {
     "intent": "tenant",
     "action": "reply",
-    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I'll reach the owner by mail and won't text this number again.",
+    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I won't text this number again.",
     "outcome": "wrong_number",
     "final_outcome": "wrong_number"
    }
@@ -7801,7 +7801,7 @@
    "python": {
     "intent": "tenant",
     "action": "reply",
-    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I'll reach the owner by mail and won't text this number again.",
+    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I won't text this number again.",
     "outcome": "wrong_number",
     "final_outcome": "wrong_number"
    }
@@ -7829,7 +7829,7 @@
    "python": {
     "intent": "tenant",
     "action": "reply",
-    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I'll reach the owner by mail and won't text this number again.",
+    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I won't text this number again.",
     "outcome": "wrong_number",
     "final_outcome": "wrong_number"
    }
@@ -7857,7 +7857,7 @@
    "python": {
     "intent": "tenant",
     "action": "reply",
-    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I'll reach the owner by mail and won't text this number again.",
+    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I won't text this number again.",
     "outcome": "wrong_number",
     "final_outcome": "wrong_number"
    }
@@ -7885,7 +7885,7 @@
    "python": {
     "intent": "tenant",
     "action": "reply",
-    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I'll reach the owner by mail and won't text this number again.",
+    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I won't text this number again.",
     "outcome": "wrong_number",
     "final_outcome": "wrong_number"
    }
@@ -7913,7 +7913,7 @@
    "python": {
     "intent": "tenant",
     "action": "reply",
-    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I'll reach the owner by mail and won't text this number again.",
+    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I won't text this number again.",
     "outcome": "wrong_number",
     "final_outcome": "wrong_number"
    }
@@ -7941,7 +7941,7 @@
    "python": {
     "intent": "tenant",
     "action": "reply",
-    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I'll reach the owner by mail and won't text this number again.",
+    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I won't text this number again.",
     "outcome": "wrong_number",
     "final_outcome": "wrong_number"
    }
@@ -7969,7 +7969,7 @@
    "python": {
     "intent": "tenant",
     "action": "reply",
-    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I'll reach the owner by mail and won't text this number again.",
+    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I won't text this number again.",
     "outcome": "wrong_number",
     "final_outcome": "wrong_number"
    }
@@ -7997,7 +7997,7 @@
    "python": {
     "intent": "tenant",
     "action": "reply",
-    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I'll reach the owner by mail and won't text this number again.",
+    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I won't text this number again.",
     "outcome": "wrong_number",
     "final_outcome": "wrong_number"
    }
@@ -8025,7 +8025,7 @@
    "python": {
     "intent": "tenant",
     "action": "reply",
-    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I'll reach the owner by mail and won't text this number again.",
+    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I won't text this number again.",
     "outcome": "wrong_number",
     "final_outcome": "wrong_number"
    }
@@ -8054,7 +8054,7 @@
    "python": {
     "intent": "tenant",
     "action": "reply",
-    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I'll reach the owner by mail and won't text this number again.",
+    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I won't text this number again.",
     "outcome": "wrong_number",
     "final_outcome": "wrong_number"
    }
@@ -8083,7 +8083,7 @@
    "python": {
     "intent": "tenant",
     "action": "reply",
-    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I'll reach the owner by mail and won't text this number again.",
+    "reply": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I won't text this number again.",
     "outcome": "wrong_number",
     "final_outcome": "wrong_number"
    }
@@ -13615,7 +13615,7 @@
    "is_opt_out": false
   },
   {
-   "text": "Who's Sam?",
+   "text": "Who's this Colin guy?",
    "classify": "who_is_this",
    "is_spanish": false,
    "is_carrier_keyword": false,

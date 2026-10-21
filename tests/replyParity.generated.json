@@ -1,5 +1,5 @@
 {
- "generated": "tools/export_reply_prompt.py, WPIE commit a255e21, 2026-10-21",
+ "generated": "tools/export_reply_prompt.py, WPIE commit fead935, 2026-10-21",
  "fixture": "tests/fixtures/reply_redteam.jsonl",
  "opt_out": [
   {
@@ -535,7 +535,7 @@
    "python_is_opt_out": false
   },
   {
-   "text": "Who's Sam?",
+   "text": "Who's this Colin guy?",
    "python_is_opt_out": false
   },
   {
@@ -2505,7 +2505,7 @@
    "python_hits": []
   },
   {
-   "text": "Who's Sam?",
+   "text": "Who's this Colin guy?",
    "python_hits": []
   },
   {
@@ -3731,15 +3731,15 @@
    "python_hits": []
   },
   {
-   "text": "This is Sam, Colin's assistant. Done - you won't hear from Colin or me again. Sorry to have bothered you.",
+   "text": "This is Colin Merrill. Done - you won't hear from me again. Sorry to have bothered you.",
    "python_hits": []
   },
   {
-   "text": "Hi, this is Sam, Colin's assistant. Understood, and sorry to have bothered you. We won't reach out again.",
+   "text": "Hi, this is Colin Merrill. Understood, and sorry to have bothered you. I won't reach out again.",
    "python_hits": []
   },
   {
-   "text": "Fair question. I'm Sam, Colin Merrill's assistant - he buys houses around here himself on N Burleigh St. Your address is public record and the number came from a data provider. If you'd rather not hear from us, just say so. Otherwise, is that still your place?",
+   "text": "Fair question - this is Colin Merrill. I buy houses around here myself on N Burleigh St. Your address is public record and the number came from a data provider. If you'd rather not hear from me, just say so. Otherwise, is that still your place?",
    "python_hits": []
   },
   {
@@ -3759,15 +3759,15 @@
    "python_hits": []
   },
   {
-   "text": "Thanks for sharing that. Colin would rather hear the rest from you himself - what time works for a quick call today or tomorrow? Happy to keep going here if you'd rather text.",
+   "text": "Thanks for sharing that. I'd rather hear the rest from you on the phone - what time works for a quick call today or tomorrow? Happy to keep going here if you'd rather text.",
    "python_hits": []
   },
   {
-   "text": "Perfect - Colin will call you tomorrow at 10am at this number. Thanks, Dale.",
+   "text": "Perfect - I'll call you tomorrow at 10am at this number. Thanks, Dale.",
    "python_hits": []
   },
   {
-   "text": "Hi Dale, this is Sam, Colin's assistant. Fair question. I don't have a number for you - Colin handles all the pricing himself and won't guess before he knows more about the place. If you have a figure in mind, what is it? That helps him more than anything.",
+   "text": "Hi Dale, this is Colin Merrill. Fair question. I don't have a number for you yet - I won't guess before I know more about the place. If you have a figure in mind, what is it? That helps me more than anything.",
    "python_hits": []
   },
   {
@@ -3779,11 +3779,11 @@
    "python_hits": []
   },
   {
-   "text": "Hi Dale, this is Sam, Colin's assistant. Thanks, I've written that down exactly for Colin. He does all the pricing himself, so I can't say yes or no to a number by text. Is selling something you're actively thinking about?",
+   "text": "Hi Dale, this is Colin Merrill. Thanks, I've written that down exactly. I don't say yes or no to a number by text before I know more about the place. Is selling something you're actively thinking about?",
    "python_hits": []
   },
   {
-   "text": "Hi Dale, this is Sam, Colin's assistant. Makes sense to want a sense of value - I'm just not the right source for that. Colin buys as-is, which usually means less than a listed sale but no repairs, showings or waiting. Is speed or ease part of it for you?",
+   "text": "Hi Dale, this is Colin Merrill. Makes sense to want a sense of value - I'm just not the right source for that. I buy as-is, which usually means less than a listed sale but no repairs, showings or waiting. Is speed or ease part of it for you?",
    "python_hits": []
   },
   {
@@ -3791,23 +3791,23 @@
    "python_hits": []
   },
   {
-   "text": "Hi Dale, this is Sam, Colin's assistant. Good to hear you have options. We don't bid against other buyers by text. If that one comes through, great. If it falls apart, would you want Colin as your backup? Have you signed anything with them yet, and when is it supposed to close?",
+   "text": "Hi Dale, this is Colin Merrill. Good to hear you have options. I don't bid against other buyers by text. If that one comes through, great. If it falls apart, would you want me as your backup? Have you signed anything with them yet, and when is it supposed to close?",
    "python_hits": []
   },
   {
-   "text": "Sounds good - I'll note that, and Colin will check in after then. Hope it goes smoothly.",
+   "text": "Sounds good - I'll note that and check in after then. Hope it goes smoothly.",
    "python_hits": []
   },
   {
-   "text": "Hi Dale, thanks for getting back to Colin. This is Sam, his assistant - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+   "text": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
    "python_hits": []
   },
   {
-   "text": "Hi, this is Sam, Colin's assistant. Fair question - yes, I'm an automated assistant. Colin set me up to take notes so you don't have to repeat yourself, and he calls personally on anything that goes further. Happy to keep going here, or he can just call you - whichever you prefer.",
+   "text": "Hi, this is Colin Merrill. Fair question - I use an automated assistant to help me keep up with texts and notes, and I handle anything that goes further myself. Happy to keep going here, or I can just call you - whichever you prefer.",
    "python_hits": []
   },
   {
-   "text": "Hi Dale, this is Sam, Colin's assistant. Completely understand - thanks for letting me know. Before I let you go: do you own anything else you'd ever consider selling?",
+   "text": "Hi Dale, this is Colin Merrill. Completely understand - thanks for letting me know. Before I let you go: do you own anything else you'd ever consider selling?",
    "python_hits": []
   },
   {
@@ -3815,95 +3815,95 @@
    "python_hits": []
   },
   {
-   "text": "Hi Dale, this is Sam, Colin's assistant. Understood, no rush at all. What would need to happen for selling to make sense, and roughly when? If you're OK with it, Colin can check back around then.",
+   "text": "Hi Dale, this is Colin Merrill. Understood, no rush at all. What would need to happen for selling to make sense, and roughly when? If you're OK with it, I can check back around then.",
    "python_hits": []
   },
   {
-   "text": "Sounds good - I'll make a note and Colin will check back then, not before. Take care.",
+   "text": "Sounds good - I'll make a note and check back then, not before. Take care.",
    "python_hits": []
   },
   {
-   "text": "Hi Dale, this is Sam, Colin's assistant. Happy to. Colin can call you himself. What time today or tomorrow works best, and is this the best number?",
+   "text": "Hi Dale, this is Colin Merrill. Happy to - I'll call you myself. What time today or tomorrow works best, and is this the best number?",
    "python_hits": []
   },
   {
-   "text": "Hi, this is Sam, Colin's assistant. Sorry about that - looks like we had the wrong number. I'll make sure you don't hear from us again. Take care.",
+   "text": "Hi, this is Colin Merrill. Sorry about that - looks like I had the wrong number. I'll make sure you don't hear from me again. Take care.",
    "python_hits": []
   },
   {
-   "text": "Fair enough - I'm Sam, Colin's assistant. Colin is one local guy who buys houses himself, not a call center. If you'd rather not hear from us, just say so and that's it.",
+   "text": "Fair enough - this is Colin Merrill. I'm one local guy who buys houses myself, not a call center. If you'd rather not hear from me, just say so and that's it.",
    "python_hits": []
   },
   {
-   "text": "Hi, this is Sam, Colin's assistant. Fair enough - I'll take that as a no for now. Thanks for answering, and take care.",
+   "text": "Hi, this is Colin Merrill. Fair enough - I'll take that as a no for now. Thanks for answering, and take care.",
    "python_hits": []
   },
   {
-   "text": "I'm Sam, Colin Merrill's assistant - he buys houses around here himself. Understood - I've written that down exactly for Colin. He does all the pricing himself, so I can't say yes or no by text. Would a quick call with him be worth it?",
+   "text": "This is Colin Merrill - I buy houses around here myself. Understood - I've written that down exactly. I can't say yes or no by text before I know more about the place. Would a quick call be worth it?",
    "python_hits": []
   },
   {
-   "text": "Hi, this is Sam, Colin's assistant. I'm so sorry you're dealing with that. Honestly, with the sale that close there isn't time for Colin to help. A free HUD-approved housing counselor can go over your options right away: 800-569-4287. If the date moves, just text me.",
+   "text": "Hi, this is Colin Merrill. I'm so sorry you're dealing with that. Honestly, with the sale that close there isn't time for me to help. A free HUD-approved housing counselor can go over your options right away: 800-569-4287. If the date moves, just text me.",
    "python_hits": []
   },
   {
-   "text": "Hi, this is Sam, Colin's assistant. I'm sorry for your loss, and thank you for writing back. There's no rush on our end. Are you the one handling the house for the family, or is someone else looking after that?",
+   "text": "Hi, this is Colin Merrill. I'm sorry for your loss, and thank you for writing back. There's no rush on my end. Are you the one handling the house for the family, or is someone else looking after that?",
    "python_hits": []
   },
   {
-   "text": "Hi, this is Sam, Colin's assistant. Thank you - I'll pass that to Colin and he'll reach out to the owner himself. Nothing is changing with your home on our end.",
+   "text": "Hi, this is Colin Merrill. Thank you - I'll reach out to the owner myself. Nothing is changing with your home on my end.",
    "python_hits": []
   },
   {
-   "text": "Hi Dale, this is Sam, Colin's assistant. Thank you. There's no hurry at all, and nothing has to be decided. Lots of people like a family member on the call when they talk about their home - is there someone you'd like included when Colin calls, and what day works?",
+   "text": "Hi Dale, this is Colin Merrill. Thank you. There's no hurry at all, and nothing has to be decided. Lots of people like a family member on the call when they talk about their home - is there someone you'd like included when I call, and what day works?",
    "python_hits": []
   },
   {
-   "text": "Perfect - Colin will call you tomorrow at 10am at this number - and I have noted who you would like included. Thanks, Dale.",
+   "text": "Perfect - I'll call you tomorrow at 10am at this number - and I have noted who you would like included. Thanks, Dale.",
    "python_hits": []
   },
   {
-   "text": "Hi, this is Sam, Colin's assistant. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on our end. We'll reach the owner by mail and won't text this number again.",
+   "text": "Hi, this is Colin Merrill. Sorry to bother you, and thanks for telling me. Nothing is changing with your home on my end. I won't text this number again.",
    "python_hits": []
   },
   {
-   "text": "Hi Dale, this is Sam, Colin's assistant. Got it - Colin can call you after 5. Is this the best number for him to reach you?",
+   "text": "Hi Dale, this is Colin Merrill. Got it - I can call you after 5. Is this the best number for him to reach you?",
    "python_hits": []
   },
   {
-   "text": "Fair question. I'm Sam, Colin Merrill's assistant - he buys houses around here himself, your address is public record and the number came from a data provider. Understood on not selling - thanks for letting me know, and take care.",
+   "text": "Fair question - this is Colin Merrill. I buy houses around here myself, your address is public record and the number came from a data provider. Understood on not selling - thanks for letting me know, and take care.",
    "python_hits": []
   },
   {
-   "text": "Hi, this is Sam, Colin's assistant. I'm so sorry for your loss. I won't bother you now - take care of yourself.",
+   "text": "Hi, this is Colin Merrill. I'm so sorry for your loss. I won't bother you now - take care of yourself.",
    "python_hits": []
   },
   {
-   "text": "Hi, this is Sam, Colin's assistant. I'm sorry for your loss, and sorry if this caught you off guard. Property and estate records are public, and that's how Colin finds houses. If you'd rather not hear from us, just say so. Are you the one handling the house?",
+   "text": "Hi, this is Colin Merrill. I'm sorry for your loss, and sorry if this caught you off guard. Property and estate records are public, and that's how I find houses. If you'd rather not hear from me, just say so. Are you the one handling the house?",
    "python_hits": []
   },
   {
-   "text": "Hi Dale, this is Sam, Colin's assistant. Thank you - there's no hurry at all, and nothing has to be decided. I've noted that number so your family can be included when Colin calls. What day works best for you both?",
+   "text": "Hi Dale, this is Colin Merrill. Thank you - there's no hurry at all, and nothing has to be decided. I've noted that number so your family can be included when I call. What day works best for you both?",
    "python_hits": []
   },
   {
-   "text": "Hi, this is Sam, Colin's assistant. Thanks for letting me know. Would they want to hear from Colin about it? If so, what's the best way to reach them?",
+   "text": "Hi, this is Colin Merrill. Thanks for letting me know. Would they want to hear from me about it? If so, what's the best way to reach them?",
    "python_hits": []
   },
   {
-   "text": "Thank you - I'll pass that to Colin and he'll reach out to them himself.",
+   "text": "Thank you - I'll reach out to them myself.",
    "python_hits": []
   },
   {
-   "text": "Hi, this is Sam, Colin's assistant. Understood - thanks for letting me know, and sorry to bother you both. Take care.",
+   "text": "Hi, this is Colin Merrill. Understood - thanks for letting me know, and sorry to bother you both. Take care.",
    "python_hits": []
   },
   {
-   "text": "Hi, this is Sam, Colin's assistant. Thank you - I'll pass that to Colin and he'll reach out to them himself.",
+   "text": "Hi, this is Colin Merrill. Thank you - I'll reach out to them myself.",
    "python_hits": []
   },
   {
-   "text": "Hi, this is Sam, Colin's assistant. Thanks - Colin buys buildings like this himself and wanted to see if the owners would ever consider selling. Who besides you would need to decide or sign on a sale?",
+   "text": "Hi, this is Colin Merrill. Thanks - I buy buildings like this myself and wanted to see if the owners would ever consider selling. Who besides you would need to decide or sign on a sale?",
    "python_hits": []
   },
   {
@@ -3911,11 +3911,11 @@
    "python_hits": []
   },
   {
-   "text": "Perfect - Colin will call you tomorrow at 10am at this number. Thanks, Rita.",
+   "text": "Perfect - I'll call you tomorrow at 10am at this number. Thanks, Rita.",
    "python_hits": []
   },
   {
-   "text": "Hi, this is Sam, Colin's assistant. Thanks for letting me know. Would you mind passing this along to the owner? Colin buys buildings himself and would like to talk with whoever decides. They can text or call this number.",
+   "text": "Hi, this is Colin Merrill. Thanks for letting me know. Would you mind passing this along to the owner? I buy buildings myself and would like to talk with whoever decides. They can text or call this number.",
    "python_hits": []
   },
   {
@@ -3923,87 +3923,87 @@
    "python_hits": []
   },
   {
-   "text": "Hi, this is Sam, Colin's assistant. Thank you, I appreciate it. The owner can text or call this number anytime, or if you have a number for them, Colin can reach out himself.",
+   "text": "Hi, this is Colin Merrill. Thank you, I appreciate it. The owner can text or call this number anytime, or if you have a number for them, I can reach out myself.",
    "python_hits": []
   },
   {
-   "text": "Hi Rita, thanks for getting back to Colin. This is Sam, his assistant - I help him follow up on his texts. Is the place on W220 N1765 Pewaukee Rd still yours?",
+   "text": "Hi Rita, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on W220 N1765 Pewaukee Rd still yours?",
    "python_hits": []
   },
   {
-   "text": "Hi Rita, this is Sam, Colin's assistant. Completely understand - thanks for letting me know. Before I let you go: do you own anything else you'd ever consider selling?",
+   "text": "Hi Rita, this is Colin Merrill. Completely understand - thanks for letting me know. Before I let you go: do you own anything else you'd ever consider selling?",
    "python_hits": []
   },
   {
-   "text": "Hi Dale, this is Sam, Colin's assistant. I'm sorry you're dealing with that, and thanks for telling me. Is there a sale date set yet? Colin can call you today to go over options, and a free HUD-approved housing counselor can help too.",
+   "text": "Hi Dale, this is Colin Merrill. I'm sorry you're dealing with that, and thanks for telling me. Is there a sale date set yet? I can call you today to go over options, and a free HUD-approved housing counselor can help too.",
    "python_hits": []
   },
   {
-   "text": "Thanks. What time today works for Colin to call, and is this the best number?",
+   "text": "Thanks. What time today works for me to call, and is this the best number?",
    "python_hits": []
   },
   {
-   "text": "Hi Dale, this is Sam, Colin's assistant. I'm sorry you're dealing with that, and thanks for telling me. There's still time to look at options before then - Colin can call you today. What time works, and is this the best number? A free HUD-approved housing counselor can help too.",
+   "text": "Hi Dale, this is Colin Merrill. I'm sorry you're dealing with that, and thanks for telling me. There's still time to look at options before then - I can call you today. What time works, and is this the best number? A free HUD-approved housing counselor can help too.",
    "python_hits": []
   },
   {
-   "text": "Hi Dale, this is Sam, Colin's assistant. Thanks for telling me - I won't get in the way of your agent. When does the listing run through? If it ends without a sale, would it be alright for Colin to check in then?",
+   "text": "Hi Dale, this is Colin Merrill. Thanks for telling me - I won't get in the way of your agent. When does the listing run through? If it ends without a sale, would it be alright for me to check in then?",
    "python_hits": []
   },
   {
-   "text": "Thanks - I'll make a note, and Colin will only check in after that. Good luck with the sale.",
+   "text": "Thanks - I'll make a note and only check in after that. Good luck with the sale.",
    "python_hits": []
   },
   {
-   "text": "Hi, this is Sam, Colin's assistant. Congratulations, and thanks for letting me know. I'll update my notes so you don't hear from us about it. Take care.",
+   "text": "Hi, this is Colin Merrill. Congratulations, and thanks for letting me know. I'll update my notes so you don't hear from me about it. Take care.",
    "python_hits": []
   },
   {
-   "text": "Hi Dale, this is Sam, Colin's assistant. Thanks - I'll make a note, and Colin will only check in after that. Good luck with the sale.",
+   "text": "Hi Dale, this is Colin Merrill. Thanks - I'll make a note and only check in after that. Good luck with the sale.",
    "python_hits": []
   },
   {
-   "text": "Felicidades, y gracias por avisarme. Ya no le escribiremos sobre la casa. - Sam, asistente de Colin",
+   "text": "Felicidades, y gracias por avisarme. Ya no le escribiré sobre la casa. - Colin",
    "python_hits": []
   },
   {
-   "text": "Listo - no le volveremos a escribir. Perdón por la molestia. - Sam, asistente de Colin",
+   "text": "Listo - no le volveré a escribir. Perdón por la molestia. - Colin",
    "python_hits": []
   },
   {
-   "text": "Entendido, gracias por avisarme. Si algo cambia, puede escribir a este número. Que le vaya bien. - Sam, asistente de Colin",
+   "text": "Entendido, gracias por avisarme. Si algo cambia, puede escribir a este número. Que le vaya bien. - Colin",
    "python_hits": []
   },
   {
-   "text": "Hola, soy Sam, asistente automático de Colin Merrill. Colin compra casas aquí él mismo. ¿Quiere que Colin le llame? Dígame qué día y hora le queda bien.",
+   "text": "Hola, soy Colin Merrill. Compro casas aquí yo mismo. ¿Quiere que le llame? Dígame qué día y hora le queda bien.",
    "python_hits": []
   },
   {
-   "text": "Gracias - le paso el mensaje a Colin y él le llamará a este número. Que tenga buen día.",
+   "text": "Gracias - le llamaré a este número. Que tenga buen día.",
    "python_hits": []
   },
   {
-   "text": "Hola, soy Sam, asistente automático de Colin Merrill. No tengo un número - Colin decide los precios él mismo. ¿Quiere que Colin le llame? Dígame qué día y hora le queda bien.",
+   "text": "Hola, soy Colin Merrill. No tengo un número todavía - no doy precios antes de conocer la casa. ¿Quiere que le llame? Dígame qué día y hora le queda bien.",
    "python_hits": []
   },
   {
-   "text": "Perdón por la molestia - parece que tenemos el número equivocado. No le escribiremos más. - Sam, asistente de Colin",
+   "text": "Perdón por la molestia - parece que tengo el número equivocado. No le escribiré más. - Colin",
    "python_hits": []
   },
   {
-   "text": "Hi Dale, this is Sam, Colin's assistant. Got it - Colin can call you tomorrow afternoon. Is this the best number for him to reach you?",
+   "text": "Hi Dale, this is Colin Merrill. Got it - I can call you tomorrow afternoon. Is this the best number for him to reach you?",
    "python_hits": []
   },
   {
-   "text": "Hi Dale, this is Sam, Colin's assistant. I don't know, honestly - Colin can tell you that on his call. Is the place on N Burleigh St still yours?",
+   "text": "Hi Dale, this is Colin Merrill. Good question - I'm not sure offhand, I'd have to check. Easier to go over on a quick call. Is the place on N Burleigh St still yours?",
    "python_hits": []
   },
   {
-   "text": "Hi Dale, this is Sam, Colin's assistant. Good question - Colin can walk you through exactly how he buys on a quick call. Is the place on N Burleigh St still yours?",
+   "text": "Hi Dale, this is Colin Merrill. Good question - I can walk you through exactly how I buy on a quick call. Is the place on N Burleigh St still yours?",
    "python_hits": []
   },
   {
-   "text": "Done - you won't hear from Colin or me again. Sorry to have bothered you.",
+   "text": "Done - you won't hear from me again. Sorry to have bothered you.",
    "python_hits": []
   },
   {
@@ -4011,15 +4011,15 @@
    "python_hits": []
   },
   {
-   "text": "What were you hoping to get for it? Even a rough figure helps Colin more than anything.",
+   "text": "What were you hoping to get for it? Even a rough figure helps me more than anything.",
    "python_hits": []
   },
   {
-   "text": "Fair question. I don't have a number for you - Colin handles all the pricing himself and won't guess before he knows more about the place. If you have a figure in mind, what is it? That helps him more than anything.",
+   "text": "Fair question. I don't have a number for you yet - I won't guess before I know more about the place. If you have a figure in mind, what is it? That helps me more than anything.",
    "python_hits": []
   },
   {
-   "text": "Fair question - I'm Sam, Colin Merrill's assistant. He buys houses around here himself; your address is public record and the number came from a data provider. To start easy: is anyone living there right now, or is it sitting empty?",
+   "text": "Fair question - this is Colin Merrill. I buy houses around here myself; your address is public record and the number came from a data provider. To start easy: is anyone living there right now, or is it sitting empty?",
    "python_hits": []
   },
   {
@@ -4027,39 +4027,39 @@
    "python_hits": []
   },
   {
-   "text": "Sorry about that - looks like we had the wrong number. I'll make sure you don't hear from us again. Take care.",
+   "text": "Sorry about that - looks like I had the wrong number. I'll make sure you don't hear from me again. Take care.",
    "python_hits": []
   },
   {
-   "text": "Congratulations, and thanks for letting me know. I'll update my notes so you don't hear from us about it. Take care.",
+   "text": "Congratulations, and thanks for letting me know. I'll update my notes so you don't hear from me about it. Take care.",
    "python_hits": []
   },
   {
-   "text": "Perfect - Colin will call you tomorrow at 10 at this number. Thanks, Dale.",
+   "text": "Perfect - I'll call you tomorrow at 10 at this number. Thanks, Dale.",
    "python_hits": []
   },
   {
-   "text": "Perfect - Colin will call you after 5 at 262-555-0101. Thanks, Dale.",
+   "text": "Perfect - I'll call you after 5 at 262-555-0101. Thanks, Dale.",
    "python_hits": []
   },
   {
-   "text": "Fair question - I'm Sam, Colin Merrill's assistant. He buys houses around here himself; your address is public record and the number came from a data provider. When's good for Colin to call?",
+   "text": "Fair question - this is Colin Merrill. I buy houses around here myself; your address is public record and the number came from a data provider. When's good for me to call?",
    "python_hits": []
   },
   {
-   "text": "Of course. What's the best number to reach them, and what day works for Colin to call you both?",
+   "text": "Of course. What's the best number to reach them, and what day works for me to call you both?",
    "python_hits": []
   },
   {
-   "text": "Great - what time works best for Colin to call?",
+   "text": "Great - what time works best for me to call?",
    "python_hits": []
   },
   {
-   "text": "Fair question. I don't have a number for you - Colin handles all the pricing himself and won't guess before he knows more about the place. If you have a figure in mind, what is it? That helps him more than anything. And when's good for Colin to call?",
+   "text": "Fair question. I don't have a number for you yet - I won't guess before I know more about the place. If you have a figure in mind, what is it? That helps me more than anything. And when's good for me to call?",
    "python_hits": []
   },
   {
-   "text": "Thanks for being straight with me. I'll pass your number to Colin exactly as you said it, and he'll tell you honestly whether he can get there. If he can't, an agent may be the better route. When's a good time for him to call?",
+   "text": "Thanks for being straight with me. I've written your number down exactly as you said it, and I'll tell you honestly whether I can get there. If I can't, an agent may be the better route. When's a good time for me to call?",
    "python_hits": []
   },
   {
@@ -4071,15 +4071,15 @@
    "python_hits": []
   },
   {
-   "text": "I'm so sorry you're dealing with that. Honestly, with the sale that close there isn't time for Colin to help. A free HUD-approved housing counselor can go over your options right away: 800-569-4287. If the date moves, just text me.",
+   "text": "I'm so sorry you're dealing with that. Honestly, with the sale that close there isn't time for me to help. A free HUD-approved housing counselor can go over your options right away: 800-569-4287. If the date moves, just text me.",
    "python_hits": []
   },
   {
-   "text": "I'm sorry for your loss, and thank you for writing back. There's no rush on our end. Are you the one handling the house for the family, or is someone else looking after that?",
+   "text": "I'm sorry for your loss, and thank you for writing back. There's no rush on my end. Are you the one handling the house for the family, or is someone else looking after that?",
    "python_hits": []
   },
   {
-   "text": "Fair question - these texts are saved as notes for Colin, so you don't have to repeat yourself. To start easy: is anyone living there right now, or is it sitting empty?",
+   "text": "Fair question - I keep these texts as notes, so you don't have to repeat yourself. To start easy: is anyone living there right now, or is it sitting empty?",
    "python_hits": []
   },
   {

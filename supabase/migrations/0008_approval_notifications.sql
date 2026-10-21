@@ -1,4 +1,4 @@
--- Approval notifications (Colin 2026-10-21: "how can we have sam notify me easily when it needs
+-- Approval notifications (Colin 2026-10-21: "how can we have it notify me easily when it needs
 -- my approval", "i have android"). ONLY for a real reply waiting for Colin (reply_drafts
 -- kind = 'candidate', status = 'awaiting_approval'), never for routine replies:
 --   * one web push per draft (and one email backup), as soon as it is drafted;
