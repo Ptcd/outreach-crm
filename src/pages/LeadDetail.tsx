@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge, Empty, ErrorNote, Section, Select, Textarea } from '@/components/ui/form'
 import { GateChecklist, type GateSave } from '@/components/GateChecklist'
+import { EmailComposer } from '@/components/EmailComposer'
+import { ReplyTaskCard } from '@/components/ReplyTaskCard'
 import { api, useDeals, useLead, useWrite } from '@/lib/queries'
-import { fmtDate, fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
-import { DEAL_STATUS_LABEL, MILESTONES, STAGES, STAGE_LABEL, TASK_KINDS, TASK_KIND_LABEL } from '@/lib/wpie'
+import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
+import { DEAL_STATUS_LABEL, MILESTONES, PEOPLE, SELLER_FACTS, STAGES, STAGE_LABEL, TASK_KINDS, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
 import type { Contact, Deal, DealStatus, Lead, LeadStage, Person } from '@/lib/types'
 
@@ -19,6 +21,9 @@ export default function LeadDetail() {
   if (q.error) return <ErrorNote error={q.error} />
   if (!q.data) return <Empty>Lead not found.</Empty>
   const { lead, contacts, messages, tasks, gates, milestones } = q.data
+  const facts = q.data.facts ?? {}
+  const replyTasks = tasks.filter((t) => t.source === 'reply' && !t.done_at)
+  const email = contacts.find((c) => c.kind === 'email' && !c.dnc_app)?.value ?? null
 
   return (
     <div className="space-y-4">
@@ -35,14 +40,23 @@ export default function LeadDetail() {
       </div>
 
       <NextAction lead={lead} />
-      <Facts lead={lead} />
-      <Contacts contacts={contacts} leadId={lead.id} />
-      <Milestones leadId={lead.id} done={milestones} />
+      <SellerSaid facts={facts} />
+      <Section title={`Tasks (${replyTasks.length})`}>
+        <p className="mb-2 text-sm text-muted-foreground">Things the seller asked for that a text can&apos;t do. Adil by default.</p>
+        {replyTasks.length === 0 && <Empty>No open tasks.</Empty>}
+        <ul className="space-y-3">
+          {replyTasks.map((t) => <ReplyTaskCard key={t.id} t={{ ...t, lead }} showLead={false} />)}
+        </ul>
+        <EmailAction leadId={lead.id} to={email} ownerName={lead.owner_name} address={lead.property_address} />
+      </Section>
       <History leadId={lead.id} messages={messages} />
-      <Tasks leadId={lead.id} tasks={tasks} />
       <Section title="Walk / don't-walk gate">
         <GateBlock leadId={lead.id} latest={gates[0] ?? null} canEdit={isOwner} />
       </Section>
+      <Tasks leadId={lead.id} tasks={tasks.filter((t) => t.source !== 'reply')} />
+      <Contacts contacts={contacts} leadId={lead.id} />
+      <Facts lead={lead} />
+      <Milestones leadId={lead.id} done={milestones} />
       {isOwner && <DealBlock leadId={lead.id} />}
       <Notes lead={lead} />
     </div>
@@ -91,8 +105,7 @@ function NextAction({ lead }: { lead: Lead }) {
           Who has it
           <Select value={who} onChange={(e) => setWho(e.target.value as Person | '')} className="mt-1">
             <option value="">Nobody yet</option>
-            <option value="colin">Colin</option>
-            <option value="thalia">Thalia</option>
+            {PEOPLE.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
           </Select>
         </label>
         <label className="text-sm font-medium">
@@ -164,9 +177,6 @@ function Facts({ lead }: { lead: Lead }) {
           ) : null}
         </Row>
         <Row label="WPIE signal score">{lead.score !== null ? Math.round(Number(lead.score)) : null}</Row>
-        <Row label="Mailed">
-          {lead.mailed_on ? `${fmtDate(lead.mailed_on)}${lead.mail_channel ? ` (${lead.mail_channel})` : ''}` : null}
-        </Row>
         <Row label="WPIE ids">
           {lead.wpie_owner_id ? `owner ${lead.wpie_owner_id}` : ''}
           {lead.wpie_property_id ? `, property ${lead.wpie_property_id}` : ''}
@@ -176,6 +186,38 @@ function Facts({ lead }: { lead: Lead }) {
         Never mention taxes, sheriff sales, code cases or a death to the owner before they raise it.
       </p>
     </Section>
+  )
+}
+
+// What the seller has told us by text (the drafting model's facts across the thread).
+function SellerSaid({ facts }: { facts: Record<string, unknown> }) {
+  const rows = SELLER_FACTS.map((f) => {
+    const v = facts[f.id]
+    const text = Array.isArray(v) ? v.filter(Boolean).map((x) => `"${String(x)}"`).join('  ') : v === true ? 'Yes' : v === null || v === undefined ? '' : String(v)
+    return { ...f, text: text === 'null' || text === 'false' ? '' : text }
+  }).filter((r) => r.text)
+  return (
+    <Section title="What the seller told us">
+      {rows.length === 0 ? (
+        <Empty>Nothing yet. This fills in as they answer texts.</Empty>
+      ) : (
+        <dl>
+          {rows.map((r) => <Row key={r.id} label={r.label}>{r.text}</Row>)}
+        </dl>
+      )}
+    </Section>
+  )
+}
+
+function EmailAction({ leadId, to, ownerName, address }: { leadId: string; to: string | null; ownerName: string; address: string | null }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mt-3">
+      <Button variant="outline" className="h-12 w-full sm:w-auto" onClick={() => setOpen((o) => !o)}>
+        {open ? 'Close email' : 'Send an email'}
+      </Button>
+      {open && <EmailComposer leadId={leadId} to={to} ownerName={ownerName} address={address} onDone={() => setOpen(false)} />}
+    </div>
   )
 }
 
@@ -313,7 +355,7 @@ function History({ leadId, messages }: { leadId: string; messages: import('@/lib
           >
             <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span>
-                {m.channel === 'sms' ? (m.direction === 'in' ? 'Text from owner' : m.is_opener ? 'Opener text' : 'Text') : m.channel === 'call' ? 'Call' : 'Note'}
+                {m.channel === 'sms' ? (m.direction === 'in' ? 'Text from owner' : m.is_opener ? 'Opener text' : 'Text') : m.channel === 'call' ? 'Call' : m.channel === 'email' ? 'Email sent' : 'Note'}
               </span>
               <span>{fmtDateTime(m.sent_at)}</span>
               {m.status && m.channel === 'sms' && <Badge>{m.status.replace(/_/g, ' ')}</Badge>}
@@ -347,7 +389,7 @@ function Tasks({ leadId, tasks }: { leadId: string; tasks: import('@/lib/types')
         {open.map((t) => (
           <li key={t.id} className="flex items-center justify-between gap-2 py-2 text-sm">
             <span>
-              <strong>{TASK_KIND_LABEL[t.kind] ?? t.kind}</strong> - {fmtDateTime(t.due_at)} - {t.owner === 'colin' ? 'Colin' : 'Thalia'}
+              <strong>{TASK_KIND_LABEL[t.kind] ?? t.kind}</strong> - {fmtDateTime(t.due_at)} - {personLabel(t.owner)}
               {t.note ? ` - ${t.note}` : ''}
             </span>
             <Button size="sm" variant="outline" disabled={done.isPending} onClick={() => done.mutate(t.id)}>
@@ -366,8 +408,7 @@ function Tasks({ leadId, tasks }: { leadId: string; tasks: import('@/lib/types')
           ))}
         </Select>
         <Select value={owner} onChange={(e) => setOwner(e.target.value as Person)} aria-label="Who">
-          <option value="colin">Colin</option>
-          <option value="thalia">Thalia</option>
+          {PEOPLE.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
         </Select>
         <Input placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
       </div>

@@ -80,7 +80,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db.exec(`
-    truncate public.reply_drafts, public.opener_send_events, public.twilio_inbound, public.suppressed_phones,
+    truncate public.tasks, public.reply_drafts, public.opener_send_events, public.twilio_inbound, public.suppressed_phones,
              public.planned_openers, public.messages, public.contacts, public.leads cascade;
     update public.campaign_control set routine_enabled = false, redteam_version = null, redteam_ok = false, agent_rules_version = null,
       agent_last_run_at = null;
@@ -173,6 +173,42 @@ describe('Sam, end to end with no real text', () => {
     const s = await run(tw, LIVE, new Date('2026-10-23T13:01:00Z'))   // 08:01 Central
     expect(s.sent).toBe(1)
     expect(tw.sends[0]).toMatchObject({ to: '+14145550177', body: 'Great - Colin will call you tomorrow.' })
+  })
+})
+
+describe('work no text can do', () => {
+  it('opens a task for Adil with their exact words and the address they gave, counted in the badge, pushed once', async () => {
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMe', '+14145550177', 'Maybe. Can you email me the details? dale@example.com')]
+    const s = await run(tw)
+    expect(s.tasks).toBe(1)
+    const t = await db.query<{ owner: string; kind: string; quote: string; email_to: string; source: string; title: string }>(
+      `select owner::text, kind, quote, email_to, source, title from public.tasks`)
+    expect(t.rows).toEqual([{ owner: 'adil', kind: 'email', quote: 'Maybe. Can you email me the details? dale@example.com',
+      email_to: 'dale@example.com', source: 'reply', title: 'Email them at dale@example.com' }])
+    expect((await db.query(`select tasks_open from public.reply_waiting`)).rows).toEqual([{ tasks_open: 1 }])
+    expect((await drafts())[0]).toMatchObject({ kind: 'candidate', status: 'awaiting_approval' })   // the text reply still waits for Colin
+    await run(tw)                                                                                    // the same text again: no second task
+    expect((await db.query(`select count(*)::int as n from public.tasks`)).rows).toEqual([{ n: 1 }])
+    const first = await db.query<{ r: unknown[] }>(`select public.notify_claim_tasks(now()) as r`)
+    const second = await db.query<{ r: unknown[] }>(`select public.notify_claim_tasks(now()) as r`)
+    expect([first.rows[0].r.length, second.rows[0].r.length]).toEqual([1, 0])
+  })
+
+  it('a removal never opens a task', async () => {
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMr', '+14145550177', 'Stop texting me, talk to my attorney')]
+    await run(tw)
+    expect((await db.query(`select count(*)::int as n from public.tasks`)).rows).toEqual([{ n: 0 }])
+  })
+
+  it('keeps the facts the drafting model read', async () => {
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMf', '+14145550177', 'Moving to Arizona in March, roof is old, my wife is on the title too')]
+    await runReplyAgent({ rpc, env: DRY, twilio: tw, control: await control(), redteamRows: ROWS, now: () => NOON,
+      drafter: async () => ({ message: 'Thanks - what were you hoping to get for it?', facts: { motivation: 'moving to Arizona', timeline: 'March', decision_makers: 'wife on title', condition: 'old roof' } }) })
+    const f = await db.query<{ facts: Record<string, string> }>(`select facts from public.reply_drafts`)
+    expect(f.rows[0].facts).toEqual({ motivation: 'moving to Arizona', timeline: 'March', decision_makers: 'wife on title', condition: 'old roof' })
   })
 })
 

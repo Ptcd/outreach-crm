@@ -31,7 +31,7 @@ export interface NotifyDeps {
   now?: () => Date
 }
 
-export interface NotifySummary { drafts: number; reminders: number; pushes_ok: number; pushes_failed: number; emails: number; email_errors: string[] }
+export interface NotifySummary { drafts: number; reminders: number; tasks: number; pushes_ok: number; pushes_failed: number; emails: number; email_errors: string[] }
 
 const ENTITY = /\b(LLC|L\.L\.C|INC|CORP|CO|COMPANY|TRUST|TRUSTEE|ESTATE|PROPERTIES|HOLDINGS|LP|LLP|BANK|CHURCH|CITY|COUNTY)\b/i
 
@@ -105,7 +105,7 @@ async function pushAll(deps: NotifyDeps, message: object, s: NotifySummary) {
 
 export async function runNotifications(deps: NotifyDeps): Promise<NotifySummary> {
   const now = deps.now ?? (() => new Date())
-  const s: NotifySummary = { drafts: 0, reminders: 0, pushes_ok: 0, pushes_failed: 0, emails: 0, email_errors: [] }
+  const s: NotifySummary = { drafts: 0, reminders: 0, tasks: 0, pushes_ok: 0, pushes_failed: 0, emails: 0, email_errors: [] }
   // Nothing that could reach Colin yet (no phone registered, no email): leave the drafts unclaimed,
   // so they are announced as soon as he turns notifications on.
   const subs = deps.push ? await deps.subscriptions() : []
@@ -128,12 +128,28 @@ export async function runNotifications(deps: NotifyDeps): Promise<NotifySummary>
       }
     }
   }
+  // Work a text can't do: one push per new task (to every phone; Adil's by default).
+  const k = await deps.rpc('notify_claim_tasks', { p_now: now().toISOString() })
+  if (!k.error) {
+    for (const t of (k.data as { id: string; title: string; quote: string | null; owner: string; owner_name: string | null;
+      property_address: string | null; phone10: string | null; lead_id: string | null }[]) ?? []) {
+      s.tasks += 1
+      const who = t.owner === 'adil' ? 'Adil' : t.owner === 'colin' ? 'Colin' : t.owner
+      const name = firstName(t.owner_name, t.phone10 ?? '')
+      await pushAll(deps, {
+        title: `Task for ${who}: ${t.title}`.slice(0, 90),
+        body: `${name}${t.property_address ? `, ${t.property_address}` : ''}: "${snippet(t.quote, 70)}"`,
+        url: `${deps.appUrl.replace(/\/$/, '')}${t.lead_id ? `/lead/${t.lead_id}` : '/today'}#task-${t.id}`,
+        tag: `task-${t.id}`,
+      }, s)
+    }
+  }
   return s
 }
 
 /** "Send a test notification": one push to every registered phone and one email. */
 export async function testNotification(deps: NotifyDeps): Promise<NotifySummary> {
-  const s: NotifySummary = { drafts: 0, reminders: 0, pushes_ok: 0, pushes_failed: 0, emails: 0, email_errors: [] }
+  const s: NotifySummary = { drafts: 0, reminders: 0, tasks: 0, pushes_ok: 0, pushes_failed: 0, emails: 0, email_errors: [] }
   await pushAll(deps, { title: 'WPIE test', body: 'Notifications work. You will get a ping when a reply needs you.',
     url: `${deps.appUrl.replace(/\/$/, '')}/inbox`, tag: 'test' }, s)
   if (deps.email && deps.emailTo) {

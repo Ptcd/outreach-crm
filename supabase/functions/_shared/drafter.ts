@@ -7,6 +7,23 @@ import { REPLY_SYSTEM_PROMPT } from './replyPrompt.generated.ts'
 import { guardDraft, parseModelMessage, shouldDraft } from './replyGuard.ts'
 import type { DraftInput, Drafter } from './replyAgent.ts'
 
+/** The facts the model reports alongside its message (WPIE prompt's JSON 'facts'), empty ones dropped. */
+export function parseModelFacts(raw: string): Record<string, unknown> | null {
+  const text = (raw ?? '').trim().replace(/^```(?:json)?\s*|\s*```$/g, '')
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
+  if (start < 0 || end <= start) return null
+  try {
+    const f = JSON.parse(text.slice(start, end + 1))?.facts
+    if (!f || typeof f !== 'object') return null
+    const kept = Object.fromEntries(Object.entries(f as Record<string, unknown>).filter(([, v]) =>
+      v !== '' && v !== null && v !== undefined && v !== false && !(Array.isArray(v) && v.length === 0)))
+    return Object.keys(kept).length ? kept : null
+  } catch {
+    return null
+  }
+}
+
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
 export function buildMessages(x: DraftInput): ChatMessage[] {
@@ -63,7 +80,8 @@ export function claudeDrafter(opts: { apiKey: string; model?: string; effort?: s
         ? data.content.filter((b: { type?: string }) => b?.type === 'text').map((b: { text?: string }) => b.text ?? '').join('') : ''
       const message = text ? parseModelMessage(text) : null
       if (!message) return null
-      return guardDraft(message, { companyName: opts.companyName || 'Merrill Holdings' }).text || null
+      const guarded = guardDraft(message, { companyName: opts.companyName || 'Merrill Holdings' }).text
+      return guarded ? { message: guarded, facts: parseModelFacts(text) } : null
     } catch {
       return null
     } finally {

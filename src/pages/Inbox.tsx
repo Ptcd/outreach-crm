@@ -107,7 +107,13 @@ function InboxCard({ x, bucket }: { x: InboxLead; bucket: Bucket }) {
     <section className="rounded-lg border bg-card p-3 shadow-sm sm:p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="truncate font-semibold">{x.lead?.owner_name ?? o.owner_name ?? `Owner ${o.wpie_owner_id}`}</h2>
+          <h2 className="truncate font-semibold">
+            {leadId ? (
+              <Link to={`/lead/${leadId}`} className="underline decoration-muted-foreground/40 underline-offset-4">
+                {x.lead?.owner_name ?? o.owner_name ?? `Owner ${o.wpie_owner_id}`}
+              </Link>
+            ) : (x.lead?.owner_name ?? o.owner_name ?? `Owner ${o.wpie_owner_id}`)}
+          </h2>
           <p className="truncate text-sm text-muted-foreground">{x.lead?.property_address ?? o.property_address}</p>
         </div>
         <Badge tone={sendTone(o.send_status)}>{SEND_LABEL[o.send_status]}</Badge>
@@ -183,7 +189,7 @@ function InboxCard({ x, bucket }: { x: InboxLead; bucket: Bucket }) {
               Not interested
             </ConfirmButton>
           )}
-          <Link to={`/lead/${leadId}`} className="ml-auto inline-flex min-h-11 items-center px-2 text-sm underline">Open lead</Link>
+          <Link to={`/lead/${leadId}`} className="ml-auto inline-flex min-h-11 items-center px-2 text-sm underline">Open card</Link>
         </div>
       )}
       <ErrorNote error={book.error ?? drop.error} />

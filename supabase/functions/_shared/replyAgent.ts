@@ -6,6 +6,7 @@
 import { decide, rulesVersion, scoreRedteam, type RedteamRow, type ReplyContext } from './replyBrain.ts'
 import { classifyFailure, isOptOut, type Rpc, type SenderEnv, type TwilioPort } from './sending.ts'
 import { guardDraft } from './replyGuard.ts'
+import { workNeeded } from './needsWork.ts'
 
 export interface DraftInput {
   inbound: string
@@ -13,7 +14,9 @@ export interface DraftInput {
   ownerName: string | null
   propertyAddress: string | null
 }
-export type Drafter = (x: DraftInput) => Promise<string | null>
+/** The draft text, or text plus the facts the model read from the thread (reason, clock, ...). */
+export type Drafted = string | { message: string; facts?: Record<string, unknown> | null }
+export type Drafter = (x: DraftInput) => Promise<Drafted | null>
 
 export interface ClaimedInbound {
   sid: string
@@ -36,6 +39,7 @@ export interface AgentSummary {
   inbound_new: number
   inbound_errors: string[]
   decided: { removal: number; routine: number; candidate: number; drafted: number }
+  tasks: number
   sent: number
   dry_sent: number
   queued: number
@@ -77,7 +81,7 @@ export async function runReplyAgent(opts: {
   const live = opts.env.live && opts.twilio != null
   const version = rulesVersion()
   const s: AgentSummary = { mode: live ? 'live' : 'dry', rules_version: version, redteam: null, inbound_new: 0, inbound_errors: [],
-    decided: { removal: 0, routine: 0, candidate: 0, drafted: 0 }, sent: 0, dry_sent: 0, queued: 0, failed: 0, uncertain: 0, refused: [] }
+    decided: { removal: 0, routine: 0, candidate: 0, drafted: 0 }, tasks: 0, sent: 0, dry_sent: 0, queued: 0, failed: 0, uncertain: 0, refused: [] }
 
   // 0. Score the rules this build runs, once per version (the routine switch depends on it).
   if (opts.control.redteam_version !== version) {
@@ -115,10 +119,13 @@ export async function runReplyAgent(opts: {
     const d = decide(ctx)
     let body = d.reply
     let source = d.reply ? 'fixed_line' : 'none'
+    let facts: Record<string, unknown> | null = null
     if (d.kind === 'candidate' && opts.drafter) {
       try {
-        body = await opts.drafter({ inbound: ctx.inbound, ownerName: t.owner_name, propertyAddress: t.property_address,
+        const got = await opts.drafter({ inbound: ctx.inbound, ownerName: t.owner_name, propertyAddress: t.property_address,
           history: (t.history ?? []).filter((h) => h.body).map((h) => ({ who: h.who, body: h.body as string })) })
+        body = typeof got === 'string' ? got : got?.message ?? null
+        facts = typeof got === 'object' && got ? got.facts ?? null : null
         if (body) { source = 'claude'; s.decided.drafted += 1 }
       } catch {
         body = null     // no draft: Colin writes this one himself
@@ -129,6 +136,14 @@ export async function runReplyAgent(opts: {
       p_outcome: d.outcome, p_body: body, p_draft_source: source, p_note: d.note, p_rules_version: version,
       p_now: now().toISOString() })
     if (r.error) throw new Error(r.error.message)
+    if (facts && Object.keys(facts).length) await opts.rpc('reply_set_facts', { p_sid: t.sid, p_facts: facts })
+    // Work no text can do (an email, paperwork, records, another person, a visit): a Task for a person.
+    const work = d.removal ? null : workNeeded(ctx.inbound)
+    if (work) {
+      const k = await opts.rpc('reply_create_task', { p_sid: t.sid, p_kind: work.kind, p_title: work.title,
+        p_quote: ctx.inbound, p_email: work.email, p_now: now().toISOString() })
+      if (!k.error) s.tasks += 1
+    }
   }
 
   // 3. Replies whose time has come: routine (switch on) and approvals held overnight.

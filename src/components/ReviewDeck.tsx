@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge, Textarea } from '@/components/ui/form'
 import { api, type WaitingDraft } from '@/lib/queries'
@@ -113,6 +114,11 @@ export function ReviewDeck({ drafts, startId }: { drafts: WaitingDraft[]; startI
           <p className="text-sm text-muted-foreground">
             {d.property_address ? `${d.property_address} · ` : ''}{fmtPhone(d.phone10)}
           </p>
+          {d.lead_id && (
+            <Link to={`/lead/${d.lead_id}`} className="mt-1 inline-flex min-h-11 items-center text-sm font-medium text-primary underline">
+              Open the full card (facts, gate, tasks)
+            </Link>
+          )}
 
           {prior.length > 0 && (
             <div className="mt-3 space-y-1.5">

@@ -16,7 +16,8 @@ const NAV = [
 
 export function Layout({ children }: { children: ReactNode }) {
   const { member, signOut } = useAuth()
-  const waiting = useRepliesWaiting().data?.drafts_waiting ?? 0
+  const w = useRepliesWaiting().data
+  const waiting = (w?.drafts_waiting ?? 0) + (w?.tasks_open ?? 0)
   const badge = (to: string) => (to === '/inbox' && waiting > 0
     ? <span aria-label={`${waiting} replies waiting`} className="ml-1 rounded-full bg-red-600 px-1.5 text-[11px] font-semibold text-white">{waiting}</span>
     : null)

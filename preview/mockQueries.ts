@@ -75,7 +75,7 @@ export const useInbox = () => ok(INBOX)
 export const useOtherDrafts = () => ok([{ ...base, id: 'd9', phone10: '2625550190', lead_id: null, inbound_at: ago(90), intent: 'wrong_number',
   kind: 'routine', status: 'would_send', inbound_body: 'wrong number', body: "Sorry about that - looks like I had the wrong number. I'll make sure you don't hear from me again. Take care.",
   draft_source: 'fixed_line' }])
-export const useRepliesWaiting = () => ok({ drafts_waiting: WAITING.length, routine_would_send: 1, queued: 0 })
+export const useRepliesWaiting = () => ok({ drafts_waiting: WAITING.length, routine_would_send: 1, queued: 0, tasks_open: 1 })
 export const useCampaignControl = () => ok(CONTROL)
 export const usePlannedOpeners = () => ok(PLANNED)
 export const useDueTasks = () => ok([{ id: 'T1', lead_id: 'L1', due_at: ago(30), kind: 'call', owner: 'colin', done_at: null, note: 'after 5', created_at: '', lead: LEADS[0] }])
@@ -83,11 +83,15 @@ export const useUnseenReplies = () => ok([{ id: 'M1', lead_id: 'L1', direction: 
 export const useFollowupDebt = () => ok([{ lead_id: 'L2', owner_name: 'RITA SCHMIDT', property_address: 'W220 N1765 Pewaukee Rd', stage: 'follow_up', next_action_at: ago(4000), next_action: 'call back about the roof', assigned_to: 'colin', days_late: 3 }])
 export const usePipelineCounts = () => ok([{ stage: 'reply_received', lane: 'hold', county: 'Milwaukee', n: 2 }, { stage: 'postcard_mailed', lane: 'flip', county: 'Racine', n: 4996 }, { stage: 'dnc', lane: 'hold', county: 'Milwaukee', n: 1 }])
 export const useLeads = () => ok({ rows: LEADS, count: LEADS.length })
+const REPLY_TASKS = [{ id: 'T9', lead_id: 'L1', due_at: ago(5), kind: 'email', owner: 'adil' as const, done_at: null, note: null, created_at: ago(5), source: 'reply',
+  title: 'Email them the info they asked for', quote: "Can you email me what you'd need? dale.novak@example.com", email_to: 'dale.novak@example.com', phone10: '4145550177' }]
 export const useLead = () => ok({
   lead: LEADS[0],
   contacts: [{ id: 'C1', lead_id: 'L1', kind: 'phone', value: '4145550177', value_normalized: '4145550177', person_name: 'DALE NOVAK', line_type: 'mobile', dnc_vendor: false, dnc_scrub: 'unknown', suppressed: false, dnc_app: false, source: 'fiverr', status: 'ok', note: null }],
-  messages: INBOX[0].messages, tasks: [], gates: [], milestones: [{ id: 1, lead_id: 'L1', kind: 'connect', at: ago(6) }],
+  messages: INBOX[0].messages, tasks: REPLY_TASKS, gates: [], milestones: [{ id: 1, lead_id: 'L1', kind: 'connect', at: ago(6) }],
+  facts: { motivation: 'tired of the tenants', timeline: 'before winter if I can', decision_makers: 'me and my sister', price_expectation: '"around 180"', flexibility: 'some, for a quick close', condition: 'roof is 20 years old', quotes: ["I'm done being a landlord"] },
 })
+export const useReplyTasks = () => ok(REPLY_TASKS.map((t) => ({ ...t, lead: LEADS[0] })))
 export const useDeals = () => ok([])
 export const useScoreboard = () => ok([{ week_start: '2026-10-19', lane: 'all', openers_sent: 100, delivered: 92, replies: 7, opt_outs: 2, connects: 6, contacts: 5, leads: 2, handoffs: 1, handoffs_held: 1, qualifying_calls: 1, walks: 1, contracts: 0, closes: 0, delivery_rate: 0.92, reply_rate: 0.0761, opt_out_rate: 0.0217, contact_rate: 0.8333, leads_per_delivered: 0.0217, handoffs_held_rate: 1, walk_rate: 1, walks_per_contract: null }])
 export const useSignalScoreboard = () => ok([{ week_start: '2026-10-19', signal: 'tired landlord', openers_sent: 40, delivered: 37, replies: 3, opt_outs: 1, leads: 1, walks: 0, contracts: 0 },

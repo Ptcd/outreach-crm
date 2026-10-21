@@ -7,7 +7,7 @@ export type LeadStage =
   | 'mail_only' | 'human_owned'
 
 export type Lane = 'hold' | 'flip'
-export type Person = 'colin' | 'thalia'
+export type Person = 'colin' | 'thalia' | 'adil'
 export type Role = 'owner' | 'caller'
 export type GateDecision = 'walk' | 'no_walk' | 'one_more_call'
 export type DealStatus = 'offer' | 'contract' | 'closed' | 'dead'
@@ -76,7 +76,7 @@ export interface Message {
   id: string
   lead_id: string
   direction: 'in' | 'out'
-  channel: 'sms' | 'call' | 'note'
+  channel: 'sms' | 'call' | 'note' | 'email'
   body: string | null
   from_number: string | null
   to_number: string | null
@@ -96,6 +96,12 @@ export interface Task {
   done_at: string | null
   note: string | null
   created_at: string
+  // 0009: opened by the reply agent
+  source?: string | null
+  title?: string | null
+  quote?: string | null
+  email_to?: string | null
+  phone10?: string | null
 }
 
 export interface GateScore {

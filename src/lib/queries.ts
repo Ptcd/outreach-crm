@@ -100,13 +100,14 @@ export function useLead(id: string) {
   return useQuery({
     queryKey: ['lead', id],
     queryFn: async () => {
-      const [lead, contacts, messages, tasks, gates, milestones] = await Promise.all([
+      const [lead, contacts, messages, tasks, gates, milestones, facts] = await Promise.all([
         supabase.from('leads').select('*').eq('id', id).single(),
         supabase.from('contacts').select('*').eq('lead_id', id).order('kind').order('line_type'),
         supabase.from('messages').select('*').eq('lead_id', id).order('sent_at', { ascending: false }),
         supabase.from('tasks').select('*').eq('lead_id', id).order('due_at'),
         supabase.from('gate_scores').select('*').eq('lead_id', id).order('at', { ascending: false }),
         supabase.from('lead_milestones').select('*').eq('lead_id', id),
+        supabase.from('reply_drafts').select('facts, inbound_at').eq('lead_id', id).not('facts', 'is', null).order('inbound_at'),
       ])
       return {
         lead: check(lead) as Lead,
@@ -115,6 +116,8 @@ export function useLead(id: string) {
         tasks: check(tasks) as Task[],
         gates: check(gates) as GateScore[],
         milestones: check(milestones) as Milestone[],
+        // What the seller has told us so far (the drafting model's facts, newest value wins)
+        facts: Object.assign({}, ...((facts.data ?? []) as { facts: Record<string, unknown> }[]).map((f) => f.facts ?? {})) as Record<string, unknown>,
       }
     },
   })
@@ -184,6 +187,14 @@ export const api = {
     return { error: d.outcome === 'refused' ? { message: d.reason ?? 'not sent' } : null, data: d }
   },
   setRoutine: (on: boolean) => supabase.rpc('set_routine_replies', { p_on: on }),
+  // A tap-sent email (never AI-sent), from the Gmail sender, logged on the lead
+  sendEmail: async (x: { lead_id: string | null; task_id: string | null; to: string; subject: string; body: string }) => {
+    const r = await supabase.functions.invoke('reply-send', { body: { action: 'send_email', ...x } })
+    if (r.error) return { error: { message: r.error.message } }
+    const d = r.data as { outcome: string; reason?: string }
+    return { error: d.outcome === 'sent' ? null : { message: d.reason ?? 'The email did not go.' } }
+  },
+  assignTask: (id: string, owner: Person) => supabase.from('tasks').update({ owner }).eq('id', id),
   setTestPhone: (phone: string) => supabase.rpc('set_test_phone', { p_phone: phone }),
   resetTestPhones: () => supabase.rpc('reset_test_phones'),
   notInterested: (leadId: string) =>
@@ -298,8 +309,8 @@ export function useRepliesWaiting() {
     queryKey: ['reply_waiting'],
     refetchInterval: 60_000,
     queryFn: async () =>
-      check(await supabase.from('reply_waiting').select('drafts_waiting, routine_would_send, queued').single()) as
-        { drafts_waiting: number; routine_would_send: number; queued: number },
+      check(await supabase.from('reply_waiting').select('drafts_waiting, routine_would_send, queued, tasks_open').single()) as
+        { drafts_waiting: number; routine_would_send: number; queued: number; tasks_open?: number },
   })
 }
 
@@ -346,5 +357,17 @@ export function useWaitingDrafts() {
         return { ...rest, owner_name: lead?.owner_name ?? null, property_address: lead?.property_address ?? null, thread: lines }
       })
     },
+  })
+}
+
+/** Open tasks the reply agent opened (things no text can do), oldest first. */
+export function useReplyTasks() {
+  return useQuery({
+    queryKey: ['tasks', 'reply'],
+    refetchInterval: 60_000,
+    queryFn: async () =>
+      check(await supabase.from('tasks').select('*, lead:leads(id, owner_name, property_address)')
+        .eq('source', 'reply').is('done_at', null).order('created_at').limit(100)) as
+        (Task & { lead: { id: string; owner_name: string; property_address: string | null } | null })[],
   })
 }

@@ -11,7 +11,7 @@ export interface StageInfo {
 }
 
 export const STAGES: StageInfo[] = [
-  { id: 'postcard_mailed', label: 'Postcard mailed', who: 'system', group: 'automatic' },
+  { id: 'postcard_mailed', label: 'Not texted yet', who: 'system', group: 'automatic' },
   { id: 'opener_queued', label: 'Text planned', who: 'colin', group: 'automatic' },
   { id: 'opener_sent', label: 'Text sent', who: 'system', group: 'automatic' },
   { id: 'reply_received', label: 'Replied', who: 'ai', group: 'working' },
@@ -26,9 +26,9 @@ export const STAGES: StageInfo[] = [
   { id: 'human_owned', label: 'Colin texting', who: 'colin', group: 'working' },
   { id: 'data_fix', label: 'Wrong number', who: 'system', group: 'working' },
   { id: 'closed_won', label: 'Closed', who: 'colin', group: 'closed' },
-  { id: 'mail_only', label: 'Mail only', who: 'system', group: 'closed' },
+  { id: 'mail_only', label: "Can't text", who: 'system', group: 'closed' },
   { id: 'dead', label: 'Dead', who: 'system', group: 'closed' },
-  { id: 'closed_no_contact', label: 'Hostile - no contact', who: 'system', group: 'closed' },
+  { id: 'closed_no_contact', label: 'No reply / no contact', who: 'system', group: 'closed' },
   { id: 'dnc', label: 'Do not contact', who: 'system', group: 'closed' },
 ]
 
@@ -158,7 +158,6 @@ export const MILESTONES: { id: MilestoneKind; label: string; hint: string }[] = 
 export const TASK_KINDS: { id: string; label: string }[] = [
   { id: 'call', label: 'Call' },
   { id: 'text', label: 'Text (inside their thread only)' },
-  { id: 'letter', label: 'Letter' },
   { id: 'confirm_walk', label: 'Confirm walk' },
   { id: 'offer_thinking', label: 'Offer: thinking it over' },
   { id: 'missed_callback', label: 'Missed callback' },
@@ -178,3 +177,55 @@ export const TASK_KINDS: { id: string; label: string }[] = [
 export const TASK_KIND_LABEL: Record<string, string> = Object.fromEntries(TASK_KINDS.map((k) => [k.id, k.label]))
 
 export const DEAL_STATUS_LABEL = { offer: 'Offer made', contract: 'Under contract', closed: 'Closed', dead: 'Dead' }
+
+/** Who can own a task. Adil works the tasks and bookings (Colin 2026-10-21). */
+export const PEOPLE: { id: 'colin' | 'adil' | 'thalia'; label: string }[] = [
+  { id: 'adil', label: 'Adil' },
+  { id: 'colin', label: 'Colin' },
+  { id: 'thalia', label: 'Thalia' },
+]
+export function personLabel(p: string | null | undefined): string {
+  return PEOPLE.find((x) => x.id === p)?.label ?? (p || '')
+}
+
+/** Work the reply agent hands to a person (supabase/functions/_shared/needsWork.ts). */
+export const REPLY_TASK_LABEL: Record<string, string> = {
+  email: 'Email',
+  send_docs: 'Send something',
+  records: 'Records / proof',
+  contact_other: 'Contact someone else',
+  appointment: 'Set up a visit',
+}
+
+/** Email templates for a tap-sent email (never AI-sent). {first} {address} are filled in. */
+export const EMAIL_TEMPLATES: { id: string; label: string; subject: string; body: string }[] = [
+  { id: 'info', label: 'The info you asked for', subject: 'About {address}',
+    body: 'Hi {first},\n\nThanks for getting back to me about {address}. \n\nAny questions, just reply here or text me at (262) 999-6513.\n\nColin Merrill' },
+  { id: 'photos', label: 'Photos or paperwork', subject: 'Photos for {address}',
+    body: 'Hi {first},\n\nThanks for offering to send photos of {address}. You can reply to this email with them, or text them to (262) 999-6513.\n\nColin Merrill' },
+  { id: 'followup', label: 'Following up', subject: 'Following up on {address}',
+    body: 'Hi {first},\n\nFollowing up on our conversation about {address}. \n\nColin Merrill\n(262) 999-6513' },
+]
+
+/** The facts the reply agent pulls from a text thread, in the order Colin reads them. */
+export const SELLER_FACTS: { id: string; label: string }[] = [
+  { id: 'motivation', label: 'Reason' },
+  { id: 'timeline', label: 'Clock' },
+  { id: 'decision_makers', label: 'Who signs' },
+  { id: 'price_expectation', label: 'Their number' },
+  { id: 'price_confirmed', label: 'Number confirmed' },
+  { id: 'flexibility', label: 'Willing to move?' },
+  { id: 'condition', label: 'Condition' },
+  { id: 'occupancy', label: 'Who lives there' },
+  { id: 'known_debt', label: 'Debt' },
+  { id: 'terms', label: 'Besides price' },
+  { id: 'interest', label: 'Interest' },
+  { id: 'callback_slot', label: 'Call time' },
+  { id: 'best_number', label: 'Better number' },
+  { id: 'handoff_flag', label: 'Flag' },
+  { id: 'signed_with_other', label: 'Signed with someone' },
+  { id: 'thinking_over', label: 'Thinking over' },
+  { id: 'buyer_check', label: 'Asked who is buying' },
+  { id: 'other_property', label: 'Other property' },
+  { id: 'quotes', label: 'In their words' },
+]

@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge, Empty, ErrorNote, Section, Select } from '@/components/ui/form'
-import { api, useDueTasks, useFollowupDebt, useUnseenReplies, useWrite } from '@/lib/queries'
+import { api, useDueTasks, useFollowupDebt, useReplyTasks, useUnseenReplies, useWrite } from '@/lib/queries'
+import { ReplyTaskCard } from '@/components/ReplyTaskCard'
 import { endOfTodayIso, fmtDateTime } from '@/lib/format'
-import { STAGE_LABEL, TASK_KIND_LABEL } from '@/lib/wpie'
+import { STAGE_LABEL, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
 import type { Person } from '@/lib/types'
 
@@ -15,6 +16,7 @@ export default function Today() {
   const tasks = useDueTasks(until, who)
   const replies = useUnseenReplies()
   const debt = useFollowupDebt()
+  const replyTasks = useReplyTasks()
   const done = useWrite((id: string) => api.finishTask(id), [['tasks'], ['lead']])
   const seen = useWrite((id: string) => api.markSeen(id, user!.id), [['messages'], ['lead']])
   const now = Date.now()
@@ -22,6 +24,15 @@ export default function Today() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Today</h1>
+
+      <Section title={`Tasks from replies${replyTasks.data ? ` (${replyTasks.data.length})` : ''}`}>
+        <p className="mb-2 text-sm text-muted-foreground">Things a seller asked for that a text can&apos;t do. Adil by default.</p>
+        <ErrorNote error={replyTasks.error} />
+        {replyTasks.data?.length === 0 && <Empty>Nothing waiting.</Empty>}
+        <ul className="space-y-3">
+          {replyTasks.data?.map((t) => <ReplyTaskCard key={t.id} t={t} />)}
+        </ul>
+      </Section>
 
       <Section
         title={`New replies${replies.data ? ` (${replies.data.length})` : ''}`}
@@ -55,6 +66,7 @@ export default function Today() {
           <Select value={who} onChange={(e) => setWho(e.target.value as Person | 'all')} className="w-32">
             <option value="all">Everyone</option>
             <option value="colin">Colin</option>
+            <option value="adil">Adil</option>
             <option value="thalia">Thalia</option>
           </Select>
         }
@@ -70,7 +82,7 @@ export default function Today() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium">{TASK_KIND_LABEL[t.kind] ?? t.kind}</span>
                     {late ? <Badge tone="bad">Overdue</Badge> : <Badge tone="info">Due today</Badge>}
-                    <Badge>{t.owner === 'colin' ? 'Colin' : 'Thalia'}</Badge>
+                    <Badge>{personLabel(t.owner)}</Badge>
                   </div>
                   {t.lead && (
                     <Link to={`/lead/${t.lead.id}`} className="inline-flex min-h-11 items-center text-sm underline">

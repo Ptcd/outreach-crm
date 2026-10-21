@@ -7,6 +7,8 @@ import { approveReply } from '../_shared/replyAgent.ts'
 import { senderEnv, twilioPort, type Rpc } from '../_shared/sending.ts'
 import { testNotification } from '../_shared/notify.ts'
 import { notifyDeps } from '../_shared/notifyDeno.ts'
+import { bodyHtml, checkEmail } from '../_shared/emailSend.ts'
+import { sendMail } from '../_shared/smtp.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -26,7 +28,29 @@ Deno.serve(async (req) => {
   const me = await asUser.from('team_members').select('display_name').limit(1).maybeSingle()
   const actor = (me.data?.display_name as string | undefined) ?? 'Colin'
 
-  const { id, action, text } = await req.json().catch(() => ({}))
+  const body = await req.json().catch(() => ({}))
+  const { id, action, text } = body
+  if (action === 'send_email') {
+    // Colin's or Adil's tap: an email from the Gmail sender, logged on the lead. Never AI-sent.
+    const to = String(body.to ?? '').trim()
+    const subject = String(body.subject ?? '').trim()
+    const content = String(body.body ?? '')
+    const problem = checkEmail({ to, subject, body: content })
+    if (problem) return json({ outcome: 'refused', reason: problem })
+    const user = Deno.env.get('SMTP_USER') ?? ''
+    const pass = Deno.env.get('SMTP_PASSWORD') ?? ''
+    if (!user || !pass) return json({ outcome: 'refused', reason: 'Email is not set up yet: Colin runs tools\\set_supabase_email.ps1 once.' })
+    try {
+      const conn = await Deno.connectTls({ hostname: Deno.env.get('SMTP_HOST') || 'smtp.gmail.com', port: 465 })
+      await sendMail(conn, { user, pass }, { from: Deno.env.get('SMTP_FROM') || user, to, subject, text: content, html: bodyHtml(content) })
+    } catch (e) {
+      return json({ outcome: 'refused', reason: `The email did not go: ${String(e instanceof Error ? e.message : e).slice(0, 160)}` })
+    }
+    const sbs = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', { auth: { persistSession: false } })
+    await sbs.rpc('log_email', { p_lead_id: body.lead_id ?? null, p_task_id: body.task_id ?? null, p_to: to, p_subject: subject,
+      p_body: content, p_actor: body.actor ?? actor })
+    return json({ outcome: 'sent' })
+  }
   if (action === 'test_notification') {
     const sbs = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', { auth: { persistSession: false } })
     const rpcs: Rpc = async (fn, args) => {

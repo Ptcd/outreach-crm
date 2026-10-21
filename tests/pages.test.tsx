@@ -39,15 +39,17 @@ vi.mock('@/lib/queries', () => ({
     lead,
     contacts: [{ id: 'C1', lead_id: 'L1', kind: 'phone', value: '4145550101', value_normalized: '4145550101', person_name: 'JANE ROE', line_type: 'mobile', dnc_vendor: false, dnc_scrub: 'unknown', suppressed: true, dnc_app: false, source: 'fiverr', status: 'ok', note: null }],
     messages: [{ id: 'M1', lead_id: 'L1', direction: 'out', channel: 'sms', body: 'Hi Jane', sent_at: '2026-10-21T15:00:00Z', seen_at: null, is_opt_out: false, is_opener: true, status: 'delivered', from_number: null, to_number: null }],
-    tasks: [], gates: [], milestones: [{ id: 1, lead_id: 'L1', kind: 'connect', at: '2026-10-21T16:00:00Z' }],
+    tasks: [{ id: 'T9', lead_id: 'L1', due_at: '2026-10-21T16:00:00Z', kind: 'email', owner: 'adil', done_at: null, note: null, created_at: '2026-10-21T16:00:00Z', source: 'reply', title: 'Email them the info they asked for', quote: 'Can you email me at jane@example.com?', email_to: 'jane@example.com', phone10: '4145550101' }], gates: [], milestones: [{ id: 1, lead_id: 'L1', kind: 'connect', at: '2026-10-21T16:00:00Z' }],
+    facts: { motivation: 'tired of tenants', timeline: 'by spring', quotes: ['done with it'] },
   }),
+  useReplyTasks: () => ok([{ id: 'T9', lead_id: 'L1', due_at: '2026-10-21T16:00:00Z', kind: 'email', owner: 'adil', done_at: null, note: null, created_at: '2026-10-21T16:00:00Z', source: 'reply', title: 'Email them the info they asked for', quote: 'Can you email me at jane@example.com?', email_to: 'jane@example.com', phone10: '4145550101', lead }]),
   useDeals: () => ok([]),
   usePlannedOpeners: () => ok([{ id: 'P1', plan_date: '2026-10-22', wpie_owner_id: 2, attempt: 1, lead_id: 'L1', lane: 'flip', template_lane: 'llc', variant: 'A', phone: '+14145550200', body: 'Hi, this is Colin Merrill with Merrill Holdings.', segments: 2, scheduled_at: '2026-10-22T15:00:00Z', owner_name: 'ACME LLC', property_address: '200 S OAK AV', decision: 'pending', decided_by_name: null, decided_at: null, decision_note: null, send_status: 'planned', send_reason: null, claimed_at: null, sent_at: null, error_code: null }]),
   useOtherDrafts: () => ok([{ id: 'D9', inbound_sid: 'SMd9', phone10: '2625550111', our_number: '+12624180202', lead_id: null,
     inbound_body: 'wrong number', inbound_at: '2026-10-21T17:00:00Z', intent: 'wrong_number', kind: 'routine', outcome: 'wrong_number',
     note: null, body: 'Sorry about that - looks like we had the wrong number.', draft_source: 'fixed_line', status: 'would_send',
     send_after: null, sent_body: null, sent_at: null, decided_by: null, decided_at: null, is_test: true }]),
-  useRepliesWaiting: () => ok({ drafts_waiting: 1, routine_would_send: 1, queued: 0 }),
+  useRepliesWaiting: () => ok({ drafts_waiting: 1, routine_would_send: 1, queued: 0, tasks_open: 1 }),
   useWaitingDrafts: () => ok([{ id: 'D1', inbound_sid: 'SMd1', phone10: '4145550300', our_number: '+12629996513', lead_id: 'L2',
     inbound_body: 'Maybe, who is buying?', inbound_at: '2026-10-21T16:00:00Z', intent: 'buyer_check', kind: 'candidate', outcome: 'open',
     note: null, body: 'Good question - I buy them myself. Is the place still yours?', draft_source: 'claude', status: 'awaiting_approval',
@@ -114,6 +116,11 @@ describe('pages render', () => {
     expect(screen.getAllByRole('radiogroup')).toHaveLength(6)
     expect(screen.getByText('Deal (Colin only)')).toBeTruthy()
     expect(screen.getByText(/never suggests an offer/)).toBeTruthy()
+    expect(screen.getByText('What the seller told us')).toBeTruthy()
+    expect(screen.getByText('tired of tenants')).toBeTruthy()
+    expect(screen.getByText(/Can you email me/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Send an email' })).toBeTruthy()
+    expect(screen.queryByText('Mailed')).toBeNull()
   })
 
   it('Approvals shows the switch, the pause, bulk buttons and each text', () => {

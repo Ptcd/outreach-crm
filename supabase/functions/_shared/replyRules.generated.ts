@@ -2,7 +2,7 @@
 // Source: WPIE repo (claude/real estate): opt-out from wpie/sms/webhooks.py (OPTOUT_WORDS and
 // the regexes is_opt_out uses), price/offer blocking from wpie/reply/rules.py (PRICE_RE,
 // OFFER_RE, ALLOWED_RE), converted to JavaScript by tools/export_reply_prompt.py
-// from WPIE commit 630eab5 on 2026-10-21 (agent Sam, owner Colin Merrill).
+// from WPIE commit 35ece64 on 2026-10-21 (agent Sam, owner Colin Merrill).
 // To change a rule, edit those files there and re-run the script. replyRules.ts holds the
 // (small) algorithm; replyRules.parity.test.ts proves it agrees with Python.
 
