@@ -119,6 +119,45 @@ describe('the locks', () => {
     await expect(as(THALIA, () => db.query('select public.clear_pause()'))).rejects.toThrow(/only Colin/)
     await as(COLIN, () => db.query('select public.clear_pause()'))
     expect(await claim(T('15:05'))).toMatchObject({ outcome: 'send' })
+    const c = (await db.query<{ pause_cleared_by: string; cleared: boolean }>(
+      `select pause_cleared_by, pause_cleared_at is not null as cleared from public.campaign_control`)).rows[0]
+    expect(c).toEqual({ pause_cleared_by: 'Colin', cleared: true })
+  })
+
+  it('the carrier-filter brake counts only sends after the last clear, so a clear sticks', async () => {
+    await db.exec(`update public.campaign_control set pause_cleared_at = null, pause_cleared_by = null`)
+    // Four filtered texts today trip it (3 of the last 50).
+    for (let i = 0; i < 4; i++) {
+      const id = await opener(await lead())
+      await db.query(`update public.planned_openers set send_status = 'undelivered', claim_mode = 'live',
+                       claimed_at = now() - make_interval(mins => 30 - $2), error_code = '30007' where id = $1`, [id, i])
+    }
+    await db.query(`select public.check_filter_rule(now())`)
+    expect((await db.query<{ paused: boolean }>(`select paused from public.campaign_control`)).rows[0].paused).toBe(true)
+    await as(COLIN, () => db.query(`select public.clear_pause('Colin, after the 30007 review')`))
+    // The next send (clean) must not re-trip on the old four.
+    const next = await opener(await lead())
+    await db.query(`update public.planned_openers set send_status = 'delivered', claim_mode = 'live', claimed_at = now() + interval '1 second' where id = $1`, [next])
+    await db.query(`select public.check_filter_rule(now())`)
+    const after = (await db.query<{ paused: boolean; pause_cleared_by: string }>(`select paused, pause_cleared_by from public.campaign_control`)).rows[0]
+    expect(after).toEqual({ paused: false, pause_cleared_by: 'Colin, after the 30007 review' })
+    // Three new filtered texts after the clear still trip it.
+    for (let i = 0; i < 3; i++) {
+      const id = await opener(await lead())
+      await db.query(`update public.planned_openers set send_status = 'undelivered', claim_mode = 'live', claimed_at = now() + make_interval(secs => $2),
+                       error_code = '30007' where id = $1`, [id, 2 + i])
+    }
+    await db.query(`select public.check_filter_rule(now())`)
+    expect((await db.query<{ paused: boolean; pause_reason: string }>(`select paused, pause_reason from public.campaign_control`)).rows[0])
+      .toEqual({ paused: true, pause_reason: expect.stringMatching(/^3 carrier-filtered texts .* since the last clear$/) })
+  })
+
+  it('stamps who and when for a clear made outside the button (e.g. the laptop push)', async () => {
+    await db.exec(`update public.campaign_control set paused = true, pause_reason = 'x', pause_cleared_at = null, pause_cleared_by = null`)
+    await db.exec(`update public.campaign_control set paused = false`)
+    const c = (await db.query<{ cleared: boolean; by: string }>(`select pause_cleared_at is not null as cleared, pause_cleared_by as by from public.campaign_control`)).rows[0]
+    expect(c.cleared).toBe(true)
+    expect(c.by).toBeTruthy()
   })
 })
 
