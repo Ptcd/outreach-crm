@@ -58,7 +58,7 @@ export default function Approvals() {
       </div>
       {!isOwner && <p className="rounded bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">Only Colin can approve, skip or withdraw.</p>}
       {isOwner && rows.length > 0 && (
-        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 border-t bg-background/95 p-3 backdrop-blur sm:sticky sm:top-14 sm:bottom-auto sm:-mx-4 sm:border-b sm:border-t-0 sm:px-4 sm:py-2">
+        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 border-t bg-background p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:sticky sm:top-14 sm:bottom-auto sm:-mx-4 sm:border-b sm:border-t-0 sm:px-4 sm:py-2">
           <div className="mx-auto flex max-w-5xl flex-col gap-2 sm:flex-row sm:flex-wrap">
             <ConfirmButton className="h-12 w-full text-base sm:h-10 sm:w-auto" disabled={busy || waiting.length === 0}
               question={tickedWaiting.length
