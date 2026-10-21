@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
 import { BarChart3, CalendarCheck, Inbox, ListChecks, MessageSquareText } from 'lucide-react'
 import { useAuth } from '@/providers/AuthProvider'
+import { useRepliesWaiting } from '@/lib/queries'
 import { cn } from '@/lib/utils'
 
 const NAV = [
@@ -14,6 +15,10 @@ const NAV = [
 
 export function Layout({ children }: { children: ReactNode }) {
   const { member, signOut } = useAuth()
+  const waiting = useRepliesWaiting().data?.drafts_waiting ?? 0
+  const badge = (to: string) => (to === '/inbox' && waiting > 0
+    ? <span aria-label={`${waiting} replies waiting`} className="ml-1 rounded-full bg-red-600 px-1.5 text-[11px] font-semibold text-white">{waiting}</span>
+    : null)
   return (
     <div className="min-h-screen bg-muted/40 pb-20 sm:pb-0">
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
@@ -29,6 +34,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 }
               >
                 {n.label}
+                {badge(n.to)}
               </NavLink>
             ))}
           </nav>
@@ -50,7 +56,12 @@ export function Layout({ children }: { children: ReactNode }) {
               cn('flex flex-col items-center gap-0.5 py-2 text-xs', isActive ? 'text-primary' : 'text-muted-foreground')
             }
           >
-            <n.icon className="h-5 w-5" aria-hidden />
+            <span className="relative">
+              <n.icon className="h-5 w-5" aria-hidden />
+              {n.to === '/inbox' && waiting > 0 && (
+                <span className="absolute -right-2 -top-1 rounded-full bg-red-600 px-1 text-[10px] font-semibold text-white">{waiting}</span>
+              )}
+            </span>
             {n.label}
           </NavLink>
         ))}

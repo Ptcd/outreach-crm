@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabaseClient'
 import type {
   CampaignControl, Contact, Deal, FollowupDebt, GateScore, Lead, LeadStage, Message, Milestone, MilestoneKind,
-  OpenerDecision, Person, PlannedOpener, ReplyThread, ScoreboardWeek, SignalWeek, Task, TwilioInbound,
+  OpenerDecision, Person, PlannedOpener, ReplyDraft, ReplyThread, ScoreboardWeek, SignalWeek, Task, TwilioInbound,
 } from './types'
 import type { InboxLead } from './inbox'
 
@@ -176,6 +176,14 @@ export const api = {
     if (a.error) return a
     return supabase.from('tasks').insert({ lead_id: leadId, due_at: atIso, kind: 'call', owner: 'colin', note: "Colin's call (booked from Inbox)" })
   },
+  // Sam's drafts: Approve (with Colin's final words) or Skip, through the reply-send Edge Function
+  replyAction: async (id: string, action: 'approve' | 'skip', text?: string) => {
+    const r = await supabase.functions.invoke('reply-send', { body: { id, action, text } })
+    if (r.error) return { error: { message: r.error.message } }
+    const d = r.data as { outcome: string; reason?: string }
+    return { error: d.outcome === 'refused' ? { message: d.reason ?? 'not sent' } : null, data: d }
+  },
+  setRoutine: (on: boolean) => supabase.rpc('set_routine_replies', { p_on: on }),
   notInterested: (leadId: string) =>
     supabase.from('leads').update({ stage: 'dead', dead_reason: 'not interested', next_action_at: null, next_action: null }).eq('id', leadId),
 }
@@ -188,7 +196,7 @@ export function useCampaignControl() {
     queryFn: async () =>
       check(
         await supabase.from('campaign_control')
-          .select('sending_enabled, sending_changed_by, sending_changed_at, paused, pause_reason, paused_at, laptop_paused, laptop_pause_reason, daily_cap, window_start, window_end, dnc_policy, last_run_at, last_run_summary')
+          .select('sending_enabled, sending_changed_by, sending_changed_at, paused, pause_reason, paused_at, laptop_paused, laptop_pause_reason, daily_cap, window_start, window_end, dnc_policy, last_run_at, last_run_summary, routine_enabled, routine_changed_by, routine_changed_at, agent_rules_version, redteam_version, redteam_passed, redteam_total, redteam_ok, redteam_at, agent_last_run_at, agent_last_summary')
           .eq('id', 1).single(),
       ) as CampaignControl,
   })
@@ -209,21 +217,24 @@ export function useInbox(fromDay: string, toDay: string) {
           .limit(500),
       ) as (PlannedOpener & { lead: InboxLead['lead'] })[]
       const leadIds = [...new Set(openers.map((o) => o.lead_id).filter((x): x is string => Boolean(x)))]
-      if (leadIds.length === 0) return openers.map((o) => ({ opener: o, lead: o.lead, messages: [], thread: null, inbound: [] }))
-      const [messages, threads, inbound] = await Promise.all([
+      if (leadIds.length === 0) return openers.map((o) => ({ opener: o, lead: o.lead, messages: [], thread: null, inbound: [], drafts: [] }))
+      const [messages, threads, inbound, drafts] = await Promise.all([
         supabase.from('messages').select('*').in('lead_id', leadIds).eq('channel', 'sms').order('sent_at'),
         supabase.from('reply_threads').select('*').in('lead_id', leadIds),
         supabase.from('twilio_inbound').select('*').in('lead_id', leadIds).order('received_at'),
+        supabase.from('reply_drafts').select('*').in('lead_id', leadIds).order('inbound_at'),
       ])
       const msgs = check(messages) as Message[]
       const ths = check(threads) as ReplyThread[]
       const inb = check(inbound) as TwilioInbound[]
+      const drs = check(drafts) as ReplyDraft[]
       return openers.map((o) => ({
         opener: o,
         lead: o.lead,
         messages: msgs.filter((m) => m.lead_id === o.lead_id),
         thread: ths.find((t) => t.lead_id === o.lead_id) ?? null,
         inbound: inb.filter((m) => m.lead_id === o.lead_id),
+        drafts: drs.filter((d) => d.lead_id === o.lead_id),
       }))
     },
   })
@@ -259,5 +270,32 @@ export function useSignalScoreboard(weekStart: string | null) {
       check(
         await supabase.from('scoreboard_weekly_by_signal').select('*').eq('week_start', weekStart!).order('openers_sent', { ascending: false }),
       ) as SignalWeek[],
+  })
+}
+
+// ------------------------------------------------------------ Sam's replies
+/** Replies from numbers that are not on any planned text (no lead, or a lead we never texted). */
+export function useOtherDrafts(knownLeadIds: string[]) {
+  return useQuery({
+    queryKey: ['reply_drafts', 'other', knownLeadIds.length],
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const rows = check(
+        await supabase.from('reply_drafts').select('*').neq('status', 'superseded').order('inbound_at', { ascending: false }).limit(200),
+      ) as ReplyDraft[]
+      const known = new Set(knownLeadIds)
+      return rows.filter((d) => !d.lead_id || !known.has(d.lead_id))
+    },
+  })
+}
+
+/** How many of Sam's drafts wait for Colin (the Inbox badge). */
+export function useRepliesWaiting() {
+  return useQuery({
+    queryKey: ['reply_waiting'],
+    refetchInterval: 60_000,
+    queryFn: async () =>
+      check(await supabase.from('reply_waiting').select('drafts_waiting, routine_would_send, queued').single()) as
+        { drafts_waiting: number; routine_would_send: number; queued: number },
   })
 }

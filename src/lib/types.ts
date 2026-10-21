@@ -185,6 +185,45 @@ export interface CampaignControl {
   dnc_policy: 'require_scrub' | 'allow_unknown'
   last_run_at: string | null
   last_run_summary: RunSummary | null
+  // 0004: Sam, the reply agent
+  routine_enabled: boolean
+  routine_changed_by: string | null
+  routine_changed_at: string | null
+  agent_rules_version: string | null
+  redteam_version: string | null
+  redteam_passed: number | null
+  redteam_total: number | null
+  redteam_ok: boolean
+  redteam_at: string | null
+  agent_last_run_at: string | null
+  agent_last_summary: Record<string, unknown> | null
+}
+
+export type DraftStatus =
+  | 'no_reply' | 'would_send' | 'awaiting_approval' | 'queued' | 'sending' | 'sent' | 'dry_sent'
+  | 'failed' | 'uncertain' | 'skipped' | 'superseded'
+
+/** One inbound text and Sam's answer to it (migration 0004). */
+export interface ReplyDraft {
+  id: string
+  inbound_sid: string
+  phone10: string
+  our_number: string | null
+  lead_id: string | null
+  inbound_body: string | null
+  inbound_at: string
+  intent: string | null
+  kind: 'removal' | 'routine' | 'candidate'
+  outcome: string | null
+  note: string | null
+  body: string | null
+  draft_source: string | null
+  status: DraftStatus
+  send_after: string | null
+  sent_body: string | null
+  sent_at: string | null
+  decided_by: string | null
+  decided_at: string | null
 }
 
 /** The reply agent's view of one conversation, pushed by the WPIE sync. */

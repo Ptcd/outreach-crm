@@ -8,7 +8,9 @@
 // reaches here. A definite 4xx refusal is 'failed'; anything else that is not a
 // clean success (network error, timeout, 5xx, unreadable answer) is 'uncertain' and
 // is never tried again.
-import * as R from './replyRules.generated.ts'
+import { isOptOut } from './replyGuard.ts'
+
+export { isOptOut }
 
 export type Rpc = (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>
 
@@ -28,8 +30,10 @@ export interface SendFailure { ok: false; httpStatus: number | null; code: strin
 export interface InboundText { sid: string; from: string; to: string; body: string; dateSent: string }
 
 export interface TwilioPort {
-  send(to: string, body: string): Promise<SendResult | SendFailure>
-  inboundSince(since: Date): Promise<InboundText[]>
+  /** `from`: send from this exact number (a reply goes out from the number they texted). */
+  send(to: string, body: string, from?: string | null): Promise<SendResult | SendFailure>
+  /** Inbound texts to `to` (default: the campaign number) since `since`. */
+  inboundSince(since: Date, to?: string): Promise<InboundText[]>
 }
 
 // ------------------------------------------------------------------ the env
@@ -70,9 +74,10 @@ export function twilioPort(cfg: TwilioConfig, fetchFn: typeof fetch): TwilioPort
   const base = `https://api.twilio.com/2010-04-01/Accounts/${cfg.accountSid}`
   const auth = 'Basic ' + btoa(`${cfg.user}:${cfg.password}`)
   return {
-    async send(to, body) {
+    async send(to, body, from) {
       const form = new URLSearchParams({ To: to, Body: body, MessagingServiceSid: cfg.messagingServiceSid })
-      if (cfg.statusCallbackUrl) form.set('StatusCallback', cfg.statusCallbackUrl)
+      if (from) form.set('From', from)     // must be a number in the same Messaging Service
+      if (cfg.statusCallbackUrl && !from) form.set('StatusCallback', cfg.statusCallbackUrl)
       let res: Response
       try {
         res = await fetchFn(`${base}/Messages.json`, {
@@ -96,9 +101,9 @@ export function twilioPort(cfg: TwilioConfig, fetchFn: typeof fetch): TwilioPort
         message: String(json.message ?? res.statusText ?? '').slice(0, 300),
       }
     },
-    async inboundSince(since) {
+    async inboundSince(since, to) {
       const day = since.toISOString().slice(0, 10)
-      const url = `${base}/Messages.json?To=${encodeURIComponent(cfg.campaignNumber)}&DateSent%3E=${day}&PageSize=200`
+      const url = `${base}/Messages.json?To=${encodeURIComponent(to ?? cfg.campaignNumber)}&DateSent%3E=${day}&PageSize=200`
       const res = await fetchFn(url, { headers: { Authorization: auth } })
       if (!res.ok) throw new Error(`Twilio inbound list answered ${res.status}`)
       const json = (await res.json()) as { messages?: Record<string, unknown>[] }
@@ -219,38 +224,4 @@ export async function validTwilioSignature(authToken: string, url: string, param
   let diff = 0
   for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ header.charCodeAt(i)
   return diff === 0
-}
-
-// ------------------------------------------------- opt-out (wpie/sms/webhooks.py)
-// The word lists and regexes are generated from WPIE (replyRules.generated.ts, copied
-// from pm-phone, written by WPIE tools/export_reply_prompt.py); this is the same small
-// algorithm pm-phone ports, and tests/optout.parity.test.ts checks it against
-// Python's answer for every red-team text.
-const re = (spec: R.RegexSpec, extra = '') => new RegExp(spec.source, spec.flags + extra)
-const OPTOUT_WORDS = new Set(R.OPTOUT_WORDS)
-const OPTOUT_PHRASE = re(R.OPTOUT_PHRASE)
-const LEGAL_THREAT = re(R.LEGAL_THREAT)
-const SOFT_OPTOUT = re(R.SOFT_OPTOUT)
-const CHANNEL_PREF = re(R.CHANNEL_PREF)
-const NEGATED = re(R.NEGATED, 'g')
-const POLITE_TAIL = re(R.POLITE_TAIL, 'g')
-const POLITE_HEAD = re(R.POLITE_HEAD, 'g')
-const SHORT_STOP = re(R.SHORT_STOP)
-const COMBINING_MARK = re(R.COMBINING_MARK, 'g')
-
-function fold(text: string): string {
-  const t = (text ?? '').toLowerCase().replace(/’/g, "'").normalize('NFKD').replace(COMBINING_MARK, '')
-  return t.replace(/[^a-z0-9' ]/g, ' ').replace(/\s+/g, ' ').trim()
-}
-const squash = (s: string) => s.replace(/[ ']/g, '')
-
-export function isOptOut(text: string): boolean {
-  const normalized = fold(text)
-  if (OPTOUT_WORDS.has(squash(normalized))) return true
-  let core = normalized.replace(POLITE_TAIL, '').replace(POLITE_HEAD, '').trim()
-  if (OPTOUT_WORDS.has(squash(core))) return true
-  core = core.replace(NEGATED, ' ').replace(/\s+/g, ' ').trim()
-  if (OPTOUT_PHRASE.test(core) || LEGAL_THREAT.test(core)) return true
-  if (SOFT_OPTOUT.test(core) && !CHANNEL_PREF.test(core)) return true
-  return SHORT_STOP.test(core)
 }

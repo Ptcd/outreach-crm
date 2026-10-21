@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge, Empty, ErrorNote } from '@/components/ui/form'
-import { api, useInbox, useWrite } from '@/lib/queries'
+import { api, useInbox, useOtherDrafts, useWrite } from '@/lib/queries'
+import { DraftBox } from '@/components/DraftBox'
 import { fmtDateTime, localInputToIso, todayLocal } from '@/lib/format'
 import {
   BUCKETS, type Bucket, type InboxLead, SEND_LABEL, WORDING, bucketOf, intentText, nextBusinessMorning, optedOut,
@@ -21,7 +22,10 @@ export default function Inbox() {
   const [to] = useState(daysAgo(-7))
   const q = useInbox(from, to)
   const [chip, setChip] = useState<Bucket | 'all'>('all')
-  const rows = useMemo(() => (q.data ?? []).map((x) => ({ x, bucket: bucketOf(x) })), [q.data])
+  const rows = useMemo(() => (q.data ?? []).map((x) => ({ x, bucket: bucketOf(x) }))
+    .sort((a, b) => Number(b.bucket === 'needs_me') - Number(a.bucket === 'needs_me')), [q.data])
+  const leadIds = useMemo(() => (q.data ?? []).map((x) => x.opener.lead_id).filter((x): x is string => Boolean(x)), [q.data])
+  const other = useOtherDrafts(leadIds)
   const counts = rows.reduce((c, r) => ({ ...c, [r.bucket]: (c[r.bucket] ?? 0) + 1 }), {} as Record<Bucket, number>)
   const shown = rows.filter((r) => chip === 'all' || r.bucket === chip)
 
@@ -29,8 +33,8 @@ export default function Inbox() {
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Inbox</h1>
       <p className="text-sm text-muted-foreground">
-        Every seller text from the last 30 days and the coming week: what was sent, what came back, and what the reply AI
-        thinks. Tap a card's buttons to move the lead along.
+        Every seller text from the last 30 days and the coming week. Sam answers the routine ones (removals, wrong numbers,
+        not interested); anything real waits here for your Approve. Nothing is forwarded to your phone.
       </p>
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1" role="tablist" aria-label="Filter">
         {[{ id: 'all' as const, label: 'All' }, ...BUCKETS].map((b) => (
@@ -56,6 +60,15 @@ export default function Inbox() {
           <InboxCard key={x.opener.id} x={x} bucket={bucket} />
         ))}
       </div>
+      {(other.data ?? []).length > 0 && (chip === 'all' || chip === 'needs_me') && (
+        <section className="space-y-2">
+          <h2 className="pt-2 font-semibold">Texts from numbers not on these plans</h2>
+          {(other.data ?? []).filter((d) => chip === 'all' || d.status === 'awaiting_approval').map((d) => (
+            <div key={d.id} className="rounded-lg border bg-card p-3 shadow-sm"><DraftBox d={d} showFrom /></div>
+          ))}
+        </section>
+      )}
+      <ErrorNote error={other.error} />
     </div>
   )
 }
@@ -108,7 +121,9 @@ function InboxCard({ x, bucket }: { x: InboxLead; bucket: Bucket }) {
         ))}
       </div>
 
-      {t && (t.intent || t.suggested_reply || t.handoff_flag) && (
+      {x.drafts.filter((d) => d.status !== 'superseded').slice(-1).map((d) => <DraftBox key={d.id} d={d} />)}
+
+      {x.drafts.length === 0 && t && (t.intent || t.suggested_reply || t.handoff_flag) && (
         <div className="mt-3 rounded-md border border-blue-200 bg-blue-50 p-2 text-sm text-blue-950">
           <p className="font-medium">
             Reply AI: {intentText(t.intent) || 'no read yet'}

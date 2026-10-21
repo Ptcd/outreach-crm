@@ -7,3 +7,10 @@ verify_jwt = false
 
 [functions.opener-status]
 verify_jwt = false
+
+[functions.reply-agent]
+verify_jwt = false
+
+# Called by the app with the signed-in user's token; the function checks the owner role itself.
+[functions.reply-send]
+verify_jwt = true

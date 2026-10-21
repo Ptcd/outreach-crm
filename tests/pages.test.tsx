@@ -43,16 +43,25 @@ vi.mock('@/lib/queries', () => ({
   }),
   useDeals: () => ok([]),
   usePlannedOpeners: () => ok([{ id: 'P1', plan_date: '2026-10-22', wpie_owner_id: 2, attempt: 1, lead_id: 'L1', lane: 'flip', template_lane: 'llc', variant: 'A', phone: '+14145550200', body: 'Hi, this is Colin Merrill with Merrill Holdings.', segments: 2, scheduled_at: '2026-10-22T15:00:00Z', owner_name: 'ACME LLC', property_address: '200 S OAK AV', decision: 'pending', decided_by_name: null, decided_at: null, decision_note: null, send_status: 'planned', send_reason: null, claimed_at: null, sent_at: null, error_code: null }]),
-  useCampaignControl: () => ok({ sending_enabled: false, sending_changed_by: null, sending_changed_at: null, paused: true, pause_reason: '3 carrier-filtered texts', paused_at: '2026-10-22T16:00:00Z', laptop_paused: false, laptop_pause_reason: null, daily_cap: 100, window_start: '10:00:00', window_end: '18:15:00', dnc_policy: 'allow_unknown', last_run_at: '2026-10-22T16:05:00Z', last_run_summary: { mode: 'dry', why_dry: 'TWILIO_LIVE_SENDING is not 1', inbound_new: 0, inbound_error: null, sent: 0, would_send: 3, skipped: [], failed: 0, uncertain: 0, stopped: 'nothing_due' } }),
+  useOtherDrafts: () => ok([{ id: 'D9', inbound_sid: 'SMd9', phone10: '2625550111', our_number: '+12624180202', lead_id: null,
+    inbound_body: 'wrong number', inbound_at: '2026-10-21T17:00:00Z', intent: 'wrong_number', kind: 'routine', outcome: 'wrong_number',
+    note: null, body: 'Sorry about that - looks like we had the wrong number.', draft_source: 'fixed_line', status: 'would_send',
+    send_after: null, sent_body: null, sent_at: null, decided_by: null, decided_at: null }]),
+  useRepliesWaiting: () => ok({ drafts_waiting: 1, routine_would_send: 1, queued: 0 }),
+  useCampaignControl: () => ok({ sending_enabled: false, sending_changed_by: null, sending_changed_at: null, paused: true, pause_reason: '3 carrier-filtered texts', paused_at: '2026-10-22T16:00:00Z', laptop_paused: false, laptop_pause_reason: null, daily_cap: 100, window_start: '10:00:00', window_end: '18:15:00', dnc_policy: 'allow_unknown', routine_enabled: false, routine_changed_by: null, routine_changed_at: null, agent_rules_version: 'r1', redteam_version: 'r1', redteam_passed: 440, redteam_total: 440, redteam_ok: true, redteam_at: '2026-10-22T16:00:00Z', agent_last_run_at: '2026-10-22T16:06:00Z', agent_last_summary: null, last_run_at: '2026-10-22T16:05:00Z', last_run_summary: { mode: 'dry', why_dry: 'TWILIO_LIVE_SENDING is not 1', inbound_new: 0, inbound_error: null, sent: 0, would_send: 3, skipped: [], failed: 0, uncertain: 0, stopped: 'nothing_due' } }),
   useInbox: () => ok([
     { opener: { id: 'P2', plan_date: '2026-10-21', wpie_owner_id: 3, attempt: 1, lead_id: 'L2', lane: 'hold', template_lane: 'hold', variant: 'B', phone: '+14145550300', body: 'Hi Ann, Colin Merrill here. reply STOP', segments: 1, scheduled_at: '2026-10-21T15:00:00Z', owner_name: 'ANN LEE', property_address: '300 W ELM ST', decision: 'approved', decided_by_name: 'Colin', decided_at: null, decision_note: null, send_status: 'delivered', send_reason: null, claimed_at: '2026-10-21T15:00:00Z', sent_at: '2026-10-21T15:00:00Z', error_code: null },
       lead: { id: 'L2', owner_name: 'ANN LEE', property_address: '300 W ELM ST', stage: 'reply_received', next_action_at: null, next_action: null, assigned_to: null, dead_reason: null },
       messages: [{ id: 'M5', lead_id: 'L2', direction: 'in', channel: 'sms', body: 'Maybe, who is buying?', sent_at: '2026-10-21T16:00:00Z', seen_at: null, is_opt_out: false, is_opener: false, status: 'replied', from_number: null, to_number: null }],
       thread: { phone10: '4145550300', lead_id: 'L2', intent: 'interested', agent_stage: 'interest', outcome: null, human_owned: true, handoff_flag: null, callback_slot: null, facts: {}, suggested_reply: 'Thanks Ann. Would a quick call with Colin work?', suggestion_note: null, last_inbound_at: null, last_inbound: null },
-      inbound: [] },
+      inbound: [],
+      drafts: [{ id: 'D1', inbound_sid: 'SMd1', phone10: '4145550300', our_number: '+12629996513', lead_id: 'L2', inbound_body: 'Maybe, who is buying?',
+        inbound_at: '2026-10-21T16:00:00Z', intent: 'buyer_check', kind: 'candidate', outcome: 'open', note: null,
+        body: 'Good question - Colin buys himself. Is the place still yours?', draft_source: 'claude', status: 'awaiting_approval',
+        send_after: null, sent_body: null, sent_at: null, decided_by: null, decided_at: null }] },
     { opener: { id: 'P3', plan_date: '2026-10-21', wpie_owner_id: 4, attempt: 1, lead_id: 'L3', lane: 'flip', template_lane: 'flip', variant: 'A', phone: '+14145550400', body: 'Hi Bo. reply STOP', segments: 1, scheduled_at: '2026-10-21T15:05:00Z', owner_name: 'BO KIM', property_address: '400 N PINE ST', decision: 'approved', decided_by_name: 'Colin', decided_at: null, decision_note: null, send_status: 'skipped', send_reason: 'phone_suppressed', claimed_at: null, sent_at: null, error_code: null },
       lead: { id: 'L3', owner_name: 'BO KIM', property_address: '400 N PINE ST', stage: 'dnc', next_action_at: null, next_action: null, assigned_to: null, dead_reason: null },
-      messages: [], thread: null, inbound: [{ sid: 'SMx', from10: '4145550400', body: 'STOP', is_opt_out: true, lead_id: 'L3', received_at: '2026-10-21T14:00:00Z' }] },
+      messages: [], thread: null, drafts: [], inbound: [{ sid: 'SMx', from10: '4145550400', body: 'STOP', is_opt_out: true, lead_id: 'L3', received_at: '2026-10-21T14:00:00Z' }] },
   ]),
   useScoreboard: () => ok([{ week_start: '2026-10-19', lane: 'all', openers_sent: 100, delivered: 92, replies: 7, opt_outs: 2, connects: 6, contacts: 5, leads: 2, handoffs: 1, handoffs_held: 1, qualifying_calls: 1, walks: 1, contracts: 0, closes: 0, delivery_rate: 0.92, reply_rate: 0.0761, opt_out_rate: 0.0217, contact_rate: 0.8333, leads_per_delivered: 0.0217, handoffs_held_rate: 1, walk_rate: 1, walks_per_contract: null }]),
   useSignalScoreboard: () => ok([{ week_start: '2026-10-19', signal: 'tired landlord', openers_sent: 40, delivered: 37, replies: 3, opt_outs: 1, leads: 1, walks: 0, contracts: 0 }]),
@@ -113,18 +122,24 @@ describe('pages render', () => {
     expect(screen.getByText(/Sending is paused/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Clear pause' })).toBeTruthy()
     expect(screen.getByText(/test run only/)).toBeTruthy()
+    expect(screen.getByText('Sam handles routine replies')).toBeTruthy()
+    expect(screen.getByText(/440\/440 passed/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Turn routine replies on' })).toBeTruthy()
   })
 
   it('Inbox shows each text with its thread, the reply AI and one-tap actions', () => {
     at('/inbox', '/inbox', <Inbox />)
     expect(screen.getByText('ANN LEE')).toBeTruthy()
     expect(screen.getByText('Maybe, who is buying?')).toBeTruthy()
-    expect(screen.getByText(/Reply AI: Interested/)).toBeTruthy()
-    expect(screen.getByText(/Would a quick call with Colin work/)).toBeTruthy()
+    expect(screen.getAllByText(/Sam read it as/)).toHaveLength(2)
     expect(screen.getAllByRole('button', { name: "Book Colin's call" })).toHaveLength(1)
     expect(screen.getByText(/STOP honored/)).toBeTruthy()
     expect(screen.getByText(/this phone said STOP/)).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'Needs me 1' })).toBeTruthy()
+    expect(screen.getByDisplayValue(/Colin buys himself/)).toBeTruthy()             // Sam's draft, editable
+    expect(screen.getAllByRole('button', { name: /Approve & send/ })).toHaveLength(2)
+    expect(screen.getByText('Texts from numbers not on these plans')).toBeTruthy()
+    expect(screen.getByText(/routine replies are off/)).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'Dead 1' })).toBeTruthy()
   })
 

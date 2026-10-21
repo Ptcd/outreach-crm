@@ -1,6 +1,6 @@
 // The Inbox's sorting rules, kept pure so tests can pin them.
 // Nothing here computes or suggests an offer, value or price.
-import type { LeadStage, Message, PlannedOpener, ReplyThread, SendStatus, TwilioInbound } from './types'
+import type { DraftStatus, LeadStage, Message, PlannedOpener, ReplyDraft, ReplyThread, SendStatus, TwilioInbound } from './types'
 
 export interface InboxLead {
   opener: PlannedOpener
@@ -17,6 +17,7 @@ export interface InboxLead {
   messages: Message[]
   thread: ReplyThread | null
   inbound: TwilioInbound[]
+  drafts: ReplyDraft[]
 }
 
 export type Bucket = 'needs_me' | 'ai' | 'booked' | 'dead' | 'waiting'
@@ -52,6 +53,11 @@ export function threadOf(x: InboxLead): ThreadLine[] {
   if (!hasOpener && x.opener.sent_at) {
     lines.push({ key: `opener-${x.opener.id}`, who: 'us', body: x.opener.body, at: x.opener.sent_at })
   }
+  for (const d of x.drafts ?? []) {
+    if (d.status === 'sent' && d.sent_body && d.sent_at && !x.messages.some((m) => m.direction === 'out' && (m.body ?? '') === d.sent_body)) {
+      lines.push({ key: `sam-${d.id}`, who: 'us', body: d.sent_body, at: d.sent_at, note: d.kind === 'routine' ? 'Sam' : undefined })
+    }
+  }
   for (const t of x.inbound) {
     const dup = x.messages.some((m) => m.direction === 'in' && (m.body ?? '').trim() === (t.body ?? '').trim()
       && Math.abs(new Date(m.sent_at).getTime() - new Date(t.received_at).getTime()) < 10 * 60_000)
@@ -78,7 +84,11 @@ export function bucketOf(x: InboxLead): Bucket {
   if ((stage && BOOKED_STAGES.includes(stage)) || (stage === 'colin_call' && x.lead?.next_action_at) || x.thread?.callback_slot) {
     return 'booked'
   }
+  if ((x.drafts ?? []).some((d) => d.status === 'awaiting_approval')) return 'needs_me'
   if (!hasReply(x)) return 'waiting'
+  const ds = x.drafts ?? []
+  const last = ds[ds.length - 1]
+  if (last && last.kind === 'routine') return 'ai'
   const t = x.thread
   const aiActive = t && !t.human_owned && !t.outcome && t.agent_stage !== 'closed' && stage !== 'human_owned'
   if (aiActive && (!stage || stage === 'ai_qualifying' || stage === 'opener_sent' || stage === 'reply_received')) return 'ai'
@@ -165,3 +175,20 @@ export function nextBusinessMorning(now: Date = new Date()): string {
   }
   return ''
 }
+
+export const DRAFT_LABEL: Record<DraftStatus, string> = {
+  no_reply: 'Nothing to send',
+  would_send: 'Sam would send this (routine replies are off)',
+  awaiting_approval: 'Waiting for you',
+  queued: 'Queued - goes out when allowed',
+  sending: 'Sending',
+  sent: 'Sent',
+  dry_sent: 'Approved - would send (live sending is off)',
+  failed: 'Failed',
+  uncertain: 'Unclear - check Twilio',
+  skipped: 'Skipped',
+  superseded: 'Replaced by a newer text',
+}
+
+/** Statuses where Colin can still approve (with edits) or skip. */
+export const DRAFT_OPEN: DraftStatus[] = ['awaiting_approval', 'would_send', 'no_reply', 'dry_sent']
