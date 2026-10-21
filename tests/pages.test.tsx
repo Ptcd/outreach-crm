@@ -153,9 +153,13 @@ describe('pages render', () => {
     expect(screen.getByRole('heading', { name: 'Call script' })).toBeTruthy()
     expect(screen.getByText(/Calling from/)).toBeTruthy()
     expect(screen.getByText('What we already know')).toBeTruthy()
-    expect(screen.getByText(/is anyone living there right now/)).toBeTruthy()            // open question: words to say
+    expect(screen.getByText(/Which place is this about, the one on 100 N Main St\?/)).toBeTruthy()   // open question: words to say
+    expect(screen.getByText('This is Colin.', { exact: false })).toBeTruthy()
+    expect(screen.getByText(/If they say\.\.\. \(22 answers\)/)).toBeTruthy()
+    expect(screen.getByText('Close: book the visit')).toBeTruthy()
+    expect(screen.getByText('Close: not ready yet')).toBeTruthy()
     expect(screen.getByText(/Tired landlord/)).toBeTruthy()                              // answered on an earlier call
-    expect(screen.getByText('1. Still the owner, and which property')).toBeTruthy()
+    expect(screen.getByText(/1\. Which property/)).toBeTruthy()
     expect(screen.getByText('Gate items this call settles')).toBeTruthy()
     const script = within(document.getElementById('call-script')!)
     expect(script.getByRole('button', { name: 'Do not contact' })).toBeTruthy()

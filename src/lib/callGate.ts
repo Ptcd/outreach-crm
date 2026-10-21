@@ -27,6 +27,8 @@ export function gateFromCall(facts: CallFacts | null | undefined, reply?: Record
   const timeline = answerOf(facts, 'timeline')
   const reason = (motivation && (motivation.text?.trim() || motivation.choices?.some((c) => c !== 'just_price'))) || said(reply, 'motivation')
   const clock = (timeline && (timeline.text?.trim() || anyOf(timeline, ['asap', 'under_30', 'one_to_three', 'three_to_six']))) || said(reply, 'timeline')
+  // q11: "are you in a spot to say yes or no, with everyone who'd need to sign there?" (or the older all_at_walk)
+  const ready = answerOf(facts, 'ready') ?? answerOf(facts, 'all_at_walk')
   if (motivation || timeline || said(reply, 'motivation') || said(reply, 'timeline')) {
     out.reason_and_clock = reason && clock ? { score: 2, why: 'A reason and a date or event' }
       : reason ? { score: 1, why: 'A reason, but no date yet' }
@@ -35,28 +37,31 @@ export function gateFromCall(facts: CallFacts | null | undefined, reply?: Record
   }
 
   const dm = answerOf(facts, 'decision_makers')
-  const atWalk = answerOf(facts, 'all_at_walk')
-  if (dm || said(reply, 'decision_makers')) {
-    out.decision_makers = anyOf(atWalk, ['yes']) ? { score: 2, why: 'Every signer named and can be there' }
-      : { score: 1, why: 'Signers named; not all lined up yet' }
+  if (dm || ready || said(reply, 'decision_makers')) {
+    out.decision_makers = anyOf(ready, ['yes']) && (dm || said(reply, 'decision_makers')) ? { score: 2, why: 'Every signer named and can be there' }
+      : dm || said(reply, 'decision_makers') ? { score: 1, why: 'Signers named; not all lined up yet' }
+      : { score: 0, why: 'Not yet known who signs' }
   }
 
   const price = answerOf(facts, 'price')
-  if (price || said(reply, 'price_expectation')) {
-    out.number_and_anchor = anyOf(price, ['own_need', 'paid']) ? { score: 2, why: 'Their number rests on their own need or what they paid' }
-      : anyOf(price, ['refused']) && !price?.number?.trim() ? { score: 0, why: 'Would not give a number' }
-      : anyOf(price, ['online', 'listing', 'neighbor', 'offers']) ? { score: 1, why: 'Their number rests on an estimate, listing, neighbor or other offers' }
-      : { score: 1, why: 'A number, anchor not asked yet' }
+  const anchor = answerOf(facts, 'anchor') ?? price
+  const needAnchor = anyOf(anchor, ['own_need', 'paid', 'next_place'])
+  if (price || answerOf(facts, 'anchor') || said(reply, 'price_expectation')) {
+    out.number_and_anchor = !price?.number?.trim() && anyOf(price, ['refused']) && !said(reply, 'price_expectation') ? { score: 0, why: 'Refused after two asks' }
+      : needAnchor ? { score: 2, why: 'Their number rests on their own need, payoff or what they paid' }
+      : anyOf(anchor, ['online', 'bank', 'listing', 'neighbor', 'offers']) ? { score: 1, why: 'Their number rests on an estimate, a neighbor or other offers' }
+      : { score: 1, why: 'A number; where it came from not asked yet' }
   }
   const flex = answerOf(facts, 'flexibility')
   if (flex) {
     out.flexibility = anyOf(flex, ['moved', 'open']) ? { score: 2, why: 'Open to hearing a number under theirs' }
-      : anyOf(flex, ['terms']) ? { score: 1, why: 'Price held, open on terms' }
-      : { score: 0, why: 'Held firm, or unclear' }
+      : anyOf(flex, ['terms', 'depends']) ? { score: 1, why: 'Price held, open on terms or it depends' }
+      : needAnchor ? { score: 1, why: 'Firm, but the floor rests on a real need' }
+      : { score: 0, why: 'Held firm on a market number' }
   }
 
   const occ = answerOf(facts, 'occupancy') || (said(reply, 'occupancy') ? {} : null)
-  const cond = answerOf(facts, 'condition') || (said(reply, 'condition') ? {} : null)
+  const cond = answerOf(facts, 'condition') || answerOf(facts, 'work_list') || answerOf(facts, 'happened') || (said(reply, 'condition') ? {} : null)
   if (occ || cond) {
     out.condition = occ && cond ? { score: 2, why: 'Who lives there and the main problems, in their words' }
       : { score: 1, why: occ ? 'Occupancy known, condition not yet' : 'Condition known, occupancy not yet' }
@@ -67,7 +72,8 @@ export function gateFromCall(facts: CallFacts | null | undefined, reply?: Record
 /** Hard stops the call turned up. */
 export function stopsFromCall(facts: CallFacts | null | undefined): string[] {
   const out: string[] = []
-  if (anyOf(answerOf(facts, 'other_buyer'), ['listed', 'signed'])) out.push('listed_active')
+  if (anyOf(answerOf(facts, 'other_buyer'), ['listed', 'signed']) || anyOf(answerOf(facts, 'identity'), ['agent'])) out.push('listed_active')
+  if (anyOf(answerOf(facts, 'behind'), ['sale_14'])) out.push('sheriff_inside_14_days')
   if (facts?.last_call && (facts.last_call.value === 'dnc')) out.push('dnc_or_no_contact')
   return out
 }

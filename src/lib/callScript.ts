@@ -1,203 +1,96 @@
-// THE CALL SCRIPT - the one file to edit when the wording changes.
-// Wording today: docs/SELLER_QUALIFICATION_LOGIC.md (sections a and b) and the fixed lines in
-// wpie/reply/brain.py. When docs/PHONE_SCRIPT.md (Rick's inbound-call wording) lands, replace the
-// `say` lines (and choices if needed) here; nothing else has to change.
-//
-// Order is the order to ask, top to bottom. `say` is read out loud. `choices` are one-tap answers
-// (multi: several at once); `text` adds a free-text box; `number` a dollar box; `when` a date-time.
-// `reply` names the reply agent's fact (from the seller's texts) that already answers it.
+// The call script. Every word said on the phone comes from phoneScript.json, a verbatim copy of
+// WPIE docs/phone_script.json (readable twin docs/PHONE_SCRIPT.md, from the Rick call corpus).
+// To change the wording, replace that JSON; this file only adds the one-tap answers for each
+// question (by its id) and where each answer is kept on the lead (call_facts[key]).
+import SCRIPT from './phoneScript.json'
 
 export type Choice = { id: string; label: string }
+type Line = { id: string; say: string; note?: string }
+export type ScriptJson = {
+  version: string; source: string; voice: string; gate_legend: Record<string, string>
+  before_pickup: string[]; pickup: string
+  questions: { id: string; gate_item: number[]; say: string; listen_for?: string; branch?: string }[]
+  booking: Line[]; objections: (Line & { trigger: string })[]; not_ready: Line[]
+}
+export const PHONE_SCRIPT = SCRIPT as ScriptJson
+
 export type CallQuestion = {
-  id: string
+  id: string          // the call_facts key the answer is kept under
+  qid: string         // the question id in phoneScript.json
   title: string
-  pillar?: boolean
+  gate: number[]      // walk-gate items it settles (gate_legend)
   say: string[]
+  listen?: string
+  branch?: string
   choices?: Choice[]
   multi?: boolean
   text?: string
   number?: string
   when?: string
-  reply?: string[]
-  then?: { id: string; say: string; choices: Choice[] }
+  reply?: string[]    // the reply agent's facts (seller texts) that may already answer it
 }
 
-export const CALL_OPENING = [
-  'Hi, this is Colin. Thanks for calling me back.',
-  '(Adil: "Hi, this is Adil, I work with Colin Merrill. Thanks for calling back.")',
-]
+type Answer = Omit<CallQuestion, 'qid' | 'gate' | 'say' | 'listen' | 'branch'>
+const c = (id: string, label: string): Choice => ({ id, label })
 
-export const CALL_SCRIPT: CallQuestion[] = [
-  {
-    id: 'owner',
-    title: 'Still the owner, and which property',
-    say: ['Which property are you calling about?', 'And it is still yours?'],
-    choices: [
-      { id: 'yes', label: 'Yes, owns it' },
-      { id: 'other_property', label: 'Different property' },
-      { id: 'sold', label: 'Sold it' },
-      { id: 'not_owner', label: 'Not the owner' },
-    ],
-    text: 'Address they named, or who the owner is',
-  },
-  {
-    id: 'occupancy',
-    title: 'Who lives there',
-    say: ['To start easy: is anyone living there right now, or is it sitting empty?'],
-    choices: [
-      { id: 'owner', label: 'They live there' },
-      { id: 'tenants', label: 'Tenants' },
-      { id: 'family', label: 'Family' },
-      { id: 'empty', label: 'Empty' },
-    ],
-    text: 'Rent, lease end, anything about the tenants',
-    reply: ['occupancy'],
-  },
-  {
-    id: 'condition',
-    title: 'Condition',
-    pillar: true,
-    say: ["How's the place holding up - anything big it needs, like the roof, the furnace, any water or leaks, or a fire?"],
-    choices: [
-      { id: 'roof', label: 'Roof' },
-      { id: 'furnace', label: 'Furnace / AC' },
-      { id: 'water', label: 'Water / leaks' },
-      { id: 'fire', label: 'Fire' },
-      { id: 'foundation', label: 'Foundation' },
-      { id: 'electrical', label: 'Electrical' },
-      { id: 'plumbing', label: 'Plumbing' },
-      { id: 'none', label: 'Nothing big' },
-    ],
-    multi: true,
-    text: 'In their words',
-    reply: ['condition'],
-  },
-  {
-    id: 'motivation',
-    title: 'Motivation: why selling',
-    pillar: true,
-    say: ["What's got you thinking about selling? I ask everyone, so I don't waste your time."],
-    choices: [
-      { id: 'tired_landlord', label: 'Tired landlord' },
-      { id: 'moving', label: 'Moving' },
-      { id: 'inherited', label: 'Inherited' },
-      { id: 'behind', label: 'Behind on payments' },
-      { id: 'repairs', label: 'Too many repairs' },
-      { id: 'divorce', label: 'Divorce' },
-      { id: 'health', label: 'Health / age' },
-      { id: 'just_price', label: 'Only for the right price' },
-    ],
-    text: 'Their reason, in their words',
-    reply: ['motivation'],
-  },
-  {
-    id: 'timeline',
-    title: 'Timeline: when they want to be done',
-    pillar: true,
-    say: ["And timing - is there a date you're working toward, or something coming up that it depends on?"],
-    choices: [
-      { id: 'asap', label: 'ASAP' },
-      { id: 'under_30', label: 'Within 30 days' },
-      { id: 'one_to_three', label: '1-3 months' },
-      { id: 'three_to_six', label: '3-6 months' },
-      { id: 'no_rush', label: 'No rush' },
-    ],
-    text: 'The date or event (lease end, move, tax deadline...)',
-    reply: ['timeline'],
-  },
-  {
-    id: 'price',
-    title: 'Price: their number and where it came from',
-    pillar: true,
-    say: ['What were you hoping to get for it? Even a rough figure helps me more than anything.', 'How did you come up with that?'],
-    number: 'Their number ($)',
-    choices: [
-      { id: 'own_need', label: 'What they need / payoff' },
-      { id: 'paid', label: 'What they paid' },
-      { id: 'online', label: 'Zillow / online' },
-      { id: 'listing', label: 'Agent / listing' },
-      { id: 'neighbor', label: 'Neighbor sold' },
-      { id: 'offers', label: 'Other offers' },
-      { id: 'refused', label: 'Would not say' },
-    ],
-    text: 'How they put it',
-    reply: ['price_expectation', 'price_confirmed'],
-    then: {
-      id: 'flexibility',
-      say: "I buy as-is and cover the repairs and the selling costs, so my number usually lands under a retail sale. If it came in under yours, would you still want to hear it?",
-      choices: [
-        { id: 'moved', label: 'Moved already' },
-        { id: 'open', label: 'Open to hear it' },
-        { id: 'terms', label: 'Only on terms' },
-        { id: 'firm', label: 'Firm' },
-        { id: 'unclear', label: 'Unclear' },
-      ],
-    },
-  },
-  {
-    id: 'decision_makers',
-    title: 'Who is on title / who else decides',
-    say: ["Is it just in your name, or is anyone else on the title or in the family who'd want a say?", 'Could they be there when I come by?'],
-    choices: [
-      { id: 'only_them', label: 'Only them' },
-      { id: 'spouse', label: 'Spouse' },
-      { id: 'family', label: 'Siblings / heirs' },
-      { id: 'estate', label: 'Estate (PR)' },
-      { id: 'company', label: 'LLC / partners' },
-    ],
-    multi: true,
-    text: 'Names, and whether they can be at the walk-through',
-    reply: ['decision_makers'],
-    then: {
-      id: 'all_at_walk',
-      say: 'Can everyone who signs be there, or agree to it?',
-      choices: [
-        { id: 'yes', label: 'Yes, all of them' },
-        { id: 'some', label: 'Not all' },
-        { id: 'unknown', label: 'Not sure' },
-      ],
-    },
-  },
-  {
-    id: 'debt',
-    title: 'Mortgage or liens',
-    say: ['Is there a mortgage or anything owed on it? A rough balance is fine.'],
-    choices: [
-      { id: 'free_clear', label: 'Free and clear' },
-      { id: 'mortgage', label: 'Mortgage' },
-      { id: 'behind', label: 'Behind on payments' },
-      { id: 'taxes', label: 'Back taxes' },
-      { id: 'liens', label: 'Liens / judgments' },
-    ],
-    multi: true,
-    number: 'Rough balance ($)',
-    text: 'Anything about a sale date or foreclosure',
-    reply: ['known_debt'],
-  },
-  {
-    id: 'other_buyer',
-    title: 'Listed or signed with anyone',
-    say: ['Have you signed anything with anyone, or is it listed with an agent?'],
-    choices: [
-      { id: 'no', label: 'No' },
-      { id: 'listed', label: 'Listed' },
-      { id: 'signed', label: 'Signed with a buyer' },
-    ],
-    reply: ['signed_with_other'],
-  },
-  {
-    id: 'next_step',
-    title: 'Next step',
-    say: ['When could I come take a look at it?', "Or: what's a good time for me to call you back?"],
-    choices: [
-      { id: 'walk', label: 'Walk-through' },
-      { id: 'callback', label: 'Colin calls back' },
-      { id: 'none', label: 'No next step' },
-    ],
-    when: 'Day and time',
-    reply: ['callback_slot'],
-  },
-]
+// One-tap answers per question id. A question in the JSON without an entry here still shows,
+// with a notes box.
+const ANSWERS: Record<string, Answer> = {
+  q1_property: { id: 'owner', title: 'Which property', text: 'Address they named (if different)',
+    choices: [c('yes', 'This one'), c('other_property', 'Different property'), c('sold', 'Sold it')] },
+  q2_identity: { id: 'identity', title: 'Their place, or helping someone',
+    choices: [c('owner', 'Owner'), c('spouse', 'Spouse'), c('adult_child', 'Adult child'), c('relative', 'Other relative'),
+      c('tenant', 'Tenant'), c('manager', 'Manager'), c('agent', 'Agent'), c('wholesaler', 'Wholesaler')], text: 'Name' },
+  q3_motivation: { id: 'motivation', title: 'Why selling (reason)', reply: ['motivation'], text: 'Their reason, in their words',
+    choices: [c('tired_landlord', 'Tired landlord'), c('moving', 'Moving'), c('inherited', 'Inherited / death'), c('behind', 'Behind on payments'),
+      c('repairs', 'Too many repairs'), c('divorce', 'Divorce'), c('health', 'Health / age'), c('just_price', 'Only for the right price')] },
+  q4_condition: { id: 'condition', title: 'About the place (condition)', reply: ['condition'], multi: true, text: 'In their words',
+    choices: [c('roof', 'Roof'), c('furnace', 'Furnace / AC'), c('water', 'Water / leaks'), c('foundation', 'Foundation'),
+      c('electrical', 'Electrical'), c('plumbing', 'Plumbing'), c('cosmetic', 'Cosmetic only'), c('perfect', 'Says perfect')] },
+  q4a_occupancy: { id: 'occupancy', title: 'Who lives there', reply: ['occupancy'],
+    choices: [c('owner', 'They live there'), c('tenants', 'Tenants'), c('family', 'Family'), c('empty', 'Empty')], text: 'Access, rent, lease end' },
+  q4b_list_tomorrow: { id: 'work_list', title: 'Work before listing', text: 'Their list of work' },
+  q4c_happened: { id: 'happened', title: 'Anything happen to it', multi: true,
+    choices: [c('leak', 'Leak / water'), c('fire', 'Fire'), c('foundation', 'Foundation'), c('code', 'Code / raze order'), c('none', 'Nothing')] },
+  q5_timeline: { id: 'timeline', title: 'Where headed, and when (clock)', reply: ['timeline'], text: 'The plan and the date or event',
+    choices: [c('asap', 'ASAP'), c('under_30', 'Within 30 days'), c('one_to_three', '1-3 months'), c('three_to_six', '3-6 months'),
+      c('no_plan', "Hasn't thought about it")] },
+  q6_decision_makers: { id: 'decision_makers', title: 'Anyone else on it', reply: ['decision_makers'], multi: true,
+    text: 'Names, and whether they can be on the next call or at the visit',
+    choices: [c('only_them', 'Just them'), c('spouse', 'Spouse'), c('family', 'Siblings / kids'), c('estate', 'Estate'), c('company', 'Company / partner')] },
+  q7_number: { id: 'price', title: 'Their number', reply: ['price_expectation', 'price_confirmed'], number: 'Their number ($), as said',
+    choices: [c('refused_once', 'Would not say (1st ask)'), c('refused', 'Refused after two asks'), c('make_offer', '"Make me an offer"')] },
+  q8_anchor: { id: 'anchor', title: 'Where the number came from', text: 'How they put it',
+    choices: [c('own_need', 'Payoff / what they need'), c('paid', 'What they paid'), c('next_place', 'The next place'), c('online', 'Zillow / online'),
+      c('bank', 'Bank estimate'), c('neighbor', 'Neighbor sold'), c('offers', 'Other offers')] },
+  q9_flexibility: { id: 'flexibility', title: 'Would they hear a number under theirs',
+    choices: [c('moved', 'Moved'), c('open', 'Open'), c('depends', 'Depends'), c('terms', 'Terms only'), c('firm', 'Firm')] },
+  q10_owed: { id: 'debt', title: 'Anything owed', reply: ['known_debt'], number: 'Roughly left ($)',
+    choices: [c('free_clear', 'Nothing owed'), c('mortgage', 'Mortgage'), c('dont_know', "Doesn't know")] },
+  q10a_behind: { id: 'behind', title: 'Behind on anything', multi: true, text: 'Sale date, if any',
+    choices: [c('no', 'Not behind'), c('payments', 'Payments'), c('taxes', 'Taxes'), c('sale_date', 'Sale date set'), c('sale_14', 'Sale inside 14 days')] },
+  q11_condition_decision: { id: 'ready', title: 'Can they say yes, with every signer there',
+    choices: [c('yes', 'Yes, everyone there'), c('spouse', 'Has to bring someone'), c('think', 'Wants to think')] },
+}
+
+const fill = (s: string, v: Record<string, string>) => s.replace(/\{(\w+)\}/g, (m, k: string) => v[k] ?? m)
+
+/** The questions in the script's order, with names filled in from the lead. */
+export function callScript(vars: Record<string, string> = {}): CallQuestion[] {
+  return PHONE_SCRIPT.questions.map((q) => {
+    const a = ANSWERS[q.id] ?? { id: q.id.replace(/[^a-z_]/g, ''), title: q.id, text: 'Notes' }
+    return { ...a, qid: q.id, gate: q.gate_item, say: [fill(q.say, vars)], listen: q.listen_for, branch: q.branch }
+  })
+}
+export const CALL_SCRIPT = callScript()
+
+export function scriptLine(l: Line, vars: Record<string, string> = {}) {
+  return { ...l, say: fill(l.say, vars) }
+}
+
+/** The booking close's answer: books the walk-through or a call-back (sets the lead's next action). */
+export const NEXT_STEP: Answer = { id: 'next_step', title: 'Booked', reply: ['callback_slot'], when: 'Day and time',
+  choices: [c('walk', 'Walk-through'), c('callback', 'Call back')] }
 
 export const CALL_OUTCOMES: { id: 'interested' | 'not_now' | 'not_interested' | 'wrong_number' | 'dnc'; label: string; hint: string }[] = [
   { id: 'interested', label: 'Interested', hint: "Stage: Colin's call (or Walk booked)" },

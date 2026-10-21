@@ -8,7 +8,7 @@ import { PGlite } from '@electric-sql/pglite'
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { SUPABASE_STUB } from './supabaseStub'
 import { gateFromCall, stopsFromCall, type CallFacts } from '../src/lib/callGate'
-import { CALL_SCRIPT } from '../src/lib/callScript'
+import { CALL_SCRIPT, PHONE_SCRIPT, callScript } from '../src/lib/callScript'
 
 const MIGRATION = readdirSync(path.resolve(__dirname, '../supabase/migrations')).filter((f) => f.endsWith('.sql')).sort()
   .map((f) => readFileSync(path.resolve(__dirname, '../supabase/migrations', f), 'utf8')).join('\n')
@@ -147,9 +147,23 @@ describe('call answers -> walk gate', () => {
     expect(gateFromCall({}, null)).toEqual({})
   })
 
-  it('asks in the order Colin set: owner, occupancy, condition, the pillars, title, debt, next step', () => {
-    expect(CALL_SCRIPT.map((q) => q.id)).toEqual(['owner', 'occupancy', 'condition', 'motivation', 'timeline', 'price',
-      'decision_makers', 'debt', 'other_buyer', 'next_step'])
-    expect(CALL_SCRIPT.every((q) => q.say.length > 0 && q.say.every((s) => !/\bSam\b/.test(s)))).toBe(true)
+  it("asks the phone script in its order, every question tied to its gate items, in Colin's voice", () => {
+    expect(CALL_SCRIPT.map((q) => q.qid)).toEqual(PHONE_SCRIPT.questions.map((q) => q.id))
+    expect(CALL_SCRIPT.map((q) => q.id)).toEqual(['owner', 'identity', 'motivation', 'condition', 'occupancy', 'work_list', 'happened',
+      'timeline', 'decision_makers', 'price', 'anchor', 'flexibility', 'debt', 'behind', 'ready'])
+    expect(CALL_SCRIPT.find((q) => q.id === 'motivation')?.gate).toEqual([1])
+    expect(CALL_SCRIPT.find((q) => q.id === 'ready')?.gate).toEqual([2, 6])
+    expect(CALL_SCRIPT.every((q) => q.choices?.length || q.text || q.number)).toBe(true)
+    const all = JSON.stringify(PHONE_SCRIPT)
+    expect(all).not.toMatch(/\bSam\b/)
+    expect(PHONE_SCRIPT.objections).toHaveLength(22)
+    expect(callScript({ street: '2825 S Logan Av', first_name: 'John' })[0].say[0]).toBe('Thanks for calling me back. Which place is this about, the one on 2825 S Logan Av?')
+  })
+
+  it('firm on a real need is a 1, and an agent or a sale inside 14 days is a hard stop', () => {
+    expect(gateFromCall(f({ anchor: { choices: ['own_need'] }, flexibility: { choices: ['firm'] } })).flexibility?.score).toBe(1)
+    expect(gateFromCall(f({ anchor: { choices: ['online'] }, flexibility: { choices: ['firm'] } })).flexibility?.score).toBe(0)
+    expect(gateFromCall(f({ decision_makers: { choices: ['spouse'] }, ready: { choices: ['yes'] } })).decision_makers?.score).toBe(2)
+    expect(stopsFromCall(f({ identity: { choices: ['agent'] }, behind: { choices: ['sale_14'] } }))).toEqual(['listed_active', 'sheriff_inside_14_days'])
   })
 })
