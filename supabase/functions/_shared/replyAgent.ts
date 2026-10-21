@@ -1,7 +1,7 @@
 // The reply-agent loop behind the reply-agent Edge Function (cron, every minute). No Deno
 // globals: tests/replyAgent.test.ts runs it against the real migrations on PGlite with a
 // fake Twilio and a fake drafter. Whether a reply MAY go is decided in Postgres
-// (reply_claim_send, migration 0004); what Sam says is decided by replyBrain.decide and,
+// (reply_claim_send, migration 0004); what the reply agent says is decided by replyBrain.decide and,
 // for a real conversation, by the drafter (Claude) whose text only Colin can approve.
 import { decide, rulesVersion, scoreRedteam, type RedteamRow, type ReplyContext } from './replyBrain.ts'
 import { classifyFailure, isOptOut, type Rpc, type SenderEnv, type TwilioPort } from './sending.ts'
@@ -30,6 +30,7 @@ export interface ClaimedInbound {
   prior_inbound: string[]
   last_agent_text: string | null
   history: { who: 'us' | 'them'; body: string | null }[]
+  is_test?: boolean
 }
 
 export interface AgentSummary {
@@ -71,7 +72,7 @@ export async function runReplyAgent(opts: {
   env: SenderEnv
   twilio: TwilioPort | null
   drafter: Drafter | null
-  control: { reply_numbers: string[]; redteam_version: string | null; agent_last_run_at: string | null }
+  control: { reply_numbers: string[]; redteam_version: string | null; agent_last_run_at: string | null; test_opener?: string | null }
   redteamRows: RedteamRow[]
   now?: () => Date
   batch?: number
@@ -114,6 +115,12 @@ export async function runReplyAgent(opts: {
   const c = await opts.rpc('reply_claim_inbound', { p_limit: opts.batch ?? 10 })
   if (c.error) throw new Error(c.error.message)
   for (const t of (c.data as ClaimedInbound[]) ?? []) {
+    // Colin's test phone plays a real owner: give it the opening text that owner was sent.
+    const opener = t.is_test ? opts.control.test_opener?.trim() || null : null
+    if (opener) {
+      t.last_agent_text = t.last_agent_text ?? opener
+      if (!(t.history ?? []).some((h) => h.who === 'us')) t.history = [{ who: 'us', body: opener }, ...(t.history ?? [])]
+    }
     const ctx: ReplyContext = { inbound: t.body ?? '', priorInbound: (t.prior_inbound ?? []).filter(Boolean),
       lastAgentText: t.last_agent_text, propertyAddress: t.property_address }
     const d = decide(ctx)
@@ -153,7 +160,7 @@ export async function runReplyAgent(opts: {
     let r = await opts.rpc('reply_claim_held', { p_id: id, p_dry: !live, p_now: now().toISOString() })
     let j = r.data as { outcome: string; reason?: string; id?: string; to?: string; from?: string | null; body?: string }
     if (j?.outcome === 'refused' && j.reason === 'not a held approval') {
-      r = await opts.rpc('reply_claim_send', { p_id: id, p_mode: 'auto', p_body: null, p_actor: 'Sam (routine)', p_dry: !live,
+      r = await opts.rpc('reply_claim_send', { p_id: id, p_mode: 'auto', p_body: null, p_actor: 'Routine reply (auto)', p_dry: !live,
         p_now: now().toISOString() })
       j = r.data as typeof j
     }

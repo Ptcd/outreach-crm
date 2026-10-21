@@ -1,7 +1,7 @@
 // Twilio's incoming-message webhook for the WPIE Mail Replies messaging service
 // (reply-inbound Edge Function). Fast path: check the signature, record the text (a STOP
 // suppresses the phone right here, as pm-phone's inbound used to record it), answer Twilio
-// with empty TwiML. Slow path, after the answer: let Sam decide it, and if a routine reply
+// with empty TwiML. Slow path, after the answer: let the reply agent decide it, and if a routine reply
 // becomes due within a couple of minutes, wait for it and send it. The 1-minute reply-agent
 // timer catches anything this misses; a reply can never go twice (reply_claim_send).
 import { runReplyAgent, type AgentSummary, type Drafter } from './replyAgent.ts'

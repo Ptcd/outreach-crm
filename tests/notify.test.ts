@@ -110,7 +110,7 @@ describe('smtp', () => {
   }
   const script = { EHLO: '250-smtp.gmail.com\r\n250-AUTH LOGIN PLAIN\r\n250 SMTPUTF8\r\n', AUTH: '334 VXNlcm5hbWU6\r\n', MAIL: '250 OK\r\n', RCPT: '250 OK\r\n',
     DATA: '354 Go ahead\r\n', QUIT: '221 bye\r\n' }
-  const mail = { from: 'sender@example.com', to: 'colin@example.com', subject: 'Sam needs you: Dale', text: 'Hi\n.leading dot', html: '<p>Hi</p>' }
+  const mail = { from: 'sender@example.com', to: 'colin@example.com', subject: 'Reply needs you: Dale', text: 'Hi\n.leading dot', html: '<p>Hi</p>' }
 
   it('authenticates and sends one message', async () => {
     const s = { ...script }

@@ -1,6 +1,6 @@
--- One-time setup for Sam, the reply agent. Run in the Supabase SQL editor AFTER the
+-- One-time setup for the reply agent. Run in the Supabase SQL editor AFTER the
 -- reply-agent Edge Function is deployed (and after send_openers_cron.sql, which creates the
--- shared secret). It sends nothing by itself: routine replies need the "Sam handles routine
+-- shared secret). It sends nothing by itself: routine replies need the "Auto-answer routine
 -- replies" switch (off), every other reply needs Colin's Approve, and with the function secret
 -- TWILIO_LIVE_SENDING unset every send is recorded as "would send".
 --

@@ -13,7 +13,7 @@ const KIND_LABEL: Record<ReplyDraft['kind'], string> = {
   candidate: 'Real reply - needs you',
 }
 
-// One text from a seller and Sam's answer. Approve sends Colin's final wording (he can edit);
+// One text from a seller and the drafted answer. Approve sends Colin's final wording (he can edit);
 // nothing here sends without his tap, except routine lines when he has turned those on.
 export function DraftBox({ d, showFrom = false }: { d: ReplyDraft; showFrom?: boolean }) {
   const { isOwner } = useAuth()

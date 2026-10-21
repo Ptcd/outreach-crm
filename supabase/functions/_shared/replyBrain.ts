@@ -1,4 +1,4 @@
-// Sam on the server: classify one inbound text and decide whether the system may answer
+// The reply agent on the server: classify one inbound text and decide whether the system may answer
 // it by itself (a routine reply with one of WPIE's fixed lines) or whether Colin must
 // approve a drafted reply. Pure functions, no network: tests/reply.test.ts and the
 // red-team score below run exactly this code.
@@ -66,7 +66,7 @@ function street(address: string | null | undefined): string {
 export interface ReplyContext {
   inbound: string
   priorInbound: string[]          // their earlier texts in this thread, oldest first
-  lastAgentText: string | null    // our most recent text to them (opener or Sam's reply)
+  lastAgentText: string | null    // our most recent text to them (opener or a drafted reply)
   propertyAddress: string | null
 }
 
@@ -138,7 +138,7 @@ export function decide(ctx: ReplyContext): Decision {
     }
     return routine(intent, B.EXIT_QUESTION, 'open', 'not interested - the one exit question')
   }
-  return toColin(intent, 'a real conversation - Sam drafts, Colin approves')
+  return toColin(intent, 'a real conversation - drafted for Colin to approve')
 }
 
 /** A stable id for the rules this build runs, so the red-team result is tied to them. */
@@ -178,7 +178,7 @@ const PERSONA_ADDRESS: Record<string, string> = { dale: '2847 N Burleigh St', ri
 
 /** Score the server's routing against WPIE's red-team fixture.
  *  A row passes when: a removal Python expects is honoured (missing one is severity 1);
- *  no removal happens that the fixture says must not; and when Sam answers by himself,
+ *  no removal happens that the fixture says must not; and when the reply agent answers on its own,
  *  his fixed line meets the row's must / must_not and a closing outcome is one the row
  *  allows. A row routed to Colin passes those content checks by construction (he reads
  *  and approves every such reply). ok = every row passes. */

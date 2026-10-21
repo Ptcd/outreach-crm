@@ -10,7 +10,7 @@ grant usage, select on all sequences in schema public to service_role;
 alter default privileges in schema public grant select, insert, update, delete on tables to service_role;
 alter default privileges in schema public grant usage, select on sequences to service_role;
 
--- 2. Test phones (Colin 2026-10-21): his own cell can play an owner so he can test Sam end to
+-- 2. Test phones (Colin 2026-10-21): his own cell can play an owner so he can test the reply agent end to
 --    end. A text from a test phone gets a sample owner and address, never touches a real lead,
 --    and its drafts are marked TEST in the Inbox. A STOP from it is honoured like any other;
 --    reset_test_phones() lifts that block so he can test again.

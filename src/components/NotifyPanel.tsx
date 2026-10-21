@@ -5,7 +5,7 @@ import {
 } from '@/lib/push'
 import { useAuth } from '@/providers/AuthProvider'
 
-// Top of the Inbox: install the app on the phone, turn on "Sam needs you" notifications, test them.
+// Top of the Inbox: install the app on the phone, turn on "reply needs you" notifications, test them.
 export function NotifyPanel() {
   const { isOwner } = useAuth()
   const [state, setState] = useState<PushState | null>(null)

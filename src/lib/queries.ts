@@ -179,7 +179,7 @@ export const api = {
     if (a.error) return a
     return supabase.from('tasks').insert({ lead_id: leadId, due_at: atIso, kind: 'call', owner: 'colin', note: "Colin's call (booked from Inbox)" })
   },
-  // Sam's drafts: Approve (with Colin's final words) or Skip, through the reply-send Edge Function
+  // drafted replies: Approve (with Colin's final words) or Skip, through the reply-send Edge Function
   replyAction: async (id: string, action: 'approve' | 'skip', text?: string) => {
     const r = await supabase.functions.invoke('reply-send', { body: { id, action, text } })
     if (r.error) return { error: { message: r.error.message } }
@@ -221,7 +221,7 @@ export function useCampaignControl() {
     queryFn: async () =>
       check(
         await supabase.from('campaign_control')
-          .select('sending_enabled, sending_changed_by, sending_changed_at, paused, pause_reason, paused_at, laptop_paused, laptop_pause_reason, daily_cap, window_start, window_end, dnc_policy, last_run_at, last_run_summary, routine_enabled, routine_changed_by, routine_changed_at, agent_rules_version, redteam_version, redteam_passed, redteam_total, redteam_ok, redteam_at, agent_last_run_at, agent_last_summary, test_phones')
+          .select('sending_enabled, sending_changed_by, sending_changed_at, paused, pause_reason, paused_at, laptop_paused, laptop_pause_reason, daily_cap, window_start, window_end, dnc_policy, last_run_at, last_run_summary, routine_enabled, routine_changed_by, routine_changed_at, agent_rules_version, redteam_version, redteam_passed, redteam_total, redteam_ok, redteam_at, agent_last_run_at, agent_last_summary, test_phones, test_owner_name, test_property_address')
           .eq('id', 1).single(),
       ) as CampaignControl,
   })
@@ -299,7 +299,7 @@ export function useSignalScoreboard(weekStart: string | null) {
   })
 }
 
-// ------------------------------------------------------------ Sam's replies
+// ------------------------------------------------------------ Drafted replies
 /** Replies from numbers that are not on any planned text (no lead, or a lead we never texted). */
 export function useOtherDrafts(knownLeadIds: string[]) {
   return useQuery({
@@ -315,7 +315,7 @@ export function useOtherDrafts(knownLeadIds: string[]) {
   })
 }
 
-/** How many of Sam's drafts wait for Colin (the Inbox badge). */
+/** How many of drafted replies wait for Colin (the Inbox badge). */
 export function useRepliesWaiting() {
   return useQuery({
     queryKey: ['reply_waiting'],

@@ -1,4 +1,4 @@
--- Reply agent on the server ("Sam"), WPIE docs/APP_SENDING.md part 2 (Colin 2026-10-21:
+-- Reply agent on the server , WPIE docs/APP_SENDING.md part 2 (Colin 2026-10-21:
 -- "dont fire off the texts until we have everything e2e handled by the system except for me
 -- approving the ai messages to actual candidates"; "i dont want every seller reply to reach my
 -- phone and email i want the system to deal with it").
@@ -11,7 +11,7 @@
 --             Sent by the server only while campaign_control.routine_enabled is on (default OFF,
 --             and it cannot be turned on until the red-team score for the deployed rules passes);
 --             otherwise status 'would_send' and Colin may still approve it by hand.
---   candidate everything else. Sam drafts; status 'awaiting_approval'; only Colin's tap sends.
+--   candidate everything else. The reply agent drafts; status 'awaiting_approval'; only Colin's tap sends.
 -- Nothing is forwarded per reply. Quiet hours: nothing goes out between quiet_start and
 -- quiet_end (Central); an approved or routine reply waits ('queued') until morning.
 -- Never twice, never stale: a draft is claimed in one locked transaction, and a newer inbound
@@ -54,7 +54,7 @@ create table public.reply_drafts (
   kind           text not null check (kind in ('removal', 'routine', 'candidate')),
   outcome        text,
   note           text,
-  body           text,                 -- the reply (fixed line, or Sam's draft); null = nothing to send
+  body           text,                 -- the reply (fixed line, or the drafted reply); null = nothing to send
   draft_source   text,                 -- fixed_line | claude | none
   status         text not null check (status in (
                    'no_reply', 'would_send', 'awaiting_approval', 'queued', 'sending', 'sent', 'dry_sent',
@@ -91,9 +91,9 @@ returns timestamptz language sql stable security definer set search_path = publi
     from public.campaign_control c where c.id = 1
 $$;
 
--- --------------------------------------------- 1. inbound texts waiting for Sam
+-- --------------------------------------------- 1. inbound texts waiting for the reply agent
 -- Claims up to p_limit unprocessed inbound texts to the reply numbers, oldest first, with the
--- context Sam needs. Marks them processed in the same transaction.
+-- context the reply agent needs. Marks them processed in the same transaction.
 create or replace function public.reply_claim_inbound(p_limit integer default 10)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
@@ -139,7 +139,7 @@ begin
   return out;
 end $$;
 
--- ---------------------------------------------- 2. what Sam decided for one text
+-- ---------------------------------------------- 2. what the reply agent decided for one text
 create or replace function public.reply_record_decision(p_sid text, p_intent text, p_kind text, p_removal boolean,
   p_outcome text, p_body text, p_draft_source text, p_note text, p_rules_version text, p_now timestamptz default now())
 returns jsonb language plpgsql security definer set search_path = public as $$
@@ -325,7 +325,7 @@ begin
   if not public.is_owner() then raise exception 'only Colin (owner) can change this'; end if;
   select * into c from public.campaign_control where id = 1;
   if p_on and not (c.redteam_ok and c.redteam_version is not null and c.redteam_version = c.agent_rules_version) then
-    raise exception 'the red-team test has not passed for the rules Sam runs now (%/% on %)',
+    raise exception 'the red-team test has not passed for the rules the reply agent runs now (%/% on %)',
       coalesce(c.redteam_passed, 0), coalesce(c.redteam_total, 0), coalesce(c.redteam_version, 'none');
   end if;
   select display_name into who from public.team_members where lower(email) = lower(auth.jwt() ->> 'email');

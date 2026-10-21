@@ -5,7 +5,7 @@
 -- reply tasks count in the Needs-you badge and get one push (never in quiet hours).
 -- Outbound email: Colin or Adil send it from the app with a tap (templates, never AI-sent); it is
 -- logged on the lead's thread.
--- Sam's facts: what the drafting model learned (reason, clock, signers, number + anchor, ...) is
+-- The drafting model's facts: what the drafting model learned (reason, clock, signers, number + anchor, ...) is
 -- kept per reply so the lead card can show it.
 
 alter type public.team_person add value if not exists 'adil';

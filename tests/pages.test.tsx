@@ -61,7 +61,7 @@ vi.mock('@/lib/queries', () => ({
     note: null, body: 'Good question - I buy them myself. Is the place still yours?', draft_source: 'claude', status: 'awaiting_approval',
     send_after: null, sent_body: null, sent_at: null, decided_by: null, decided_at: null, is_test: false,
     owner_name: 'ANN LEE', property_address: '300 W ELM ST', thread: [{ key: 'o', who: 'us', body: 'Hi Ann, Colin Merrill here.', at: '2026-10-21T15:00:00Z' }] }]),
-  useCampaignControl: () => ok({ sending_enabled: false, sending_changed_by: null, sending_changed_at: null, paused: true, pause_reason: '3 carrier-filtered texts', paused_at: '2026-10-22T16:00:00Z', laptop_paused: false, laptop_pause_reason: null, daily_cap: 100, window_start: '10:00:00', window_end: '18:15:00', dnc_policy: 'allow_unknown', routine_enabled: false, routine_changed_by: null, routine_changed_at: null, agent_rules_version: 'r1', redteam_version: 'r1', redteam_passed: 440, redteam_total: 440, redteam_ok: true, redteam_at: '2026-10-22T16:00:00Z', agent_last_run_at: '2026-10-22T16:06:00Z', agent_last_summary: null, test_phones: [], last_run_at: '2026-10-22T16:05:00Z', last_run_summary: { mode: 'dry', why_dry: 'TWILIO_LIVE_SENDING is not 1', inbound_new: 0, inbound_error: null, sent: 0, would_send: 3, skipped: [], failed: 0, uncertain: 0, stopped: 'nothing_due' } }),
+  useCampaignControl: () => ok({ sending_enabled: false, sending_changed_by: null, sending_changed_at: null, paused: true, pause_reason: '3 carrier-filtered texts', paused_at: '2026-10-22T16:00:00Z', laptop_paused: false, laptop_pause_reason: null, daily_cap: 100, window_start: '10:00:00', window_end: '18:15:00', dnc_policy: 'allow_unknown', routine_enabled: false, routine_changed_by: null, routine_changed_at: null, agent_rules_version: 'r1', redteam_version: 'r1', redteam_passed: 440, redteam_total: 440, redteam_ok: true, redteam_at: '2026-10-22T16:00:00Z', agent_last_run_at: '2026-10-22T16:06:00Z', agent_last_summary: null, test_phones: ['2627770909'], test_owner_name: 'JOHN W PANKIEWICZ JR', test_property_address: '2825 S LOGAN AV, Milwaukee', last_run_at: '2026-10-22T16:05:00Z', last_run_summary: { mode: 'dry', why_dry: 'TWILIO_LIVE_SENDING is not 1', inbound_new: 0, inbound_error: null, sent: 0, would_send: 3, skipped: [], failed: 0, uncertain: 0, stopped: 'nothing_due' } }),
   useInbox: () => ok([
     { opener: { id: 'P2', plan_date: '2026-10-21', wpie_owner_id: 3, attempt: 1, lead_id: 'L2', lane: 'hold', template_lane: 'hold', variant: 'B', phone: '+14145550300', body: 'Hi Ann, Colin Merrill here. reply STOP', segments: 1, scheduled_at: '2026-10-21T15:00:00Z', owner_name: 'ANN LEE', property_address: '300 W ELM ST', decision: 'approved', decided_by_name: 'Colin', decided_at: null, decision_note: null, send_status: 'delivered', send_reason: null, claimed_at: '2026-10-21T15:00:00Z', sent_at: '2026-10-21T15:00:00Z', error_code: null },
       lead: { id: 'L2', owner_name: 'ANN LEE', property_address: '300 W ELM ST', stage: 'reply_received', next_action_at: null, next_action: null, assigned_to: null, dead_reason: null },
@@ -160,6 +160,7 @@ describe('pages render', () => {
     expect(screen.getByText(/440\/440 passed/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Turn routine replies on' })).toBeTruthy()
     expect(screen.getByLabelText('Test phone')).toBeTruthy()
+    expect(screen.getByText(/Test phone: \(262\) 777-0909 plays JOHN W PANKIEWICZ JR, 2825 S LOGAN AV/)).toBeTruthy()
   })
 
   it('Inbox shows each text with its thread, the reply AI and one-tap actions', () => {
@@ -174,7 +175,7 @@ describe('pages render', () => {
     expect(screen.getByText(/STOP honored/)).toBeTruthy()
     expect(screen.getByText(/this phone said STOP/)).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'Needs me 1' })).toBeTruthy()
-    expect(screen.getByDisplayValue(/Colin buys himself/)).toBeTruthy()             // Sam's draft, editable
+    expect(screen.getByDisplayValue(/Colin buys himself/)).toBeTruthy()             // the drafted reply, editable
     expect(screen.getAllByRole('button', { name: /Approve & send/ })).toHaveLength(2)
     expect(screen.getByText('Texts from numbers not on these plans')).toBeTruthy()
     expect(screen.getByText(/routine replies are off/)).toBeTruthy()

@@ -191,7 +191,7 @@ export interface CampaignControl {
   dnc_policy: 'require_scrub' | 'allow_unknown'
   last_run_at: string | null
   last_run_summary: RunSummary | null
-  // 0004: Sam, the reply agent
+  // 0004: The reply agent
   routine_enabled: boolean
   routine_changed_by: string | null
   routine_changed_at: string | null
@@ -204,13 +204,15 @@ export interface CampaignControl {
   agent_last_run_at: string | null
   agent_last_summary: Record<string, unknown> | null
   test_phones: string[]
+  test_owner_name?: string | null
+  test_property_address?: string | null
 }
 
 export type DraftStatus =
   | 'no_reply' | 'would_send' | 'awaiting_approval' | 'queued' | 'sending' | 'sent' | 'dry_sent'
   | 'failed' | 'uncertain' | 'skipped' | 'superseded'
 
-/** One inbound text and Sam's answer to it (migration 0004). */
+/** One inbound text and the drafted answer to it (migration 0004). */
 export interface ReplyDraft {
   id: string
   inbound_sid: string

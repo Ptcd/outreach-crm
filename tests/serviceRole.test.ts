@@ -53,7 +53,7 @@ describe('test phone', () => {
     await db.query(`select public.record_inbound('SMt1', '+14145550909', '+12629996513', 'Test', false, now())`)
     const claimed = (await asService(() => db.query<{ r: { lead_id: string | null; is_test: boolean; owner_name: string; property_address: string }[] }>(
       `select public.reply_claim_inbound(5) as r`))).rows[0].r
-    expect(claimed[0]).toMatchObject({ lead_id: null, is_test: true, owner_name: "TEST - Colin's phone", property_address: '1234 N Test St, Milwaukee' })
+    expect(claimed[0]).toMatchObject({ lead_id: null, is_test: true, owner_name: 'JOHN W PANKIEWICZ JR', property_address: '2825 S LOGAN AV, Milwaukee' })
     await asService(() => db.query(`select public.reply_record_decision('SMt1', 'statement', 'candidate', false, 'open', 'Hi there', 'claude', 'n', 'v')`))
     expect((await db.query(`select is_test, lead_id from public.reply_drafts`)).rows).toEqual([{ is_test: true, lead_id: null }])
     // a STOP from the test phone is honoured, the real lead sharing that number is untouched, and Colin can reset it

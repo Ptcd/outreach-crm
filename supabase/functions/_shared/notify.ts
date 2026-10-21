@@ -1,4 +1,4 @@
-// Tell Colin when Sam needs him: ONLY for a real reply waiting for approval (never routine).
+// Tell Colin when the reply agent needs him: ONLY for a real reply waiting for approval (never routine).
 // One push per draft plus an email backup, one reminder push after 2 hours, nothing in quiet
 // hours (notify_claim, migration 0008, decides all of that and marks each draft as it hands it
 // out). The email only OPENS the card in the app: no approve-by-link (mail scanners pre-fetch

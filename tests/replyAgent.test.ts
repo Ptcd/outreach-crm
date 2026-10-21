@@ -1,4 +1,4 @@
-// Sam end to end on the real migrations (PGlite), with a fake Twilio and a fake drafter:
+// The reply agent end to end on the real migrations (PGlite), with a fake Twilio and a fake drafter:
 // inbound -> classified -> removal / routine "would send" / candidate draft -> Colin approves
 // -> "would send" recorded. Plus never twice, stale drafts, quiet hours, opted-out phones,
 // a price in Colin's edit, the red-team gate on the routine switch, and live routine sends.
@@ -52,8 +52,8 @@ class FakeTwilio implements TwilioPort {
 const drafter: Drafter = async (x) => `Thanks for getting back to me about ${x.propertyAddress ?? 'the place'}. Is it still yours?`
 
 async function control() {
-  return (await db.query<{ reply_numbers: string[]; redteam_version: string | null; agent_last_run_at: string | null }>(
-    `select reply_numbers, redteam_version, agent_last_run_at from public.campaign_control`)).rows[0]
+  return (await db.query<{ reply_numbers: string[]; redteam_version: string | null; agent_last_run_at: string | null; test_opener: string | null }>(
+    `select reply_numbers, redteam_version, agent_last_run_at, test_opener from public.campaign_control`)).rows[0]
 }
 async function run(tw: FakeTwilio, env = DRY, at = NOON) {
   return runReplyAgent({ rpc, env, twilio: tw, drafter, control: await control(), redteamRows: ROWS, now: () => at })
@@ -95,7 +95,21 @@ beforeEach(async () => {
   `)
 })
 
-describe('Sam, end to end with no real text', () => {
+describe('the reply agent, end to end with no real text', () => {
+  it("Colin's test phone plays a real planned owner: the draft knows the owner, the property and the opening text", async () => {
+    const seen: Parameters<Drafter>[0][] = []
+    const capture: Drafter = async (x) => { seen.push(x); return 'Thanks for getting back to me, John. Is the place on Logan still yours?' }
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMt', '+12627770909', 'Test - what is this about?')]
+    await runReplyAgent({ rpc, env: DRY, twilio: tw, drafter: capture, control: await control(), redteamRows: ROWS, now: () => NOON })
+    expect(seen).toHaveLength(1)
+    expect(seen[0]).toMatchObject({ ownerName: 'JOHN W PANKIEWICZ JR', propertyAddress: '2825 S LOGAN AV, Milwaukee' })
+    expect(seen[0].history[0]).toEqual({ who: 'us', body: expect.stringMatching(/^Hi John, Colin Merrill here\..*2825 S Logan Ave/) })
+    const d = (await db.query<{ is_test: boolean; status: string; body: string }>(`select is_test, status, body from public.reply_drafts`)).rows
+    expect(d).toEqual([{ is_test: true, status: 'awaiting_approval', body: 'Thanks for getting back to me, John. Is the place on Logan still yours?' }])
+    expect(tw.sends).toHaveLength(0)
+  })
+
   it('routine reply would send, a real reply becomes a draft, and Colin approving it records "would send"', async () => {
     const tw = new FakeTwilio()
     tw.inbound = [text('SMa', '+14145550177', 'Maybe. What would you pay?'), text('SMb', '+14145550199', 'who is this?')]
@@ -213,7 +227,7 @@ describe('work no text can do', () => {
 })
 
 describe('the routine switch', () => {
-  it('cannot be turned on until the red team passed for the rules Sam runs', async () => {
+  it('cannot be turned on until the red team passed for the rules the reply agent runs', async () => {
     await expect(as(() => db.query('select public.set_routine_replies(true)'))).rejects.toThrow(/red-team test has not passed/)
     await run(new FakeTwilio())                               // scores and records the red team
     const c = await db.query<{ redteam_ok: boolean; redteam_version: string }>(`select redteam_ok, redteam_version from public.campaign_control`)

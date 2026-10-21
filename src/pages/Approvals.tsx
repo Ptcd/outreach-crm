@@ -188,9 +188,15 @@ function SendingPanel({ canDecide }: { canDecide: boolean }) {
       {canDecide && (
         <div className="mt-4 border-t pt-3">
           <p className="font-medium">Test phone</p>
+          {c.test_phones.length > 0 ? (
+            <p className="mt-1 rounded-md bg-amber-50 p-2 text-sm font-medium text-amber-950">
+              Test phone: {c.test_phones.map(fmtPhone).join(', ')} plays {c.test_owner_name || 'a sample owner'}
+              {c.test_property_address ? `, ${c.test_property_address}` : ''}.
+            </p>
+          ) : <p className="mt-1 text-sm">No test phone set.</p>}
           <p className="mt-1 text-sm">
-            Text the campaign number from this phone and the system treats you as a sample owner
-            ({c.test_phones.length ? fmtPhone(c.test_phones[0]) : 'none set'}). Your texts show as TEST in the Inbox and never touch a real lead.
+            Text the campaign number from that phone and you get exactly what that owner would get: a draft for you to approve,
+            marked TEST in the Inbox. Nothing touches the real owner.
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Input className="w-44" inputMode="tel" placeholder="Your cell" value={testPhone ?? (c.test_phones[0] ?? '')}

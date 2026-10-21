@@ -1,4 +1,4 @@
--- Sam's timer: call the reply-agent Edge Function every minute (same as
+-- The reply agent's timer: call the reply-agent Edge Function every minute (same as
 -- supabase/setup/reply_agent_cron.sql, as a migration so `supabase db push` sets it up).
 -- Skipped where pg_cron, pg_net or the shared secret (send_openers_cron.sql) are absent,
 -- e.g. the local test database. It sends nothing by itself: routine replies need Colin's

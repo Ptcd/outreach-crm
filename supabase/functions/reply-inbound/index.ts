@@ -1,7 +1,7 @@
 // reply-inbound: Twilio's "A message comes in" webhook for the WPIE Mail Replies messaging
 // service. URL: https://jyfetargyaaxcqmxdgft.supabase.co/functions/v1/reply-inbound (POST).
 // Answers Twilio within a database round trip (empty TwiML, so Twilio sends nothing itself and
-// nothing is relayed anywhere); Sam's decision and any due routine reply run after the answer.
+// nothing is relayed anywhere); the reply agent's decision and any due routine reply run after the answer.
 // Requests without a valid X-Twilio-Signature (TWILIO_AUTH_TOKEN of the subaccount) are refused.
 import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
 import { afterWebhook, recordWebhook } from '../_shared/inbound.ts'
@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
   if (res.status === 200 && res.sid) {
     const work = (async () => {
       const env = senderEnv((n) => Deno.env.get(n), `${url}/functions/v1`)
-      const control = await sb.from('campaign_control').select('reply_numbers, redteam_version, agent_last_run_at').eq('id', 1).single()
+      const control = await sb.from('campaign_control').select('reply_numbers, redteam_version, agent_last_run_at, test_opener').eq('id', 1).single()
       if (control.error) return
       const key = Deno.env.get('ANTHROPIC_API_KEY') ?? ''
       try {

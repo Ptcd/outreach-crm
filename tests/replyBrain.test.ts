@@ -1,4 +1,4 @@
-// Sam's classifier and routing (supabase/functions/_shared/replyBrain.ts) against WPIE.
+// The reply agent's classifier and routing (supabase/functions/_shared/replyBrain.ts) against WPIE.
 import { describe, expect, it } from 'vitest'
 import data from '../supabase/functions/_shared/replyRedteam.generated.json'
 import { classify, decide, isCarrierKeyword, isSpanish, scoreRedteam, type RedteamRow } from '../supabase/functions/_shared/replyBrain'

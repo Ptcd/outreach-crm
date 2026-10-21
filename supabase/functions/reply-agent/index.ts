@@ -1,8 +1,8 @@
-// reply-agent ("Sam"): called every minute by pg_cron (supabase/setup/reply_agent_cron.sql).
+// reply-agent : called every minute by pg_cron (supabase/setup/reply_agent_cron.sql).
 // Pulls new texts to the reply numbers from Twilio, decides each one (removal / routine line /
 // a draft for Colin), and sends routine replies and held approvals that are due. Dry unless
 // TWILIO_LIVE_SENDING=1 and every Twilio setting is set; routine replies also need Colin's
-// "Sam handles routine replies" switch, which needs a passing red-team score.
+// "Auto-answer routine replies" switch, which needs a passing red-team score.
 import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
 import { runReplyAgent } from '../_shared/replyAgent.ts'
 import { claudeDrafter } from '../_shared/drafter.ts'
@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   if (ok.error || ok.data !== true) return new Response('forbidden', { status: 403 })
 
   const env = senderEnv((n) => Deno.env.get(n), `${url}/functions/v1`)
-  const control = await sb.from('campaign_control').select('reply_numbers, redteam_version, agent_last_run_at').eq('id', 1).single()
+  const control = await sb.from('campaign_control').select('reply_numbers, redteam_version, agent_last_run_at, test_opener').eq('id', 1).single()
   if (control.error) return Response.json({ error: control.error.message }, { status: 500 })
   const key = Deno.env.get('ANTHROPIC_API_KEY') ?? ''
   try {

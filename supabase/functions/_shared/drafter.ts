@@ -1,4 +1,4 @@
-// Sam's drafted reply for a real conversation (Colin approves every one before it goes).
+// the drafted replyed reply for a real conversation (Colin approves every one before it goes).
 // Same prompt and guard pm-phone uses (both generated from WPIE): REPLY_SYSTEM_PROMPT,
 // then guardDraft strips price/offer language (replaced by the deflection), the business
 // name, "postcard" and markdown, and caps the length. Returns null when there is nothing
@@ -43,8 +43,8 @@ export function conversationContext(x: DraftInput): string {
   return [
     '# This conversation',
     'Channel: sms',
-    x.ownerName ? `Owner on record: ${x.ownerName}` : 'We could not match this number to an owner on record.',
-    x.propertyAddress ? `Property the text was about: ${x.propertyAddress}` : 'Find out which property they mean before anything else.',
+    x.ownerName ? `Owner on record: ${x.ownerName}` : 'This number is not one of the owners Colin texted (it may be a relative, a new phone, or a wrong number).',
+    x.propertyAddress ? `Property the text was about: ${x.propertyAddress}` : "Ask, the way Colin would in one short friendly line, which property they are texting about (e.g. 'Thanks for getting back to me - which property is this about?'). Never say you can't find, lost or don't have their information, and never mention a database or records.",
     'The assistant turns above were sent by Colin or for him (the first is usually his own opening text).',
     'Never mention a postcard or a business. Never give or hint at a price, value or offer.',
     'Your message is a draft Colin reads in the WPIE app and approves or edits before it is sent.',
