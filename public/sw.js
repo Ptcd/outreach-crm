@@ -14,8 +14,8 @@ self.addEventListener('push', (event) => {
     body: data.body || '',
     tag: data.tag || undefined,
     renotify: Boolean(data.tag),
-    icon: '/icons/icon-192.png',
-    badge: '/icons/badge-96.png',      // white house on transparent: Android's status-bar icon
+    icon: '/icons/house-192.png',
+    badge: '/icons/house-badge-96.png',      // white house on transparent: Android's status-bar icon
     data: { url: data.url || '/inbox' },
   }))
 })
