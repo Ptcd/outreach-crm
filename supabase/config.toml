@@ -14,3 +14,7 @@ verify_jwt = false
 # Called by the app with the signed-in user's token; the function checks the owner role itself.
 [functions.reply-send]
 verify_jwt = true
+
+# Twilio's incoming-message webhook; the function checks X-Twilio-Signature itself.
+[functions.reply-inbound]
+verify_jwt = false

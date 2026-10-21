@@ -195,9 +195,11 @@ describe('the routine switch', () => {
     await as(() => db.query('select public.set_routine_replies(true)'))
     tw.inbound = [text('SMw', '+14145550177', 'wrong number', NOON, '+12624180202')]
     const s = await run(tw, LIVE)
-    expect(s.sent).toBe(1)
+    expect(s.sent).toBe(0)                                   // a natural 45-90 s pause first
+    const later = await run(tw, LIVE, new Date(NOON.getTime() + 91_000))
+    expect(later.sent).toBe(1)
     expect(tw.sends).toEqual([{ to: '+14145550177', from: '+12624180202', body: expect.stringMatching(/wrong number/) }])
-    await run(tw, LIVE)
+    await run(tw, LIVE, new Date(NOON.getTime() + 200_000))
     expect(tw.sends.length).toBe(1)
     const ct = await db.query<{ status: string }>(`select status::text from public.contacts where value_normalized = '4145550177'`)
     expect(ct.rows[0].status).toBe('bad')

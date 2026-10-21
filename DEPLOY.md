@@ -124,6 +124,31 @@ left, in order (Claude never sees a key; each script shows only "set" / "saved")
 5. **Go live, only on Colin's word:** add the function secret `TWILIO_LIVE_SENDING` = `1`, approve the
    day's texts, "Turn sending on". To stop: turn sending off, or delete that secret.
 
+## Instant replies: the webhook (deployed 2026-10-21, not pointed at yet)
+
+`reply-inbound` is Twilio's "A message comes in" webhook for the WPIE Mail Replies messaging service:
+
+    https://jyfetargyaaxcqmxdgft.supabase.co/functions/v1/reply-inbound   (HTTP POST)
+
+- Refuses any request without a valid X-Twilio-Signature (the subaccount's auth token).
+- Records the text and, for a STOP or any removal wording, blocks the phone before answering Twilio
+  (what pm-phone's inbound did for these numbers). Answers with empty TwiML: Twilio sends nothing and
+  nothing is relayed to Colin's phone or email.
+- After answering: Sam decides the text (a draft for Colin, or a routine line), and a routine reply goes
+  after a natural 45-90 s pause (`campaign_control.auto_reply_delay_min/max`), never in quiet hours (then
+  08:00 plus the pause). Colin's approvals go when he taps (or at 08:00).
+- The 1-minute reply-agent timer stays as the catch-up; a reply can never go twice.
+- Twilio's own STOP handling (Advanced Opt-Out on the messaging service) keeps working as before.
+
+Order (each needs Colin's OK):
+1. Twilio settings on the functions (`tools\set_supabase_secrets.ps1`, or the hidden-prompt pattern).
+   **Do this first**: without TWILIO_AUTH_TOKEN the webhook refuses every request and texts would only
+   arrive through the timer's Twilio pull, which also needs those settings.
+2. Twilio console > switch to the WPIE Mail Replies subaccount > Messaging > Services > WPIE Mail Replies
+   (MGd94f196186140435f7889071eb014882) > Integration > Incoming Messages: "Send a webhook", Request URL
+   the address above, HTTP POST > Save. That moves these texts off pm-phone.
+3. Send a test text from your own phone to (262) 999-6513: it appears in the Inbox within seconds.
+
 ## Sending from the app (WPIE docs/APP_SENDING.md)
 
 Three locks, all OFF until Colin says go:

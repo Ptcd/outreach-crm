@@ -71,6 +71,7 @@ export async function runReplyAgent(opts: {
   redteamRows: RedteamRow[]
   now?: () => Date
   batch?: number
+  pull?: boolean            // read new texts from Twilio first (the timer); the webhook already recorded its text
 }): Promise<AgentSummary> {
   const now = opts.now ?? (() => new Date())
   const live = opts.env.live && opts.twilio != null
@@ -88,7 +89,7 @@ export async function runReplyAgent(opts: {
   }
 
   // 1. New inbound texts to every reply number, straight from Twilio.
-  if (opts.twilio) {
+  if (opts.twilio && opts.pull !== false) {
     const since = opts.control.agent_last_run_at
       ? new Date(new Date(opts.control.agent_last_run_at).getTime() - 3600_000) : new Date(now().getTime() - 3 * 86400_000)
     for (const num of opts.control.reply_numbers) {
