@@ -3,7 +3,7 @@
 // fake Twilio and a fake drafter. Whether a reply MAY go is decided in Postgres
 // (reply_claim_send, migration 0004); what the reply agent says is decided by replyBrain.decide and,
 // for a real conversation, by the drafter (Claude) whose text only Colin can approve.
-import { pitchReply, decide, rulesVersion, scoreRedteam, type RedteamRow, type ReplyContext } from './replyBrain.ts'
+import { decide, rulesVersion, scoreRedteam, type RedteamRow, type ReplyContext } from './replyBrain.ts'
 import { classifyFailure, isOptOut, type Rpc, type SenderEnv, type TwilioPort } from './sending.ts'
 import { guardDraft } from './replyGuard.ts'
 import { workNeeded } from './needsWork.ts'
@@ -122,20 +122,13 @@ export async function runReplyAgent(opts: {
       if (!(t.history ?? []).some((h) => h.who === 'us')) t.history = [{ who: 'us', body: opener }, ...(t.history ?? [])]
     }
     const ctx: ReplyContext = { inbound: t.body ?? '', priorInbound: (t.prior_inbound ?? []).filter(Boolean),
-      lastAgentText: t.last_agent_text, propertyAddress: t.property_address }
+      lastAgentText: t.last_agent_text, propertyAddress: t.property_address, ownerName: t.owner_name,
+      ourTurns: Math.max(0, (t.history ?? []).filter((h) => h.who === 'us').length - 1) }
     const d = decide(ctx)
     let body = d.reply
     let source = d.reply ? 'fixed_line' : 'none'
-    let facts: Record<string, unknown> | null = null
-    // Their first answer to the question-only opener is a plain yes: the pitch line, word for word.
-    const pitch = d.kind === 'candidate' ? pitchReply({ inbound: ctx.inbound, priorInbound: ctx.priorInbound,
-      ourTurns: Math.max(0, (t.history ?? []).filter((h) => h.who === 'us').length - 1), propertyAddress: t.property_address,
-      ownerName: t.owner_name }) : null
-    if (pitch) {
-      body = pitch.reply
-      facts = pitch.facts
-      source = 'fixed_line'
-    } else if (d.kind === 'candidate' && opts.drafter) {
+    let facts: Record<string, unknown> | null = d.facts ?? null
+    if (d.kind === 'candidate' && opts.drafter) {
       try {
         const got = await opts.drafter({ inbound: ctx.inbound, ownerName: t.owner_name, propertyAddress: t.property_address,
           history: (t.history ?? []).filter((h) => h.body).map((h) => ({ who: h.who, body: h.body as string })) })
@@ -168,7 +161,7 @@ export async function runReplyAgent(opts: {
     let r = await opts.rpc('reply_claim_held', { p_id: id, p_dry: !live, p_now: now().toISOString() })
     let j = r.data as { outcome: string; reason?: string; id?: string; to?: string; from?: string | null; body?: string }
     if (j?.outcome === 'refused' && j.reason === 'not a held approval') {
-      r = await opts.rpc('reply_claim_send', { p_id: id, p_mode: 'auto', p_body: null, p_actor: 'Routine reply (auto)', p_dry: !live,
+      r = await opts.rpc('reply_claim_send', { p_id: id, p_mode: 'auto', p_body: null, p_actor: 'auto-reply', p_dry: !live,
         p_now: now().toISOString() })
       j = r.data as typeof j
     }

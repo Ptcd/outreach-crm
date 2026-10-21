@@ -71,6 +71,8 @@ export interface ReplyContext {
   priorInbound: string[]          // their earlier texts in this thread, oldest first
   lastAgentText: string | null    // our most recent text to them (opener or a drafted reply)
   propertyAddress: string | null
+  ourTurns?: number               // our replies already sent in this thread (the opener not counted)
+  ownerName?: string | null       // for "Hi <first>," on the pitch line
 }
 
 export type Kind = 'removal' | 'routine' | 'candidate'
@@ -83,6 +85,7 @@ export interface Decision {
   reply: string | null            // the fixed line for removal/routine; null = say nothing / Colin drafts
   outcome: Outcome
   note: string
+  facts?: Record<string, unknown>  // what this decision learned (e.g. pitched, last_asked)
 }
 
 const routine = (intent: string, reply: string, outcome: Outcome, note: string): Decision =>
@@ -90,7 +93,21 @@ const routine = (intent: string, reply: string, outcome: Outcome, note: string):
 const toColin = (intent: string, note: string): Decision =>
   ({ intent, kind: 'candidate', removal: false, reply: null, outcome: 'open', note })
 
+/** decideBase, plus Rick's two-tier opener (Colin 2026-10-21: "if we get a text that says yes the
+ *  agent can go ahead with the next text without my permission"): a short yes to the question-only
+ *  opener, as the first text of a thread matched to a property, is answered with the pitch line on
+ *  its own (routine: the switch, the 45-90 s delay and quiet hours apply). Their answer to it, and
+ *  anything with selling, interest or price words, stays a draft for Colin. */
 export function decide(ctx: ReplyContext): Decision {
+  const d = decideBase(ctx)
+  if (d.kind !== 'candidate' || (d.intent !== 'interested' && d.intent !== 'statement')) return d
+  const pitch = pitchReply({ inbound: ctx.inbound, priorInbound: ctx.priorInbound, ourTurns: ctx.ourTurns ?? 0,
+    propertyAddress: ctx.propertyAddress, ownerName: ctx.ownerName ?? null })
+  if (!pitch) return d
+  return { ...routine(d.intent, pitch.reply, 'open', 'yes to the question-only opener - pitch line, one question'), facts: pitch.facts }
+}
+
+function decideBase(ctx: ReplyContext): Decision {
   const text = (ctx.inbound ?? '').trim()
   const intent = classify(text)
   const spanish = isSpanish(text)
@@ -212,7 +229,7 @@ export function scoreRedteam(rows: RedteamRow[]): RedteamResult {
 /** Rick's two-tier opener (wpie.reply.brain, identify stage, agent_turns == 0): the opener only asked
  *  whether the place is still theirs. A short yes to it, on a thread matched to a property, gets the
  *  pitch line with one question; a first reply that already talks selling, interest or price does not
- *  (the drafter takes it). Returns the reply and its facts, or null. Still a draft for Colin. */
+ *  (the drafter takes it). Returns the reply and its facts, or null. decide() makes it routine. */
 export function pitchReply(x: { inbound: string; priorInbound: string[]; ourTurns: number; propertyAddress: string | null
   ownerName: string | null }): { reply: string; facts: Record<string, unknown> } | null {
   const text = (x.inbound ?? '').trim()

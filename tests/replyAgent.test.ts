@@ -96,21 +96,6 @@ beforeEach(async () => {
 })
 
 describe('the reply agent, end to end with no real text', () => {
-  it('a plain yes to the question-only opener drafts the pitch line, word for word, for Colin to approve', async () => {
-    const seen: string[] = []
-    const capture: Drafter = async (x) => { seen.push(x.inbound); return 'Thanks - what made you think about it?' }
-    const tw = new FakeTwilio()
-    tw.inbound = [text('SMy', '+14145550177', 'Yes'), text('SMh', '+14145550178', 'Yes, how much?')]
-    await runReplyAgent({ rpc, env: DRY, twilio: tw, drafter: capture, control: await control(), redteamRows: ROWS, now: () => NOON })
-    const d = (await db.query<{ phone10: string; status: string; kind: string; body: string; draft_source: string; facts: Record<string, unknown> | null }>(
-      `select phone10, status, kind, body, draft_source, facts from public.reply_drafts order by inbound_at, phone10`)).rows
-    const yes = d.find((x) => x.phone10 === '4145550177')!
-    expect(yes).toMatchObject({ kind: 'candidate', status: 'awaiting_approval', draft_source: 'fixed_line',
-      body: "Hi Test, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Would you ever consider selling that one? No pressure either way." })
-    expect(yes.facts).toMatchObject({ pitched: true, last_asked: 'interest' })
-    expect(seen).toEqual(['Yes, how much?'])           // talks price already: the drafter takes it, no pitch
-    expect(tw.sends).toHaveLength(0)
-  })
 
   it("Colin's test phone plays a real planned owner: the draft knows the owner, the property and the opening text", async () => {
     const seen: Parameters<Drafter>[0][] = []
@@ -269,5 +254,35 @@ describe('the routine switch', () => {
     expect(tw.sends.length).toBe(1)
     const ct = await db.query<{ status: string }>(`select status::text from public.contacts where value_normalized = '4145550177'`)
     expect(ct.rows[0].status).toBe('bad')
+  })
+  it('a plain yes to the question-only opener gets the pitch line on its own; their answer to it is a draft for Colin', async () => {
+    const seen: string[] = []
+    const capture: Drafter = async (x) => { seen.push(x.inbound); return 'Glad to hear it - what has you thinking about it?' }
+    const go = (tw: FakeTwilio, env = DRY, at = NOON) =>
+      control().then((c) => runReplyAgent({ rpc, env, twilio: tw, drafter: capture, control: c, redteamRows: ROWS, now: () => at }))
+    const tw = new FakeTwilio()
+    await go(tw)                                              // scores the red team
+    await as(() => db.query('select public.set_routine_replies(true)'))
+    tw.inbound = [text('SMy', '+14145550177', 'Yes'), text('SMh', '+14145550178', 'Yes, how much?')]
+    await go(tw, LIVE)
+    const d = (await db.query<{ phone10: string; kind: string; status: string; body: string; draft_source: string; facts: Record<string, unknown> | null }>(
+      `select phone10, kind, status, body, draft_source, facts from public.reply_drafts order by inbound_at, phone10`)).rows
+    const yes = d.find((x) => x.phone10 === '4145550177')!
+    expect(yes).toMatchObject({ kind: 'routine', draft_source: 'fixed_line',
+      body: "Hi Test, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Would you ever consider selling that one? No pressure either way." })
+    expect(yes.facts).toMatchObject({ pitched: true, last_asked: 'interest' })
+    expect(d.find((x) => x.phone10 === '4145550178')).toMatchObject({ kind: 'candidate', status: 'awaiting_approval' })
+    expect(seen).toEqual(['Yes, how much?'])
+    expect(tw.sends).toHaveLength(0)                          // the natural 45-90 s pause first
+    await go(tw, LIVE, new Date(NOON.getTime() + 91_000))
+    expect(tw.sends).toEqual([{ to: '+14145550177', from: CAMPAIGN, body: yes.body }])
+    const sent = (await db.query<{ status: string; decided_by: string }>(`select status, decided_by from public.reply_drafts where phone10 = '4145550177'`)).rows[0]
+    expect(sent).toEqual({ status: 'sent', decided_by: 'auto-reply' })
+    // Their answer to "would you ever consider selling" is Colin's to approve.
+    tw.inbound = [...tw.inbound, text('SMy2', '+14145550177', 'Maybe, depends on the price', new Date(NOON.getTime() + 300_000))]
+    await go(tw, LIVE, new Date(NOON.getTime() + 300_000))
+    const ans = (await db.query<{ kind: string; status: string }>(`select kind, status from public.reply_drafts where inbound_sid = 'SMy2'`)).rows[0]
+    expect(ans).toEqual({ kind: 'candidate', status: 'awaiting_approval' })
+    expect(tw.sends).toHaveLength(1)
   })
 })
