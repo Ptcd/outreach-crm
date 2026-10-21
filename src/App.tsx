@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAuth } from '@/providers/AuthProvider'
 import { supabaseConfigured } from '@/lib/supabaseClient'
 import { Layout } from '@/components/Layout'
@@ -11,6 +11,7 @@ import LeadDetail from '@/pages/LeadDetail'
 import Approvals from '@/pages/Approvals'
 import Inbox from '@/pages/Inbox'
 import Scoreboard from '@/pages/Scoreboard'
+import SignContract from '@/pages/SignContract'
 
 function Centered({ children }: { children: React.ReactNode }) {
   return <div className="flex min-h-dvh items-center justify-center p-6 text-center text-base">{children}</div>
@@ -18,6 +19,7 @@ function Centered({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const { user, member, memberStatus, memberError, retryMember, loading, recovering, signOut } = useAuth()
+  const location = useLocation()
 
   if (!supabaseConfigured) {
     return (
@@ -30,6 +32,10 @@ export default function App() {
         </div>
       </Centered>
     )
+  }
+  // A seller's signing link: no login, no team check.
+  if (location.pathname.startsWith('/sign/')) {
+    return <Routes><Route path="/sign/:token" element={<SignContract />} /></Routes>
   }
   if (loading) return <Centered>Loading...</Centered>
   if (!user) return <Login />

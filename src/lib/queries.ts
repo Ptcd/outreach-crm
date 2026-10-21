@@ -195,6 +195,18 @@ export const api = {
     return { error: d.outcome === 'sent' ? null : { message: d.reason ?? 'The email did not go.' } }
   },
   assignTask: (id: string, owner: Person) => supabase.from('tasks').update({ owner }).eq('id', id),
+  // Send contract (Colin): preview / send / new_link / void / pdf / seal. Errors come back as { ok: false, reason }.
+  contract: async (body: Record<string, unknown>): Promise<{ ok: boolean; reason?: string } & Record<string, unknown>> => {
+    const r = await supabase.functions.invoke('contract', { body })
+    if (r.error) return { ok: false, reason: await fnError(r.error) }
+    return r.data as { ok: boolean; reason?: string } & Record<string, unknown>
+  },
+  // The seller's signing page (no login; the link token is the key).
+  contractSign: async (body: Record<string, unknown>): Promise<{ ok: boolean; reason?: string } & Record<string, unknown>> => {
+    const r = await supabase.functions.invoke('contract-sign', { body })
+    if (r.error) return { ok: false, reason: await fnError(r.error) }
+    return r.data as { ok: boolean; reason?: string } & Record<string, unknown>
+  },
   setTestPhone: (phone: string) => supabase.rpc('set_test_phone', { p_phone: phone }),
   resetTestPhones: () => supabase.rpc('reset_test_phones'),
   notInterested: (leadId: string) =>
@@ -369,5 +381,35 @@ export function useReplyTasks() {
       check(await supabase.from('tasks').select('*, lead:leads(id, owner_name, property_address)')
         .eq('source', 'reply').is('done_at', null).order('created_at').limit(100)) as
         (Task & { lead: { id: string; owner_name: string; property_address: string | null } | null })[],
+  })
+}
+
+/** A function error's own message when it sent one ({ reason }), else the transport error. */
+async function fnError(e: unknown): Promise<string> {
+  const ctx = (e as { context?: Response }).context
+  try {
+    const j = ctx && typeof ctx.json === 'function' ? await ctx.json() : null
+    if (j && typeof j.reason === 'string') return j.reason
+  } catch { /* not json */ }
+  return e instanceof Error ? e.message : String(e)
+}
+
+export type ContractRow = {
+  id: string; lead_id: string; form: string; status: 'sent' | 'signed' | 'void'; created_at: string; signed_at: string | null
+  voided_at: string | null; void_reason: string | null; final_path: string | null; include_recr: boolean
+  terms: { price: number; closing: string; street: string }
+  contract_signers: { id: string; position: number; name: string; email: string | null; phone: string | null; opened_at: string | null
+    signed_at: string | null; expires_at: string }[]
+}
+
+/** Contracts on a lead, newest first, with each seller's progress. */
+export function useContracts(leadId: string) {
+  return useQuery({
+    queryKey: ['contracts', leadId],
+    refetchInterval: 30_000,
+    queryFn: async () =>
+      check(await supabase.from('contracts')
+        .select('id, lead_id, form, status, created_at, signed_at, voided_at, void_reason, final_path, include_recr, terms, contract_signers(id, position, name, email, phone, opened_at, signed_at, expires_at)')
+        .eq('lead_id', leadId).order('created_at', { ascending: false })) as ContractRow[],
   })
 }

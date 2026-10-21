@@ -176,7 +176,7 @@ export const TASK_KINDS: { id: string; label: string }[] = [
 
 export const TASK_KIND_LABEL: Record<string, string> = Object.fromEntries(TASK_KINDS.map((k) => [k.id, k.label]))
 
-export const DEAL_STATUS_LABEL = { offer: 'Offer made', contract: 'Under contract', closed: 'Closed', dead: 'Dead' }
+export const DEAL_STATUS_LABEL = { offer: 'Offer made', contract: 'Under contract', signed_to_title: 'Signed: to title', closed: 'Closed', dead: 'Dead' }
 
 /** Who can own a task. Adil works the tasks and bookings (Colin 2026-10-21). */
 export const PEOPLE: { id: 'colin' | 'adil' | 'thalia'; label: string }[] = [

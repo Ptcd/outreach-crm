@@ -6,6 +6,7 @@ import { Badge, Empty, ErrorNote, Section, Select, Textarea } from '@/components
 import { GateChecklist, type GateSave } from '@/components/GateChecklist'
 import { EmailComposer } from '@/components/EmailComposer'
 import { ReplyTaskCard } from '@/components/ReplyTaskCard'
+import { ContractBlock } from '@/components/ContractBlock'
 import { api, useDeals, useLead, useWrite } from '@/lib/queries'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
 import { DEAL_STATUS_LABEL, MILESTONES, PEOPLE, SELLER_FACTS, STAGES, STAGE_LABEL, TASK_KINDS, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
@@ -57,6 +58,7 @@ export default function LeadDetail() {
       <Contacts contacts={contacts} leadId={lead.id} />
       <Facts lead={lead} />
       <Milestones leadId={lead.id} done={milestones} />
+      {isOwner && <ContractBlock lead={lead} contacts={contacts} />}
       {isOwner && <DealBlock leadId={lead.id} />}
       <Notes lead={lead} />
     </div>

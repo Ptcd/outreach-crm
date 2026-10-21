@@ -101,4 +101,19 @@ export function useWrite<TArgs>(fn: (args: TArgs) => PromiseLike<{ error: { mess
   return useMutation({ mutationFn: async (args: TArgs) => { const r = await fn(args); if (r.error) throw new Error(r.error.message) } })
 }
 const done = async () => ({ error: null, data: { outcome: 'dry_sent' } })
-export const api = new Proxy({}, { get: () => done }) as Record<string, (...a: unknown[]) => Promise<{ error: null; data: { outcome: string } }>>
+const SIGN_VIEW = { contract_id: 'K1', signer_id: 'S1', status: 'sent', form: 'WB-11 10-1-2026', include_recr: true, recr: null,
+  buyer_name: 'Colin Merrill', signer: { name: 'Dale Novak', position: 1, signed_at: null }, others: [{ name: 'Rita Novak', signed: false }],
+  offer_url: '#', final_url: null,
+  terms: { street: '2847 N Burleigh St', muniName: 'Milwaukee', county: 'Milwaukee', price: 182500, earnestMoney: 1000, earnestHolder: 'Knight Barry Title',
+    closing: 'November 20, 2026', bindingDeadline: 'October 24, 2026 at 11:59 p.m.', inspection: true, inspectionDays: 10, proofOfFundsDays: 5 } }
+const special: Record<string, (...a: unknown[]) => Promise<unknown>> = {
+  contractSign: async (b: unknown) => ((b as { action: string }).action === 'open' ? { ok: true, view: SIGN_VIEW } : { ok: true, allSigned: false }),
+  contract: async (b: unknown) => ((b as { action: string }).action === 'send'
+    ? { ok: true, links: [{ position: 1, name: 'Dale Novak', url: 'https://deals.junkcarsmequon.com/sign/preview-token-not-real' }] }
+    : { ok: false, reason: 'Preview mode: no server.' }),
+}
+export const api = new Proxy({}, { get: (_t, k: string) => special[k] ?? done }) as Record<string, (...a: unknown[]) => Promise<{ error: null; data: { outcome: string } }>>
+export const useContracts = () => ok([{ id: 'K1', lead_id: 'L1', form: 'WB-11 10-1-2026', status: 'signed', created_at: ago(900), signed_at: ago(30),
+  voided_at: null, void_reason: null, final_path: 'K1/signed.pdf', include_recr: true, terms: { price: 182500, closing: 'November 20, 2026', street: '2847 N Burleigh St' },
+  contract_signers: [{ id: 'S1', position: 1, name: 'Dale Novak', email: 'dale.novak@example.com', phone: '4145550177', opened_at: ago(60), signed_at: ago(45), expires_at: ago(-20000) },
+    { id: 'S2', position: 2, name: 'Rita Novak', email: null, phone: null, opened_at: ago(40), signed_at: ago(30), expires_at: ago(-20000) }] }])

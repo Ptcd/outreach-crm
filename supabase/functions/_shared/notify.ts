@@ -164,3 +164,19 @@ export async function testNotification(deps: NotifyDeps): Promise<NotifySummary>
   }
   return s
 }
+
+/** One push to every registered phone, plus the email backup when it is set up (e.g. a signed contract). */
+export async function notifyEveryone(deps: NotifyDeps, m: { title: string; body: string; url: string; tag: string }): Promise<NotifySummary> {
+  const s: NotifySummary = { drafts: 0, reminders: 0, tasks: 0, pushes_ok: 0, pushes_failed: 0, emails: 0, email_errors: [] }
+  await pushAll(deps, m, s)
+  if (deps.email && deps.emailTo) {
+    try {
+      await deps.email({ to: deps.emailTo, subject: m.title, text: `${m.body}\n\n${m.url}`,
+        html: `<p>${esc(m.body)}</p><p><a href="${esc(m.url)}">Open it in WPIE</a></p>` })
+      s.emails += 1
+    } catch (e) {
+      s.email_errors.push(String(e instanceof Error ? e.message : e).slice(0, 160))
+    }
+  }
+  return s
+}

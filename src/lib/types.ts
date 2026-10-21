@@ -10,7 +10,7 @@ export type Lane = 'hold' | 'flip'
 export type Person = 'colin' | 'thalia' | 'adil'
 export type Role = 'owner' | 'caller'
 export type GateDecision = 'walk' | 'no_walk' | 'one_more_call'
-export type DealStatus = 'offer' | 'contract' | 'closed' | 'dead'
+export type DealStatus = 'offer' | 'contract' | 'signed_to_title' | 'closed' | 'dead'
 export type OpenerDecision = 'pending' | 'approved' | 'skipped'
 export type MilestoneKind = 'connect' | 'contact' | 'lead' | 'handoff' | 'handoff_held' | 'qualifying_call' | 'walk'
 

@@ -18,3 +18,11 @@ verify_jwt = true
 # Twilio's incoming-message webhook; the function checks X-Twilio-Signature itself.
 [functions.reply-inbound]
 verify_jwt = false
+
+# Colin's "Send contract" (preview, send, new link, withdraw, open a PDF); checks the owner role itself.
+[functions.contract]
+verify_jwt = true
+
+# The seller's signing page: no login, the link token is the credential (only its hash is stored).
+[functions.contract-sign]
+verify_jwt = false

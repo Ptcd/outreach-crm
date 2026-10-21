@@ -28,8 +28,14 @@ vi.mock('@/providers/AuthProvider', () => ({
 }))
 vi.mock('@/lib/queries', () => ({
   PAGE_SIZE: 50,
-  api: {},
+  api: { contractSign: vi.fn(async () => ({ ok: true, view: { contract_id: 'K1', signer_id: 'S1', status: 'sent', form: 'WB-11 10-1-2026', include_recr: true, recr: null,
+    buyer_name: 'Colin Merrill', signer: { name: 'Jane Roe', position: 1, signed_at: null }, others: [], offer_url: 'https://x/offer.pdf', final_url: null,
+    terms: { street: '100 N Main St', muniName: 'Milwaukee', county: 'Milwaukee', price: 182500, earnestMoney: 1000, earnestHolder: 'Knight Barry Title',
+      closing: 'November 20, 2026', bindingDeadline: 'October 24, 2026 at 11:59 p.m.', inspection: true, inspectionDays: 10, proofOfFundsDays: 5 } } })) },
   useWrite: () => mutation,
+  useContracts: () => ok([{ id: 'K1', lead_id: 'L1', form: 'WB-11 10-1-2026', status: 'sent', created_at: '2026-10-21T19:00:00Z', signed_at: null,
+    voided_at: null, void_reason: null, final_path: null, include_recr: true, terms: { price: 182500, closing: 'November 20, 2026', street: '100 N Main St' },
+    contract_signers: [{ id: 'S1', position: 1, name: 'Jane Roe', email: null, phone: null, opened_at: '2026-10-21T20:00:00Z', signed_at: null, expires_at: '2026-11-04T19:00:00Z' }] }]),
   useDueTasks: () => ok([{ id: 'T1', lead_id: 'L1', due_at: '2026-10-20T15:00:00Z', kind: 'call', owner: 'colin', done_at: null, note: 'after 5', created_at: '', lead }]),
   useUnseenReplies: () => ok([{ id: 'M1', lead_id: 'L1', direction: 'in', channel: 'sms', body: 'Who is this?', sent_at: '2026-10-21T16:00:00Z', seen_at: null, is_opt_out: false, is_opener: false, status: 'replied', lead }]),
   useFollowupDebt: () => ok([]),
@@ -80,6 +86,7 @@ import LeadDetail from '@/pages/LeadDetail'
 import Approvals from '@/pages/Approvals'
 import Inbox from '@/pages/Inbox'
 import Scoreboard from '@/pages/Scoreboard'
+import SignContract from '@/pages/SignContract'
 
 afterEach(cleanup)
 
@@ -121,6 +128,21 @@ describe('pages render', () => {
     expect(screen.getByText(/Can you email me/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Send an email' })).toBeTruthy()
     expect(screen.queryByText('Mailed')).toBeNull()
+    expect(screen.getByText('Contract (WB-11)')).toBeTruthy()
+    expect(screen.getByText('Out for signature')).toBeTruthy()
+    expect(screen.getByText(/opened/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'New signing link' })).toBeTruthy()
+  })
+
+  it('the seller signing page shows the terms, consent, all 62 condition questions, and locks Sign until done', async () => {
+    at('/sign/tok', '/sign/:token', <SignContract />)
+    expect(await screen.findByText('$182,500')).toBeTruthy()
+    expect(screen.getByText(/No financing contingency/)).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Read the full Offer (PDF)' }).getAttribute('href')).toBe('https://x/offer.pdf')
+    expect(screen.getByText(/I agree to use electronic records and signatures/)).toBeTruthy()
+    expect(screen.getAllByRole('radiogroup')).toHaveLength(62)
+    expect((screen.getByRole('button', { name: 'Accept and sign' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText(/Answer every question/)).toBeTruthy()
   })
 
   it('Approvals shows the switch, the pause, bulk buttons and each text', () => {
