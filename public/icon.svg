@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="WPIE">
+  <rect width="512" height="512" rx="96" fill="#0f172a"/>
+  <rect x="336" y="120" width="48" height="100" fill="#fbbf24"/>
+  <polygon points="256,92 452,262 60,262" fill="#fbbf24"/>
+  <rect x="118" y="240" width="276" height="184" fill="#fbbf24"/>
+  <rect x="218" y="318" width="76" height="106" fill="#0f172a"/>
+</svg>
