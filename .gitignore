@@ -10,3 +10,6 @@ coverage/
 .vercel
 .env.*
 !.env.example
+
+# Supabase CLI link state
+supabase/.temp/
