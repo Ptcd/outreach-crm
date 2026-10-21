@@ -7,6 +7,7 @@ import Today from '@/pages/Today'
 import Pipeline from '@/pages/Pipeline'
 import LeadDetail from '@/pages/LeadDetail'
 import Approvals from '@/pages/Approvals'
+import Inbox from '@/pages/Inbox'
 import Scoreboard from '@/pages/Scoreboard'
 
 function Centered({ children }: { children: React.ReactNode }) {
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/today" element={<Today />} />
         <Route path="/pipeline" element={<Pipeline />} />
         <Route path="/lead/:id" element={<LeadDetail />} />
+        <Route path="/inbox" element={<Inbox />} />
         <Route path="/approvals" element={<Approvals />} />
         <Route path="/scoreboard" element={<Scoreboard />} />
         <Route path="*" element={<Navigate to="/today" replace />} />

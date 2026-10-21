@@ -3,9 +3,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabaseClient'
 import type {
-  Contact, Deal, FollowupDebt, GateScore, Lead, LeadStage, Message, Milestone, MilestoneKind,
-  OpenerDecision, Person, PlannedOpener, ScoreboardWeek, SignalWeek, Task,
+  CampaignControl, Contact, Deal, FollowupDebt, GateScore, Lead, LeadStage, Message, Milestone, MilestoneKind,
+  OpenerDecision, Person, PlannedOpener, ReplyThread, ScoreboardWeek, SignalWeek, Task, TwilioInbound,
 } from './types'
+import type { InboxLead } from './inbox'
 
 function check<T>(res: { data: T | null; error: { message: string } | null }): T {
   if (res.error) throw new Error(res.error.message)
@@ -163,6 +164,69 @@ export const api = {
       .from('planned_openers')
       .update({ decision, decided_by_name: name, decided_at: new Date().toISOString(), decision_note: note })
       .eq('id', id),
+  // Colin's sending buttons (owner-only functions in migration 0003)
+  setSending: (on: boolean) => supabase.rpc('set_sending', { p_on: on }),
+  clearPause: () => supabase.rpc('clear_pause'),
+  approveDay: (day: string, except: string[]) => supabase.rpc('approve_day', { p_date: day, p_except: except }),
+  withdrawDay: (day: string) => supabase.rpc('withdraw_day', { p_date: day }),
+  // Inbox one-tap actions
+  bookCall: async (leadId: string, atIso: string) => {
+    const a = await supabase.from('leads')
+      .update({ stage: 'colin_call', next_action: "Colin's call", next_action_at: atIso, assigned_to: 'colin' }).eq('id', leadId)
+    if (a.error) return a
+    return supabase.from('tasks').insert({ lead_id: leadId, due_at: atIso, kind: 'call', owner: 'colin', note: "Colin's call (booked from Inbox)" })
+  },
+  notInterested: (leadId: string) =>
+    supabase.from('leads').update({ stage: 'dead', dead_reason: 'not interested', next_action_at: null, next_action: null }).eq('id', leadId),
+}
+
+// ------------------------------------------------------------- Sending
+export function useCampaignControl() {
+  return useQuery({
+    queryKey: ['campaign_control'],
+    refetchInterval: 60_000,
+    queryFn: async () =>
+      check(
+        await supabase.from('campaign_control')
+          .select('sending_enabled, sending_changed_by, sending_changed_at, paused, pause_reason, paused_at, laptop_paused, laptop_pause_reason, daily_cap, window_start, window_end, dnc_policy, last_run_at, last_run_summary')
+          .eq('id', 1).single(),
+      ) as CampaignControl,
+  })
+}
+
+// ---------------------------------------------------------------- Inbox
+/** Every planned text in [fromDay, toDay] with its lead, thread, reply-agent view and server-seen replies. */
+export function useInbox(fromDay: string, toDay: string) {
+  return useQuery({
+    queryKey: ['inbox', fromDay, toDay],
+    refetchInterval: 60_000,
+    queryFn: async (): Promise<InboxLead[]> => {
+      const openers = check(
+        await supabase.from('planned_openers')
+          .select('*, lead:leads(id, owner_name, property_address, stage, next_action_at, next_action, assigned_to, dead_reason)')
+          .gte('plan_date', fromDay).lte('plan_date', toDay)
+          .order('scheduled_at', { ascending: false, nullsFirst: false })
+          .limit(500),
+      ) as (PlannedOpener & { lead: InboxLead['lead'] })[]
+      const leadIds = [...new Set(openers.map((o) => o.lead_id).filter((x): x is string => Boolean(x)))]
+      if (leadIds.length === 0) return openers.map((o) => ({ opener: o, lead: o.lead, messages: [], thread: null, inbound: [] }))
+      const [messages, threads, inbound] = await Promise.all([
+        supabase.from('messages').select('*').in('lead_id', leadIds).eq('channel', 'sms').order('sent_at'),
+        supabase.from('reply_threads').select('*').in('lead_id', leadIds),
+        supabase.from('twilio_inbound').select('*').in('lead_id', leadIds).order('received_at'),
+      ])
+      const msgs = check(messages) as Message[]
+      const ths = check(threads) as ReplyThread[]
+      const inb = check(inbound) as TwilioInbound[]
+      return openers.map((o) => ({
+        opener: o,
+        lead: o.lead,
+        messages: msgs.filter((m) => m.lead_id === o.lead_id),
+        thread: ths.find((t) => t.lead_id === o.lead_id) ?? null,
+        inbound: inb.filter((m) => m.lead_id === o.lead_id),
+      }))
+    },
+  })
 }
 
 // ------------------------------------------------------------- Approvals

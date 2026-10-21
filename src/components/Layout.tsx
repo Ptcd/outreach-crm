@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
-import { BarChart3, CalendarCheck, ListChecks, MessageSquareText } from 'lucide-react'
+import { BarChart3, CalendarCheck, Inbox, ListChecks, MessageSquareText } from 'lucide-react'
 import { useAuth } from '@/providers/AuthProvider'
 import { cn } from '@/lib/utils'
 
 const NAV = [
   { to: '/today', label: 'Today', icon: CalendarCheck },
+  { to: '/inbox', label: 'Inbox', icon: Inbox },
   { to: '/pipeline', label: 'Pipeline', icon: ListChecks },
-  { to: '/approvals', label: 'Approvals', icon: MessageSquareText },
+  { to: '/approvals', label: 'Approve', icon: MessageSquareText },
   { to: '/scoreboard', label: 'Scoreboard', icon: BarChart3 },
 ]
 
@@ -40,7 +41,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-4">{children}</main>
-      <nav className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-4 border-t bg-background sm:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-5 border-t bg-background sm:hidden">
         {NAV.map((n) => (
           <NavLink
             key={n.to}

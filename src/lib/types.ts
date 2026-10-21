@@ -1,4 +1,4 @@
-// Row shapes for supabase/migrations/0001_wpie_live.sql.
+// Row shapes for supabase/migrations/0001_wpie_live.sql and 0003_app_sending.sql.
 
 export type LeadStage =
   | 'postcard_mailed' | 'opener_queued' | 'opener_sent' | 'reply_received' | 'ai_qualifying'
@@ -145,6 +145,73 @@ export interface PlannedOpener {
   decided_by_name: string | null
   decided_at: string | null
   decision_note: string | null
+  // 0003: where the text stands on the server
+  send_status: SendStatus
+  send_reason: string | null
+  claimed_at: string | null
+  sent_at: string | null
+  error_code: string | null
+}
+
+export type SendStatus =
+  | 'planned' | 'would_send' | 'sending' | 'sent' | 'delivered' | 'undelivered'
+  | 'failed' | 'uncertain' | 'skipped' | 'withdrawn'
+
+export interface RunSummary {
+  mode: 'live' | 'dry'
+  why_dry: string
+  inbound_new: number
+  inbound_error: string | null
+  sent: number
+  would_send: number
+  skipped: { id: string; reason: string }[]
+  failed: number
+  uncertain: number
+  stopped: string
+}
+
+export interface CampaignControl {
+  sending_enabled: boolean
+  sending_changed_by: string | null
+  sending_changed_at: string | null
+  paused: boolean
+  pause_reason: string | null
+  paused_at: string | null
+  laptop_paused: boolean
+  laptop_pause_reason: string | null
+  daily_cap: number
+  window_start: string
+  window_end: string
+  dnc_policy: 'require_scrub' | 'allow_unknown'
+  last_run_at: string | null
+  last_run_summary: RunSummary | null
+}
+
+/** The reply agent's view of one conversation, pushed by the WPIE sync. */
+export interface ReplyThread {
+  phone10: string
+  lead_id: string | null
+  intent: string | null
+  agent_stage: string | null
+  outcome: string | null
+  human_owned: boolean
+  handoff_flag: string | null
+  callback_slot: string | null
+  facts: Record<string, string>
+  suggested_reply: string | null
+  suggestion_note: string | null
+  last_inbound_at: string | null
+  last_inbound: string | null
+}
+
+/** An inbound text the server pulled from Twilio (may not be in WPIE yet). */
+export interface TwilioInbound {
+  sid: string
+  from10: string
+  body: string | null
+  is_opt_out: boolean
+  lead_id: string | null
+  received_at: string
 }
 
 export interface Milestone {
