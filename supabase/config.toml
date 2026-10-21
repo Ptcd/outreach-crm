@@ -1,0 +1,9 @@
+# Only the settings the WPIE Edge Functions need. Both check their own credential:
+# send-openers a shared secret from Vault (cron_secret_ok), opener-status Twilio's signature.
+project_id = "jyfetargyaaxcqmxdgft"
+
+[functions.send-openers]
+verify_jwt = false
+
+[functions.opener-status]
+verify_jwt = false
