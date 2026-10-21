@@ -5,6 +5,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
 import { approveReply } from '../_shared/replyAgent.ts'
 import { senderEnv, twilioPort, type Rpc } from '../_shared/sending.ts'
+import { testNotification } from '../_shared/notify.ts'
+import { notifyDeps } from '../_shared/notifyDeno.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -25,6 +27,16 @@ Deno.serve(async (req) => {
   const actor = (me.data?.display_name as string | undefined) ?? 'Colin'
 
   const { id, action, text } = await req.json().catch(() => ({}))
+  if (action === 'test_notification') {
+    const sbs = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', { auth: { persistSession: false } })
+    const rpcs: Rpc = async (fn, args) => {
+      const r = await sbs.rpc(fn, args)
+      return { data: r.data, error: r.error ? { message: r.error.message } : null }
+    }
+    const deps = notifyDeps(sbs, rpcs)
+    const s = await testNotification(deps)
+    return json({ outcome: 'tested', push_configured: deps.push != null, email_configured: deps.email != null && deps.emailTo != null, ...s })
+  }
   if (!id || (action !== 'approve' && action !== 'skip')) return json({ outcome: 'refused', reason: 'bad request' }, 400)
   if (action === 'skip') {
     const r = await asUser.rpc('skip_reply', { p_id: id })

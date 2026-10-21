@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge, Empty, ErrorNote } from '@/components/ui/form'
 import { api, useInbox, useOtherDrafts, useWrite } from '@/lib/queries'
 import { DraftBox } from '@/components/DraftBox'
+import { NotifyPanel } from '@/components/NotifyPanel'
 import { fmtDateTime, localInputToIso, todayLocal } from '@/lib/format'
 import {
   BUCKETS, type Bucket, type InboxLead, SEND_LABEL, WORDING, bucketOf, intentText, nextBusinessMorning, optedOut,
@@ -26,12 +27,19 @@ export default function Inbox() {
     .sort((a, b) => Number(b.bucket === 'needs_me') - Number(a.bucket === 'needs_me')), [q.data])
   const leadIds = useMemo(() => (q.data ?? []).map((x) => x.opener.lead_id).filter((x): x is string => Boolean(x)), [q.data])
   const other = useOtherDrafts(leadIds)
+  // A notification opens /inbox#draft-<id>: show that card once the data is in.
+  useEffect(() => {
+    const h = window.location.hash
+    if (!h.startsWith('#draft-') || !q.data || !other.data) return
+    document.getElementById(h.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [q.data, other.data])
   const counts = rows.reduce((c, r) => ({ ...c, [r.bucket]: (c[r.bucket] ?? 0) + 1 }), {} as Record<Bucket, number>)
   const shown = rows.filter((r) => chip === 'all' || r.bucket === chip)
 
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Inbox</h1>
+      <NotifyPanel />
       <p className="text-sm text-muted-foreground">
         Every seller text from the last 30 days and the coming week. Sam answers the routine ones (removals, wrong numbers,
         not interested); anything real waits here for your Approve. Nothing is forwarded to your phone.

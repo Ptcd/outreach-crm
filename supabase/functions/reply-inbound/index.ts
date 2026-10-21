@@ -6,6 +6,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
 import { afterWebhook, recordWebhook } from '../_shared/inbound.ts'
 import { claudeDrafter } from '../_shared/drafter.ts'
+import { runNotifications } from '../_shared/notify.ts'
+import { notifyDeps } from '../_shared/notifyDeno.ts'
 import { senderEnv, twilioPort, validTwilioSignature, type Rpc } from '../_shared/sending.ts'
 import type { RedteamRow } from '../_shared/replyBrain.ts'
 import redteam from '../_shared/replyRedteam.generated.json' with { type: 'json' }
@@ -38,7 +40,8 @@ Deno.serve(async (req) => {
             effort: Deno.env.get('REPLY_EFFORT') ?? 'low', companyName: Deno.env.get('REPLY_COMPANY_NAME') ?? undefined, fetchFn: fetch }) : null,
           redteamRows: redteam.rows as unknown as RedteamRow[],
         })
-        await rpc('note_agent_run', { p_summary: { via: 'webhook', sid: res.sid, runs } })
+        const notified = await runNotifications(notifyDeps(sb, rpc)).catch((e) => ({ error: String(e).slice(0, 200) }))
+        await rpc('note_agent_run', { p_summary: { via: 'webhook', sid: res.sid, runs, notified } })
       } catch (e) {
         await rpc('note_agent_run', { p_summary: { via: 'webhook', sid: res.sid, error: String(e).slice(0, 300) } })
       }

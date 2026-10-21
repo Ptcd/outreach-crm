@@ -6,6 +6,11 @@ import QueryProvider from '@/providers/QueryProvider'
 import './index.css'
 import App from './App.tsx'
 
+// Installable app + "Sam needs you" notifications (public/sw.js).
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => { void navigator.serviceWorker.register('/sw.js') })
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>

@@ -142,6 +142,8 @@ describe('pages render', () => {
     expect(screen.getByText('Texts from numbers not on these plans')).toBeTruthy()
     expect(screen.getByText(/routine replies are off/)).toBeTruthy()
     expect(screen.getByText('TEST - your phone')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Send a test notification' })).toBeTruthy()
+    expect(screen.getByText(/Add to Home screen/)).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'Dead 1' })).toBeTruthy()
   })
 

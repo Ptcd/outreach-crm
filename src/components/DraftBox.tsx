@@ -30,7 +30,7 @@ export function DraftBox({ d, showFrom = false }: { d: ReplyDraft; showFrom?: bo
     : d.status === 'failed' || d.status === 'uncertain' ? 'bad' : 'muted'
 
   return (
-    <div className="mt-3 rounded-md border border-amber-200 bg-amber-50/60 p-2 text-sm">
+    <div id={`draft-${d.id}`} className="mt-3 scroll-mt-20 rounded-md border border-amber-200 bg-amber-50/60 p-2 text-sm target:ring-2 target:ring-amber-500">
       <div className="flex flex-wrap items-center gap-1.5">
         {d.is_test && <Badge tone="bad">TEST - your phone</Badge>}
         <Badge tone={d.kind === 'candidate' ? 'warn' : d.kind === 'removal' ? 'bad' : 'info'}>{KIND_LABEL[d.kind]}</Badge>
