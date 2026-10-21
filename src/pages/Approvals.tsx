@@ -98,6 +98,9 @@ function SendingPanel({ canDecide }: { canDecide: boolean }) {
   const keys = [['campaign_control']]
   const setSending = useWrite((on: boolean) => api.setSending(on), keys)
   const setRoutine = useWrite((on: boolean) => api.setRoutine(on), keys)
+  const setTest = useWrite((p: string) => api.setTestPhone(p), keys)
+  const resetTest = useWrite(() => api.resetTestPhones(), keys)
+  const [testPhone, setTestPhone] = useState<string | null>(null)
   const clearPause = useWrite(() => api.clearPause(), keys)
   const c: CampaignControl | undefined = q.data
   if (q.error) return <ErrorNote error={q.error} />
@@ -177,7 +180,25 @@ function SendingPanel({ canDecide }: { canDecide: boolean }) {
           )
         )}
       </div>
-      <ErrorNote error={setSending.error ?? clearPause.error ?? setRoutine.error} />
+      {canDecide && (
+        <div className="mt-4 border-t pt-3">
+          <p className="font-medium">Test phone</p>
+          <p className="mt-1 text-sm">
+            Text the campaign number from this phone and Sam treats you as a sample owner
+            ({c.test_phones.length ? fmtPhone(c.test_phones[0]) : 'none set'}). Your texts show as TEST in the Inbox and never touch a real lead.
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Input className="w-44" inputMode="tel" placeholder="Your cell" value={testPhone ?? (c.test_phones[0] ?? '')}
+              onChange={(e) => setTestPhone(e.target.value)} aria-label="Test phone" />
+            <Button variant="outline" disabled={setTest.isPending} onClick={() => setTest.mutate((testPhone ?? '').trim())}>Save</Button>
+            <Button variant="ghost" disabled={resetTest.isPending || !c.test_phones.length}
+              onClick={() => { if (window.confirm('Unblock your test phone after a STOP test?')) resetTest.mutate(undefined) }}>
+              Reset after a STOP test
+            </Button>
+          </div>
+        </div>
+      )}
+      <ErrorNote error={setSending.error ?? clearPause.error ?? setRoutine.error ?? setTest.error ?? resetTest.error} />
     </Section>
   )
 }

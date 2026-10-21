@@ -184,6 +184,8 @@ export const api = {
     return { error: d.outcome === 'refused' ? { message: d.reason ?? 'not sent' } : null, data: d }
   },
   setRoutine: (on: boolean) => supabase.rpc('set_routine_replies', { p_on: on }),
+  setTestPhone: (phone: string) => supabase.rpc('set_test_phone', { p_phone: phone }),
+  resetTestPhones: () => supabase.rpc('reset_test_phones'),
   notInterested: (leadId: string) =>
     supabase.from('leads').update({ stage: 'dead', dead_reason: 'not interested', next_action_at: null, next_action: null }).eq('id', leadId),
 }
@@ -196,7 +198,7 @@ export function useCampaignControl() {
     queryFn: async () =>
       check(
         await supabase.from('campaign_control')
-          .select('sending_enabled, sending_changed_by, sending_changed_at, paused, pause_reason, paused_at, laptop_paused, laptop_pause_reason, daily_cap, window_start, window_end, dnc_policy, last_run_at, last_run_summary, routine_enabled, routine_changed_by, routine_changed_at, agent_rules_version, redteam_version, redteam_passed, redteam_total, redteam_ok, redteam_at, agent_last_run_at, agent_last_summary')
+          .select('sending_enabled, sending_changed_by, sending_changed_at, paused, pause_reason, paused_at, laptop_paused, laptop_pause_reason, daily_cap, window_start, window_end, dnc_policy, last_run_at, last_run_summary, routine_enabled, routine_changed_by, routine_changed_at, agent_rules_version, redteam_version, redteam_passed, redteam_total, redteam_ok, redteam_at, agent_last_run_at, agent_last_summary, test_phones')
           .eq('id', 1).single(),
       ) as CampaignControl,
   })

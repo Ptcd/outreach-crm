@@ -197,6 +197,7 @@ export interface CampaignControl {
   redteam_at: string | null
   agent_last_run_at: string | null
   agent_last_summary: Record<string, unknown> | null
+  test_phones: string[]
 }
 
 export type DraftStatus =
@@ -224,6 +225,7 @@ export interface ReplyDraft {
   sent_at: string | null
   decided_by: string | null
   decided_at: string | null
+  is_test: boolean
 }
 
 /** The reply agent's view of one conversation, pushed by the WPIE sync. */

@@ -32,6 +32,7 @@ export function DraftBox({ d, showFrom = false }: { d: ReplyDraft; showFrom?: bo
   return (
     <div className="mt-3 rounded-md border border-amber-200 bg-amber-50/60 p-2 text-sm">
       <div className="flex flex-wrap items-center gap-1.5">
+        {d.is_test && <Badge tone="bad">TEST - your phone</Badge>}
         <Badge tone={d.kind === 'candidate' ? 'warn' : d.kind === 'removal' ? 'bad' : 'info'}>{KIND_LABEL[d.kind]}</Badge>
         <Badge tone={tone}>{DRAFT_LABEL[d.status]}</Badge>
         {d.intent && <span className="text-xs text-muted-foreground">Sam read it as: {intentText(d.intent)}</span>}
