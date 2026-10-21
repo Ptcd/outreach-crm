@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge, Empty, ErrorNote } from '@/components/ui/form'
-import { api, useInbox, useOtherDrafts, useWrite } from '@/lib/queries'
+import { api, useInbox, useOtherDrafts, useWaitingDrafts, useWrite } from '@/lib/queries'
+import { ReviewDeck } from '@/components/ReviewDeck'
+import { ConfirmButton } from '@/components/ui/confirm'
 import { DraftBox } from '@/components/DraftBox'
 import { NotifyPanel } from '@/components/NotifyPanel'
 import { fmtDateTime, localInputToIso, todayLocal } from '@/lib/format'
@@ -21,7 +23,10 @@ function daysAgo(n: number): string {
 export default function Inbox() {
   const [from] = useState(daysAgo(30))
   const [to] = useState(daysAgo(-7))
-  const q = useInbox(from, to)
+  // The replies waiting for Colin load first; the full list follows.
+  const waiting = useWaitingDrafts()
+  const q = useInbox(from, to, waiting.isFetched)
+  const [startId] = useState(() => (window.location.hash.startsWith('#draft-') ? window.location.hash.slice(7) : null))
   const [chip, setChip] = useState<Bucket | 'all'>('all')
   const rows = useMemo(() => (q.data ?? []).map((x) => ({ x, bucket: bucketOf(x) }))
     .sort((a, b) => Number(b.bucket === 'needs_me') - Number(a.bucket === 'needs_me')), [q.data])
@@ -39,12 +44,18 @@ export default function Inbox() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Inbox</h1>
+      {waiting.isLoading && <Empty>Loading replies that need you...</Empty>}
+      <ErrorNote error={waiting.error} />
+      {(waiting.data ?? []).length > 0 && <ReviewDeck drafts={waiting.data!} startId={startId} />}
+      {waiting.data && waiting.data.length === 0 && (
+        <p className="rounded-xl border bg-card p-4 text-base">Nothing needs you right now.</p>
+      )}
       <NotifyPanel />
       <p className="text-sm text-muted-foreground">
         Every seller text from the last 30 days and the coming week. Routine ones (removals, wrong numbers, not interested)
         are answered automatically; anything real waits here for your Approve.
       </p>
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1" role="tablist" aria-label="Filter">
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter">
         {[{ id: 'all' as const, label: 'All' }, ...BUCKETS].map((b) => (
           <button
             key={b.id}
@@ -52,7 +63,7 @@ export default function Inbox() {
             aria-selected={chip === b.id}
             onClick={() => setChip(b.id)}
             className={cn(
-              'shrink-0 rounded-full border px-3 py-1.5 text-sm',
+              'h-11 shrink-0 rounded-full border px-4 text-sm',
               chip === b.id ? 'border-primary bg-primary text-primary-foreground' : 'bg-background',
             )}
           >
@@ -61,7 +72,7 @@ export default function Inbox() {
         ))}
       </div>
       <ErrorNote error={q.error} />
-      {q.isLoading && <Empty>Loading...</Empty>}
+      {(q.isLoading || q.fetchStatus === 'paused') && !q.data && <Empty>Loading all texts...</Empty>}
       {q.data && shown.length === 0 && <Empty>Nothing here.</Empty>}
       <div className="space-y-3">
         {shown.map(({ x, bucket }) => (
@@ -167,12 +178,12 @@ function InboxCard({ x, bucket }: { x: InboxLead; bucket: Bucket }) {
             )
           )}
           {!stopped && bucket !== 'dead' && (
-            <Button variant="outline" disabled={drop.isPending}
-              onClick={() => { if (window.confirm('Mark this owner not interested? The lead moves to Dead.')) drop.mutate(leadId) }}>
+            <ConfirmButton variant="outline" disabled={drop.isPending} yes="Yes, not interested"
+              question="Mark this owner not interested? The lead moves to Dead." onConfirm={() => drop.mutate(leadId)}>
               Not interested
-            </Button>
+            </ConfirmButton>
           )}
-          <Link to={`/lead/${leadId}`} className="ml-auto text-sm underline">Open lead</Link>
+          <Link to={`/lead/${leadId}`} className="ml-auto inline-flex min-h-11 items-center px-2 text-sm underline">Open lead</Link>
         </div>
       )}
       <ErrorNote error={book.error ?? drop.error} />

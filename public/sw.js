@@ -1,7 +1,46 @@
-// WPIE service worker: makes the app installable and shows Sam's "needs you" notifications.
-// It caches nothing (the app always shows live data). A tap opens the draft's card in the Inbox.
-self.addEventListener('install', () => self.skipWaiting())
-self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
+// WPIE service worker: installable app, "Reply needs you" notifications, and an app shell that
+// opens on a weak signal. Only the app's own files are cached: the page itself network-first
+// (falls back to the last copy when offline), hashed /assets/* cache-first. Data from Supabase
+// is never cached here (the app keeps its own copy of the last loaded data).
+const SHELL = 'wpie-shell-v1'
+self.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(SHELL).then((c) => c.addAll(['/', '/manifest.webmanifest', '/icons/house-192.png'])).catch(() => {}))
+  self.skipWaiting()
+})
+self.addEventListener('activate', (event) => event.waitUntil((async () => {
+  for (const k of await caches.keys()) if (k !== SHELL) await caches.delete(k)
+  await self.clients.claim()
+})()))
+
+self.addEventListener('fetch', (event) => {
+  const req = event.request
+  if (req.method !== 'GET') return
+  const url = new URL(req.url)
+  if (url.origin !== self.location.origin) return
+  if (req.mode === 'navigate') {
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(req)
+        const c = await caches.open(SHELL)
+        c.put('/', fresh.clone())
+        return fresh
+      } catch {
+        return (await caches.match('/')) || Response.error()
+      }
+    })())
+    return
+  }
+  if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/icons/')) {
+    event.respondWith((async () => {
+      const hit = await caches.match(req)
+      if (hit) return hit
+      const res = await fetch(req)
+      if (res.ok) (await caches.open(SHELL)).put(req, res.clone())
+      return res
+    })())
+  }
+})
+
 
 self.addEventListener('push', (event) => {
   let data = {}

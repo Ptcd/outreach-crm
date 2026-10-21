@@ -52,7 +52,7 @@ export default function Pipeline() {
       key={id}
       onClick={() => set({ stage: id })}
       className={cn(
-        'whitespace-nowrap rounded-full border px-3 py-1 text-sm',
+        'min-h-11 rounded-full border px-4 py-2 text-sm',
         filter.stage === id ? 'border-primary bg-primary text-primary-foreground' : 'bg-background hover:bg-accent',
       )}
     >
@@ -94,7 +94,7 @@ export default function Pipeline() {
         </form>
       </div>
 
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+      <div className="flex flex-wrap gap-2">
         {chip('working', 'Being worked', working)}
         {STAGES.map((s) => chip(s.id, s.label, byStage.get(s.id) ?? 0))}
         {chip('all', 'Everyone', all)}

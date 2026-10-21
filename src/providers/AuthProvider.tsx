@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import type { Session, User } from '@supabase/supabase-js'
 import { appLoginEmail, supabase, supabaseConfigured } from '@/lib/supabaseClient'
 import type { TeamMember } from '@/lib/types'
+import { clearCachedData } from '@/lib/queryClient'
 
 /** Where the team check stands. 'checking' must never be shown as "not on the team" (2026-10-21:
  *  Adil saw that screen while the lookup was still in flight on a phone connection). */
@@ -115,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     checkedFor.current = null
+    clearCachedData()
     await supabase.auth.signOut()
   }
 

@@ -206,9 +206,10 @@ export function useCampaignControl() {
 
 // ---------------------------------------------------------------- Inbox
 /** Every planned text in [fromDay, toDay] with its lead, thread, reply-agent view and server-seen replies. */
-export function useInbox(fromDay: string, toDay: string) {
+export function useInbox(fromDay: string, toDay: string, enabled = true) {
   return useQuery({
     queryKey: ['inbox', fromDay, toDay],
+    enabled,
     refetchInterval: 60_000,
     queryFn: async (): Promise<InboxLead[]> => {
       const openers = check(
@@ -299,5 +300,51 @@ export function useRepliesWaiting() {
     queryFn: async () =>
       check(await supabase.from('reply_waiting').select('drafts_waiting, routine_would_send, queued').single()) as
         { drafts_waiting: number; routine_would_send: number; queued: number },
+  })
+}
+
+// ------------------------------------------------------- drafts waiting for Colin
+export interface WaitingDraft extends ReplyDraft {
+  owner_name: string | null
+  property_address: string | null
+  thread: { key: string; who: 'us' | 'them'; body: string; at: string }[]
+}
+
+/** The replies waiting for Colin, with their threads: small and loaded first. */
+export function useWaitingDrafts() {
+  return useQuery({
+    queryKey: ['reply_drafts', 'waiting'],
+    refetchInterval: 30_000,
+    queryFn: async (): Promise<WaitingDraft[]> => {
+      const drafts = check(
+        await supabase.from('reply_drafts').select('*, lead:leads(owner_name, property_address)')
+          .eq('status', 'awaiting_approval').order('inbound_at').limit(50),
+      ) as (ReplyDraft & { lead: { owner_name: string | null; property_address: string | null } | null })[]
+      if (!drafts.length) return []
+      const phones = [...new Set(drafts.map((d) => d.phone10))]
+      const leadIds = [...new Set(drafts.map((d) => d.lead_id).filter((x): x is string => Boolean(x)))]
+      const [inbound, sent, msgs] = await Promise.all([
+        supabase.from('twilio_inbound').select('sid, from10, body, received_at').in('from10', phones).order('received_at'),
+        supabase.from('reply_drafts').select('id, phone10, sent_body, sent_at').in('phone10', phones).eq('status', 'sent'),
+        leadIds.length
+          ? supabase.from('messages').select('id, lead_id, direction, body, sent_at, provider_sid').in('lead_id', leadIds).eq('channel', 'sms')
+          : Promise.resolve({ data: [], error: null }),
+      ])
+      const inb = check(inbound) as { sid: string; from10: string; body: string | null; received_at: string }[]
+      const out = check(sent) as { id: string; phone10: string; sent_body: string | null; sent_at: string | null }[]
+      const ms = check(msgs) as { id: string; lead_id: string; direction: 'in' | 'out'; body: string | null; sent_at: string; provider_sid: string | null }[]
+      return drafts.map((d) => {
+        const lines = [
+          ...inb.filter((t) => t.from10 === d.phone10 && t.received_at <= d.inbound_at)
+            .map((t) => ({ key: t.sid, who: 'them' as const, body: t.body ?? '', at: t.received_at })),
+          ...out.filter((s) => s.phone10 === d.phone10 && s.sent_at && s.sent_at <= d.inbound_at)
+            .map((s) => ({ key: `s-${s.id}`, who: 'us' as const, body: s.sent_body ?? '', at: s.sent_at! })),
+          ...ms.filter((m) => m.lead_id === d.lead_id && m.direction === 'out' && m.sent_at <= d.inbound_at)
+            .map((m) => ({ key: m.id, who: 'us' as const, body: m.body ?? '', at: m.sent_at })),
+        ].filter((l) => l.body).sort((a, b) => a.at.localeCompare(b.at))
+        const { lead, ...rest } = d
+        return { ...rest, owner_name: lead?.owner_name ?? null, property_address: lead?.property_address ?? null, thread: lines }
+      })
+    },
   })
 }

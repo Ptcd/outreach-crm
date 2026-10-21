@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge, Empty, ErrorNote, Section } from '@/components/ui/form'
+import { ConfirmButton } from '@/components/ui/confirm'
 import { api, useCampaignControl, usePlannedOpeners, useWrite } from '@/lib/queries'
 import { fmtDateTime, fmtPhone, todayLocal } from '@/lib/format'
 import { SEND_LABEL, WORDING, reasonText, sendTone } from '@/lib/inbox'
@@ -42,12 +43,12 @@ export default function Approvals() {
   })
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-36 sm:pb-0">
       <h1 className="text-xl font-semibold">Texts to approve</h1>
       <SendingPanel canDecide={isOwner} />
       <div className="flex flex-wrap items-center gap-3">
         <label className="text-sm font-medium">
-          Day <Input type="date" value={day} onChange={(e) => { setDay(e.target.value); setTicked(new Set()) }} className="mt-1 w-44" />
+          Day <Input type="date" value={day} onChange={(e) => { setDay(e.target.value); setTicked(new Set()) }} className="mt-1 w-48" />
         </label>
         <span className="text-sm">
           {rows.length} planned - {decisions.pending ?? 0} waiting, {decisions.approved ?? 0} approved, {decisions.skipped ?? 0} skipped
@@ -55,29 +56,26 @@ export default function Approvals() {
           {sends.would_send ? `, ${sends.would_send} passed a test run` : ''}
         </span>
       </div>
-      {!isOwner && <p className="rounded bg-amber-50 p-2 text-sm text-amber-900">Only Colin can approve, skip or withdraw.</p>}
+      {!isOwner && <p className="rounded bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">Only Colin can approve, skip or withdraw.</p>}
       {isOwner && rows.length > 0 && (
-        <div className="sticky top-14 z-[5] -mx-4 flex flex-wrap gap-2 border-b bg-background/95 px-4 py-2 backdrop-blur">
-          <Button
-            disabled={busy || waiting.length === 0}
-            onClick={() => {
-              const n = waiting.length - tickedWaiting.length
-              const msg = tickedWaiting.length
-                ? `Approve ${n} texts and skip the ${tickedWaiting.length} you ticked?`
-                : `Approve all ${n} waiting texts for ${day}?`
-              if (window.confirm(msg)) approveAll.mutate(tickedWaiting, { onSuccess: () => setTicked(new Set()) })
-            }}
-          >
-            {tickedWaiting.length ? `Approve all except ${tickedWaiting.length} ticked` : `Approve all (${waiting.length})`}
-          </Button>
-          <Button
-            variant="outline"
-            disabled={busy || unsent.length === 0}
-            onClick={() => { if (window.confirm(`Withdraw the ${unsent.length} texts for ${day} that have not been sent? They will not go out.`)) withdraw.mutate(undefined) }}
-          >
-            Withdraw unsent ({unsent.length})
-          </Button>
-          {ticked.size > 0 && <Button variant="ghost" onClick={() => setTicked(new Set())}>Clear ticks</Button>}
+        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 border-t bg-background/95 p-3 backdrop-blur sm:sticky sm:top-14 sm:bottom-auto sm:-mx-4 sm:border-b sm:border-t-0 sm:px-4 sm:py-2">
+          <div className="mx-auto flex max-w-5xl flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <ConfirmButton className="h-12 w-full text-base sm:h-10 sm:w-auto" disabled={busy || waiting.length === 0}
+              question={tickedWaiting.length
+                ? `Approve ${waiting.length - tickedWaiting.length} texts and skip the ${tickedWaiting.length} you ticked?`
+                : `Approve all ${waiting.length} waiting texts for ${day}?`}
+              yes="Yes, approve" onConfirm={() => approveAll.mutate(tickedWaiting, { onSuccess: () => setTicked(new Set()) })}>
+              {tickedWaiting.length ? `Approve all except ${tickedWaiting.length} ticked` : `Approve all (${waiting.length})`}
+            </ConfirmButton>
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <ConfirmButton variant="outline" className="h-12 w-full sm:h-10 sm:w-auto" disabled={busy || unsent.length === 0} tone="danger"
+                question={`Withdraw the ${unsent.length} texts for ${day} that have not been sent? They will not go out.`}
+                yes="Yes, withdraw" onConfirm={() => withdraw.mutate(undefined)}>
+                Withdraw ({unsent.length})
+              </ConfirmButton>
+              {ticked.size > 0 && <Button variant="ghost" className="h-12 sm:h-10" onClick={() => setTicked(new Set())}>Clear ticks</Button>}
+            </div>
+          </div>
         </div>
       )}
       <ErrorNote error={q.error ?? decide.error ?? approveAll.error ?? withdraw.error} />
@@ -114,15 +112,18 @@ function SendingPanel({ canDecide }: { canDecide: boolean }) {
       </Badge>}
     >
       {(c.paused || c.laptop_paused) && (
-        <div className="mb-3 rounded-md bg-red-50 p-3 text-sm text-red-900">
+        <div className="mb-3 rounded-md bg-red-50 p-3 text-sm text-red-900 dark:bg-red-950 dark:text-red-100">
           <p className="font-medium">Sending is paused. Nothing goes out until this is cleared.</p>
           {c.paused && <p>{c.pause_reason} {c.paused_at ? `(${fmtDateTime(c.paused_at)})` : ''}</p>}
           {c.laptop_paused && <p>WPIE's delivery watchdog on the laptop: {c.laptop_pause_reason}. Clear it there with "watchdog --clear".</p>}
           {c.paused && canDecide && (
-            <Button className="mt-2" variant="outline" disabled={clearPause.isPending}
-              onClick={() => { if (window.confirm('Clear the pause? Only do this once you know why Twilio or the carriers refused texts.')) clearPause.mutate(undefined) }}>
-              Clear pause
-            </Button>
+            <div className="mt-2">
+              <ConfirmButton variant="outline" className="h-12 w-full sm:w-auto" disabled={clearPause.isPending}
+                question="Clear the pause? Only do this once you know why Twilio or the carriers refused texts." yes="Yes, clear it"
+                onConfirm={() => clearPause.mutate(undefined)}>
+                Clear pause
+              </ConfirmButton>
+            </div>
           )}
         </div>
       )}
@@ -146,12 +147,13 @@ function SendingPanel({ canDecide }: { canDecide: boolean }) {
       {canDecide && (
         <div className="mt-3">
           {c.sending_enabled ? (
-            <Button variant="outline" disabled={setSending.isPending} onClick={() => setSending.mutate(false)}>Turn sending off</Button>
+            <Button variant="outline" className="h-12 w-full sm:w-auto" disabled={setSending.isPending} onClick={() => setSending.mutate(false)}>Turn sending off</Button>
           ) : (
-            <Button disabled={setSending.isPending}
-              onClick={() => { if (window.confirm('Turn sending on? Approved texts will start going out to sellers at their planned times.')) setSending.mutate(true) }}>
+            <ConfirmButton className="h-12 w-full sm:w-auto" disabled={setSending.isPending}
+              question="Turn sending on? Approved texts start going out to sellers at their planned times." yes="Yes, turn on"
+              onConfirm={() => setSending.mutate(true)}>
               Turn sending on
-            </Button>
+            </ConfirmButton>
           )}
         </div>
       )}
@@ -171,12 +173,15 @@ function SendingPanel({ canDecide }: { canDecide: boolean }) {
         </p>
         {canDecide && (
           c.routine_enabled ? (
-            <Button className="mt-2" variant="outline" disabled={setRoutine.isPending} onClick={() => setRoutine.mutate(false)}>Turn routine replies off</Button>
+            <Button className="mt-2 h-12 w-full sm:w-auto" variant="outline" disabled={setRoutine.isPending} onClick={() => setRoutine.mutate(false)}>Turn routine replies off</Button>
           ) : (
-            <Button className="mt-2" disabled={setRoutine.isPending || !c.redteam_ok}
-              onClick={() => { if (window.confirm('Send routine replies automatically?')) setRoutine.mutate(true) }}>
-              Turn routine replies on
-            </Button>
+            <div className="mt-2">
+              <ConfirmButton className="h-12 w-full sm:w-auto" disabled={setRoutine.isPending || !c.redteam_ok}
+                question="Answer wrong numbers, sold, not interested, who-is-this and is-this-a-bot texts automatically?" yes="Yes, turn on"
+                onConfirm={() => setRoutine.mutate(true)}>
+                Turn routine replies on
+              </ConfirmButton>
+            </div>
           )
         )}
       </div>
@@ -191,10 +196,10 @@ function SendingPanel({ canDecide }: { canDecide: boolean }) {
             <Input className="w-44" inputMode="tel" placeholder="Your cell" value={testPhone ?? (c.test_phones[0] ?? '')}
               onChange={(e) => setTestPhone(e.target.value)} aria-label="Test phone" />
             <Button variant="outline" disabled={setTest.isPending} onClick={() => setTest.mutate((testPhone ?? '').trim())}>Save</Button>
-            <Button variant="ghost" disabled={resetTest.isPending || !c.test_phones.length}
-              onClick={() => { if (window.confirm('Unblock your test phone after a STOP test?')) resetTest.mutate(undefined) }}>
+            <ConfirmButton variant="ghost" disabled={resetTest.isPending || !c.test_phones.length}
+              question="Unblock your test phone after a STOP test?" yes="Yes, unblock" onConfirm={() => resetTest.mutate(undefined)}>
               Reset after a STOP test
-            </Button>
+            </ConfirmButton>
           </div>
         </div>
       )}
@@ -245,15 +250,15 @@ function OpenerCard({
         </p>
       )}
       {r.lead_id && (
-        <Link to={`/lead/${r.lead_id}`} className="mt-2 inline-block text-sm underline">
+        <Link to={`/lead/${r.lead_id}`} className="mt-1 inline-flex min-h-11 items-center text-sm underline">
           Open lead
         </Link>
       )}
       {canDecide && open && (
         <div className="mt-3 space-y-2">
           {r.decision === 'pending' && (
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" className="h-5 w-5" checked={ticked} onChange={onTick} />
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+              <input type="checkbox" className="h-6 w-6" checked={ticked} onChange={onTick} />
               Leave this one out of "Approve all"
             </label>
           )}

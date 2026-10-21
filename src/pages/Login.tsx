@@ -20,8 +20,9 @@ export default function Login() {
     if (error) setError(error)
   }
 
+  const [asking, setAsking] = useState(false)
   const forgot = async () => {
-    if (!window.confirm('Email Colin a link to set a new app password?')) return
+    setAsking(false)
     setBusy(true)
     const { error } = await sendPasswordLink()
     setBusy(false)
@@ -36,11 +37,11 @@ export default function Login() {
         <form onSubmit={submit} className="space-y-3">
           <label className="block text-sm font-medium">
             App password
-            <Input type="password" required autoComplete="current-password" value={password}
-              onChange={(e) => setPw(e.target.value)} className="mt-1" />
+            <Input type="password" required autoComplete="current-password" className="mt-1 h-12 text-lg" value={password}
+              onChange={(e) => setPw(e.target.value)} />
           </label>
           {error && <p className="text-sm text-red-700">{error}</p>}
-          <Button type="submit" className="w-full" disabled={busy || !password}>
+          <Button type="submit" className="h-12 w-full text-base" disabled={busy || !password}>
             {busy ? 'Signing in...' : 'Sign in'}
           </Button>
         </form>
@@ -49,9 +50,19 @@ export default function Login() {
             A link went to Colin&apos;s email. Open it, then choose the new password.
           </p>
         ) : (
-          <button type="button" className="mt-4 text-sm text-muted-foreground underline" onClick={() => void forgot()} disabled={busy}>
-            Set or reset the app password
-          </button>
+          asking ? (
+            <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950">
+              <p>Email Colin a link to set a new app password?</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <Button className="h-12" onClick={() => void forgot()} disabled={busy}>Yes, email it</Button>
+                <Button className="h-12" variant="outline" onClick={() => setAsking(false)}>Cancel</Button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="mt-4 min-h-11 text-sm text-muted-foreground underline" onClick={() => setAsking(true)} disabled={busy}>
+              Set or reset the app password
+            </button>
+          )
         )}
       </div>
     </div>

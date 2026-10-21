@@ -32,7 +32,7 @@ export default function Today() {
           {replies.data?.map((m) => (
             <li key={m.id} className="flex flex-col gap-1 py-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <Link to={`/lead/${m.lead_id}`} className="font-medium underline">
+                <Link to={`/lead/${m.lead_id}`} className="inline-flex min-h-11 items-center font-medium underline">
                   {m.lead?.owner_name ?? 'Lead'}
                 </Link>
                 <span className="text-sm text-muted-foreground"> - {m.lead?.property_address}</span>
@@ -73,7 +73,7 @@ export default function Today() {
                     <Badge>{t.owner === 'colin' ? 'Colin' : 'Thalia'}</Badge>
                   </div>
                   {t.lead && (
-                    <Link to={`/lead/${t.lead.id}`} className="text-sm underline">
+                    <Link to={`/lead/${t.lead.id}`} className="inline-flex min-h-11 items-center text-sm underline">
                       {t.lead.owner_name} - {t.lead.property_address}
                     </Link>
                   )}
@@ -97,7 +97,7 @@ export default function Today() {
         <ul className="divide-y">
           {debt.data?.map((d) => (
             <li key={d.lead_id} className="py-2 text-sm">
-              <Link to={`/lead/${d.lead_id}`} className="font-medium underline">
+              <Link to={`/lead/${d.lead_id}`} className="inline-flex min-h-11 items-center font-medium underline">
                 {d.owner_name}
               </Link>{' '}
               - {STAGE_LABEL[d.stage]} - {d.days_late} days late{d.next_action ? ` (${d.next_action})` : ''}

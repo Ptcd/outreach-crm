@@ -81,13 +81,15 @@
     overflow-x: clip;            /* never scroll sideways (sticky bars keep working, unlike hidden) */
     -webkit-tap-highlight-color: transparent;
   }
-  /* Phones: body text at 16px, small print at 14px, so nothing is squinted at or zoomed. */
-  @media (max-width: 639px) {
-    .text-sm { font-size: 1rem; line-height: 1.5rem; }
-    .text-xs { font-size: 0.875rem; line-height: 1.25rem; }
-    .text-\[11px\] { font-size: 0.8125rem; }
-  }
 }
 
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
 .pt-safe { padding-top: env(safe-area-inset-top); }
+
+/* Phones: body text at 16px, small print at 14px, so nothing is squinted at or zoomed.
+   Outside any layer on purpose: it must win over Tailwind's own text-sm / text-xs. */
+@media (max-width: 639px) {
+  .text-sm { font-size: 1rem; line-height: 1.5rem; }
+  .text-xs { font-size: 0.875rem; line-height: 1.25rem; }
+  .text-\[11px\], .text-\[10px\] { font-size: 0.8125rem; }
+}

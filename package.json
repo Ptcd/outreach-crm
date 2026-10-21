@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "db:local": "node scripts/local-db.mjs"
+    "db:local": "node scripts/local-db.mjs",
+    "preview:mock": "vite --config vite.preview.config.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",

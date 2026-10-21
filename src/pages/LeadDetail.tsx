@@ -23,7 +23,7 @@ export default function LeadDetail() {
   return (
     <div className="space-y-4">
       <div>
-        <Link to="/pipeline" className="text-sm underline">
+        <Link to="/pipeline" className="inline-flex min-h-11 items-center text-sm underline">
           Back to pipeline
         </Link>
         <h1 className="mt-1 text-xl font-semibold">{lead.owner_name}</h1>

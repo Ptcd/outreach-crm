@@ -47,7 +47,20 @@ export default function Scoreboard() {
       {q.data && weeks.length === 0 && <Empty>No activity yet. Numbers appear once openers go out.</Empty>}
       {week && (
         <Section title={`Week of ${fmtDate(week.week_start)}`}>
-          <table className="w-full text-sm">
+          {/* phones: one card per number */}
+          <ul className="space-y-2 sm:hidden">
+            {ROWS.map((r) => (
+              <li key={r.n} className="rounded-lg border p-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="font-medium">{r.n}. {r.label}</span>
+                  <span className="shrink-0 text-lg font-semibold">{r.value(week)}</span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{r.def}</p>
+                <p className="text-xs text-muted-foreground">Starting guess: {r.target}</p>
+              </li>
+            ))}
+          </ul>
+          <table className="hidden w-full text-sm sm:table">
             <thead>
               <tr className="text-left text-xs text-muted-foreground">
                 <th className="py-1 pr-2">#</th>
@@ -81,7 +94,20 @@ export default function Scoreboard() {
           <ErrorNote error={signals.error} />
           {signals.data?.length === 0 && <Empty>Nothing this week.</Empty>}
           {signals.data && signals.data.length > 0 && (
-            <div className="overflow-x-auto">
+            <>
+            <ul className="space-y-2 sm:hidden">
+              {signals.data.map((s) => (
+                <li key={s.signal} className="rounded-lg border p-3">
+                  <p className="font-medium">{s.signal}</p>
+                  <dl className="mt-1 grid grid-cols-3 gap-x-3 gap-y-1 text-sm">
+                    {([['Sent', s.openers_sent], ['Replies', s.replies], ['STOPs', s.opt_outs], ['Leads', s.leads], ['Walks', s.walks], ['Contracts', s.contracts]] as const).map(([k, v]) => (
+                      <div key={k}><dt className="text-xs text-muted-foreground">{k}</dt><dd className="font-semibold">{v}</dd></div>
+                    ))}
+                  </dl>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden sm:block">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs text-muted-foreground">
@@ -109,6 +135,7 @@ export default function Scoreboard() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
           <p className="mt-2 text-xs text-muted-foreground">A lead with several reasons counts under each one. Judge a signal after about 2,000 owners.</p>
         </Section>
