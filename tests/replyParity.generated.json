@@ -1,5 +1,5 @@
 {
- "generated": "tools/export_reply_prompt.py, WPIE commit fead935, 2026-10-21",
+ "generated": "tools/export_reply_prompt.py, WPIE commit 3aaf7fb, 2026-10-21",
  "fixture": "tests/fixtures/reply_redteam.jsonl",
  "opt_out": [
   {
@@ -3751,7 +3751,7 @@
    "python_hits": []
   },
   {
-   "text": "What's got you thinking about selling? I ask everyone, so Colin doesn't waste your time.",
+   "text": "What's got you thinking about selling? I ask everyone, so I don't waste your time.",
    "python_hits": []
   },
   {
