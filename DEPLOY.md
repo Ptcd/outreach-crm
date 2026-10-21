@@ -105,6 +105,25 @@ which is fine for this one account.
 **P3.** Supabase > Authentication > Sign In / Providers > Email: keep it on (it covers passwords); keep
 "Allow new users to sign up" **off**.
 
+## Sam, the reply agent (deployed 2026-10-21, everything off)
+
+Migrations 0004 and 0005 are applied and the reply-agent / reply-send functions are deployed. What is
+left, in order (Claude never sees a key; each script shows only "set" / "saved"):
+
+1. **Server settings  [Colin runs, about 1 minute]** in a PowerShell window in `C:\Users\onkau\claude\real estate`:
+   `powershell -ExecutionPolicy Bypass -File tools\set_supabase_secrets.ps1`
+   It copies the Twilio subaccount SID/token, messaging service and sender number already saved on the
+   PC into Supabase, and asks once (hidden) for an Anthropic API key for Sam's drafts. It never sets
+   `TWILIO_LIVE_SENDING`. From then on Sam reads every reply each minute and drafts; nothing is sent.
+2. **Laptop -> app sync  [Colin runs, about 2 minutes]**
+   `powershell -ExecutionPolicy Bypass -File tools\set_supabase_db_url.ps1`
+   (paste the Session pooler string from Supabase > Connect, then the database password, hidden).
+   The 10-minute live cycle then puts each day's planned texts into the app and pulls results back.
+3. **Check** the Approve page: "Red-team test: 440/440 passed - Sam last checked <time>".
+4. **Optional:** Approve page > "Turn routine replies on" (Sam answers the routine ones himself).
+5. **Go live, only on Colin's word:** add the function secret `TWILIO_LIVE_SENDING` = `1`, approve the
+   day's texts, "Turn sending on". To stop: turn sending off, or delete that secret.
+
 ## Sending from the app (WPIE docs/APP_SENDING.md)
 
 Three locks, all OFF until Colin says go:
