@@ -48,9 +48,11 @@ class FakeTwilio implements TwilioPort {
     if (a instanceof Error) throw a
     return a
   }
-  async inboundSince() {
+  inboundAsked: (string | undefined)[] = []
+  async inboundSince(_since: Date, to?: string) {
     if (this.inboundFails) throw new Error('Twilio inbound list answered 503')
-    return this.inbound
+    this.inboundAsked.push(to)
+    return to ? this.inbound.filter((m) => m.to === to) : this.inbound
   }
   outbound: OutboundText[] = []
   outboundFails = false
@@ -96,6 +98,26 @@ beforeEach(async () => {
 })
 
 describe('runSendOpeners', () => {
+  it('sender pool: reads STOPs on every pool number, sends without From, and records the number Twilio used', async () => {
+    const POOL = senderEnv((n) => ({ TWILIO_LIVE_SENDING: '1', TWILIO_ACCOUNT_SID: 'ACtest', TWILIO_AUTH_TOKEN: 'tok',
+      CAMPAIGN_MESSAGING_SERVICE_SID: 'MGtest', CAMPAIGN_FROM_NUMBER: 'pool' } as Record<string, string>)[n], 'https://x')
+    expect(POOL.live).toBe(true)
+    const stopper = await approvedOpener()
+    const fine = await approvedOpener()
+    const tw = new FakeTwilio()
+    tw.inbound = [{ sid: 'SMstop', from: `+1${stopper}`, to: '+12624180202', body: 'STOP', dateSent: NOW.toISOString() }]
+    tw.answers = [{ ok: true, sid: 'SMpool1', status: 'accepted', from: '+12624180202' }]
+    const s = await runSendOpeners({ rpc, env: POOL, twilio: tw, now: () => NOW, inboundNumbers: ['+12629996513', '+12624180202'] })
+    expect(tw.inboundAsked).toEqual(['+12629996513', '+12624180202'])
+    expect(s).toMatchObject({ inbound_new: 1, sent: 1 })
+    expect(tw.sends.map((x) => x.to)).toEqual([`+1${fine}`])
+    const r = (await db.query<{ from_number: string }>(`select from_number from public.planned_openers where provider_sid = 'SMpool1'`)).rows
+    expect(r).toEqual([{ from_number: '+12624180202' }])
+    // No pool numbers known: STOPs cannot be read, so a live run sends nothing.
+    const none = await runSendOpeners({ rpc, env: POOL, twilio: new FakeTwilio(), now: () => NOW, inboundNumbers: [] })
+    expect(none).toMatchObject({ stopped: 'inbound_check_failed', sent: 0 })
+  })
+
   it('reconciles a lost result: Twilio has the text -> recorded sent with its delivery, never re-sent', async () => {
     const phone = await approvedOpener()
     await stuck(phone)

@@ -22,5 +22,7 @@ Deno.serve(async (req) => {
     p_error_code: params.ErrorCode ?? null,
   })
   if (r.error) return new Response(r.error.message, { status: 500 })
+  // Sender pool: the number Twilio picked for this conversation.
+  if (params.From) await sb.rpc('record_from', { p_sid: params.MessageSid ?? params.SmsSid ?? '', p_from: params.From })
   return new Response('ok')
 })

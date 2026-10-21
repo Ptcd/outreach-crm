@@ -20,15 +20,15 @@ export interface TwilioConfig {
   user: string
   password: string
   messagingServiceSid: string
-  campaignNumber: string        // E.164; inbound texts TO this number are pulled before each run
+  campaignNumber: string        // E.164 whose inbound texts are pulled before each run, or 'pool': every reply number
   statusCallbackUrl?: string    // set only when the auth token is available to verify callbacks
 }
 
-export interface SendResult { ok: true; sid: string; status: string }
+export interface SendResult { ok: true; sid: string; status: string; from?: string | null }
 export interface SendFailure { ok: false; httpStatus: number | null; code: string | null; message: string }
 
 export interface InboundText { sid: string; from: string; to: string; body: string; dateSent: string }
-export interface OutboundText { sid: string; to: string; body: string; status: string; errorCode: string | null; dateCreated: string }
+export interface OutboundText { sid: string; to: string; from?: string | null; body: string; status: string; errorCode: string | null; dateCreated: string }
 
 export interface TwilioPort {
   /** `from`: send from this exact number (a reply goes out from the number they texted). */
@@ -96,7 +96,7 @@ export function twilioPort(cfg: TwilioConfig, fetchFn: typeof fetch): TwilioPort
         // an unreadable answer is treated like no answer
       }
       if (res.status >= 200 && res.status < 300 && typeof json.sid === 'string') {
-        return { ok: true, sid: json.sid, status: String(json.status ?? 'accepted') }
+        return { ok: true, sid: json.sid, status: String(json.status ?? 'accepted'), from: typeof json.from === 'string' && json.from ? json.from : null }
       }
       return {
         ok: false, httpStatus: res.status,
@@ -113,7 +113,7 @@ export function twilioPort(cfg: TwilioConfig, fetchFn: typeof fetch): TwilioPort
       return (json.messages ?? [])
         .filter((m) => String(m.direction ?? '').startsWith('outbound'))
         .map((m) => ({
-          sid: String(m.sid), to: String(m.to ?? ''), body: String(m.body ?? ''), status: String(m.status ?? ''),
+          sid: String(m.sid), to: String(m.to ?? ''), from: m.from ? String(m.from) : null, body: String(m.body ?? ''), status: String(m.status ?? ''),
           errorCode: m.error_code != null ? String(m.error_code) : null,
           dateCreated: new Date(String(m.date_created ?? m.date_sent ?? new Date().toISOString())).toISOString(),
         }))
@@ -162,6 +162,7 @@ export async function runSendOpeners(opts: {
   maxSends?: number            // campaign_control.max_per_run
   maxClaims?: number           // a hard bound on loop turns (skips included)
   lastInboundPollAt?: string | null
+  inboundNumbers?: string[]    // with CAMPAIGN_FROM_NUMBER=pool: every number in the sender pool
   deadline?: number            // epoch ms: no new claim when less than `safetyMs` remains
   safetyMs?: number
   clock?: () => number         // wall clock for the deadline (tests)
@@ -178,7 +179,13 @@ export async function runSendOpeners(opts: {
   if (opts.twilio) {
     try {
       const since = opts.lastInboundPollAt ? new Date(new Date(opts.lastInboundPollAt).getTime() - 3600_000) : new Date(now().getTime() - 3 * 86400_000)
-      for (const m of await opts.twilio.inboundSince(since)) {
+      // Sender pool: a STOP can arrive on any pool number, so every one is read; none known = no check.
+      const pool = opts.env.twilio?.campaignNumber === 'pool'
+      const numbers: (string | undefined)[] = pool ? (opts.inboundNumbers ?? []) : [undefined]
+      if (!numbers.length) throw new Error('sender pool: no reply numbers to read STOPs from')
+      const seen: InboundText[] = []
+      for (const num of numbers) seen.push(...await opts.twilio.inboundSince(since, num))
+      for (const m of seen) {
         const r = await opts.rpc('record_inbound', {
           p_sid: m.sid, p_from: m.from, p_to: m.to, p_body: m.body, p_is_opt_out: isOptOut(m.body), p_received_at: m.dateSent,
         })
@@ -212,6 +219,7 @@ export async function runSendOpeners(opts: {
           const rec = await opts.rpc('record_send_result', { p_id: r.id, p_status: 'sent', p_sid: sent.sid, p_error_code: null,
             p_reason: 'reconciled: result was lost, Twilio has the text', p_now: sent.dateCreated })
           if (rec.error) throw new Error(rec.error.message)
+          if (sent.from) await opts.rpc('record_from', { p_sid: sent.sid, p_from: sent.from })
           if (['delivered', 'undelivered', 'failed'].includes(sent.status)) {
             await opts.rpc('record_delivery', { p_sid: sent.sid, p_status: sent.status, p_error_code: sent.errorCode, p_now: now().toISOString() })
           }
@@ -259,6 +267,7 @@ export async function runSendOpeners(opts: {
       await sleep(400 * (i + 1))
       rec = await opts.rpc('record_send_result', args)
     }
+    if (res.ok && res.from) await opts.rpc('record_from', { p_sid: res.sid, p_from: res.from })
     if (res.ok) s.sent += 1
     else if (args.p_status === 'failed') s.failed += 1
     else s.uncertain += 1

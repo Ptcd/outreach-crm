@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
   if (ok.error || ok.data !== true) return new Response('forbidden', { status: 403 })
 
   const env = senderEnv((n) => Deno.env.get(n), `${url}/functions/v1`)
-  const control = await sb.from('campaign_control').select('max_per_run, last_inbound_poll_at').eq('id', 1).single()
+  const control = await sb.from('campaign_control').select('max_per_run, last_inbound_poll_at, reply_numbers').eq('id', 1).single()
   if (control.error) return Response.json({ error: control.error.message }, { status: 500 })
 
   const summary = await runSendOpeners({
@@ -32,6 +32,7 @@ Deno.serve(async (req) => {
     twilio: env.twilio ? twilioPort(env.twilio, fetch) : null,
     maxSends: control.data.max_per_run,
     lastInboundPollAt: control.data.last_inbound_poll_at,
+    inboundNumbers: control.data.reply_numbers,
     deadline,
   })
   await rpc('note_run', { p_summary: summary, p_inbound_polled: env.twilio != null && !summary.inbound_error })

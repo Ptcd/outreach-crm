@@ -46,6 +46,9 @@ export function conversationContext(x: DraftInput): string {
     x.ownerName ? `Owner on record: ${x.ownerName}` : 'This number is not one of the owners Colin texted (it may be a relative, a new phone, or a wrong number).',
     x.propertyAddress ? `Property the text was about: ${x.propertyAddress}` : "Ask, the way Colin would in one short friendly line, which property they are texting about (e.g. 'Thanks for getting back to me - which property is this about?'). Never say you can't find, lost or don't have their information, and never mention a database or records.",
     'The assistant turns above were sent by Colin or for him (the first is usually his own opening text).',
+    ...(x.history.some((h) => h.who === 'us')
+      ? ["Colin's first text (the first assistant turn) only asked whether the place is still theirs. It made no pitch: it did not say he buys houses or ask about selling."]
+      : []),
     'Never mention a postcard or a business. Never give or hint at a price, value or offer.',
     'Your message is a draft Colin reads in the WPIE app and approves or edits before it is sent.',
   ].join('\n')
