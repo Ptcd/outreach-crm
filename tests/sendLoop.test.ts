@@ -11,7 +11,7 @@ import { SUPABASE_STUB } from './supabaseStub'
 import parity from './replyParity.generated.json'
 import {
   classifyFailure, isOptOut, runSendOpeners, senderEnv, twilioSignature, validTwilioSignature,
-  type InboundText, type Rpc, type SendFailure, type SendResult, type TwilioPort,
+  type InboundText, type OutboundText, type Rpc, type SendFailure, type SendResult, type TwilioPort,
 } from '../supabase/functions/_shared/sending'
 
 const MIGRATIONS_DIR = path.resolve(__dirname, '../supabase/migrations')
@@ -52,6 +52,18 @@ class FakeTwilio implements TwilioPort {
     if (this.inboundFails) throw new Error('Twilio inbound list answered 503')
     return this.inbound
   }
+  outbound: OutboundText[] = []
+  outboundFails = false
+  async outboundTo(to: string) {
+    if (this.outboundFails) throw new Error('Twilio message list answered 500')
+    return this.outbound.filter((m) => m.to === to)
+  }
+}
+
+// A row the claim left in 'sending' (the result never came back), claimed `ago` seconds before NOW.
+async function stuck(phone: string, ago = 300) {
+  await db.query(`update public.planned_openers set send_status = 'sending', claim_mode = 'live', claimed_at = $2
+                   where phone = $1`, [`+1${phone}`, new Date(NOW.getTime() - ago * 1000).toISOString()])
 }
 
 let n = 0
@@ -84,6 +96,64 @@ beforeEach(async () => {
 })
 
 describe('runSendOpeners', () => {
+  it('reconciles a lost result: Twilio has the text -> recorded sent with its delivery, never re-sent', async () => {
+    const phone = await approvedOpener()
+    await stuck(phone)
+    const tw = new FakeTwilio()
+    tw.outbound = [{ sid: 'SMlost', to: `+1${phone}`, body: BODY, status: 'delivered', errorCode: null,
+      dateCreated: new Date(NOW.getTime() - 290_000).toISOString() }]
+    const s = await runSendOpeners({ rpc, env: LIVE, twilio: tw, now: () => NOW })
+    expect(s.reconciled).toEqual([{ id: expect.any(String), outcome: 'found', detail: 'SMlost delivered' }])
+    expect(tw.sends).toEqual([])
+    const r = (await db.query<{ send_status: string; provider_sid: string }>(`select send_status, provider_sid from public.planned_openers`)).rows
+    expect(r).toEqual([{ send_status: 'delivered', provider_sid: 'SMlost' }])
+    const ev = (await db.query<{ event: string }>(`select event from public.opener_send_events order by at, id`)).rows.map((x) => x.event)
+    expect(ev).toEqual(['sent', 'delivered'])
+  })
+
+  it('reconciles a claim that never went out: released to planned, then sent once in the same run', async () => {
+    const phone = await approvedOpener()
+    await stuck(phone)
+    const tw = new FakeTwilio()
+    tw.outbound = [{ sid: 'SMother', to: `+1${phone}`, body: 'a different text', status: 'delivered', errorCode: null,
+      dateCreated: NOW.toISOString() }]
+    const s = await runSendOpeners({ rpc, env: LIVE, twilio: tw, now: () => NOW })
+    expect(s.reconciled?.[0]).toMatchObject({ outcome: 'released' })
+    expect(tw.sends).toHaveLength(1)
+    expect(s.sent).toBe(1)
+    const ev = (await db.query<{ event: string }>(`select event from public.opener_send_events order by at, id`)).rows.map((x) => x.event)
+    expect(ev).toEqual(['released', 'sending', 'sent'])
+  })
+
+  it('leaves a stuck row alone when Twilio cannot be asked, and ignores fresh claims', async () => {
+    const a = await approvedOpener(); const b = await approvedOpener()
+    await stuck(a); await stuck(b, 30)
+    const tw = new FakeTwilio()
+    tw.outboundFails = true
+    const s = await runSendOpeners({ rpc, env: LIVE, twilio: tw, now: () => NOW })
+    expect(s.reconciled).toEqual([{ id: expect.any(String), outcome: 'error', detail: 'Twilio message list answered 500' }])
+    expect((await db.query<{ n: number }>(`select count(*)::int n from public.planned_openers where send_status = 'sending'`)).rows[0].n).toBe(2)
+    expect(tw.sends).toEqual([])
+  })
+
+  it('never starts a claim with under 10 s left, and retries writing a result', async () => {
+    await approvedOpener(); await approvedOpener()
+    const tw = new FakeTwilio()
+    let t = 0
+    const clock = () => t
+    const s1 = await runSendOpeners({ rpc, env: LIVE, twilio: tw, now: () => NOW, deadline: 9_000, clock })
+    expect(s1).toMatchObject({ sent: 0, stopped: 'time_budget' })
+    let fails = 1
+    const flaky: Rpc = async (fn, args) => {
+      if (fn === 'record_send_result' && fails > 0) { fails -= 1; return { data: null, error: { message: 'connection reset' } } }
+      return rpc(fn, args)
+    }
+    t = 0
+    const s2 = await runSendOpeners({ rpc: flaky, env: LIVE, twilio: tw, now: () => NOW, deadline: 60_000, clock, sleep: async () => {} })
+    expect(s2).toMatchObject({ sent: 2, stopped: 'nothing_due' })
+    expect((await db.query<{ n: number }>(`select count(*)::int n from public.planned_openers where send_status = 'sent'`)).rows[0].n).toBe(2)
+  })
+
   it('in a dry env checks everything and never calls Twilio send', async () => {
     await approvedOpener(); await approvedOpener()
     const tw = new FakeTwilio()

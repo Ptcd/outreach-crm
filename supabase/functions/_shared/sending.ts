@@ -28,12 +28,15 @@ export interface SendResult { ok: true; sid: string; status: string }
 export interface SendFailure { ok: false; httpStatus: number | null; code: string | null; message: string }
 
 export interface InboundText { sid: string; from: string; to: string; body: string; dateSent: string }
+export interface OutboundText { sid: string; to: string; body: string; status: string; errorCode: string | null; dateCreated: string }
 
 export interface TwilioPort {
   /** `from`: send from this exact number (a reply goes out from the number they texted). */
   send(to: string, body: string, from?: string | null): Promise<SendResult | SendFailure>
   /** Inbound texts to `to` (default: the campaign number) since `since`. */
   inboundSince(since: Date, to?: string): Promise<InboundText[]>
+  /** Texts we sent to `to` since `since` (Twilio's own record; used to reconcile a lost result). */
+  outboundTo?(to: string, since: Date): Promise<OutboundText[]>
 }
 
 // ------------------------------------------------------------------ the env
@@ -101,6 +104,20 @@ export function twilioPort(cfg: TwilioConfig, fetchFn: typeof fetch): TwilioPort
         message: String(json.message ?? res.statusText ?? '').slice(0, 300),
       }
     },
+    async outboundTo(to, since) {
+      const day = since.toISOString().slice(0, 10)
+      const url = `${base}/Messages.json?To=${encodeURIComponent(to)}&DateSent%3E=${day}&PageSize=50`
+      const res = await fetchFn(url, { headers: { Authorization: auth } })
+      if (!res.ok) throw new Error(`Twilio message list answered ${res.status}`)
+      const json = (await res.json()) as { messages?: Record<string, unknown>[] }
+      return (json.messages ?? [])
+        .filter((m) => String(m.direction ?? '').startsWith('outbound'))
+        .map((m) => ({
+          sid: String(m.sid), to: String(m.to ?? ''), body: String(m.body ?? ''), status: String(m.status ?? ''),
+          errorCode: m.error_code != null ? String(m.error_code) : null,
+          dateCreated: new Date(String(m.date_created ?? m.date_sent ?? new Date().toISOString())).toISOString(),
+        }))
+    },
     async inboundSince(since, to) {
       const day = since.toISOString().slice(0, 10)
       const url = `${base}/Messages.json?To=${encodeURIComponent(to ?? cfg.campaignNumber)}&DateSent%3E=${day}&PageSize=200`
@@ -134,6 +151,7 @@ export interface RunSummary {
   failed: number
   uncertain: number
   stopped: string
+  reconciled?: { id: string; outcome: 'found' | 'released' | 'error'; detail: string }[]
 }
 
 export async function runSendOpeners(opts: {
@@ -144,6 +162,10 @@ export async function runSendOpeners(opts: {
   maxSends?: number            // campaign_control.max_per_run
   maxClaims?: number           // a hard bound on loop turns (skips included)
   lastInboundPollAt?: string | null
+  deadline?: number            // epoch ms: no new claim when less than `safetyMs` remains
+  safetyMs?: number
+  clock?: () => number         // wall clock for the deadline (tests)
+  sleep?: (ms: number) => Promise<void>
 }): Promise<RunSummary> {
   const now = opts.now ?? (() => new Date())
   const live = opts.env.live && opts.twilio != null
@@ -172,11 +194,47 @@ export async function runSendOpeners(opts: {
     }
   }
 
-  // 2. Claim, send, record - one text at a time.
+  // 2. Lost results first: a row 'sending' for over two minutes is checked against Twilio. Found:
+  //    recorded as sent (with its delivery status). Not found: it was never sent, so it goes back
+  //    to 'planned'. If Twilio cannot be asked, the row is left alone (never released blind).
+  const clock = opts.clock ?? (() => Date.now())
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
+  if (live && opts.twilio?.outboundTo) {
+    const st = await opts.rpc('stuck_sending', { p_older_than_seconds: 120, p_now: now().toISOString() })
+    for (const r of ((st.data as { id: string; phone: string; body: string; claimed_at: string }[] | null) ?? [])) {
+      s.reconciled = s.reconciled ?? []
+      try {
+        const since = new Date(new Date(r.claimed_at).getTime() - 60_000)
+        const sent = (await opts.twilio.outboundTo(r.phone, since))
+          .filter((m) => m.body.trim() === r.body.trim() && new Date(m.dateCreated).getTime() >= since.getTime())
+          .sort((a, b) => a.dateCreated.localeCompare(b.dateCreated))[0]
+        if (sent) {
+          const rec = await opts.rpc('record_send_result', { p_id: r.id, p_status: 'sent', p_sid: sent.sid, p_error_code: null,
+            p_reason: 'reconciled: result was lost, Twilio has the text', p_now: sent.dateCreated })
+          if (rec.error) throw new Error(rec.error.message)
+          if (['delivered', 'undelivered', 'failed'].includes(sent.status)) {
+            await opts.rpc('record_delivery', { p_sid: sent.sid, p_status: sent.status, p_error_code: sent.errorCode, p_now: now().toISOString() })
+          }
+          s.reconciled.push({ id: r.id, outcome: 'found', detail: `${sent.sid} ${sent.status}` })
+        } else {
+          const rel = await opts.rpc('release_stuck_opener', { p_id: r.id,
+            p_reason: 'released: claimed but Twilio has no such text (never sent)', p_now: now().toISOString() })
+          if (rel.error) throw new Error(rel.error.message)
+          s.reconciled.push({ id: r.id, outcome: 'released', detail: 'not at Twilio; back to planned' })
+        }
+      } catch (e) {
+        s.reconciled.push({ id: r.id, outcome: 'error', detail: String(e instanceof Error ? e.message : e).slice(0, 200) })
+      }
+    }
+  }
+
+  // 3. Claim, send, record - one text at a time, never starting a claim without time to finish it.
   const maxSends = opts.maxSends ?? 10
   const maxClaims = opts.maxClaims ?? 300
+  const safety = opts.safetyMs ?? 10_000
   for (let turn = 0; turn < maxClaims; turn++) {
     if (s.sent + s.failed + s.uncertain + s.would_send >= maxSends) { s.stopped = 'max_per_run'; break }
+    if (opts.deadline != null && opts.deadline - clock() < safety) { s.stopped = 'time_budget'; break }
     const c = await opts.rpc('claim_next_opener', { p_dry_run: !live, p_now: now().toISOString() })
     if (c.error) { s.stopped = `claim_error: ${c.error.message}`; break }
     const j = c.data as { outcome: string; reason?: string; opener?: { id: string; phone: string; body: string } }
@@ -195,7 +253,12 @@ export async function runSendOpeners(opts: {
       ? { p_id: j.opener.id, p_status: 'sent', p_sid: res.sid, p_error_code: null, p_reason: null, p_now: now().toISOString() }
       : { p_id: j.opener.id, p_status: classifyFailure(res), p_sid: null, p_error_code: res.code,
           p_reason: `${res.httpStatus ?? 'no answer'} ${res.code ?? ''} ${res.message}`.trim().slice(0, 300), p_now: now().toISOString() }
-    const rec = await opts.rpc('record_send_result', args)
+    // The text is out: writing its result must not be lost to one bad moment.
+    let rec = await opts.rpc('record_send_result', args)
+    for (let i = 0; rec.error && i < 3; i++) {
+      await sleep(400 * (i + 1))
+      rec = await opts.rpc('record_send_result', args)
+    }
     if (res.ok) s.sent += 1
     else if (args.p_status === 'failed') s.failed += 1
     else s.uncertain += 1

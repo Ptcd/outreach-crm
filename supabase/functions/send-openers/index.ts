@@ -10,6 +10,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
 import { runSendOpeners, senderEnv, twilioPort, type Rpc } from '../_shared/sending.ts'
 
 Deno.serve(async (req) => {
+  // pg_net waits 55 s for this call: stop claiming with 10 s to spare (a claim is always finished).
+  const deadline = Date.now() + 45_000
   const url = Deno.env.get('SUPABASE_URL') ?? ''
   const sb = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', { auth: { persistSession: false } })
   const rpc: Rpc = async (fn, args) => {
@@ -30,6 +32,7 @@ Deno.serve(async (req) => {
     twilio: env.twilio ? twilioPort(env.twilio, fetch) : null,
     maxSends: control.data.max_per_run,
     lastInboundPollAt: control.data.last_inbound_poll_at,
+    deadline,
   })
   await rpc('note_run', { p_summary: summary, p_inbound_polled: env.twilio != null && !summary.inbound_error })
   return Response.json(summary)
