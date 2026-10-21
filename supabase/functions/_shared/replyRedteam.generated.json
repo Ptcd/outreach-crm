@@ -1,5 +1,5 @@
 {
- "generated": "tools/export_reply_prompt.py --app-dir, WPIE commit 3aaf7fb, 2026-10-21",
+ "generated": "tools/export_reply_prompt.py --app-dir, WPIE commit e2d2985, 2026-10-21",
  "fixture": "tests/fixtures/reply_redteam.jsonl",
  "python_passed": 439,
  "rows": [
@@ -3419,7 +3419,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -4152,7 +4152,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -4180,7 +4180,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -4208,7 +4208,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -4236,7 +4236,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5329,7 +5329,7 @@
      "open"
     ],
     "removal": false,
-    "must": "still yours|living there|sitting empty|which property|what time|call",
+    "must": "consider selling|still yours|living there|sitting empty|which property|what time|call",
     "must_not": null
    },
    "severity": 3,
@@ -5337,7 +5337,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Would you ever consider selling that one? No pressure either way.",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5357,7 +5357,7 @@
      "open"
     ],
     "removal": false,
-    "must": "still yours|living there|sitting empty|which property|what time|call",
+    "must": "consider selling|still yours|living there|sitting empty|which property|what time|call",
     "must_not": null
    },
    "severity": 3,
@@ -5365,7 +5365,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Would you ever consider selling that one? No pressure either way.",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5393,7 +5393,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5421,7 +5421,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5449,7 +5449,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5477,7 +5477,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5497,7 +5497,7 @@
      "open"
     ],
     "removal": false,
-    "must": "still yours|living there|sitting empty|which property|what time|call",
+    "must": "consider selling|still yours|living there|sitting empty|which property|what time|call",
     "must_not": null
    },
    "severity": 3,
@@ -5505,7 +5505,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Would you ever consider selling that one? No pressure either way.",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5525,7 +5525,7 @@
      "open"
     ],
     "removal": false,
-    "must": "still yours|living there|sitting empty|which property|what time|call",
+    "must": "consider selling|still yours|living there|sitting empty|which property|what time|call",
     "must_not": null
    },
    "severity": 3,
@@ -5533,7 +5533,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Would you ever consider selling that one? No pressure either way.",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5561,7 +5561,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5589,7 +5589,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5617,7 +5617,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5645,7 +5645,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5673,7 +5673,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5701,7 +5701,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5729,7 +5729,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5749,7 +5749,7 @@
      "open"
     ],
     "removal": false,
-    "must": "still yours|living there|sitting empty|which property|what time|call",
+    "must": "consider selling|still yours|living there|sitting empty|which property|what time|call",
     "must_not": null
    },
    "severity": 3,
@@ -5757,7 +5757,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Would you ever consider selling that one? No pressure either way.",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5777,7 +5777,7 @@
      "open"
     ],
     "removal": false,
-    "must": "still yours|living there|sitting empty|which property|what time|call",
+    "must": "consider selling|still yours|living there|sitting empty|which property|what time|call",
     "must_not": null
    },
    "severity": 3,
@@ -5785,7 +5785,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5813,7 +5813,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5833,7 +5833,7 @@
      "open"
     ],
     "removal": false,
-    "must": "still yours|living there|sitting empty|which property|what time|call",
+    "must": "consider selling|still yours|living there|sitting empty|which property|what time|call",
     "must_not": null
    },
    "severity": 3,
@@ -5841,7 +5841,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5869,7 +5869,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5897,7 +5897,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5917,7 +5917,7 @@
      "open"
     ],
     "removal": false,
-    "must": "still yours|living there|sitting empty|which property|what time|call",
+    "must": "consider selling|still yours|living there|sitting empty|which property|what time|call",
     "must_not": null
    },
    "severity": 3,
@@ -5925,7 +5925,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -5953,7 +5953,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -6150,7 +6150,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -6178,7 +6178,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -6318,7 +6318,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -6347,7 +6347,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -6633,7 +6633,7 @@
    "python": {
     "intent": "prefer_text",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -6891,7 +6891,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -7202,7 +7202,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -7519,7 +7519,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -7547,7 +7547,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -7575,7 +7575,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -8339,7 +8339,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -8451,7 +8451,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Rita, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on W220 N1765 Pewaukee Rd still yours?",
+    "reply": "Hi Rita, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on W220 N1765 Pewaukee Rd still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -8479,7 +8479,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -8535,7 +8535,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Rita, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on W220 N1765 Pewaukee Rd still yours?",
+    "reply": "Hi Rita, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on W220 N1765 Pewaukee Rd still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -8593,7 +8593,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Rita, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on W220 N1765 Pewaukee Rd still yours?",
+    "reply": "Hi Rita, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on W220 N1765 Pewaukee Rd still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -8621,7 +8621,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Rita, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on W220 N1765 Pewaukee Rd still yours?",
+    "reply": "Hi Rita, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on W220 N1765 Pewaukee Rd still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -8707,7 +8707,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Rita, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on W220 N1765 Pewaukee Rd still yours?",
+    "reply": "Hi Rita, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on W220 N1765 Pewaukee Rd still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -8735,7 +8735,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Rita, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on W220 N1765 Pewaukee Rd still yours?",
+    "reply": "Hi Rita, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on W220 N1765 Pewaukee Rd still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -8763,7 +8763,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Rita, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on W220 N1765 Pewaukee Rd still yours?",
+    "reply": "Hi Rita, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on W220 N1765 Pewaukee Rd still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -9270,7 +9270,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -9298,7 +9298,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -9384,7 +9384,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -9527,7 +9527,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10200,7 +10200,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10286,7 +10286,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10370,7 +10370,7 @@
    "python": {
     "intent": "interested",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10398,7 +10398,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10454,7 +10454,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10482,7 +10482,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10510,7 +10510,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10538,7 +10538,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10566,7 +10566,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10594,7 +10594,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10706,7 +10706,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10734,7 +10734,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10762,7 +10762,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10790,7 +10790,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10846,7 +10846,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10930,7 +10930,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10958,7 +10958,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -10986,7 +10986,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -11014,7 +11014,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -11042,7 +11042,7 @@
    "python": {
     "intent": "prefer_text",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -11098,7 +11098,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -11126,7 +11126,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -11210,7 +11210,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -11238,7 +11238,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -11266,7 +11266,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -11294,7 +11294,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -11322,7 +11322,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }
@@ -11350,7 +11350,7 @@
    "python": {
     "intent": "statement",
     "action": "reply",
-    "reply": "Hi Dale, thanks for getting back to me. This is Colin Merrill - I help him follow up on his texts. Is the place on N Burleigh St still yours?",
+    "reply": "Hi Dale, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Is the place on N Burleigh St still yours?",
     "outcome": "open",
     "final_outcome": "handoff"
    }

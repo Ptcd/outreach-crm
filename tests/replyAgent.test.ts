@@ -96,6 +96,22 @@ beforeEach(async () => {
 })
 
 describe('the reply agent, end to end with no real text', () => {
+  it('a plain yes to the question-only opener drafts the pitch line, word for word, for Colin to approve', async () => {
+    const seen: string[] = []
+    const capture: Drafter = async (x) => { seen.push(x.inbound); return 'Thanks - what made you think about it?' }
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMy', '+14145550177', 'Yes'), text('SMh', '+14145550178', 'Yes, how much?')]
+    await runReplyAgent({ rpc, env: DRY, twilio: tw, drafter: capture, control: await control(), redteamRows: ROWS, now: () => NOON })
+    const d = (await db.query<{ phone10: string; status: string; kind: string; body: string; draft_source: string; facts: Record<string, unknown> | null }>(
+      `select phone10, status, kind, body, draft_source, facts from public.reply_drafts order by inbound_at, phone10`)).rows
+    const yes = d.find((x) => x.phone10 === '4145550177')!
+    expect(yes).toMatchObject({ kind: 'candidate', status: 'awaiting_approval', draft_source: 'fixed_line',
+      body: "Hi Test, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Would you ever consider selling that one? No pressure either way." })
+    expect(yes.facts).toMatchObject({ pitched: true, last_asked: 'interest' })
+    expect(seen).toEqual(['Yes, how much?'])           // talks price already: the drafter takes it, no pitch
+    expect(tw.sends).toHaveLength(0)
+  })
+
   it("Colin's test phone plays a real planned owner: the draft knows the owner, the property and the opening text", async () => {
     const seen: Parameters<Drafter>[0][] = []
     const capture: Drafter = async (x) => { seen.push(x); return 'Thanks for getting back to me, John. Is the place on Logan still yours?' }

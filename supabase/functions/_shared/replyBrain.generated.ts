@@ -2,7 +2,7 @@
 // Source: WPIE repo (claude/real estate): wpie/reply/rules.py (_INTENTS = classify, the negation
 // rule, is_spanish, CARRIER_KEYWORDS) and wpie/reply/brain.py (routing regexes and the fixed lines
 // the server may send on its own), converted by tools/export_reply_prompt.py --app-dir
-// from WPIE commit 3aaf7fb on 2026-10-21 (texts written as Colin Merrill, first person; no agent name).
+// from WPIE commit e2d2985 on 2026-10-21 (texts written as Colin Merrill, first person; no agent name).
 // replyBrain.ts holds the small algorithm; tests prove it agrees with Python.
 
 import type { RegexSpec } from './replyRules.generated.ts'
@@ -55,6 +55,8 @@ export const SAYS_NO_RE: RegexSpec = { source: "\\b(?:don'?t\\s+want\\s+to\\s+se
 export const CONDITIONAL_RE: RegexSpec = { source: "\\bunless\\b|\\bonly\\s+if\\b|\\bif\\s+(?:you|u|the\\s+price|someone|he)\\b", flags: "i" };
 export const BARE_NO_RE: RegexSpec = { source: "\\W*(?:no|nope|nah|none|not really)\\W*", flags: "i" };
 export const NOT_ANYMORE_RE: RegexSpec = { source: "^\\W*(?:no\\W+)?not\\s+any\\s*more\\W*(?=\\n?$)", flags: "i" };
+export const AFFIRM_RE: RegexSpec = { source: "^\\W*(?:yes|yep|yeah|yup|ya|sure|correct|it is|that's (?:me|mine|right)|this is (?:he|she|him|her)|i am|i do|mine|still (?:mine|own|do)|we (?:do|still)|i still)\\b", flags: "i" };
+export const INTEREST_WORDS_RE: RegexSpec = { source: "\\b(?:sell|selling|interest\\w*|maybe|possibly|depends|price|offer|how much|come see|get me out|what do you need|cash|number)\\b", flags: "i" };
 
 export const DNC_LINE = "Done - you won't hear from me again. Sorry to have bothered you.";
 export const ES_DNC_LINE = "Listo - no le volveré a escribir. Perdón por la molestia. - Colin";
@@ -69,3 +71,4 @@ export const ES_NO_LINE = "Entendido, gracias por avisarme. Si algo cambia, pued
 export const WHO_LINE = "Fair question - this is Colin Merrill. I buy houses around here myself{where}. Your address is public record and the number came from a data provider. If you'd rather not hear from me, just say so. Otherwise, is that still your place?";
 export const WHO_NOT_SELLING_LINE = "Fair question - this is Colin Merrill. I buy houses around here myself, your address is public record and the number came from a data provider. Understood on not selling - thanks for letting me know, and take care.";
 export const BOT_LINE = "Fair question - I use an automated assistant to help me keep up with texts and notes, and I handle anything that goes further myself. Happy to keep going here, or I can just call you - whichever you prefer.";
+export const PITCH_LINE = "Thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Would you ever consider selling that one? No pressure either way.";

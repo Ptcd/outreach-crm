@@ -23,6 +23,9 @@ const ENGLISH_G = re(B.ENGLISH, 'g')
 const SAYS_NO = re(B.SAYS_NO_RE)
 const CONDITIONAL = re(B.CONDITIONAL_RE)
 const NOT_ANYMORE = re(B.NOT_ANYMORE_RE)
+const AFFIRM = re(B.AFFIRM_RE)
+const INTEREST_WORDS = re(B.INTEREST_WORDS_RE)
+const ENTITY_NAME = /\b(?:LLC|L\.L\.C|INC|CORP|CO|COMPANY|TRUST|TRUSTEE|ESTATE|PROPERTIES|HOLDINGS|LP|LLP|BANK|CHURCH|CITY|COUNTY)\b/i
 const NEGATABLE = new Set(B.NEGATABLE)
 const CARRIER = new Set(B.CARRIER_KEYWORDS)
 
@@ -204,4 +207,22 @@ export function scoreRedteam(rows: RedteamRow[]): RedteamResult {
   }
   out.ok = out.passed === out.total
   return out
+}
+
+/** Rick's two-tier opener (wpie.reply.brain, identify stage, agent_turns == 0): the opener only asked
+ *  whether the place is still theirs. A short yes to it, on a thread matched to a property, gets the
+ *  pitch line with one question; a first reply that already talks selling, interest or price does not
+ *  (the drafter takes it). Returns the reply and its facts, or null. Still a draft for Colin. */
+export function pitchReply(x: { inbound: string; priorInbound: string[]; ourTurns: number; propertyAddress: string | null
+  ownerName: string | null }): { reply: string; facts: Record<string, unknown> } | null {
+  const text = (x.inbound ?? '').trim()
+  if (x.priorInbound.length || x.ourTurns > 0 || !x.propertyAddress) return null
+  if (!AFFIRM.test(text) || INTEREST_WORDS.test(text) || text.split(/\s+/).filter(Boolean).length > 6) return null
+  const word = (x.ownerName ?? '').trim().split(/\s+/)[0] ?? ''
+  const first = word && !ENTITY_NAME.test(x.ownerName ?? '') ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : ''
+  const hi = first ? `Hi ${first}, ` : 'Hi, '
+  return {
+    reply: `${hi}${B.PITCH_LINE.charAt(0).toLowerCase()}${B.PITCH_LINE.slice(1)}`,
+    facts: { identity_confirmed: true, still_owns: true, interest: 'maybe', last_asked: 'interest', pitched: true },
+  }
 }
