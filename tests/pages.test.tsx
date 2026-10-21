@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // Smoke test: every page renders with sample data (data hooks and auth are mocked).
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -13,6 +13,7 @@ const lead = {
   parcel_id: 'P-11', property_type: 'residential', units: 4, reasons_to_sell: ['tired landlord'], score: 412.5,
   mailed_on: '2026-10-20', mail_channel: 'postcard', stage: 'colin_call', stage_changed_at: '2026-10-21T15:00:00Z',
   next_action_at: '2026-10-22T15:00:00Z', next_action: 'call back', assigned_to: 'colin', dead_reason: null,
+  call_facts: { motivation: { value: { choices: ['tired_landlord'] }, at: '2026-10-21T19:00:00Z', by: 'Adil' }, timeline: { value: { choices: ['under_30'] }, at: '2026-10-21T19:00:00Z' } },
   notes: null, last_inbound_at: null, created_at: '2026-10-20T00:00:00Z', updated_at: '2026-10-20T00:00:00Z',
 }
 const ok = <T,>(data: T) => ({ data, error: null, isLoading: false, isPending: false, isSuccess: false })
@@ -33,6 +34,9 @@ vi.mock('@/lib/queries', () => ({
     terms: { street: '100 N Main St', muniName: 'Milwaukee', county: 'Milwaukee', price: 182500, earnestMoney: 1000, earnestHolder: 'Knight Barry Title',
       closing: 'November 20, 2026', bindingDeadline: 'October 24, 2026 at 11:59 p.m.', inspection: true, inspectionDays: 10, proofOfFundsDays: 5 } } })) },
   useWrite: () => mutation,
+  usePhoneLookup: (d: string) => ok(d.replace(/\D/g, '').length >= 3 ? [
+    { lead_id: 'L1', owner_name: 'JANE ROE', property_address: '100 N MAIN ST', municipality: 'Milwaukee', lane: 'hold', stage: 'colin_call', phone: '4145550101', person_name: null, blocked: false, exact: false },
+    { lead_id: 'L9', owner_name: 'BO KIM', property_address: '400 N PINE ST', municipality: 'Milwaukee', lane: 'flip', stage: 'dnc', phone: '2625550101', person_name: null, blocked: true, exact: false }] : []),
   useContracts: () => ok([{ id: 'K1', lead_id: 'L1', form: 'WB-11 10-1-2026', status: 'sent', created_at: '2026-10-21T19:00:00Z', signed_at: null,
     voided_at: null, void_reason: null, final_path: null, include_recr: true, terms: { price: 182500, closing: 'November 20, 2026', street: '100 N Main St' },
     contract_signers: [{ id: 'S1', position: 1, name: 'Jane Roe', email: null, phone: null, opened_at: '2026-10-21T20:00:00Z', signed_at: null, expires_at: '2026-11-04T19:00:00Z' }] }]),
@@ -132,6 +136,31 @@ describe('pages render', () => {
     expect(screen.getByText('Out for signature')).toBeTruthy()
     expect(screen.getByText(/opened/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'New signing link' })).toBeTruthy()
+  })
+
+  it('the phone lookup lists every owner sharing the last 4 digits', () => {
+    at('/inbox', '/inbox', <Inbox />)
+    const box = screen.getByLabelText(/last 4 digits/)
+    fireEvent.change(box, { target: { value: '0101' } })
+    const look = within(box.closest('section')!)
+    expect(look.getByText(/2 owners have a number ending in 0101/)).toBeTruthy()
+    expect(look.getByRole('link', { name: /JANE ROE/ }).getAttribute('href')).toBe('/lead/L1?call=1&phone=4145550101')
+    expect(within(look.getByRole('link', { name: /BO KIM/ })).getByText('Do not contact')).toBeTruthy()
+  })
+
+  it('the lead card opens the call script from a lookup: known facts, questions in order, gate ticks, log the call', () => {
+    at('/lead/L1?call=1&phone=4145550101', '/lead/:id', <LeadDetail />)
+    expect(screen.getByRole('heading', { name: 'Call script' })).toBeTruthy()
+    expect(screen.getByText(/Calling from/)).toBeTruthy()
+    expect(screen.getByText('What we already know')).toBeTruthy()
+    expect(screen.getByText(/is anyone living there right now/)).toBeTruthy()            // open question: words to say
+    expect(screen.getByText(/Tired landlord/)).toBeTruthy()                              // answered on an earlier call
+    expect(screen.getByText('1. Still the owner, and which property')).toBeTruthy()
+    expect(screen.getByText('Gate items this call settles')).toBeTruthy()
+    const script = within(document.getElementById('call-script')!)
+    expect(script.getByRole('button', { name: 'Do not contact' })).toBeTruthy()
+    expect((script.getByRole('button', { name: 'Save the call' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getAllByText(/From the call: 2 - A reason and a date or event/).length).toBeGreaterThan(0)
   })
 
   it('the seller signing page shows the terms, consent, all 62 condition questions, and locks Sign until done', async () => {

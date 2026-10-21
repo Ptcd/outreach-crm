@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge, Empty, ErrorNote, Section, Select, Textarea } from '@/components/ui/form'
@@ -7,6 +7,8 @@ import { GateChecklist, type GateSave } from '@/components/GateChecklist'
 import { EmailComposer } from '@/components/EmailComposer'
 import { ReplyTaskCard } from '@/components/ReplyTaskCard'
 import { ContractBlock } from '@/components/ContractBlock'
+import { CallScript } from '@/components/CallScript'
+import { gateFromCall, stopsFromCall, type CallFacts } from '@/lib/callGate'
 import { api, useDeals, useLead, useWrite } from '@/lib/queries'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
 import { DEAL_STATUS_LABEL, MILESTONES, PEOPLE, SELLER_FACTS, STAGES, STAGE_LABEL, TASK_KINDS, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
@@ -17,6 +19,7 @@ export default function LeadDetail() {
   const { id = '' } = useParams()
   const q = useLead(id)
   const { isOwner } = useAuth()
+  const [params] = useSearchParams()
 
   if (q.isLoading) return <Empty>Loading...</Empty>
   if (q.error) return <ErrorNote error={q.error} />
@@ -40,6 +43,8 @@ export default function LeadDetail() {
         </div>
       </div>
 
+      <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}
+        phone={params.get('phone')} startOpen={params.get('call') === '1'} />
       <NextAction lead={lead} />
       <SellerSaid facts={facts} />
       <Section title={`Tasks (${replyTasks.length})`}>
@@ -52,7 +57,8 @@ export default function LeadDetail() {
       </Section>
       <History leadId={lead.id} messages={messages} />
       <Section title="Walk / don't-walk gate">
-        <GateBlock leadId={lead.id} latest={gates[0] ?? null} canEdit={isOwner} />
+        <GateBlock leadId={lead.id} latest={gates[0] ?? null} canEdit={isOwner}
+          hints={gateFromCall((lead.call_facts ?? {}) as CallFacts, facts)} hintStops={stopsFromCall((lead.call_facts ?? {}) as CallFacts)} />
       </Section>
       <Tasks leadId={lead.id} tasks={tasks.filter((t) => t.source !== 'reply')} />
       <Contacts contacts={contacts} leadId={lead.id} />
@@ -428,7 +434,8 @@ function Tasks({ leadId, tasks }: { leadId: string; tasks: import('@/lib/types')
   )
 }
 
-function GateBlock({ leadId, latest, canEdit }: { leadId: string; latest: import('@/lib/types').GateScore | null; canEdit: boolean }) {
+function GateBlock({ leadId, latest, canEdit, hints, hintStops }: { leadId: string; latest: import('@/lib/types').GateScore | null; canEdit: boolean
+  hints: import('@/lib/callGate').GateHints; hintStops: string[] }) {
   const { member } = useAuth()
   const save = useWrite(
     (v: GateSave) =>
@@ -444,7 +451,8 @@ function GateBlock({ leadId, latest, canEdit }: { leadId: string; latest: import
   )
   return (
     <>
-      <GateChecklist key={latest?.id ?? 'new'} latest={latest} canEdit={canEdit} saving={save.isPending} onSave={(v) => save.mutate(v)} />
+      <GateChecklist key={latest?.id ?? `new-${JSON.stringify(hints)}-${hintStops.join()}`} latest={latest} canEdit={canEdit} saving={save.isPending}
+        onSave={(v) => save.mutate(v)} hints={hints} hintStops={hintStops} />
       <ErrorNote error={save.error} />
     </>
   )

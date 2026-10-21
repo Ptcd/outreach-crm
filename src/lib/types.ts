@@ -53,6 +53,8 @@ export interface Lead {
   last_inbound_at: string | null
   created_at: string
   updated_at: string
+  // 0013: answers from the call script, { key: { value, at, by } }
+  call_facts?: Record<string, { value: unknown; at: string; by?: string | null }> | null
 }
 
 export interface Contact {

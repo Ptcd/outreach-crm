@@ -5,6 +5,7 @@ import { DECISION_LABEL, GATE_ITEMS, HARD_STOPS, gateSuggestion, gateTotal, noWa
 import type { GateDecision, GateScore } from '@/lib/types'
 import { fmtDateTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import type { GateHints } from '@/lib/callGate'
 
 export interface GateSave {
   scores: GateScores
@@ -27,15 +28,19 @@ function fromRow(row: GateScore | null): GateScores {
 
 /** The six-item walk / don't-walk gate. Colin scores it after his call; others read it. */
 export function GateChecklist({
-  latest, canEdit, onSave, saving,
+  latest, canEdit, onSave, saving, hints, hintStops,
 }: {
   latest: GateScore | null
   canEdit: boolean
   onSave?: (v: GateSave) => Promise<void> | void
   saving?: boolean
+  hints?: GateHints
+  hintStops?: string[]
 }) {
-  const [scores, setScores] = useState<GateScores>(() => fromRow(latest))
-  const [stops, setStops] = useState<string[]>(() => latest?.hard_stops ?? [])
+  // Nothing saved yet: start from what the call script settled (Colin still checks and saves).
+  const [scores, setScores] = useState<GateScores>(() => latest ? fromRow(latest)
+    : { ...EMPTY, ...Object.fromEntries(Object.entries(hints ?? {}).map(([k, h]) => [k, h!.score])) })
+  const [stops, setStops] = useState<string[]>(() => latest?.hard_stops ?? hintStops ?? [])
   const [decision, setDecision] = useState<GateDecision | ''>('')
   const [note, setNote] = useState('')
 
@@ -58,6 +63,9 @@ export function GateChecklist({
           <li key={item.id} className="rounded-md border p-3">
             <div className="mb-2 font-medium">
               {i + 1}. {item.label}
+              {hints?.[item.id] && (
+                <span className="mt-0.5 block text-xs font-normal text-emerald-800">From the call: {hints[item.id]!.score} - {hints[item.id]!.why}</span>
+              )}
             </div>
             <div role="radiogroup" aria-label={item.label} className="grid gap-2 sm:grid-cols-3">
               {[0, 1, 2].map((v) => (

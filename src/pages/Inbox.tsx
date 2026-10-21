@@ -8,6 +8,7 @@ import { ReviewDeck } from '@/components/ReviewDeck'
 import { ConfirmButton } from '@/components/ui/confirm'
 import { DraftBox } from '@/components/DraftBox'
 import { NotifyPanel } from '@/components/NotifyPanel'
+import { PhoneLookup } from '@/components/PhoneLookup'
 import { fmtDateTime, localInputToIso, todayLocal } from '@/lib/format'
 import {
   BUCKETS, type Bucket, type InboxLead, SEND_LABEL, WORDING, bucketOf, intentText, nextBusinessMorning, optedOut,
@@ -44,6 +45,7 @@ export default function Inbox() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Inbox</h1>
+      <PhoneLookup />
       {waiting.isLoading && <Empty>Loading replies that need you...</Empty>}
       <ErrorNote error={waiting.error} />
       {(waiting.data ?? []).length > 0 && <ReviewDeck drafts={waiting.data!} startId={startId} />}

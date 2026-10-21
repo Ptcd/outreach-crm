@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge, Empty, ErrorNote, Select } from '@/components/ui/form'
 import { PAGE_SIZE, useLeads, usePipelineCounts, type LeadFilter } from '@/lib/queries'
+import { PhoneLookup } from '@/components/PhoneLookup'
 import { STAGES, STAGE_LABEL, WORKING_STAGES } from '@/lib/wpie'
 import { fmtDateTime } from '@/lib/format'
 import type { LeadStage } from '@/lib/types'
@@ -65,6 +66,7 @@ export default function Pipeline() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Pipeline</h1>
+      <PhoneLookup />
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Select value={filter.lane} onChange={(e) => set({ lane: e.target.value })} aria-label="Lane">

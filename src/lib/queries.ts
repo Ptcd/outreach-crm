@@ -195,6 +195,11 @@ export const api = {
     return { error: d.outcome === 'sent' ? null : { message: d.reason ?? 'The email did not go.' } }
   },
   assignTask: (id: string, owner: Person) => supabase.from('tasks').update({ owner }).eq('id', id),
+  // Call desk (migration 0013)
+  newCaller: (phone: string, name?: string) => supabase.rpc('new_caller', { p_phone: phone, p_name: name ?? null }),
+  callAnswer: (leadId: string, key: string, value: unknown) => supabase.rpc('call_answer', { p_lead_id: leadId, p_key: key, p_value: value }),
+  logCall: (leadId: string, phone: string | null, outcome: string, note: string | null) =>
+    supabase.rpc('log_call', { p_lead_id: leadId, p_phone: phone, p_outcome: outcome, p_note: note }),
   // Send contract (Colin): preview / send / new_link / void / pdf / seal. Errors come back as { ok: false, reason }.
   contract: async (body: Record<string, unknown>): Promise<{ ok: boolean; reason?: string } & Record<string, unknown>> => {
     const r = await supabase.functions.invoke('contract', { body })
@@ -411,5 +416,19 @@ export function useContracts(leadId: string) {
       check(await supabase.from('contracts')
         .select('id, lead_id, form, status, created_at, signed_at, voided_at, void_reason, final_path, include_recr, terms, contract_signers(id, position, name, email, phone, opened_at, signed_at, expires_at)')
         .eq('lead_id', leadId).order('created_at', { ascending: false })) as ContractRow[],
+  })
+}
+
+export type PhoneMatch = { lead_id: string; owner_name: string; property_address: string | null; municipality: string | null
+  lane: string | null; stage: LeadStage; phone: string; person_name: string | null; blocked: boolean; exact: boolean }
+
+/** Owners whose phone ends in these digits (last 4 is the usual case), or is exactly this number. */
+export function usePhoneLookup(digits: string) {
+  const d = digits.replace(/\D/g, '')
+  return useQuery({
+    queryKey: ['phone_lookup', d],
+    enabled: d.length >= 3,
+    staleTime: 60_000,
+    queryFn: async () => check(await supabase.rpc('phone_lookup', { p_digits: d })) as PhoneMatch[],
   })
 }

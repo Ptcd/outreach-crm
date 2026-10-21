@@ -107,6 +107,9 @@ const SIGN_VIEW = { contract_id: 'K1', signer_id: 'S1', status: 'sent', form: 'W
   terms: { street: '2847 N Burleigh St', muniName: 'Milwaukee', county: 'Milwaukee', price: 182500, earnestMoney: 1000, earnestHolder: 'Knight Barry Title',
     closing: 'November 20, 2026', bindingDeadline: 'October 24, 2026 at 11:59 p.m.', inspection: true, inspectionDays: 10, proofOfFundsDays: 5 } }
 const special: Record<string, (...a: unknown[]) => Promise<unknown>> = {
+  callAnswer: async () => ({ data: { ok: true }, error: null }),
+  logCall: async () => ({ data: { ok: true, outcome: 'interested' }, error: null }),
+  newCaller: async () => ({ data: { ok: true, lead_id: 'L1' }, error: null }),
   contractSign: async (b: unknown) => ((b as { action: string }).action === 'open' ? { ok: true, view: SIGN_VIEW } : { ok: true, allSigned: false }),
   contract: async (b: unknown) => ((b as { action: string }).action === 'send'
     ? { ok: true, links: [{ position: 1, name: 'Dale Novak', url: 'https://deals.junkcarsmequon.com/sign/preview-token-not-real' }] }
@@ -117,3 +120,6 @@ export const useContracts = () => ok([{ id: 'K1', lead_id: 'L1', form: 'WB-11 10
   voided_at: null, void_reason: null, final_path: 'K1/signed.pdf', include_recr: true, terms: { price: 182500, closing: 'November 20, 2026', street: '2847 N Burleigh St' },
   contract_signers: [{ id: 'S1', position: 1, name: 'Dale Novak', email: 'dale.novak@example.com', phone: '4145550177', opened_at: ago(60), signed_at: ago(45), expires_at: ago(-20000) },
     { id: 'S2', position: 2, name: 'Rita Novak', email: null, phone: null, opened_at: ago(40), signed_at: ago(30), expires_at: ago(-20000) }] }])
+export const usePhoneLookup = (d: string) => ok(d.replace(/\D/g, '').length >= 3 ? [
+  { lead_id: 'L1', owner_name: 'DALE NOVAK', property_address: '2847 N Burleigh St', municipality: 'Milwaukee', lane: 'hold', stage: 'reply_received', phone: '4145550177', person_name: 'DALE NOVAK', blocked: false, exact: false },
+  { lead_id: 'L2', owner_name: 'RITA SCHMIDT', property_address: 'W220 N1765 Pewaukee Rd', municipality: 'Pewaukee', lane: 'flip', stage: 'follow_up', phone: '2625550177', person_name: null, blocked: false, exact: false }] : [])
