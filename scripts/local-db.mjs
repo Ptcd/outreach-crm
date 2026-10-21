@@ -1,4 +1,4 @@
-// A throwaway local Postgres (PGlite, in memory) with the WPIE migration applied,
+// A throwaway local Postgres (PGlite, in memory) with every WPIE migration applied,
 // for testing `python -m wpie.live.sync push/pull` without a Supabase project.
 //
 //   npm run db:local            # listens on 127.0.0.1:5433 until Ctrl+C
@@ -6,14 +6,17 @@
 //
 // It stands in for Supabase's auth schema and roles only as far as the migration
 // needs. Data is lost when it stops. One client connection at a time.
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PGlite } from '@electric-sql/pglite'
 import { PGLiteSocketServer } from '@electric-sql/pglite-socket'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const migration = readFileSync(path.join(here, '..', 'supabase', 'migrations', '0001_wpie_live.sql'), 'utf8')
+// Every migration, in order (0001 schema, 0002 gate round 2, 0003 app sending, ...).
+const dir = path.join(here, '..', 'supabase', 'migrations')
+const migration = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()
+  .map((f) => readFileSync(path.join(dir, f), 'utf8')).join('\n')
 const port = Number(process.env.PORT || 5433)
 
 const stub = `
