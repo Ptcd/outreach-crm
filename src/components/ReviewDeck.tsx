@@ -147,7 +147,7 @@ export function ReviewDeck({ drafts, startId }: { drafts: WaitingDraft[]; startI
       )}
 
       {/* thumb bar: sits above the bottom navigation on a phone */}
-      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 border-t bg-background p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:static sm:border-0 sm:bg-transparent sm:p-0">
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 !m-0 border-t bg-background p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:static sm:border-0 sm:bg-transparent sm:p-0">
         <div className="mx-auto max-w-5xl">
           {result ? (
             <div className="grid grid-cols-[1fr_auto] items-center gap-2">
