@@ -170,6 +170,7 @@ export const api = {
   // Colin's sending buttons (owner-only functions in migration 0003)
   setSending: (on: boolean) => supabase.rpc('set_sending', { p_on: on }),
   clearPause: () => supabase.rpc('clear_pause'),
+  resumeFollowups: () => supabase.rpc('resume_followups'),
   approveDay: (day: string, except: string[]) => supabase.rpc('approve_day', { p_date: day, p_except: except }),
   withdrawDay: (day: string) => supabase.rpc('withdraw_day', { p_date: day }),
   // Inbox one-tap actions
@@ -227,7 +228,7 @@ export function useCampaignControl() {
     queryFn: async () =>
       check(
         await supabase.from('campaign_control')
-          .select('sending_enabled, sending_changed_by, sending_changed_at, paused, pause_reason, paused_at, laptop_paused, laptop_pause_reason, daily_cap, window_start, window_end, dnc_policy, last_run_at, last_run_summary, routine_enabled, routine_changed_by, routine_changed_at, agent_rules_version, redteam_version, redteam_passed, redteam_total, redteam_ok, redteam_at, agent_last_run_at, agent_last_summary, test_phones, test_owner_name, test_property_address')
+          .select('sending_enabled, sending_changed_by, sending_changed_at, paused, pause_reason, paused_at, laptop_paused, laptop_pause_reason, daily_cap, window_start, window_end, dnc_policy, last_run_at, last_run_summary, routine_enabled, routine_changed_by, routine_changed_at, agent_rules_version, redteam_version, redteam_passed, redteam_total, redteam_ok, redteam_at, agent_last_run_at, agent_last_summary, test_phones, test_owner_name, test_property_address, followups_paused, followups_pause_reason, followups_paused_at')
           .eq('id', 1).single(),
       ) as CampaignControl,
   })

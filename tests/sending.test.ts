@@ -80,7 +80,9 @@ beforeEach(async () => {
   await db.exec(`
     truncate public.opener_send_events, public.twilio_inbound, public.suppressed_phones, public.planned_openers,
              public.messages, public.contacts, public.leads cascade;
-    update public.campaign_control set sending_enabled = true, paused = false, pause_reason = null, laptop_paused = false,
+    truncate public.ops_alerts;
+    update public.campaign_control set followups_paused = false, followups_pause_reason = null,
+      sending_enabled = true, paused = false, pause_reason = null, laptop_paused = false,
       daily_cap = 100, dnc_policy = 'allow_unknown', scrub_date = null, external_openers = 0, external_openers_date = null,
       banned_words = '{}';
   `)
@@ -158,6 +160,90 @@ describe('the locks', () => {
     const c = (await db.query<{ cleared: boolean; by: string }>(`select pause_cleared_at is not null as cleared, pause_cleared_by as by from public.campaign_control`)).rows[0]
     expect(c.cleared).toBe(true)
     expect(c.by).toBeTruthy()
+  })
+})
+
+describe('follow-ups (texts 2 and 3)', () => {
+  // A live, delivered text to this owner `days` before DAY 15:00Z (step 1 = the opener).
+  async function sentBefore(l: { id: string; owner: number; phone: string }, days: number, step = 1, status = 'delivered') {
+    const at = new Date(new Date(T('15:00')).getTime() - days * 86_400_000).toISOString()
+    await db.query(
+      `insert into public.planned_openers (plan_date, wpie_owner_id, attempt, step, lead_id, phone, body, body_sha256, scheduled_at,
+         window_start_utc, window_end_utc, dnc_state, per_hour, decision, send_status, claim_mode, claimed_at, sent_at, provider_sid)
+       values (($1::timestamptz)::date, $2, 1, $3, $4, $5, $6, encode(sha256(convert_to($6, 'UTF8')), 'hex'), $1, $1, $1, 'unknown', 12,
+         'approved', $7, 'live', $1, $1, $8)`,
+      [at, l.owner, step, l.id, `+1${l.phone}`, BODY, status, `SMprev${l.owner}${step}`])
+  }
+  async function followUp(l: { id: string; owner: number; phone: string }, step: number) {
+    const id = await opener(l)
+    await db.query(`update public.planned_openers set step = $2 where id = $1`, [id, step])
+    return id
+  }
+
+  it('sends text 2 once the opener was delivered 3+ days ago, ahead of a due new opener', async () => {
+    const fresh = await lead()
+    await opener(fresh)                                         // a new opener, also due
+    const l = await lead({ stage: 'opener_sent' })
+    await sentBefore(l, 4)
+    const fu = await followUp(l, 2)
+    expect(await claim(T('15:05'))).toMatchObject({ outcome: 'send', opener: { id: fu, step: 2 } })
+    await db.query(`select public.record_send_result($1, 'sent', 'SMfu1')`, [fu])
+    const m = (await db.query<{ source_key: string; is_opener: boolean }>(`select source_key, is_opener from public.messages where provider_sid = 'SMfu1'`)).rows
+    expect(m).toEqual([{ source_key: `ledger:${l.owner}:1:text2`, is_opener: false }])
+  })
+
+  it('holds or skips a follow-up for each rule', async () => {
+    const cases: [string, (l: { id: string; owner: number; phone: string }) => Promise<void>, number][] = [
+      ['too_soon', async (l) => sentBefore(l, 2), 2],
+      ['opener_not_delivered', async (l) => sentBefore(l, 4, 1, 'undelivered'), 2],
+      ['text_2_not_delivered', async (l) => sentBefore(l, 8), 3],
+      ['owner_replied', async (l) => { await sentBefore(l, 4); await db.query(
+        `insert into public.twilio_inbound (sid, from10, to_number, body, received_at) values ($1, $2, '+12629996513', 'who is this', now())`, [`SMin${l.owner}`, l.phone]) }, 2],
+      ['phone_marked_bad', async (l) => { await sentBefore(l, 4); await db.query(`update public.contacts set status = 'bad' where value_normalized = $1`, [l.phone]) }, 2],
+      ['phone_suppressed', async (l) => { await sentBefore(l, 4); await db.query(`insert into public.suppressed_phones (phone10, reason) values ($1, 'stop_reply')`, [l.phone]) }, 2],
+    ]
+    for (const [reason, setup, step] of cases) {
+      const l = await lead({ stage: 'opener_sent' })
+      await setup(l)
+      const id = await followUp(l, step)
+      expect(await claim(T('15:05')), reason).toMatchObject({ outcome: 'skipped', reason })
+      expect((await status(id)).send_status).toBe('skipped')
+    }
+  })
+
+  it('text 3 goes after a delivered text 2, and never a fourth text', async () => {
+    const l = await lead({ stage: 'opener_sent' })
+    await sentBefore(l, 8)
+    await sentBefore(l, 4, 2)
+    const t3 = await followUp(l, 3)
+    expect(await claim(T('15:05'))).toMatchObject({ outcome: 'send', opener: { id: t3, step: 3 } })
+    const m = await lead({ stage: 'opener_sent' })
+    await sentBefore(m, 12); await sentBefore(m, 8, 2); await sentBefore(m, 4, 3)
+    const again = await followUp(m, 3)
+    expect(await claim(T('15:06'))).toMatchObject({ outcome: 'skipped', reason: 'step_already_sent' })
+    expect((await status(again)).send_status).toBe('skipped')
+  })
+
+  it('pauses follow-ups only when their opt-outs run high, texts Colin, keeps openers going, Colin restarts', async () => {
+    // 50 delivered follow-ups, 2 opted out (4% > 2%)
+    for (let i = 0; i < 50; i++) {
+      const l = await lead({ stage: 'opener_sent' })
+      await sentBefore(l, 3, 2)
+      if (i < 2) await db.query(`insert into public.twilio_inbound (sid, from10, to_number, body, is_opt_out, received_at) values ($1, $2, '+12629996513', 'STOP', true, now())`, [`SMstop${i}`, l.phone])
+    }
+    const l = await lead({ stage: 'opener_sent' })
+    await sentBefore(l, 4)
+    await followUp(l, 2)
+    const fresh = await lead()
+    const op = await opener(fresh)
+    expect(await claim(T('15:05'))).toMatchObject({ outcome: 'send', opener: { id: op, step: 1 } })
+    const c = (await db.query<{ followups_paused: boolean; followups_pause_reason: string }>(`select followups_paused, followups_pause_reason from public.campaign_control`)).rows[0]
+    expect(c.followups_paused).toBe(true)
+    expect(c.followups_pause_reason).toMatch(/^2 of 50 delivered follow-ups opted out \(4\.0%, over 2%\)$/)
+    expect((await db.query<{ n: number }>(`select count(*)::int n from public.ops_alerts where text like 'Follow-up texts paused:%'`)).rows[0].n).toBe(1)
+    await expect(as(THALIA, () => db.query('select public.resume_followups()'))).rejects.toThrow(/only Colin/)
+    await as(COLIN, () => db.query('select public.resume_followups()'))
+    expect((await db.query<{ p: boolean }>(`select followups_paused p from public.campaign_control`)).rows[0].p).toBe(false)
   })
 })
 

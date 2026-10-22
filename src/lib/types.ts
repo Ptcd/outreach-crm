@@ -136,6 +136,7 @@ export interface Deal {
 
 export interface PlannedOpener {
   id: string
+  step?: number            // 1 = opener, 2 / 3 = no-reply follow-ups (0018)
   plan_date: string
   wpie_owner_id: number
   attempt: number
@@ -207,6 +208,9 @@ export interface CampaignControl {
   agent_last_summary: Record<string, unknown> | null
   test_phones: string[]
   test_owner_name?: string | null
+  followups_paused?: boolean
+  followups_pause_reason?: string | null
+  followups_paused_at?: string | null
   test_property_address?: string | null
 }
 

@@ -55,7 +55,7 @@ export function digestText(list: { first_name: string | null; address: string | 
 
 export type AlertSend = (text: string) => Promise<{ ok: boolean; sid?: string | null; error?: string }>
 
-export interface HotSummary { alerts: number; second_alerts: number; digest: number; errors: string[]; off?: string }
+export interface HotSummary { alerts: number; second_alerts: number; digest: number; errors: string[]; off?: string; ops?: number }
 
 /** Text what is due (first alerts, 15-minute repeats, the 7 PM list). */
 export async function runHotAlerts(opts: { rpc: Rpc; send: AlertSend | null; appUrl: string; now?: () => Date }): Promise<HotSummary> {
@@ -71,6 +71,14 @@ export async function runHotAlerts(opts: { rpc: Rpc; send: AlertSend | null; app
     if (!r.ok) s.errors.push(String((r as { error?: string }).error ?? 'not sent').slice(0, 200))
     else if (a.n === 2) s.second_alerts += 1
     else s.alerts += 1
+  }
+  // Texts about the system itself (e.g. follow-ups paused by their opt-out brake).
+  const ops = await opts.rpc('ops_claim', { p_limit: 5 })
+  for (const o of (ops.data as { id: number; text: string }[] | null) ?? []) {
+    const r = await opts.send(o.text).catch((e) => ({ ok: false, error: String(e) }))
+    await opts.rpc('ops_result', { p_id: o.id, p_sid: r.ok ? (r as { sid?: string | null }).sid ?? null : null,
+      p_error: r.ok ? null : String((r as { error?: string }).error ?? 'not sent').slice(0, 200) })
+    if (r.ok) s.ops = (s.ops ?? 0) + 1
   }
   const d = await opts.rpc('hot_digest', { p_now: now.toISOString() })
   const list = (d.data as { first_name: string | null; address: string | null; phone10: string }[] | null) ?? null

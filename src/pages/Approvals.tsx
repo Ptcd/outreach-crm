@@ -100,6 +100,7 @@ function SendingPanel({ canDecide }: { canDecide: boolean }) {
   const resetTest = useWrite(() => api.resetTestPhones(), keys)
   const [testPhone, setTestPhone] = useState<string | null>(null)
   const clearPause = useWrite(() => api.clearPause(), keys)
+  const resumeFollowups = useWrite(() => api.resumeFollowups(), keys)
   const c: CampaignControl | undefined = q.data
   if (q.error) return <ErrorNote error={q.error} />
   if (!c) return null
@@ -124,6 +125,19 @@ function SendingPanel({ canDecide }: { canDecide: boolean }) {
                 Clear pause
               </ConfirmButton>
             </div>
+          )}
+        </div>
+      )}
+      {c.followups_paused && (
+        <div className="mb-3 rounded-md bg-amber-50 p-3 text-sm text-amber-950">
+          <p className="font-medium">Follow-up texts (2 and 3) are paused. New openers keep going.</p>
+          <p>{c.followups_pause_reason} {c.followups_paused_at ? `(${fmtDateTime(c.followups_paused_at)})` : ''}</p>
+          {canDecide && (
+            <ConfirmButton variant="outline" className="mt-2 h-12 w-full sm:w-auto" disabled={resumeFollowups.isPending}
+              question="Restart follow-up texts? Only once you know why people opted out of them." yes="Yes, restart"
+              onConfirm={() => resumeFollowups.mutate(undefined)}>
+              Restart follow-ups
+            </ConfirmButton>
           )}
         </div>
       )}
@@ -209,7 +223,7 @@ function SendingPanel({ canDecide }: { canDecide: boolean }) {
           </div>
         </div>
       )}
-      <ErrorNote error={setSending.error ?? clearPause.error ?? setRoutine.error ?? setTest.error ?? resetTest.error} />
+      <ErrorNote error={setSending.error ?? clearPause.error ?? resumeFollowups.error ?? setRoutine.error ?? setTest.error ?? resetTest.error} />
     </Section>
   )
 }
@@ -242,6 +256,7 @@ function OpenerCard({
       </div>
       <div className="mb-2 flex flex-wrap gap-2">
         {r.lane && <Badge tone="info">{r.lane}</Badge>}
+        {(r.step ?? 1) > 1 ? <Badge tone="info">Text {r.step} (follow-up)</Badge> : <Badge>Text 1</Badge>}
         {r.template_lane && <Badge>{WORDING[r.template_lane] ?? r.template_lane} wording</Badge>}
         {r.variant && <Badge>version {r.variant}</Badge>}
         {r.segments && <Badge>{r.segments} segments</Badge>}
