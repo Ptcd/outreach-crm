@@ -172,8 +172,8 @@
     {
       "id": "obj_wholesaler",
       "trigger": "Are you a wholesaler / do you buy it yourself?",
-      "say": "I'm the one buying it. I'll walk you through exactly how I buy when I see it.",
-      "note": "Final wording pending Colin's answer on whether he ever assigns (qualification logic c.12). Never 'never say wholesaler'."
+      "say": "Depends on the deal. Some I keep and rent, some I fix up or pass along to a partner. Either way you deal with me, and I'll tell you up front which it is.",
+      "note": "Rick's answer (docs/RICK_PLAYBOOK.md: 'depends on the deal', said plainly, never brought up first); Colin 2026-10-22: 'do whatever Rick does'. Never 'never say wholesaler'."
     },
     {
       "id": "obj_my_number",
