@@ -1,7 +1,7 @@
 {
-  "version": "2026-10-21",
+  "version": "2026-10-22",
   "source": "docs/PHONE_SCRIPT.md",
-  "voice": "Colin, first person. No business name, no cash claims, no number from our side, no promises on closing dates or tenants.",
+  "voice": "Colin, first person. No business name, no cash claims, no number from our side, no promises on closing dates or tenants. Our side never says offer, price, investor, contract or home (Rick's poison words, docs/RICK_PLAYBOOK.md section 4): say a number, an agreement, the place.",
   "gate_legend": {
     "1": "reason + clock",
     "2": "decision makers",
@@ -76,7 +76,7 @@
     {
       "id": "q6_decision_makers",
       "gate_item": [2],
-      "say": "Is it just you on this, or is there anyone else who'd want to look at an offer before you said yes?",
+      "say": "Is it just you on this, or is there anyone else who'd want to weigh in before you said yes?",
       "listen_for": "Spouse, siblings, heir, partner, 'my kids handle it'. Get the name and whether they can be on the next call or at the visit.",
       "branch": "estate -> 'Are you the one handling the house for the family, and have the court papers come through yet?'; company -> who signs for it"
     },
@@ -303,9 +303,19 @@
       "note": "Listen for an event, not just a date."
     },
     {
+      "id": "nr1b_concerns",
+      "say": "What concerns you most about selling it?",
+      "note": "Rick's second qualifying question (utzhagndcks): the answer is often the real blocker (the move, the cost, 'can you actually buy it'), and it is something I can answer or note. Then silence. Only when they are not ready; skip if the reason is already plain."
+    },
+    {
       "id": "nr2_permission",
       "say": "Mind if I check back around then? And if anything changes before that, this number reaches me; text if I don't pick up.",
       "note": "Date goes in exactly as said, with the event. Never call before it."
+    },
+    {
+      "id": "nr2b_half_rule",
+      "say": "Things sometimes move sooner than people expect. Mind if I check in around {half_date} as well, just in case? If not, I'll wait for {date}.",
+      "note": "Rick's half rule (QE8CCPM58XI, 8JKQipxh0xM): a 'call me in six months' gets a permission ask for a check-in at three. Only for a far date (over 60 days out); only once; their answer is final and goes in as the follow-up date. A no means the full date, exactly as said."
     },
     {
       "id": "nr3_nothing_would_change",
