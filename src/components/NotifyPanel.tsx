@@ -5,9 +5,10 @@ import {
 } from '@/lib/push'
 import { useAuth } from '@/providers/AuthProvider'
 
-// Top of the Inbox: install the app on the phone, turn on "reply needs you" notifications, test them.
+// Top of the Inbox: install the app on the phone, turn on notifications, test them. Every team member:
+// Colin gets "reply needs you"; everyone gets the hot-lead alerts (Colin 2026-10-22).
 export function NotifyPanel() {
-  const { isOwner } = useAuth()
+  const { member } = useAuth()
   const [state, setState] = useState<PushState | null>(null)
   const [installable, setInstallable] = useState(canPromptInstall())
   const [msg, setMsg] = useState<string | null>(null)
@@ -18,7 +19,7 @@ export function NotifyPanel() {
     return onInstallChange(() => setInstallable(canPromptInstall()))
   }, [])
 
-  if (!isOwner) return null
+  if (!member) return null
   const run = async (f: () => Promise<string | PushState>) => {
     setBusy(true)
     setMsg(null)
@@ -44,7 +45,7 @@ export function NotifyPanel() {
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        {state === 'on' && <span>Notifications are on: you get a ping only when a reply needs you.</span>}
+        {state === 'on' && <span>Notifications are on: a ping for every hot lead{member.role === 'owner' ? ' and when a reply needs you' : ''}.</span>}
         {state === 'off' && <Button size="sm" disabled={busy} onClick={() => void run(enablePush)}>Turn on notifications</Button>}
         {state === 'denied' && <span>Notifications are blocked. Chrome ⋮ &gt; Settings &gt; Notifications (or the lock icon) &gt; allow this site.</span>}
         {state === 'unsupported' && <span>This browser can&apos;t show notifications. Use Chrome on your phone.</span>}
