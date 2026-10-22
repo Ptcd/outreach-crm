@@ -275,7 +275,26 @@ describe('hot replies', () => {
     await run(tw, DRY, new Date(NOON.getTime() + 300_000))
     const h = (await db.query<{ inbound_sid: string; resolved: boolean }>(`select inbound_sid, resolved_at is not null as resolved from public.hot_alerts`)).rows
     expect(h).toEqual([{ inbound_sid: 'SMm2', resolved: true }])
-    expect((await db.query<{ kind: string }>(`select kind from public.reply_drafts where inbound_sid = 'SMm3'`)).rows[0].kind).toBe('candidate')
+    // "if you're looking to overpay" is a plain no: closed politely, no draft for Colin
+    const m3 = (await db.query<{ kind: string; outcome: string; body: string }>(`select kind, outcome, body from public.reply_drafts where inbound_sid = 'SMm3'`)).rows[0]
+    expect(m3).toMatchObject({ kind: 'routine', outcome: 'not_interested', body: expect.stringMatching(/^Got it - thanks for your time/) })
+  })
+
+  it("a no with a real condition gets one question and a quiet 30-day check-back; a no that names a number stays Colin's", async () => {
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMc1', '+14145550177', 'Not interested unless I find a new place first'),
+      text('SMc2', '+14145550178', 'Not interested unless you pay 300k')]
+    await run(tw)
+    const d = (await db.query<{ inbound_sid: string; kind: string; status: string; body: string | null }>(
+      `select inbound_sid, kind, status, body from public.reply_drafts order by inbound_sid`)).rows
+    expect(d.find((x) => x.inbound_sid === 'SMc1')).toMatchObject({ kind: 'routine', body: expect.stringMatching(/What would need to happen for selling to make sense/) })
+    expect(d.find((x) => x.inbound_sid === 'SMc2')).toMatchObject({ kind: 'candidate', status: 'awaiting_approval' })
+    const t = (await db.query<{ source: string; owner: string; days: number; notified: boolean }>(
+      `select source, owner::text, round(extract(epoch from due_at - $1::timestamptz) / 86400)::int days, notified_at is not null notified from public.tasks where reply_inbound_sid = 'SMc1'`,
+      [NOON.toISOString()])).rows
+    expect(t).toEqual([{ source: 'nurture', owner: 'colin', days: 30, notified: true }])
+    expect((await db.query<{ stage: string }>(`select stage::text from public.leads where wpie_owner_id = 77`)).rows[0].stage).toBe('follow_up')
+    expect((await db.query(`select 1 from public.hot_alerts`)).rows).toHaveLength(0)
   })
 
   it('puts back a text a run claimed but never decided, so it is not lost', async () => {

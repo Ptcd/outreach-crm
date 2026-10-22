@@ -156,6 +156,11 @@ export async function runReplyAgent(opts: {
       p_now: now().toISOString() })
     if (r.error) throw new Error(r.error.message)
     if (facts && Object.keys(facts).length) await opts.rpc('reply_set_facts', { p_sid: t.sid, p_facts: facts })
+    // A real condition behind a no: a quiet follow-up task in 30 days (no email, no ping).
+    if (d.facts?.nurture) {
+      await opts.rpc('reply_nurture', { p_sid: t.sid, p_quote: ctx.inbound,
+        p_due: new Date(now().getTime() + 30 * 86_400_000).toISOString(), p_now: now().toISOString() })
+    }
     // A reply that shows interest or asks about selling: Colin's cell gets a text (hotLeads.ts).
     if (endsInterest({ intent: d.intent, removal: d.removal, outcome: d.outcome })) {
       await opts.rpc('hot_resolve', { p_phone10: t.from10, p_lead_id: t.lead_id, p_reason: `later reply: ${d.intent}`,

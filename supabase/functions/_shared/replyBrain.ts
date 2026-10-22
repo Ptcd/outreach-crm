@@ -23,6 +23,13 @@ const SPANISH_G = re(B.SPANISH, 'g')
 const ENGLISH_G = re(B.ENGLISH, 'g')
 const SAYS_NO = re(B.SAYS_NO_RE)
 const CONDITIONAL = re(B.CONDITIONAL_RE)
+// A conditional no whose only condition is price (Colin 2026-10-22, on "If you're looking to overpay ...
+// I'm not looking to sell": "I also should not have gotten this email"). Without a number named, it is
+// a plain no.
+export const PRICE_ONLY_CONDITION = /\b(?:over\s*pay\w*|top\s+dollar|full\s+(?:price|asking|value)|retail|(?:the\s+)?right\s+(?:price|number|money|offer)|pay\s+(?:me\s+)?enough|enough\s+money|(?:crazy|silly|stupid|big)\s+(?:money|offer)|more\s+than\s+(?:it'?s|its)\s+worth|what\s+it'?s\s+worth|market\s+(?:price|value))/i
+const NAMES_A_NUMBER = /\$|\d/
+/** One question for a real (non-price) condition: what would have to happen, and when (phone script nr1). */
+export const NURTURE_LINE = "That's fine, and I'd rather you take your time than feel pushed. What would need to happen for selling to make sense, and roughly when?"
 const NOT_ANYMORE = re(B.NOT_ANYMORE_RE)
 const AFFIRM = re(B.AFFIRM_RE)
 const INTEREST_WORDS = re(B.INTEREST_WORDS_RE)
@@ -154,7 +161,15 @@ function decideBase(ctx: ReplyContext): Decision {
   }
   if (intent === 'bot_question') return routine(intent, B.BOT_LINE, 'open', 'asked if automated - told the truth')
   if (intent === 'not_interested') {
-    if (CONDITIONAL.test(text)) return toColin(intent, 'a conditional no ("unless", "only if") - Colin')
+    if (CONDITIONAL.test(text)) {
+      // They named their number: a real lead, Colin's call.
+      if (NAMES_A_NUMBER.test(text)) return toColin(intent, 'a conditional no that names their number - Colin')
+      // Only "if you overpay / top dollar / the right number": a plain no, closed politely, no email.
+      if (PRICE_ONLY_CONDITION.test(text)) return routine(intent, B.CLOSE_LINE, 'not_interested', 'a no unless overpaid - closed politely')
+      // A real condition (a tenant leaving, the next place, a date, family): one question, check back in 30 days.
+      return { ...routine(intent, NURTURE_LINE, 'open', 'a conditional no with a real condition - one question, check back in 30 days'),
+        facts: { nurture: true, interest: 'later', condition: text.slice(0, 300) } }
+    }
     if (!first && new RegExp(`^(?:${B.BARE_NO_RE.source})$`, B.BARE_NO_RE.flags).test(text)) {
       return toColin(intent, 'a bare "no" mid conversation may answer a question - Colin')
     }
