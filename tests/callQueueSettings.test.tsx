@@ -40,7 +40,12 @@ vi.mock('@/lib/queries', () => ({
   useDueTasks: () => ok(tasks),
   useLead: (id: string) => ok({
     lead: LEADS[id], gates: [], milestones: [], tasks: [], facts: {},
-    contacts: [{ id: `C-${id}`, lead_id: id, kind: 'phone', value: id === 'L1' ? '4145550101' : '2625550102', value_normalized: id === 'L1' ? '4145550101' : '2625550102', person_name: null, line_type: id === 'L1' ? 'mobile' : 'landline', dnc_vendor: id === 'L2', dnc_scrub: id === 'L2' ? 'dnc' : 'unknown', suppressed: false, dnc_app: false, source: null, status: 'ok', note: null }],
+    contacts: id === 'L1'
+      ? [{ id: 'C-L1', lead_id: id, kind: 'phone', value: '4145550101', value_normalized: '4145550101', person_name: null, line_type: 'mobile', dnc_vendor: false, dnc_scrub: 'unknown', suppressed: false, dnc_app: false, source: null, status: 'ok', note: null }]
+      : [
+          { id: 'C-L2-vendor', lead_id: id, kind: 'phone', value: '2625550102', value_normalized: '2625550102', person_name: null, line_type: 'landline', dnc_vendor: true, dnc_scrub: 'unknown', suppressed: false, dnc_app: false, source: null, status: 'ok', note: null },
+          { id: 'C-L2-scrub', lead_id: id, kind: 'phone', value: '2625550103', value_normalized: '2625550103', person_name: null, line_type: 'landline', dnc_vendor: false, dnc_scrub: 'dnc', suppressed: false, dnc_app: false, source: null, status: 'ok', note: null },
+        ],
     messages: id === 'L1' ? [{ id: 'M1', lead_id: 'L1', direction: 'out', channel: 'sms', body: 'Hi Jane, still yours?', sent_at: '2026-10-21T15:00:00Z', seen_at: null, is_opt_out: false, is_opener: true, status: 'delivered', from_number: null, to_number: null }] : [],
   }),
 }))

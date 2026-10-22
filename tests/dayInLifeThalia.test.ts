@@ -82,10 +82,22 @@ describe("Thalia's day", () => {
   })
 
   it('hands a card to Colin repeat-safely and makes STOP final across every phone', async () => {
-    await as(db, THALIA, () => rpc(db, 'handoff_to_colin', { p_lead_id: STOP_LEAD, p_note: 'Would sell; lease ends in December; just him', p_now: '2026-10-26T15:00:00Z' }))
-    await as(db, THALIA, () => rpc(db, 'handoff_to_colin', { p_lead_id: STOP_LEAD, p_note: 'Same card, corrected note', p_now: '2026-10-26T15:01:00Z' }))
+    const note = 'Would sell; lease ends in December; just him'
+    await as(db, THALIA, () => rpc(db, 'handoff_to_colin', { p_lead_id: STOP_LEAD, p_note: note, p_now: '2026-10-26T15:00:00Z' }))
+    expect(await as(db, THALIA, () => rpc(db, 'handoff_to_colin', {
+      p_lead_id: STOP_LEAD, p_note: note, p_now: '2026-10-26T15:01:00Z',
+    }))).toMatchObject({ ok: true, duplicate: true })
+    expect(await one(db, `select count(*)::int as n from public.messages where lead_id = '${STOP_LEAD}' and channel = 'note'`)).toEqual({ n: 1 })
+    expect(await one(db, `select count(*)::int as n from public.hot_alerts where lead_id = '${STOP_LEAD}'`)).toEqual({ n: 1 })
+
+    // A materially different handoff is genuine even inside the retry window.
+    await as(db, THALIA, () => rpc(db, 'handoff_to_colin', {
+      p_lead_id: STOP_LEAD, p_note: 'Same card, corrected note', p_now: '2026-10-26T15:02:00Z',
+    }))
     expect(await one(db, `select count(*)::int as n from public.tasks where lead_id = '${STOP_LEAD}' and owner = 'colin' and done_at is null`))
       .toEqual({ n: 1 })
+    expect(await one(db, `select count(*)::int as n from public.messages where lead_id = '${STOP_LEAD}' and channel = 'note'`)).toEqual({ n: 2 })
+    expect(await one(db, `select count(*)::int as n from public.hot_alerts where lead_id = '${STOP_LEAD}'`)).toEqual({ n: 2 })
     await as(db, THALIA, () => rpc(db, 'log_call', { p_lead_id: STOP_LEAD, p_phone: '4145550181', p_outcome: 'dnc', p_note: 'wrong number, STOP' }))
     expect(await one(db, `select stage::text from public.leads where id = '${STOP_LEAD}'`)).toEqual({ stage: 'dnc' })
     expect(await one(db, `select count(*)::int as n from public.contacts where lead_id = '${STOP_LEAD}' and suppressed and dnc_app`))

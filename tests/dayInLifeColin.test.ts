@@ -20,6 +20,24 @@ beforeAll(async () => {
 afterAll(async () => { await db.close() })
 
 describe("Colin's day", () => {
+  it('backfills booked walks to Colin and rejects later caller-only ownership drift', async () => {
+    const upgraded = await dayDb({
+      migration: '0034_visit_owner.sql',
+      sql: `insert into public.leads (id, owner_name, property_address, municipality, lane, stage, belt, assigned_to)
+        values ('00000000-0000-0000-0000-0000000000cf', 'OLD BOOKING', '1 Old St', 'Milwaukee', 'flip',
+          'walkthrough_booked', 'visit_booked', 'thalia')`,
+    })
+    try {
+      expect(await one(upgraded, `select assigned_to::text from public.leads where id = '00000000-0000-0000-0000-0000000000cf'`))
+        .toEqual({ assigned_to: 'colin' })
+      await upgraded.exec(`update public.leads set assigned_to = 'adil' where id = '00000000-0000-0000-0000-0000000000cf'`)
+      expect(await one(upgraded, `select assigned_to::text from public.leads where id = '00000000-0000-0000-0000-0000000000cf'`))
+        .toEqual({ assigned_to: 'colin' })
+    } finally {
+      await upgraded.close()
+    }
+  })
+
   it("receives Thalia's complete handoff, logs the call sequence, and books the walk-through", async () => {
     await as(db, THALIA, () => rpc(db, 'handoff_to_colin', {
       p_lead_id: LEAD, p_note: 'Moving for work in 30 days; just her; number rests on payoff', p_now: '2026-10-22T15:00:00Z',

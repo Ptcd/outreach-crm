@@ -11,6 +11,8 @@ const KIND_LABEL: Record<ReplyDraft['kind'], string> = {
   removal: 'Removal - phone blocked',
   routine: 'Routine - can auto-answer',
   candidate: 'Real reply - needs you',
+  after_close: 'After close - needs you',
+  belt: 'Follow-up - needs you',
 }
 
 // One text from a seller and the drafted answer. Approve sends Colin's final wording (he can edit);

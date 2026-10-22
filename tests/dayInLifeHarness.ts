@@ -8,13 +8,15 @@ export const THALIA = { sub: '00000000-0000-0000-0000-00000000000d', email: 'tha
 export const ADIL = { sub: '00000000-0000-0000-0000-00000000000e', email: 'adil@example.com' }
 
 const migrationsDir = path.resolve(__dirname, '../supabase/migrations')
-const migrations = readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort()
-  .map((f) => readFileSync(path.join(migrationsDir, f), 'utf8')).join('\n')
+const migrationFiles = readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort()
 
-export async function dayDb(): Promise<PGlite> {
+export async function dayDb(before?: { migration: string; sql: string }): Promise<PGlite> {
   const db = new PGlite()
   await db.exec(SUPABASE_STUB)
-  await db.exec(migrations)
+  for (const file of migrationFiles) {
+    if (before?.migration === file) await db.exec(before.sql)
+    await db.exec(readFileSync(path.join(migrationsDir, file), 'utf8'))
+  }
   await db.exec(`insert into public.team_members (email, role, person, display_name) values
     ('colin@example.com', 'owner', 'colin', 'Colin'),
     ('thalia@example.com', 'caller', 'thalia', 'Thalia'),
