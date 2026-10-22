@@ -90,7 +90,7 @@ beforeEach(async () => {
       ('00000000-0000-0000-0000-0000000000a1', 'phone', '4145550177', '4145550177'),
       ('00000000-0000-0000-0000-0000000000a1', 'phone', '4145550178', '4145550178');
     insert into public.messages (lead_id, direction, channel, body, provider_sid, is_opener, sent_at, source_key) values
-      ('00000000-0000-0000-0000-0000000000a1', 'out', 'sms', 'Hi, Colin Merrill here. Any interest in selling? No worries if not, just reply STOP.',
+      ('00000000-0000-0000-0000-0000000000a1', 'out', 'sms', 'Hi, Colin Merrill here from Mequon. Is the place on N Burleigh St still yours? No worries if not, just reply STOP.',
        'SMopener', true, '2026-10-22T15:00:00Z', 'ledger:77:1:opener');
   `)
 })

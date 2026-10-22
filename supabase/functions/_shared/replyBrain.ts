@@ -107,7 +107,7 @@ export function decide(ctx: ReplyContext): Decision {
   if (react) ctx = { ...ctx, inbound: reactionMeaning(react)! }
   const d = decideBase(ctx)
   if (d.kind !== 'candidate' || (d.intent !== 'interested' && d.intent !== 'statement')) return d
-  const pitch = pitchReply({ inbound: ctx.inbound, priorInbound: ctx.priorInbound, ourTurns: ctx.ourTurns ?? 0,
+  const pitch = pitchReply({ inbound: ctx.inbound, priorInbound: ctx.priorInbound, ourTurns: ctx.ourTurns ?? 0, openerText: ctx.lastAgentText,
     propertyAddress: ctx.propertyAddress, ownerName: ctx.ownerName ?? null })
   if (!pitch) return d
   return { ...routine(d.intent, pitch.reply, 'open', 'yes to the question-only opener - pitch line, one question'), facts: pitch.facts }
@@ -236,10 +236,18 @@ export function scoreRedteam(rows: RedteamRow[]): RedteamResult {
  *  whether the place is still theirs. A short yes to it, on a thread matched to a property, gets the
  *  pitch line with one question; a first reply that already talks selling, interest or price does not
  *  (the drafter takes it). Returns the reply and its facts, or null. decide() makes it routine. */
+/** Did our first text already ask about selling (wpie.reply.brain _OPENER_ASKED_SELLING_RE)? */
+export const OPENER_ASKED_SELLING = /\bsell|\bbuy\b|as-is|\bcash\b/i
+export function openerAskedSelling(opener: string | null | undefined): boolean {
+  return !!opener && OPENER_ASKED_SELLING.test(opener)
+}
+
 export function pitchReply(x: { inbound: string; priorInbound: string[]; ourTurns: number; propertyAddress: string | null
-  ownerName: string | null }): { reply: string; facts: Record<string, unknown> } | null {
+  ownerName: string | null; openerText?: string | null }): { reply: string; facts: Record<string, unknown> } | null {
   const text = (x.inbound ?? '').trim()
   if (x.priorInbound.length || x.ourTurns > 0 || !x.propertyAddress) return null
+  // An old-style opener that already asked about selling: a yes is interest, never pitch twice.
+  if (openerAskedSelling(x.openerText)) return null
   if (!AFFIRM.test(text) || INTEREST_WORDS.test(text) || text.split(/\s+/).filter(Boolean).length > 6) return null
   const word = (x.ownerName ?? '').trim().split(/\s+/)[0] ?? ''
   const first = word && !ENTITY_NAME.test(x.ownerName ?? '') ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : ''
