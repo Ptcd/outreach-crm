@@ -9,6 +9,7 @@ import { THALIA, as, dayDb, one, rpc, serviceRpc } from './dayInLifeHarness'
 
 const LEAD = '00000000-0000-0000-0000-0000000000a1'
 const STOP_LEAD = '00000000-0000-0000-0000-0000000000a2'
+const RACE_LEAD = '00000000-0000-0000-0000-0000000000a3'
 let db: PGlite
 
 beforeAll(async () => {
@@ -16,11 +17,13 @@ beforeAll(async () => {
   await db.exec(`
     insert into public.leads (id, wpie_owner_id, owner_name, property_address, municipality, lane, stage)
     values ('${LEAD}', 77, 'JANE ROE', '100 N Main St', 'Milwaukee', 'flip', 'reply_received'),
-           ('${STOP_LEAD}', 78, 'BO KIM', '400 N Pine St', 'Milwaukee', 'hold', 'reply_received');
+           ('${STOP_LEAD}', 78, 'BO KIM', '400 N Pine St', 'Milwaukee', 'hold', 'reply_received'),
+           ('${RACE_LEAD}', 79, 'SAM FOX', '500 N Oak St', 'Milwaukee', 'flip', 'reply_received');
     insert into public.contacts (lead_id, kind, value, value_normalized, line_type, status) values
       ('${LEAD}', 'phone', '4145550177', '4145550177', 'mobile', 'ok'),
       ('${STOP_LEAD}', 'phone', '4145550181', '4145550181', 'mobile', 'ok'),
-      ('${STOP_LEAD}', 'phone', '2625550182', '2625550182', 'landline', 'ok');
+      ('${STOP_LEAD}', 'phone', '2625550182', '2625550182', 'landline', 'ok'),
+      ('${RACE_LEAD}', 'phone', '4145550183', '4145550183', 'mobile', 'ok');
   `)
 })
 
@@ -102,5 +105,24 @@ describe("Thalia's day", () => {
     expect(await one(db, `select stage::text from public.leads where id = '${STOP_LEAD}'`)).toEqual({ stage: 'dnc' })
     expect(await one(db, `select count(*)::int as n from public.contacts where lead_id = '${STOP_LEAD}' and suppressed and dnc_app`))
       .toEqual({ n: 2 })
+  })
+
+  it('keeps simultaneous corrected handoffs distinct without duplicating the open task', async () => {
+    const at = '2026-10-26T16:00:00Z'
+    const results = await as(db, THALIA, () => Promise.all([
+      rpc<{ ok: boolean; duplicate: boolean }>(db, 'handoff_to_colin', {
+        p_lead_id: RACE_LEAD, p_note: 'Moving this month; confirmed sole owner', p_now: at,
+      }),
+      rpc<{ ok: boolean; duplicate: boolean }>(db, 'handoff_to_colin', {
+        p_lead_id: RACE_LEAD, p_note: 'Correction: spouse also signs', p_now: at,
+      }),
+    ]))
+    expect(results).toEqual([
+      expect.objectContaining({ ok: true, duplicate: false }),
+      expect.objectContaining({ ok: true, duplicate: false }),
+    ])
+    expect(await one(db, `select count(*)::int as n from public.messages where lead_id = '${RACE_LEAD}' and channel = 'note'`)).toEqual({ n: 2 })
+    expect(await one(db, `select count(*)::int as n from public.hot_alerts where lead_id = '${RACE_LEAD}'`)).toEqual({ n: 2 })
+    expect(await one(db, `select count(*)::int as n from public.tasks where lead_id = '${RACE_LEAD}' and owner = 'colin' and done_at is null`)).toEqual({ n: 1 })
   })
 })

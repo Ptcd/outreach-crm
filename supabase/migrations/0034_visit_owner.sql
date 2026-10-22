@@ -29,7 +29,7 @@ update public.leads
 -- a corrected line, another caller, or a later handoff remains a new event.
 create or replace function public.handoff_to_colin(p_lead_id uuid, p_note text, p_now timestamptz default now())
 returns jsonb language plpgsql security definer set search_path = public as $$
-declare who text; l public.leads; ph text; tid uuid; first text; key text; line text; res jsonb; note_body text;
+declare who text; l public.leads; ph text; tid uuid; note_id uuid; first text; key text; line text; res jsonb; note_body text;
 begin
   if not public.is_team() then raise exception 'team only'; end if;
   line := nullif(btrim(coalesce(p_note, '')), '');
@@ -51,8 +51,6 @@ begin
   select c.value_normalized into ph from public.contacts c
    where c.lead_id = p_lead_id and c.kind = 'phone' and c.value_normalized ~ '^[0-9]{10}$' and not c.suppressed and c.status = 'ok'
    order by c.created_at limit 1;
-  key := 'handoff:' || p_lead_id || ':' || extract(epoch from p_now)::bigint;
-
   perform set_config('wpie.task_outcome', '1', true);
   update public.tasks set done_at = p_now, note = coalesce(tasks.note, '') || ' [handed to Colin]'
    where lead_id = p_lead_id and done_at is null and kind in ('call', 'visit') and owner <> 'colin';
@@ -63,7 +61,9 @@ begin
          next_action = 'Colin: ' || left(line, 80), next_action_at = p_now
    where id = p_lead_id;
   insert into public.messages (lead_id, direction, channel, body, sent_at, seen_at)
-  values (p_lead_id, 'out', 'note', note_body, p_now, p_now);
+  values (p_lead_id, 'out', 'note', note_body, p_now, p_now)
+  returning id into note_id;
+  key := 'handoff:' || p_lead_id || ':' || note_id;
 
   res := public.belt_event(p_lead_id, 'next_step', jsonb_build_object('kind', 'callback', 'at', p_now, 'key', key,
            'said', 'Handed off by ' || coalesce(who, 'the team') || ': ' || line), who, p_now);
