@@ -85,6 +85,8 @@ beforeEach(async () => {
       sending_enabled = true, paused = false, pause_reason = null, laptop_paused = false,
       daily_cap = 100, dnc_policy = 'allow_unknown', scrub_date = null, external_openers = 0, external_openers_date = null,
       banned_words = '{}';
+    -- un-pausing above stamps a clear time (trigger); tests start with none
+    update public.campaign_control set pause_cleared_at = null, pause_cleared_by = null;
   `)
 })
 

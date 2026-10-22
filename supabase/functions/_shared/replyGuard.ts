@@ -34,8 +34,31 @@ export function fold(text: string): string {
 
 const squash = (s: string) => s.replace(/[ ']/g, "");
 
+// --- Phone reactions (wpie/sms/webhooks.py reaction_kind) ------------------------
+// Android sends a reaction as '👍 to “<our whole text>”', iPhone as 'Liked “<our whole text>”'.
+// The quote carries our STOP line, so a reaction must be recognised before any opt-out check.
+const ZERO_WIDTH = re(R.ZERO_WIDTH, "g");
+const REACTION = re(R.REACTION);
+const POSITIVE_REACTION = re(R.POSITIVE_REACTION);
+const NEGATIVE_REACTION = re(R.NEGATIVE_REACTION);
+
+export type ReactionKind = "positive" | "negative" | "neutral" | "";
+export function reactionKind(text: string): ReactionKind {
+  const t = (text ?? "").replace(ZERO_WIDTH, "");
+  if (!REACTION.test(t)) return "";
+  if (NEGATIVE_REACTION.test(t)) return "negative";
+  return POSITIVE_REACTION.test(t) ? "positive" : "neutral";
+}
+
+/** What a reaction means, for the reply brain: 👍 / Liked = "yes", 👎 / Disliked = "no thanks". */
+export function reactionMeaning(kind: ReactionKind): string | null {
+  return kind === "positive" ? "yes" : kind === "negative" ? "no thanks" : kind === "neutral" ? "(reacted to your text)" : null;
+}
+
 // Any removal request: carrier keyword, plain language, abuse, a legal threat, Spanish.
+// A phone reaction (which quotes our own text, STOP line included) is never one.
 export function isOptOut(text: string): boolean {
+  if (reactionKind(text)) return false;
   const normalized = fold(text);
   if (OPTOUT_WORDS.has(squash(normalized))) return true;                       // "S T O P"
   let core = normalized.replace(POLITE_TAIL, "").replace(POLITE_HEAD, "").trim(); // "unsubscribe pls"

@@ -228,6 +228,20 @@ describe('work no text can do', () => {
 })
 
 describe('hot replies', () => {
+  it('a thumbs-up reaction (quoting our STOP line) is a yes: no suppression, no DNC, a hot alert', async () => {
+    const tw = new FakeTwilio()
+    const quote = 'Hi, Colin Merrill here. Any interest in selling? No worries if not, just reply STOP.'
+    tw.inbound = [text('SMr1', '+14145550177', '\u{1F44D}​ to “​' + quote + '​”')]
+    await run(tw)
+    expect((await db.query(`select * from public.suppressed_phones`)).rows).toEqual([])
+    expect((await db.query<{ is_opt_out: boolean }>(`select is_opt_out from public.twilio_inbound where sid = 'SMr1'`)).rows[0].is_opt_out).toBe(false)
+    expect((await db.query<{ stage: string }>(`select stage::text from public.leads where wpie_owner_id = 77`)).rows[0].stage).not.toBe('dnc')
+    const d = (await db.query<{ kind: string; body: string }>(`select kind, body from public.reply_drafts where inbound_sid = 'SMr1'`)).rows[0]
+    expect(d.kind).toBe('routine')
+    expect(d.body).toMatch(/Would you ever consider selling that one\?/)
+    expect((await db.query(`select 1 from public.hot_alerts where inbound_sid = 'SMr1'`)).rows).toHaveLength(1)
+  })
+
   it('queue a text to Colin for interest and price talk, never for STOP or a wrong number', async () => {
     const tw = new FakeTwilio()
     tw.inbound = [text('SMh1', '+14145550177', 'Yes, what would you pay?'), text('SMh2', '+14145550178', 'STOP'),

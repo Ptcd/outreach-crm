@@ -2,7 +2,7 @@
 // Source: WPIE repo (claude/real estate): opt-out from wpie/sms/webhooks.py (OPTOUT_WORDS and
 // the regexes is_opt_out uses), price/offer blocking from wpie/reply/rules.py (PRICE_RE,
 // OFFER_RE, ALLOWED_RE), converted to JavaScript by tools/export_reply_prompt.py
-// from WPIE commit e2d2985 on 2026-10-21 (texts written as Colin Merrill, first person; no agent name).
+// from WPIE commit a4c81bc on 2026-10-22 (texts written as Colin Merrill, first person; no agent name).
 // To change a rule, edit those files there and re-run the script. replyRules.ts holds the
 // (small) algorithm; replyRules.parity.test.ts proves it agrees with Python.
 
@@ -18,6 +18,10 @@ export const NEGATED: RegexSpec = { source: "\\b(?:don'?t|dont|do\\s+not|never|w
 export const POLITE_TAIL: RegexSpec = { source: "(?:\\s+(?:pls|please|plz|now|thanks|thx|thank\\s+you|ty|asap|ok|okay|sir|maam|por\\s+favor|gracias))+(?=\\n?$)", flags: "" };
 export const POLITE_HEAD: RegexSpec = { source: "^(?:(?:pls|please|plz|ok|okay|just)\\s+)+", flags: "" };
 export const SHORT_STOP: RegexSpec = { source: "^stop\\b(?!\\s+(?:by|in|over|at|the|being)\\b)|\\bstop(?=\\n?$)", flags: "i" };
+export const ZERO_WIDTH: RegexSpec = { source: "[​-‍⁠﻿]", flags: "" };
+export const REACTION: RegexSpec = { source: "^\\s*(?:reacted\\s+)?(?:[^\\w\\s]{1,8}\\s+to|liked|loved|laughed\\s+at|emphasi[sz]ed|questioned|disliked)\\s+[\\\"“”']", flags: "i" };
+export const POSITIVE_REACTION: RegexSpec = { source: "^\\s*(?:reacted\\s+)?(?:liked|loved|emphasi[sz]ed|(?:👍|❤|👌|🙏|😀|🙂|😊|✅|💯)\\S*\\s+to)\\s", flags: "i" };
+export const NEGATIVE_REACTION: RegexSpec = { source: "^\\s*(?:reacted\\s+)?(?:disliked|👎\\S*\\s+to)\\s", flags: "i" };
 export const PRICE: RegexSpec = { source: "(?:\\$\\s?\\d)|(?:\\b\\d{2,3}\\s?k\\b)|(?:\\b\\d{1,3}(?:,\\d{3})+\\b)|(?:\\b\\d+(?:\\.\\d+)?\\s?(?:thousand|grand|million)\\b)|(?:\\b(?:one|two|three|four|five|six|seven|eight|nine)\\s?(?:hundred|fifty|forty|sixty|seventy|eighty|ninety|twenty|thirty)?\\s?(?:thousand|grand)\\b)|(?:\\b\\d+(?:\\.\\d+)?\\s?(?:%|percent))|(?:\\b(?:per|a)\\s?(?:square\\s?foot|sq\\.?\\s?ft|door|unit)\\b)", flags: "i" };
 export const OFFER: RegexSpec = { source: "(?:\\b(?:we|i|colin|thalia)\\s?(?:'d|'ll|'re|would|will|can|could|might|are|am)?\\s?(?:be\\s)?(?:able\\s?to\\s)?(?:pay|offer|give|buy\\s?it\\s?for|go\\s?(?:up\\s)?to|do|come\\s?in\\s?(?:at|around)|get\\s?you)\\b)|(?:\\b(?:our|my)\\s(?:cash\\s)?(?:offer|number|price|range|ballpark|bid)\\b)|(?:\\boffer\\s(?:of|is|would\\s?be|comes?\\s(?:in|to)|around)\\b)|(?:\\b(?:ballpark|range|somewhere)\\s(?:of|around|between|is|would)\\b)|(?:\\b(?:it'?s|house\\s?is|property\\s?is|that'?s)\\s(?:worth|valued)\\b)|(?:\\b(?:worth|valued)\\s(?:about|around|roughly|maybe|at)\\b)|(?:\\b(?:cents\\s?on\\s?the\\s?dollar|below\\s?market|under\\s?market|discount\\s?to)\\b)", flags: "i" };
 export const ALLOWED: RegexSpec = { source: "(?:consider an offer)|(?:open to an offer)|(?:handles? (?:all )?the (?:numbers|offers?|pricing))|(?:(?:don'?t|do not|never) (?:have|give|quote|throw out) (?:a )?(?:number|price|offer))|(?:not (?:going to|gonna) (?:guess|throw out))|(?:(?:what|where) (?:were|are) you (?:hoping|thinking|looking))|(?:hoping to get)|(?:your (?:number|price|ask))", flags: "i" };

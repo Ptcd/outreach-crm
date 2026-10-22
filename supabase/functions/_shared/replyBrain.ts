@@ -13,6 +13,7 @@
 //   (the exit question, then the close line on a second no)
 import * as B from './replyBrain.generated.ts'
 import { isOptOut } from './sending.ts'
+import { reactionKind, reactionMeaning } from './replyGuard.ts'
 import type { RegexSpec } from './replyRules.generated.ts'
 
 const re = (spec: RegexSpec, extra = '') => new RegExp(spec.source, spec.flags + extra)
@@ -99,6 +100,11 @@ const toColin = (intent: string, note: string): Decision =>
  *  its own (routine: the switch, the 45-90 s delay and quiet hours apply). Their answer to it, and
  *  anything with selling, interest or price words, stays a draft for Colin. */
 export function decide(ctx: ReplyContext): Decision {
+  // A phone reaction quotes our own text back (STOP line included): answer what it means, never the
+  // quote. 👍 / Liked = yes, 👎 / Disliked = no thanks, anything else is for Colin (WPIE 2026-10-22).
+  const react = reactionKind(ctx.inbound)
+  if (react === 'neutral') return toColin('reaction', 'phone reaction - Colin reads it')
+  if (react) ctx = { ...ctx, inbound: reactionMeaning(react)! }
   const d = decideBase(ctx)
   if (d.kind !== 'candidate' || (d.intent !== 'interested' && d.intent !== 'statement')) return d
   const pitch = pitchReply({ inbound: ctx.inbound, priorInbound: ctx.priorInbound, ourTurns: ctx.ourTurns ?? 0,
