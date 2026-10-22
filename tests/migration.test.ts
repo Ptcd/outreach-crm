@@ -153,3 +153,43 @@ describe('migration 0001_wpie_live', () => {
     expect(r.rows).toEqual([{ days_late: 3 }])
   })
 })
+
+describe('migration 0022_team_alerts_call_tasks', () => {
+  it('lets any team member register a phone for push, and a stranger not', async () => {
+    const save = (ep: string) => db.query(`select public.save_push_subscription($1, 'k', 'a', 'Chrome')`, [ep])
+    await as(THALIA, async () => { await save('https://fcm.googleapis.com/fcm/send/thalia') })
+    await as(COLIN, async () => { await save('https://fcm.googleapis.com/fcm/send/colin') })
+    await expect(as(STRANGER, async () => { await save('https://fcm.googleapis.com/fcm/send/x') })).rejects.toThrow(/team only/)
+    const rows = await db.query<{ endpoint: string }>('select endpoint from public.push_subscriptions order by endpoint')
+    expect(rows.rows.map((r) => r.endpoint)).toEqual(['https://fcm.googleapis.com/fcm/send/colin', 'https://fcm.googleapis.com/fcm/send/thalia'])
+    // each person forgets their own phone, not another's
+    await as(THALIA, async () => { await db.query(`select public.delete_push_subscription('https://fcm.googleapis.com/fcm/send/colin')`) })
+    expect((await db.query('select 1 from public.push_subscriptions')).rows).toHaveLength(2)
+    await as(THALIA, async () => { await db.query(`select public.delete_push_subscription('https://fcm.googleapis.com/fcm/send/thalia')`) })
+    expect((await db.query('select 1 from public.push_subscriptions')).rows).toHaveLength(1)
+  })
+
+  it('alert_recipients: members with a phone on file, normalized, never the owner; service_role only', async () => {
+    await db.query(`update public.team_members set alert_phone = '(414) 555-0123' where person = 'thalia'`)
+    await db.query(`update public.team_members set alert_phone = '262-555-0100' where person = 'colin'`)
+    await db.exec('set role service_role')
+    try {
+      expect((await db.query<{ r: unknown }>('select public.alert_recipients() as r')).rows[0].r).toEqual([{ person: 'thalia', phone: '+14145550123' }])
+      await db.query(`update public.team_members set alert_phone = 'none yet' where person = 'thalia'`)
+      expect((await db.query<{ r: unknown }>('select public.alert_recipients() as r')).rows[0].r).toEqual([])
+    } finally { await db.exec('reset role') }
+    await expect(as(THALIA, async () => { await db.query('select public.alert_recipients()') })).rejects.toThrow(/permission denied/)
+  })
+
+  it('tasks.source_key makes the call-list upsert idempotent', async () => {
+    const up = () => db.query(`insert into public.tasks (lead_id, due_at, kind, owner, note, source_key)
+      values ($1, '2026-10-23T19:00:00Z', 'call', 'thalia', 'from the call list', 'calls:2026-10-23:100561')
+      on conflict (source_key) do update set note = excluded.note, due_at = excluded.due_at`, [leadId])
+    await up()
+    await up()
+    const r = await db.query<{ n: string }>(`select count(*)::text as n from public.tasks where source_key like 'calls:%'`)
+    expect(r.rows[0].n).toBe('1')
+    await db.query(`insert into public.tasks (lead_id, due_at, kind, owner) values ($1, now(), 'call', 'thalia')`, [leadId])  // null keys never collide
+    await db.query(`insert into public.tasks (lead_id, due_at, kind, owner) values ($1, now(), 'call', 'thalia')`, [leadId])
+  })
+})
