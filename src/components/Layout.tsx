@@ -5,6 +5,8 @@ import { useAuth } from '@/providers/AuthProvider'
 import { useRepliesWaiting } from '@/lib/queries'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { CallBar } from '@/components/CallBar'
+import { IncomingCallBar } from '@/components/IncomingCallBar'
+import { useDialer } from '@/lib/dialer'
 import { cn } from '@/lib/utils'
 
 const NAV = [
@@ -17,6 +19,7 @@ const NAV = [
 
 export function Layout({ children }: { children: ReactNode }) {
   const { member, signOut } = useAuth()
+  const { ready } = useDialer()   // registered with Twilio: a seller's call rings in this open app
   const w = useRepliesWaiting().data
   const waiting = (w?.drafts_waiting ?? 0) + (w?.tasks_open ?? 0)
   const badge = (to: string) => (to === '/inbox' && waiting > 0
@@ -42,6 +45,12 @@ export function Layout({ children }: { children: ReactNode }) {
             ))}
           </nav>
           <div className="flex items-center gap-1 text-sm">
+            {ready && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground" title="Ready for calls: a seller calling the seller line rings here while the app is open">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
+                <span className="sr-only sm:not-sr-only">Ready for calls</span>
+              </span>
+            )}
             <span className="hidden text-muted-foreground sm:inline">{member?.display_name}</span>
             <button className="h-11 rounded-md px-3 text-muted-foreground underline" onClick={() => void signOut()}>
               Sign out
@@ -51,6 +60,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <OfflineBanner />
       </header>
       <main className="mx-auto max-w-5xl px-4 py-4">{children}</main>
+      <IncomingCallBar />
       <CallBar />
       <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-background sm:hidden" aria-label="Main">
         {NAV.map((n) => (

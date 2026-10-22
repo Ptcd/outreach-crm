@@ -1,5 +1,7 @@
 // A Twilio access token for the app's in-browser dialer: a JWT (HS256) with one Voice grant, built the way
 // twilio-node's AccessToken builds it. Pure WebCrypto, so it runs in the Edge Function and in the tests.
+// The grant is both ways: outgoing through the TwiML App, and incoming so a seller calling the seller line
+// rings this person's open app (pm-phone dials <Client>identity</Client> next to Colin's cell).
 function b64url(bytes: Uint8Array): string {
   let s = ''
   for (const b of bytes) s += String.fromCharCode(b)
@@ -23,7 +25,7 @@ export async function voiceToken(opts: VoiceTokenOpts): Promise<string> {
   const header = { typ: 'JWT', alg: 'HS256', cty: 'twilio-fpa;v=1' }
   const payload = {
     jti: `${opts.apiKeySid}-${now}`, iss: opts.apiKeySid, sub: opts.accountSid, iat: now, nbf: now, exp: now + ttl,
-    grants: { identity: opts.identity, voice: { outgoing: { application_sid: opts.appSid }, incoming: { allow: false } } },
+    grants: { identity: opts.identity, voice: { outgoing: { application_sid: opts.appSid }, incoming: { allow: true } } },
   }
   const signingInput = `${b64url(enc.encode(JSON.stringify(header)))}.${b64url(enc.encode(JSON.stringify(payload)))}`
   const key = await crypto.subtle.importKey('raw', enc.encode(opts.apiKeySecret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])

@@ -1,8 +1,11 @@
 // voice-token: a short-lived Twilio Voice access token for the app's in-browser dialer (Colin 2026-10-22:
 // "app/browser based dialer"). Any signed-in team member gets one, under their own identity (colin /
-// thalia / adil), good for one hour, outgoing calls only. The call itself is placed by the browser with
+// thalia / adil), good for one hour, outgoing and incoming. Outgoing: the browser places the call with
 // Twilio's Voice SDK; the TwiML App "WPIE app dialer" (TWILIO_TWIML_APP_SID) points at pm-phone's
-// /api/twilio/voice/client, which dials the owner showing a seller number as caller ID.
+// /api/twilio/voice/client, which dials the owner showing a seller number as caller ID. Incoming: a seller
+// calling a seller line rings the open app as <Client>identity</Client> next to Colin's cell (pm-phone's
+// /api/twilio/voice/incoming); the app shows the caller's lead card (Colin 2026-10-22: "if a lead calls in
+// should the app ring ... and then show the property card stuff").
 // Secrets: TWILIO_ACCOUNT_SID (the WPIE Mail Replies subaccount), TWILIO_API_KEY_SID, TWILIO_API_KEY_SECRET,
 // TWILIO_TWIML_APP_SID. Nothing here sends a text or places a call.
 import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
