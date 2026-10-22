@@ -37,7 +37,8 @@ describe('phone reactions', () => {
     for (const r of [ANDROID_UP, IPHONE_LIKED]) {
       const d = decide(ctx(r))
       expect(d).toMatchObject({ removal: false, kind: 'routine', outcome: 'open' })
-      expect(d.reply).toMatch(/^Hi Gregory, thanks for getting back to me\..*Would you ever consider selling that one\?/)
+      expect(d.reply).toMatch(/^Thanks for getting back to me\. I buy a few houses.*Would you ever consider selling that one\?/)
+      expect(d.reply).not.toMatch(/Colin|^Hi/)
     }
   })
 
