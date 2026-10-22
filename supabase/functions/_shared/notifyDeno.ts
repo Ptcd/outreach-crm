@@ -3,6 +3,7 @@
 // Secrets: VAPID_PUBLIC_KEY, VAPID_PRIVATE_JWK (push); SMTP_USER, SMTP_PASSWORD, NOTIFY_EMAIL_TO
 // (email; SMTP_HOST defaults to smtp.gmail.com). A missing group just turns that channel off.
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.56.1'
+import type { HotPush } from './hotLeads.ts'
 import type { NotifyDeps } from './notify.ts'
 import type { Rpc } from './sending.ts'
 import { sendMail } from './smtp.ts'
@@ -31,5 +32,18 @@ export function notifyDeps(sb: SupabaseClient, rpc: Rpc): NotifyDeps {
         await sendMail(conn, { user, pass }, { ...m, from })
       }
       : null,
+  }
+}
+
+/** The push half of the hot-lead alerts: every registered phone, or null when VAPID is not set. */
+export function hotPush(sb: SupabaseClient): HotPush | null {
+  const vapid = vapidFromEnv((n) => Deno.env.get(n))
+  if (!vapid) return null
+  return {
+    subscriptions: async () => {
+      const r = await sb.from('push_subscriptions').select('endpoint, p256dh, auth')
+      return (r.data ?? []) as PushSubscriptionKeys[]
+    },
+    push: (sub, message) => sendPush(sub, message, vapid, fetch),
   }
 }

@@ -1,9 +1,15 @@
-// Hot-lead alerts to Colin's cell (Colin 2026-10-22: "we need the app to notify my phone").
+// Hot-lead alerts (Colin 2026-10-22: "we need the app to notify my phone"; later that day, on the
+// caller's guide saying alerts only reach Colin: "that should be automated").
 // A seller reply that shows interest or asks about selling is queued (hot_record); within a minute
-// the reply agent texts Colin through pm-phone's PM line (never a seller number), once more after
-// 15 minutes if the lead is not marked called, and a 7 PM Central list of hot leads not called.
-// These texts go only to Colin; they may quote the seller.
+// the reply agent alerts the team, once more after 15 minutes if the lead is not marked called, and
+// a 7 PM Central list of hot leads not called. Each alert goes out three ways at the same moment:
+//   * a text to Colin's cell through pm-phone's PM line (never a seller number);
+//   * a text to every team member with an alert_phone on file (alert_recipients, migration 0022),
+//     through the same pm-phone route, which only accepts numbers on its own allow-list;
+//   * a web push to every phone registered in push_subscriptions, opening the lead card.
+// Alerts may quote the seller. Texts about the system itself (ops_claim) go to Colin only.
 import type { Rpc } from './sending.ts'
+import type { PushOutcome, PushSubscriptionKeys } from './webpush.ts'
 
 // Intents that mean "talk to this person now" (wpie/reply/rules.py names).
 const HOT_INTENTS = new Set(['interested', 'price_first', 'who_is_this', 'buyer_check', 'worth', 'terms', 'firm', 'number_only',
@@ -32,6 +38,7 @@ export function fmtPhone10(p: string): string {
   return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : p
 }
 const titleCase = (s: string) => s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase())
+const street = (address: string | null) => (address ? titleCase(address.replace(/,.*$/, '')) : null)
 const trimQuote = (s: string, n = 140) => {
   const t = (s ?? '').replace(/\s+/g, ' ').trim()
   return t.length > n ? `${t.slice(0, n - 1)}...` : t
@@ -40,64 +47,147 @@ const trimQuote = (s: string, n = 140) => {
 export type HotAlert = { id: string; n: 1 | 2; lead_id: string | null; phone10: string; first_name: string | null; address: string | null
   body: string; is_test: boolean }
 
+function leadLink(a: { lead_id: string | null; phone10: string }, appUrl: string): string {
+  return a.lead_id ? `${appUrl.replace(/\/$/, '')}/lead/${a.lead_id}?call=1&phone=${a.phone10}` : `${appUrl.replace(/\/$/, '')}/inbox`
+}
+
 export function alertText(a: HotAlert, appUrl: string): string {
-  const who = [a.first_name ?? 'Seller', a.address ? titleCase(a.address.replace(/,.*$/, '')) : null].filter(Boolean).join(', ')
-  const link = a.lead_id ? ` ${appUrl.replace(/\/$/, '')}/lead/${a.lead_id}?call=1&phone=${a.phone10}` : ''
+  const who = [a.first_name ?? 'Seller', street(a.address)].filter(Boolean).join(', ')
+  const link = a.lead_id ? ` ${leadLink(a, appUrl)}` : ''
   const head = `${a.is_test ? 'TEST ' : ''}${a.n === 2 ? 'STILL NOT CALLED (15 min) - HOT' : 'HOT'}`
   return `${head}: ${who} said: "${trimQuote(a.body)}". Call: ${fmtPhone10(a.phone10)}${link}`
 }
 
-export function digestText(list: { first_name: string | null; address: string | null; phone10: string }[]): string {
-  const items = list.slice(0, 8).map((x) => `${x.first_name ?? 'Seller'}${x.address ? ` (${titleCase(x.address.replace(/,.*$/, ''))})` : ''} ${fmtPhone10(x.phone10)}`)
+export type PushMessage = { title: string; body: string; url: string; tag: string }
+
+/** The phone notification for one alert: "Hot lead: John, 2825 S Logan Av", tap opens the lead card. */
+export function alertPush(a: HotAlert, appUrl: string): PushMessage {
+  const who = [a.first_name ?? 'Seller', street(a.address)].filter(Boolean).join(', ')
+  const head = a.n === 2 ? 'Still not called (15 min)' : 'Hot lead'
+  return {
+    title: `${a.is_test ? 'TEST ' : ''}${head}: ${who}`.slice(0, 90),
+    body: `"${trimQuote(a.body, 90)}" Call ${fmtPhone10(a.phone10)}`,
+    url: leadLink(a, appUrl),
+    tag: `hot-${a.id}`,
+  }
+}
+
+export type DigestRow = { first_name: string | null; address: string | null; phone10: string; lead_id?: string | null }
+
+export function digestText(list: DigestRow[]): string {
+  const items = list.slice(0, 8).map((x) => `${x.first_name ?? 'Seller'}${x.address ? ` (${street(x.address)})` : ''} ${fmtPhone10(x.phone10)}`)
   const more = list.length > 8 ? ` +${list.length - 8} more in the app` : ''
   return `7 PM: ${list.length} hot lead${list.length === 1 ? '' : 's'} not called yet: ${items.join('; ')}${more}`
 }
 
-export type AlertSend = (text: string) => Promise<{ ok: boolean; sid?: string | null; error?: string }>
+export function digestPush(list: DigestRow[], appUrl: string): PushMessage {
+  const names = list.slice(0, 4).map((x) => x.first_name ?? 'Seller').join(', ')
+  return {
+    title: `7 PM: ${list.length} hot lead${list.length === 1 ? '' : 's'} not called`,
+    body: `${names}${list.length > 4 ? ` +${list.length - 4} more` : ''}. Open the Inbox.`,
+    url: `${appUrl.replace(/\/$/, '')}/inbox`,
+    tag: 'hot-digest',
+  }
+}
 
-export interface HotSummary { alerts: number; second_alerts: number; digest: number; errors: string[]; off?: string; ops?: number }
+/** Sends one text. `to` names a team member's phone (pm-phone allows only its own list); absent = Colin. */
+export type AlertSend = (text: string, to?: string) => Promise<{ ok: boolean; sid?: string | null; error?: string }>
 
-/** Text what is due (first alerts, 15-minute repeats, the 7 PM list). */
-export async function runHotAlerts(opts: { rpc: Rpc; send: AlertSend | null; appUrl: string; now?: () => Date }): Promise<HotSummary> {
-  const s: HotSummary = { alerts: 0, second_alerts: 0, digest: 0, errors: [] }
-  if (!opts.send) { s.off = 'ALERT_SECRET not set'; return s }
+export interface HotPush {
+  subscriptions: () => Promise<PushSubscriptionKeys[]>
+  push: (sub: PushSubscriptionKeys, message: object) => Promise<PushOutcome>
+}
+
+export interface HotSummary { alerts: number; second_alerts: number; digest: number; errors: string[]; off?: string; ops?: number
+  member_texts: number; pushes_ok: number; pushes_failed: number }
+
+type Member = { person: string; phone: string }
+
+/** Alert what is due (first alerts, 15-minute repeats, the 7 PM list): texts to Colin and to every
+ * member with a phone on file, and a push to every registered phone, at the same moments. */
+export async function runHotAlerts(opts: { rpc: Rpc; send: AlertSend | null; appUrl: string; now?: () => Date; push?: HotPush | null })
+  : Promise<HotSummary> {
+  const s: HotSummary = { alerts: 0, second_alerts: 0, digest: 0, errors: [], member_texts: 0, pushes_ok: 0, pushes_failed: 0 }
+  const push = opts.push ?? null
+  // Nothing that could reach anyone: leave the alerts unclaimed so they go out once a channel exists.
+  const subs = push ? await push.subscriptions().catch(() => [] as PushSubscriptionKeys[]) : []
+  if (!opts.send && !subs.length) { s.off = push ? 'ALERT_SECRET not set and no phone registered' : 'ALERT_SECRET not set'; return s }
   const now = (opts.now ?? (() => new Date()))()
+  const members: Member[] = opts.send ? await membersWithPhones(opts.rpc) : []
+  const err = (r: { error?: string }, fallback: string) => String(r.error ?? fallback).slice(0, 200)
+
+  const fanOut = async (text: string, message: PushMessage) => {
+    for (const m of members) {
+      const r = await opts.send!(text, m.phone).catch((e) => ({ ok: false, error: String(e) }))
+      if (r.ok) s.member_texts += 1
+      else s.errors.push(`${m.person}: ${err(r, 'not sent')}`)
+    }
+    if (push) {
+      for (const sub of subs) {
+        const r = await push.push(sub, message).catch(() => ({ ok: false, gone: false, status: null }))
+        if (r.ok) s.pushes_ok += 1
+        else s.pushes_failed += 1
+        await opts.rpc('push_result', { p_endpoint: sub.endpoint, p_ok: r.ok, p_gone: r.gone })
+      }
+    }
+  }
+
   const c = await opts.rpc('hot_claim', { p_now: now.toISOString(), p_limit: 10 })
   if (c.error) { s.errors.push(c.error.message); return s }
   for (const a of (c.data as HotAlert[] | null) ?? []) {
-    const r = await opts.send(alertText(a, opts.appUrl)).catch((e) => ({ ok: false, error: String(e) }))
-    await opts.rpc('hot_result', { p_id: a.id, p_sid: r.ok ? (r as { sid?: string | null }).sid ?? null : null,
-      p_error: r.ok ? null : String((r as { error?: string }).error ?? 'not sent').slice(0, 200) })
-    if (!r.ok) s.errors.push(String((r as { error?: string }).error ?? 'not sent').slice(0, 200))
-    else if (a.n === 2) s.second_alerts += 1
-    else s.alerts += 1
+    const text = alertText(a, opts.appUrl)
+    if (opts.send) {
+      const r = await opts.send(text).catch((e) => ({ ok: false, error: String(e) }))
+      await opts.rpc('hot_result', { p_id: a.id, p_sid: r.ok ? (r as { sid?: string | null }).sid ?? null : null,
+        p_error: r.ok ? null : err(r, 'not sent') })
+      if (!r.ok) s.errors.push(err(r, 'not sent'))
+      else if (a.n === 2) s.second_alerts += 1
+      else s.alerts += 1
+    } else {
+      await opts.rpc('hot_result', { p_id: a.id, p_sid: null, p_error: 'push only (no ALERT_SECRET)' })
+      if (a.n === 2) s.second_alerts += 1
+      else s.alerts += 1
+    }
+    await fanOut(text, alertPush(a, opts.appUrl))
   }
-  // Texts about the system itself (e.g. follow-ups paused by their opt-out brake).
-  const ops = await opts.rpc('ops_claim', { p_limit: 5 })
-  for (const o of (ops.data as { id: number; text: string }[] | null) ?? []) {
-    const r = await opts.send(o.text).catch((e) => ({ ok: false, error: String(e) }))
-    await opts.rpc('ops_result', { p_id: o.id, p_sid: r.ok ? (r as { sid?: string | null }).sid ?? null : null,
-      p_error: r.ok ? null : String((r as { error?: string }).error ?? 'not sent').slice(0, 200) })
-    if (r.ok) s.ops = (s.ops ?? 0) + 1
+  // Texts about the system itself (e.g. follow-ups paused by their opt-out brake): Colin only.
+  if (opts.send) {
+    const ops = await opts.rpc('ops_claim', { p_limit: 5 })
+    for (const o of (ops.data as { id: number; text: string }[] | null) ?? []) {
+      const r = await opts.send(o.text).catch((e) => ({ ok: false, error: String(e) }))
+      await opts.rpc('ops_result', { p_id: o.id, p_sid: r.ok ? (r as { sid?: string | null }).sid ?? null : null,
+        p_error: r.ok ? null : err(r, 'not sent') })
+      if (r.ok) s.ops = (s.ops ?? 0) + 1
+    }
   }
   const d = await opts.rpc('hot_digest', { p_now: now.toISOString() })
-  const list = (d.data as { first_name: string | null; address: string | null; phone10: string }[] | null) ?? null
+  const list = (d.data as DigestRow[] | null) ?? null
   if (!d.error && list && list.length) {
-    const r = await opts.send(digestText(list)).catch((e) => ({ ok: false, error: String(e) }))
-    if (r.ok) s.digest = 1
-    else s.errors.push(String((r as { error?: string }).error ?? 'digest not sent').slice(0, 200))
+    const text = digestText(list)
+    if (opts.send) {
+      const r = await opts.send(text).catch((e) => ({ ok: false, error: String(e) }))
+      if (r.ok) s.digest = 1
+      else s.errors.push(err(r, 'digest not sent'))
+    } else s.digest = 1
+    await fanOut(text, digestPush(list, opts.appUrl))
   }
   return s
 }
 
-/** pm-phone's /api/alert: sends from the PM line to Colin's forward number. */
+async function membersWithPhones(rpc: Rpc): Promise<Member[]> {
+  const r = await rpc('alert_recipients', {})
+  if (r.error || !Array.isArray(r.data)) return []
+  return (r.data as Member[]).filter((m) => /^\+1\d{10}$/.test(m.phone ?? ''))
+}
+
+/** pm-phone's /api/alert: sends from the PM line to Colin's forward number, or to a listed member's `to`. */
 export function pmPhoneSender(get: (n: string) => string | undefined, fetchFn: typeof fetch): AlertSend | null {
   const secret = (get('ALERT_SECRET') ?? '').trim()
   if (!secret) return null
   const url = (get('ALERT_URL') ?? '').trim() || 'https://junkcarsmequon.com/api/alert'
-  return async (text) => {
+  return async (text, to) => {
     const res = await fetchFn(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-alert-secret': secret },
-      body: JSON.stringify({ text }) })
+      body: JSON.stringify(to ? { text, to } : { text }) })
     const j = (await res.json().catch(() => ({}))) as { ok?: boolean; sid?: string; error?: string }
     return res.ok && j.ok ? { ok: true, sid: j.sid ?? null } : { ok: false, error: `pm-phone ${res.status}: ${j.error ?? 'error'}` }
   }
