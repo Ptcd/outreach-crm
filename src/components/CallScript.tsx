@@ -33,9 +33,10 @@ function scriptVars(lead: Lead, facts: CallFacts): Record<string, string> {
 // exact words and one-tap answers (saved to the lead as you tap), then the close the card decided on
 // (book / one more call / not ready; src/lib/bookingVerdict.ts), then "log this call". Only Colin
 // (canOverride) can book a walk-through the card did not earn.
-export function CallScript({ lead, contacts, messages, replyFacts, latestGate, phone, startOpen, canOverride }: {
+export function CallScript({ lead, contacts, messages, replyFacts, latestGate, phone, startOpen, canOverride, onLogged }: {
   lead: Lead; contacts: Contact[]; messages: Message[]; replyFacts: Record<string, unknown>; latestGate: GateScore | null
   phone: string | null; startOpen: boolean; canOverride?: boolean
+  onLogged?: (outcome: string) => void     // the call queue: a logged call finishes the task and brings the next card
 }) {
   const qc = useQueryClient()
   const [open, setOpen] = useState(startOpen)
@@ -159,7 +160,7 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
         <p className="mt-1 text-xs text-muted-foreground">These fill in Colin&apos;s score on the card; the booking decision above is the card&apos;s.</p>
       </details>
 
-      <LogCall lead={lead} contacts={contacts} phone={phone} />
+      <LogCall lead={lead} contacts={contacts} phone={phone} onLogged={onLogged} />
     </section>
   )
 }
@@ -305,7 +306,7 @@ function Field({ label, initial, onCommit, multiline, inputMode }: {
   )
 }
 
-function LogCall({ lead, contacts, phone }: { lead: Lead; contacts: Contact[]; phone: string | null }) {
+function LogCall({ lead, contacts, phone, onLogged }: { lead: Lead; contacts: Contact[]; phone: string | null; onLogged?: (outcome: string) => void }) {
   const qc = useQueryClient()
   const phones = contacts.filter((c) => c.kind === 'phone').map((c) => c.value_normalized ?? c.value)
   const [from, setFrom] = useState<string>(phone ?? phones[0] ?? '')
@@ -321,9 +322,11 @@ function LogCall({ lead, contacts, phone }: { lead: Lead; contacts: Contact[]; p
     const d = r.data as { ok: boolean; reason?: string } | null
     if (r.error || !d?.ok) { setMsg({ ok: false, text: r.error?.message ?? d?.reason ?? 'Not saved' }); return }
     setMsg({ ok: true, text: `Logged: ${LABEL_OUTCOME[outcome]}.` })
+    const logged = outcome
     setOutcome('')
     setNote('')
     for (const k of [['lead', lead.id], ['leads'], ['pipeline_counts'], ['phone_lookup']]) void qc.invalidateQueries({ queryKey: k })
+    onLogged?.(logged)
   }
   const chosen = CALL_OUTCOMES.find((o) => o.id === outcome)
   return (

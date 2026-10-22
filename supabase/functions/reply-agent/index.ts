@@ -41,7 +41,13 @@ Deno.serve(async (req) => {
     } catch (e) {
       notified = { error: String(e).slice(0, 200) }
     }
-    const hot = await runHotAlerts({ rpc, send: pmPhoneSender((n) => Deno.env.get(n), fetch), push: hotPush(sb),
+    // Hot alerts also go by email to every member with an alert email on file (Settings page, migration 0028).
+    const deps = notifyDeps(sb, rpc)
+    const hotEmail = deps.email ? { send: deps.email, recipients: async () => {
+      const r = await rpc('alert_email_recipients', {})
+      return Array.isArray(r.data) ? (r.data as { person: string; email: string }[]) : []
+    } } : null
+    const hot = await runHotAlerts({ rpc, send: pmPhoneSender((n) => Deno.env.get(n), fetch), push: hotPush(sb), email: hotEmail,
       appUrl: Deno.env.get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com' }).catch((e) => ({ error: String(e).slice(0, 200) }))
     await rpc('note_agent_run', { p_summary: { ...summary, notified, hot_alerts: hot, drafter: key ? 'claude' : 'none (ANTHROPIC_API_KEY not set)' } })
     return Response.json({ ...summary, notified, hot_alerts: hot })

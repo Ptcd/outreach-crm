@@ -12,6 +12,8 @@ import Approvals from '@/pages/Approvals'
 import Inbox from '@/pages/Inbox'
 import Scoreboard from '@/pages/Scoreboard'
 import SignContract from '@/pages/SignContract'
+import CallQueue from '@/pages/CallQueue'
+import Settings from '@/pages/Settings'
 
 function Centered({ children }: { children: React.ReactNode }) {
   return <div className="flex min-h-dvh items-center justify-center p-6 text-center text-base">{children}</div>
@@ -73,6 +75,8 @@ export default function App() {
     <Layout>
       <Routes>
         <Route path="/today" element={<Today />} />
+        <Route path="/calls" element={<CallQueue />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/pipeline" element={<Pipeline />} />
         <Route path="/lead/:id" element={<LeadDetail />} />
         <Route path="/inbox" element={<Inbox />} />

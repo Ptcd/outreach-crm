@@ -69,6 +69,12 @@ function leadLink(a: { lead_id: string | null; phone10: string }, appUrl: string
 export function alertText(a: HotAlert, appUrl: string): string {
   const who = [a.first_name ?? 'Seller', street(a.address)].filter(Boolean).join(', ')
   const link = a.lead_id ? ` ${leadLink(a, appUrl)}` : ''
+  if (HANDOFF_RE.test(a.body)) {
+    // "Thalia hands off: motivated, lease ends in December" -> HANDED TO YOU: Jane, N Main St. Thalia: motivated...
+    const [, caller, note] = a.body.match(/^(\S+) hands off: ([\s\S]*)$/) ?? [null, 'The team', a.body]
+    const call = /^\d{10}$/.test(a.phone10) ? ` Call: ${fmtPhone10(a.phone10)}` : ''
+    return `${a.is_test ? 'TEST ' : ''}${a.n === 2 ? 'STILL WAITING (15 min) - ' : ''}HANDED TO YOU: ${who}. ${caller}: "${trimQuote(note ?? '')}".${call}${link}`
+  }
   const head = `${a.is_test ? 'TEST ' : ''}${a.n === 2 ? 'STILL NOT CALLED (15 min) - HOT' : 'HOT'}`
   return `${head}: ${who} said: "${trimQuote(a.body)}". Call: ${fmtPhone10(a.phone10)}${link}`
 }
@@ -114,28 +120,64 @@ export interface HotPush {
 }
 
 export interface HotSummary { alerts: number; second_alerts: number; digest: number; errors: string[]; off?: string; ops?: number
-  member_texts: number; pushes_ok: number; pushes_failed: number }
+  member_texts: number; pushes_ok: number; pushes_failed: number; emails?: number }
 
 type Member = { person: string; phone: string }
+type EmailMember = { person: string; email: string }
+
+/** The email half (Colin 2026-10-22: "a spot in settings to add emails for hot pings"): every member with an
+ * alert email on file (alert_email_recipients, migration 0028) gets the same alert as an email. */
+export interface HotEmail {
+  recipients: () => Promise<EmailMember[]>
+  send: (m: { to: string; subject: string; text: string; html: string }) => Promise<void>
+}
+
+/** A caller handing a card to Colin (handoff_to_colin, migration 0028) rides the hot-alert path; the text
+ * goes to Colin's cell and the pushes and emails to everyone, but no member text: it was their own hand-off. */
+export const HANDOFF_RE = /^\S+ hands off: /
+
+export function alertEmail(text: string, message: PushMessage): { subject: string; text: string; html: string } {
+  const esc = (x: string) => x.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string))
+  return {
+    subject: message.title,
+    text: `${text}\n\nOpen the card: ${message.url}`,
+    html: `<p>${esc(text)}</p><p><a href="${message.url}">Open the card</a></p>`,
+  }
+}
 
 /** Alert what is due (first alerts, 15-minute repeats, the 7 PM list): texts to Colin and to every
- * member with a phone on file, and a push to every registered phone, at the same moments. */
-export async function runHotAlerts(opts: { rpc: Rpc; send: AlertSend | null; appUrl: string; now?: () => Date; push?: HotPush | null })
-  : Promise<HotSummary> {
-  const s: HotSummary = { alerts: 0, second_alerts: 0, digest: 0, errors: [], member_texts: 0, pushes_ok: 0, pushes_failed: 0 }
+ * member with a phone on file, a push to every registered phone, and an email to every member with an
+ * alert email, at the same moments. */
+export async function runHotAlerts(opts: { rpc: Rpc; send: AlertSend | null; appUrl: string; now?: () => Date; push?: HotPush | null
+  email?: HotEmail | null }): Promise<HotSummary> {
+  const s: HotSummary = { alerts: 0, second_alerts: 0, digest: 0, errors: [], member_texts: 0, pushes_ok: 0, pushes_failed: 0, emails: 0 }
   const push = opts.push ?? null
   // Nothing that could reach anyone: leave the alerts unclaimed so they go out once a channel exists.
   const subs = push ? await push.subscriptions().catch(() => [] as PushSubscriptionKeys[]) : []
-  if (!opts.send && !subs.length) { s.off = push ? 'ALERT_SECRET not set and no phone registered' : 'ALERT_SECRET not set'; return s }
+  const mails: EmailMember[] = opts.email ? await opts.email.recipients().catch(() => [] as EmailMember[]) : []
+  if (!opts.send && !subs.length && !mails.length) { s.off = push ? 'ALERT_SECRET not set and no phone registered' : 'ALERT_SECRET not set'; return s }
   const now = (opts.now ?? (() => new Date()))()
   const members: Member[] = opts.send ? await membersWithPhones(opts.rpc) : []
   const err = (r: { error?: string }, fallback: string) => String(r.error ?? fallback).slice(0, 200)
 
-  const fanOut = async (text: string, message: PushMessage) => {
-    for (const m of members) {
-      const r = await opts.send!(text, m.phone).catch((e) => ({ ok: false, error: String(e) }))
-      if (r.ok) s.member_texts += 1
-      else s.errors.push(`${m.person}: ${err(r, 'not sent')}`)
+  const fanOut = async (text: string, message: PushMessage, memberTexts = true) => {
+    if (memberTexts) {
+      for (const m of members) {
+        const r = await opts.send!(text, m.phone).catch((e) => ({ ok: false, error: String(e) }))
+        if (r.ok) s.member_texts += 1
+        else s.errors.push(`${m.person}: ${err(r, 'not sent')}`)
+      }
+    }
+    if (opts.email) {
+      const mail = alertEmail(text, message)
+      for (const m of mails) {
+        try {
+          await opts.email.send({ to: m.email, ...mail })
+          s.emails = (s.emails ?? 0) + 1
+        } catch (e) {
+          s.errors.push(`${m.person} email: ${String(e).slice(0, 160)}`)
+        }
+      }
     }
     if (push) {
       for (const sub of subs) {
@@ -163,7 +205,7 @@ export async function runHotAlerts(opts: { rpc: Rpc; send: AlertSend | null; app
       if (a.n === 2) s.second_alerts += 1
       else s.alerts += 1
     }
-    await fanOut(text, alertPush(a, opts.appUrl))
+    await fanOut(text, alertPush(a, opts.appUrl), !HANDOFF_RE.test(a.body))
   }
   // Texts about the system itself (e.g. follow-ups paused by their opt-out brake): Colin only.
   if (opts.send) {

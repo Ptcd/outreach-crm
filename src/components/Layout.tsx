@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
-import { BarChart3, CalendarCheck, Inbox, ListChecks, MessageSquareText } from 'lucide-react'
+import { BarChart3, CalendarCheck, Inbox, ListChecks, MessageSquareText, PhoneCall, Settings as SettingsIcon } from 'lucide-react'
 import { useAuth } from '@/providers/AuthProvider'
 import { useRepliesWaiting } from '@/lib/queries'
 import { OfflineBanner } from '@/components/OfflineBanner'
@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 
 const NAV = [
   { to: '/today', label: 'Today', icon: CalendarCheck },
+  { to: '/calls', label: 'Calls', icon: PhoneCall },
   { to: '/inbox', label: 'Inbox', icon: Inbox },
   { to: '/pipeline', label: 'Pipeline', icon: ListChecks },
   { to: '/approvals', label: 'Approve', icon: MessageSquareText },
@@ -52,6 +53,10 @@ export function Layout({ children }: { children: ReactNode }) {
               </span>
             )}
             <span className="hidden text-muted-foreground sm:inline">{member?.display_name}</span>
+            <NavLink to="/settings" aria-label="Settings" title="Settings: your alert email and phone, notifications"
+              className={({ isActive }) => cn('flex h-11 w-11 items-center justify-center rounded-md', isActive ? 'text-primary' : 'text-muted-foreground hover:bg-accent')}>
+              <SettingsIcon className="h-5 w-5" aria-hidden />
+            </NavLink>
             <button className="h-11 rounded-md px-3 text-muted-foreground underline" onClick={() => void signOut()}>
               Sign out
             </button>
@@ -62,7 +67,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <main className="mx-auto max-w-5xl px-4 py-4">{children}</main>
       <IncomingCallBar />
       <CallBar />
-      <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-background sm:hidden" aria-label="Main">
+      <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t bg-background sm:hidden" aria-label="Main">
         {NAV.map((n) => (
           <NavLink
             key={n.to}

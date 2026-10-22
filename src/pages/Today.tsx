@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge, Empty, ErrorNote, Section, Select } from '@/components/ui/form'
-import { api, useDueTasks, useFollowupDebt, useReplyTasks, useUnseenReplies, useWrite } from '@/lib/queries'
+import { api, useDueTasks, useFollowupDebt, useMyStops, useReplyTasks, useUnseenReplies, useWrite } from '@/lib/queries'
 import { ReplyTaskCard } from '@/components/ReplyTaskCard'
+import { BeltHealthStrip } from '@/components/BeltHealthStrip'
+import { StopCard } from '@/components/StopCard'
 import { endOfTodayIso, fmtDateTime } from '@/lib/format'
 import { STAGE_LABEL, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
@@ -14,6 +16,7 @@ export default function Today() {
   const [who, setWho] = useState<Person | 'all'>(member?.person ?? 'all')
   const until = endOfTodayIso()
   const tasks = useDueTasks(until, who)
+  const stops = useMyStops(until, who)
   const replies = useUnseenReplies()
   const debt = useFollowupDebt()
   const replyTasks = useReplyTasks()
@@ -24,6 +27,25 @@ export default function Today() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Today</h1>
+      <BeltHealthStrip />
+      <Section
+        title={`Your stops${stops.data ? ` (${stops.data.length})` : ''}`}
+        right={
+          <Select value={who} onChange={(e) => setWho(e.target.value as Person | 'all')} className="w-32" aria-label="Whose stops">
+            <option value="all">Everyone</option>
+            <option value="colin">Colin</option>
+            <option value="adil">Adil</option>
+            <option value="thalia">Thalia</option>
+          </Select>
+        }
+      >
+        <p className="mb-2 text-sm text-muted-foreground">The belt&apos;s next stop on each card, and the day&apos;s call list: log the outcome and the next stop sets itself. The Calls page works these one at a time.</p>
+        <ErrorNote error={stops.error} />
+        {stops.data?.length === 0 && <Empty>No stops due. A hot reply pings you the moment it lands.</Empty>}
+        <ul className="space-y-3">
+          {stops.data?.map((t) => <StopCard key={t.id} t={t} now={now} />)}
+        </ul>
+      </Section>
 
       <Section title={`Tasks from replies${replyTasks.data ? ` (${replyTasks.data.length})` : ''}`}>
         <p className="mb-2 text-sm text-muted-foreground">Things a seller asked for that a text can&apos;t do. Adil by default.</p>
@@ -72,9 +94,9 @@ export default function Today() {
         }
       >
         <ErrorNote error={tasks.error ?? done.error} />
-        {tasks.data?.length === 0 && <Empty>Nothing due today.</Empty>}
+        {tasks.data?.filter((t) => !['belt', 'call_list', 'after_stop'].includes(t.source ?? '')).length === 0 && <Empty>Nothing due today.</Empty>}
         <ul className="divide-y">
-          {tasks.data?.map((t) => {
+          {tasks.data?.filter((t) => !['belt', 'call_list', 'after_stop'].includes(t.source ?? '')).map((t) => {
             const late = new Date(t.due_at).getTime() < now - 60_000
             return (
               <li key={t.id} className="flex items-start justify-between gap-2 py-3">

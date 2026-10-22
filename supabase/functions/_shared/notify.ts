@@ -118,12 +118,20 @@ export async function runNotifications(deps: NotifyDeps): Promise<NotifySummary>
       if (kind === 'first') s.drafts += 1
       else s.reminders += 1
       await pushAll(deps, pushMessage(d, deps.appUrl), s)
-      if (kind === 'first' && deps.email && deps.emailTo) {
-        try {
-          await deps.email({ to: deps.emailTo, ...emailFor(d, deps.appUrl) })
-          s.emails += 1
-        } catch (e) {
-          s.email_errors.push(String(e instanceof Error ? e.message : e).slice(0, 160))
+      if (kind === 'first' && deps.email) {
+        // Colin's address from the env, plus every member with an alert email on file (Settings page,
+        // migration 0028): the callers approve drafts too (Colin 2026-10-22).
+        const to = new Set<string>()
+        if (deps.emailTo) to.add(deps.emailTo.toLowerCase())
+        const r = await deps.rpc('alert_email_recipients', {}).catch(() => ({ data: null, error: null }))
+        for (const m of (Array.isArray(r.data) ? r.data : []) as { email?: string }[]) if (m.email) to.add(m.email.toLowerCase())
+        for (const addr of to) {
+          try {
+            await deps.email({ to: addr, ...emailFor(d, deps.appUrl) })
+            s.emails += 1
+          } catch (e) {
+            s.email_errors.push(String(e instanceof Error ? e.message : e).slice(0, 160))
+          }
         }
       }
     }

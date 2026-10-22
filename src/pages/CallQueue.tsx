@@ -1,0 +1,155 @@
+// The call queue: the calls due to the signed-in person, one card at a time (Colin 2026-10-22: "do they go to
+// the call outs to do and do one then choose dispo then it brings the next and tells them context"). Each
+// card says who, where, why they are on the list, what they texted, the numbers to dial, then the script with
+// the booking verdict and Log this call. Logging the call finishes the task and brings the next one; Skip
+// moves it to the end of this sitting; Hand to Colin gives him the card with one line and pings him.
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
+import { Badge, Empty, ErrorNote, Textarea } from '@/components/ui/form'
+import { CallButton } from '@/components/CallButton'
+import { CallScript } from '@/components/CallScript'
+import { useDueTasks, useLead, useWrite } from '@/lib/queries'
+import { handoffToColin } from '@/lib/apiExtra'
+import { endOfTodayIso, fmtDateTime, fmtPhone } from '@/lib/format'
+import { STAGE_LABEL } from '@/lib/wpie'
+import { useAuth } from '@/providers/AuthProvider'
+import type { Task } from '@/lib/types'
+
+type QueueTask = Task & { lead: { id: string; owner_name: string; property_address: string | null; stage: string } | null }
+
+export default function CallQueue() {
+  const { member, isOwner } = useAuth()
+  const until = endOfTodayIso()
+  const tasks = useDueTasks(until, member?.person ?? 'all')
+  const [skipped, setSkipped] = useState<string[]>([])
+  const [done, setDone] = useState<string[]>([])
+  const queue = useMemo(() => {
+    const all = ((tasks.data ?? []) as QueueTask[]).filter((t) => t.kind === 'call' && t.lead_id && !done.includes(t.id))
+    const head = all.filter((t) => !skipped.includes(t.id))
+    const tail = skipped.map((id) => all.find((t) => t.id === id)).filter((t): t is QueueTask => !!t)
+    return [...head, ...tail]
+  }, [tasks.data, skipped, done])
+  const current = queue[0] ?? null
+  // A logged call closes the stop on the server (log_call's call row; the belt's trigger) and a hand-off closes the
+  // caller's open stops itself, so the queue only steps forward and refreshes; it never marks a stop Done by hand,
+  // which the belt would read as a plain Done and route again.
+  const refresh = useWrite(async () => ({ data: null, error: null }), [['tasks'], ['lead'], ['leads'], ['pipeline_counts']])
+  const total = queue.length + done.length
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-baseline justify-between">
+        <h1 className="text-xl font-semibold">Calls</h1>
+        <p className="text-sm text-muted-foreground" data-testid="queue-count">
+          {total === 0 ? 'nothing to call' : `${Math.min(done.length + 1, total)} of ${total}${skipped.length ? `, ${skipped.length} skipped for now` : ''}`}
+        </p>
+      </div>
+      <ErrorNote error={tasks.error} />
+      {tasks.isLoading && <Empty>Loading...</Empty>}
+      {!tasks.isLoading && !current && (
+        <Empty>
+          {done.length ? `All ${done.length} done. ` : ''}Nothing to call right now. A hot reply pings you the moment it lands; the day&apos;s list is on here each morning.
+        </Empty>
+      )}
+      {current && (
+        <QueueCard key={current.id} task={current} canOverride={isOwner}
+          onDone={() => { setDone((d) => [...d, current.id]); refresh.mutate(undefined) }}
+          onSkip={() => setSkipped((s) => [...s, current.id])} />
+      )}
+    </div>
+  )
+}
+
+function QueueCard({ task, canOverride, onDone, onSkip }: { task: QueueTask; canOverride: boolean; onDone: () => void; onSkip: () => void }) {
+  const q = useLead(task.lead_id!)
+  const [handing, setHanding] = useState(false)
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  if (q.isLoading) return <Empty>Loading the card...</Empty>
+  if (q.error) return <ErrorNote error={q.error} />
+  if (!q.data) return <Empty>That card is gone.</Empty>
+  const { lead, contacts, messages, gates } = q.data
+  const facts = q.data.facts ?? {}
+  const phones = contacts.filter((c) => c.kind === 'phone')
+  const texted = messages.filter((m) => m.channel === 'sms' && m.direction === 'in').slice(-3)
+  const hand = async () => {
+    setBusy(true)
+    setErr(null)
+    try {
+      const r = await handoffToColin(lead.id, note.trim())
+      if (!r.ok) { setErr(r.reason ?? 'Not handed off'); return }
+      onDone()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <section className="space-y-3 rounded-lg border-2 border-primary/40 bg-card p-3" data-testid="queue-card">
+      <div>
+        <h2 className="text-lg font-semibold">{lead.owner_name}</h2>
+        <p className="text-sm">{lead.property_address}{lead.municipality ? `, ${lead.municipality}` : ''}</p>
+        <div className="mt-1 flex flex-wrap gap-2">
+          <Badge>{STAGE_LABEL[lead.stage]}</Badge>
+          {lead.lane && <Badge tone="info">{lead.lane === 'hold' ? 'Hold lane' : 'Flip lane'}</Badge>}
+          <Link to={`/lead/${lead.id}`} className="inline-flex min-h-6 items-center text-sm underline">Open the full card</Link>
+        </div>
+      </div>
+
+      <div className="rounded-md bg-muted p-3 text-sm">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Why this call</p>
+        <p className="mt-1 font-medium">{task.title ?? 'On your list'}{task.note ? `: ${task.note}` : ''}</p>
+        {lead.reasons_to_sell.length > 0 && (
+          <p className="mt-1 text-muted-foreground">Why they are on the list (never say this to them): {lead.reasons_to_sell.join(', ')}</p>
+        )}
+        {task.quote && <p className="mt-1">They said: &ldquo;{task.quote}&rdquo;</p>}
+        <p className="mt-1 text-xs text-muted-foreground">Due {fmtDateTime(task.due_at)}</p>
+      </div>
+
+      {texted.length > 0 && (
+        <div className="text-sm">
+          <p className="font-medium">What they texted</p>
+          {texted.map((m) => <p key={m.id} className="mt-1 rounded bg-blue-50 p-2">{m.body} <span className="text-xs text-muted-foreground">{fmtDateTime(m.sent_at)}</span></p>)}
+        </div>
+      )}
+
+      <div>
+        <p className="text-sm font-medium">Numbers to dial</p>
+        {phones.length === 0 && <p className="text-sm text-muted-foreground">No phone on the card.</p>}
+        <ul className="mt-1 space-y-2">
+          {phones.map((c) => (
+            <li key={c.id} className="flex flex-wrap items-center gap-2 text-sm">
+              <span>{fmtPhone(c.value_normalized ?? c.value)}</span>
+              {c.line_type && <Badge>{c.line_type}</Badge>}
+              {c.person_name && <span className="text-muted-foreground">{c.person_name}</span>}
+              <CallButton to={c.value_normalized ?? c.value} name={lead.owner_name} address={lead.property_address} leadId={lead.id}
+                contactId={c.id} blocked={c.suppressed || c.dnc_app || c.status === 'bad'} size="sm" />
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}
+        phone={phones[0]?.value_normalized ?? null} startOpen canOverride={canOverride} onLogged={onDone} />
+
+      <div className="space-y-2 rounded-md border p-3">
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="h-11" onClick={onSkip}>Skip for now</Button>
+          <Button variant="outline" className="h-11" onClick={() => setHanding((h) => !h)}>Hand to Colin</Button>
+        </div>
+        {handing && (
+          <div className="space-y-2">
+            <Textarea rows={2} placeholder="One line for Colin: why this one is worth his time (their reason, their number, who signs)"
+              value={note} onChange={(e) => setNote(e.target.value)} />
+            <Button className="h-11" disabled={busy || !note.trim()} onClick={() => void hand()}>{busy ? 'Handing off...' : 'Send to Colin'}</Button>
+            <p className="text-xs text-muted-foreground">Colin gets the card, a task with your line, and a ping on his phone. This call leaves your list.</p>
+          </div>
+        )}
+        {err && <p className="text-sm text-red-700">{err}</p>}
+      </div>
+    </section>
+  )
+}

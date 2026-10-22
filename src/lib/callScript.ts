@@ -92,8 +92,10 @@ export function scriptLine(l: Line, vars: Record<string, string> = {}) {
 export const NEXT_STEP: Answer = { id: 'next_step', title: 'Booked', reply: ['callback_slot'], when: 'Day and time',
   choices: [c('walk', 'Walk-through'), c('callback', 'Call back')] }
 
-export const CALL_OUTCOMES: { id: 'interested' | 'not_now' | 'not_interested' | 'wrong_number' | 'dnc'; label: string; hint: string }[] = [
+export const CALL_OUTCOMES: { id: 'interested' | 'reached_no_decision' | 'no_answer' | 'not_now' | 'not_interested' | 'wrong_number' | 'dnc'; label: string; hint: string }[] = [
+  { id: 'no_answer', label: 'No answer', hint: 'Rang out or voicemail; nothing changes on the card' },
   { id: 'interested', label: 'Interested', hint: "Stage: Colin's call (or Walk booked)" },
+  { id: 'reached_no_decision', label: 'Reached, no decision', hint: "Talked, nothing settled yet; stage: Colin's call" },
   { id: 'not_now', label: 'Not now', hint: 'Stage: Follow up later, check back in 30 days' },
   { id: 'not_interested', label: 'Not interested', hint: 'Stage: Dead' },
   { id: 'wrong_number', label: 'Wrong number', hint: 'That phone marked bad; stage: Wrong number' },

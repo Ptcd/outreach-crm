@@ -12,6 +12,7 @@ import { HotBanner } from '@/components/HotBanner'
 import { gateFromCall, stopsFromCall, type CallFacts } from '@/lib/callGate'
 import { bookingVerdict } from '@/lib/bookingVerdict'
 import { VerdictBadge, VerdictBox } from '@/components/BookingVerdict'
+import { BeltStrip } from '@/components/BeltStrip'
 import { CallButton } from '@/components/CallButton'
 import { api, useDeals, useLead, useWrite } from '@/lib/queries'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
@@ -51,6 +52,7 @@ export default function LeadDetail() {
       </div>
 
       <HotBanner leadId={lead.id} />
+      <BeltStrip lead={lead} />
       <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}
         phone={params.get('phone')} startOpen={params.get('call') === '1'} canOverride={isOwner} />
       <NextAction lead={lead} />

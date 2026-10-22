@@ -23,8 +23,9 @@ Deno.serve(async (req) => {
   const auth = req.headers.get('Authorization') ?? ''
   const asUser = createClient(url, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
     global: { headers: { Authorization: auth } }, auth: { persistSession: false } })
-  const owner = await asUser.rpc('is_owner')
-  if (owner.error || owner.data !== true) return json({ outcome: 'refused', reason: 'only Colin can approve replies' }, 403)
+  // Any team member approves or skips a draft (Colin 2026-10-22: "they approve the texts and drafts").
+  const me = await asUser.from('team_members').select('person').limit(1).maybeSingle()
+  if (me.error || !me.data) return json({ outcome: 'refused', reason: 'not on the team' }, 403)
   const me = await asUser.from('team_members').select('display_name').limit(1).maybeSingle()
   const actor = (me.data?.display_name as string | undefined) ?? 'Colin'
 

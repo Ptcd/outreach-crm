@@ -8,6 +8,7 @@ import { api, useCampaignControl, usePlannedOpeners, useWrite } from '@/lib/quer
 import { fmtDateTime, fmtPhone, todayLocal } from '@/lib/format'
 import { SEND_LABEL, WORDING, reasonText, sendTone } from '@/lib/inbox'
 import { useAuth } from '@/providers/AuthProvider'
+import { TouchSwitches } from '@/components/TouchSwitches'
 import type { CampaignControl, OpenerDecision, PlannedOpener } from '@/lib/types'
 
 const DECISION_LABEL: Record<OpenerDecision, string> = { pending: 'Waiting', approved: 'Approved', skipped: 'Skipped' }
@@ -46,6 +47,7 @@ export default function Approvals() {
     <div className="space-y-4 pb-36 sm:pb-0">
       <h1 className="text-xl font-semibold">Texts to approve</h1>
       <SendingPanel canDecide={isOwner} />
+      <TouchSwitches canDecide={isOwner} />
       <div className="flex flex-wrap items-center gap-3">
         <label className="text-sm font-medium">
           Day <Input type="date" value={day} onChange={(e) => { setDay(e.target.value); setTicked(new Set()) }} className="mt-1 w-48" />
@@ -56,8 +58,8 @@ export default function Approvals() {
           {sends.would_send ? `, ${sends.would_send} passed a test run` : ''}
         </span>
       </div>
-      {!isOwner && <p className="rounded bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">Only Colin can approve, skip or withdraw.</p>}
-      {isOwner && rows.length > 0 && (
+      {!isOwner && <p className="rounded bg-muted p-2 text-sm text-muted-foreground">You approve or skip each text and the whole day; the sending switch and the pause are Colin&apos;s.</p>}
+      {!!member && rows.length > 0 && (
         <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 !m-0 border-t bg-background p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:sticky sm:top-14 sm:bottom-auto sm:-mx-4 sm:border-b sm:border-t-0 sm:px-4 sm:py-2">
           <div className="mx-auto flex max-w-5xl flex-col gap-2 sm:flex-row sm:flex-wrap">
             <ConfirmButton className="h-12 w-full text-base sm:h-10 sm:w-auto" disabled={busy || waiting.length === 0}
@@ -83,7 +85,7 @@ export default function Approvals() {
       {q.data && rows.length === 0 && <Empty>No texts planned for this day. Run the WPIE plan, then the sync push.</Empty>}
       <div className="space-y-3">
         {rows.map((r) => (
-          <OpenerCard key={r.id} r={r} canDecide={isOwner} busy={busy} ticked={ticked.has(r.id)} onTick={() => toggle(r.id)}
+          <OpenerCard key={r.id} r={r} canDecide={!!member} busy={busy} ticked={ticked.has(r.id)} onTick={() => toggle(r.id)}
             onDecide={(decision, note) => decide.mutate({ id: r.id, decision, note })} />
         ))}
       </div>

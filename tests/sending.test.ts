@@ -410,9 +410,10 @@ describe("Colin's buttons and who may press them", () => {
     const a = await opener(await lead(), { decision: 'pending' })
     const b = await opener(await lead(), { decision: 'pending' })
     const c = await opener(await lead(), { decision: 'pending' })
-    await expect(as(THALIA, () => db.query(`select public.approve_day($1, '{}')`, [DAY]))).rejects.toThrow(/only Colin/)
-    const r = await as(COLIN, () => db.query<{ j: Record<string, number> }>(`select public.approve_day($1, $2::uuid[]) as j`, [DAY, [b]]))
+    // The caller on shift approves the day (Colin 2026-10-22: "they approve the texts and drafts").
+    const r = await as(THALIA, () => db.query<{ j: Record<string, number> }>(`select public.approve_day($1, $2::uuid[]) as j`, [DAY, [b]]))
     expect(r.rows[0].j).toEqual({ approved: 2, skipped: 1 })
+    expect((await db.query<{ n: number }>(`select count(*)::int as n from public.planned_openers where decided_by_name = 'Thalia'`)).rows[0].n).toBe(3)
     const d = await db.query<{ id: string; decision: string }>(`select id, decision::text from public.planned_openers order by scheduled_at, id`)
     expect(Object.fromEntries(d.rows.map((x) => [x.id, x.decision]))).toEqual({ [a]: 'approved', [b]: 'skipped', [c]: 'approved' })
     await claim(T('15:05'))

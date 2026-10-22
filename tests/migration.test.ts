@@ -134,14 +134,15 @@ describe('migration 0001_wpie_live', () => {
     await expect(db.query(`update public.deals set colin_offer = 1 where lead_id = $1`, [leadId])).rejects.toThrow(/only be entered by Colin/)
   })
 
-  it('lets Colin approve a planned opener, not Thalia', async () => {
+  it('lets any team member approve a planned opener (Colin 2026-10-22: the callers approve the texts), never edit its words', async () => {
     await db.query(`insert into public.planned_openers (plan_date, wpie_owner_id, attempt, body) values ('2026-10-21', 100561, 1, 'Hi John')`)
     await as(THALIA, async () => {
-      const r = await db.query(`update public.planned_openers set decision = 'approved' returning id`)
-      expect(r.rows.length).toBe(0)
+      const r = await db.query(`update public.planned_openers set decision = 'approved', decided_at = now() returning id`)
+      expect(r.rows.length).toBe(1)
+      await expect(db.query(`update public.planned_openers set body = 'changed'`)).rejects.toThrow(/permission denied/)
     })
     await as(COLIN, async () => {
-      const r = await db.query(`update public.planned_openers set decision = 'approved', decided_at = now() returning id`)
+      const r = await db.query(`update public.planned_openers set decision = 'skipped', decided_at = now() returning id`)
       expect(r.rows.length).toBe(1)
       await expect(db.query(`update public.planned_openers set body = 'changed'`)).rejects.toThrow(/permission denied/)
     })

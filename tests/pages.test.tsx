@@ -44,6 +44,12 @@ vi.mock('@/lib/queries', () => ({
   useDueTasks: () => ok([{ id: 'T1', lead_id: 'L1', due_at: '2026-10-20T15:00:00Z', kind: 'call', owner: 'colin', done_at: null, note: 'after 5', created_at: '', lead }]),
   useUnseenReplies: () => ok([{ id: 'M1', lead_id: 'L1', direction: 'in', channel: 'sms', body: 'Who is this?', sent_at: '2026-10-21T16:00:00Z', seen_at: null, is_opt_out: false, is_opener: false, status: 'replied', lead }]),
   useFollowupDebt: () => ok([]),
+  // the conveyor's pieces (migrations 0029-0032): nothing on the belt in this fixture
+  useMyStops: () => ok([]),
+  useBeltEvents: () => ok([]),
+  useBeltMaxSteps: () => ok({}),
+  useBeltHealth: () => ok(null),
+  useTouchTemplates: () => ok([]),
   usePipelineCounts: () => ok([{ stage: 'colin_call', lane: 'hold', county: 'Milwaukee', n: 1 }, { stage: 'postcard_mailed', lane: 'flip', county: 'Racine', n: 4999 }]),
   useLeads: () => ok({ rows: [lead], count: 1 }),
   useLead: () => ok({

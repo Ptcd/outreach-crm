@@ -16,7 +16,7 @@ const KIND_LABEL: Record<ReplyDraft['kind'], string> = {
 // One text from a seller and the drafted answer. Approve sends Colin's final wording (he can edit);
 // nothing here sends without his tap, except routine lines when he has turned those on.
 export function DraftBox({ d, showFrom = false }: { d: ReplyDraft; showFrom?: boolean }) {
-  const { isOwner } = useAuth()
+  const { member } = useAuth()     // any team member approves or skips (Colin 2026-10-22)
   const [text, setText] = useState(d.body ?? '')
   const [result, setResult] = useState<string | null>(null)
   const keys = [['inbox'], ['reply_drafts'], ['reply_waiting']]
@@ -43,7 +43,7 @@ export function DraftBox({ d, showFrom = false }: { d: ReplyDraft; showFrom?: bo
       {showFrom && d.inbound_body && <p className="mt-1 whitespace-pre-wrap rounded bg-muted p-2">{d.inbound_body}</p>}
       {d.status === 'sent' && d.sent_body && <p className="mt-1 whitespace-pre-wrap">Sent: {d.sent_body}</p>}
       {d.status === 'queued' && d.send_after && <p className="mt-1 text-xs">Goes out {fmtDateTime(d.send_after)} (quiet hours).</p>}
-      {open && isOwner && (
+      {open && !!member && (
         <div className="mt-2 space-y-2">
           <label className="block text-xs font-medium text-muted-foreground">
             {d.body ? (d.kind === 'candidate' ? 'Draft reply - edit if you like' : 'Fixed reply') : 'No draft - write the reply'}
