@@ -126,7 +126,7 @@ function QueueCard({ task, canOverride, onDone, onSkip }: { task: QueueTask; can
               {c.line_type && <Badge>{c.line_type}</Badge>}
               {c.person_name && <span className="text-muted-foreground">{c.person_name}</span>}
               <CallButton to={c.value_normalized ?? c.value} name={lead.owner_name} address={lead.property_address} leadId={lead.id}
-                contactId={c.id} blocked={c.suppressed || c.dnc_app || c.status === 'bad'} size="sm" />
+                contactId={c.id} blocked={c.suppressed || c.dnc_app || c.dnc_vendor || c.dnc_scrub === 'dnc' || c.status === 'bad'} size="sm" />
             </li>
           ))}
         </ul>

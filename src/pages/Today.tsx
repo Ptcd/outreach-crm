@@ -28,25 +28,6 @@ export default function Today() {
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Today</h1>
       <BeltHealthStrip />
-      <Section
-        title={`Your stops${stops.data ? ` (${stops.data.length})` : ''}`}
-        right={
-          <Select value={who} onChange={(e) => setWho(e.target.value as Person | 'all')} className="w-32" aria-label="Whose stops">
-            <option value="all">Everyone</option>
-            <option value="colin">Colin</option>
-            <option value="adil">Adil</option>
-            <option value="thalia">Thalia</option>
-          </Select>
-        }
-      >
-        <p className="mb-2 text-sm text-muted-foreground">The belt&apos;s next stop on each card, and the day&apos;s call list: log the outcome and the next stop sets itself. The Calls page works these one at a time.</p>
-        <ErrorNote error={stops.error} />
-        {stops.data?.length === 0 && <Empty>No stops due. A hot reply pings you the moment it lands.</Empty>}
-        <ul className="space-y-3">
-          {stops.data?.map((t) => <StopCard key={t.id} t={t} now={now} />)}
-        </ul>
-      </Section>
-
       <Section title={`Tasks from replies${replyTasks.data ? ` (${replyTasks.data.length})` : ''}`}>
         <p className="mb-2 text-sm text-muted-foreground">Things a seller asked for that a text can&apos;t do. Adil by default.</p>
         <ErrorNote error={replyTasks.error} />
@@ -85,7 +66,7 @@ export default function Today() {
       <Section
         title="Follow-ups due"
         right={
-          <Select value={who} onChange={(e) => setWho(e.target.value as Person | 'all')} className="w-32">
+          <Select value={who} onChange={(e) => setWho(e.target.value as Person | 'all')} className="w-32" aria-label="Whose follow-ups">
             <option value="all">Everyone</option>
             <option value="colin">Colin</option>
             <option value="adil">Adil</option>
@@ -137,6 +118,25 @@ export default function Today() {
               - {STAGE_LABEL[d.stage]} - {d.days_late} days late{d.next_action ? ` (${d.next_action})` : ''}
             </li>
           ))}
+        </ul>
+      </Section>
+
+      <Section
+        title={`Your stops${stops.data ? ` (${stops.data.length})` : ''}`}
+        right={
+          <Select value={who} onChange={(e) => setWho(e.target.value as Person | 'all')} className="w-32" aria-label="Whose stops">
+            <option value="all">Everyone</option>
+            <option value="colin">Colin</option>
+            <option value="adil">Adil</option>
+            <option value="thalia">Thalia</option>
+          </Select>
+        }
+      >
+        <p className="mb-2 text-sm text-muted-foreground">The belt&apos;s next stop on each card, and the day&apos;s call list: log the outcome and the next stop sets itself. The Calls page works these one at a time.</p>
+        <ErrorNote error={stops.error} />
+        {stops.data?.length === 0 && <Empty>No stops due. A hot reply pings you the moment it lands.</Empty>}
+        <ul className="space-y-3">
+          {stops.data?.map((t) => <StopCard key={t.id} t={t} now={now} />)}
         </ul>
       </Section>
     </div>

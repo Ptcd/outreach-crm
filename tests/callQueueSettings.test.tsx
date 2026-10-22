@@ -40,7 +40,7 @@ vi.mock('@/lib/queries', () => ({
   useDueTasks: () => ok(tasks),
   useLead: (id: string) => ok({
     lead: LEADS[id], gates: [], milestones: [], tasks: [], facts: {},
-    contacts: [{ id: `C-${id}`, lead_id: id, kind: 'phone', value: id === 'L1' ? '4145550101' : '2625550102', value_normalized: id === 'L1' ? '4145550101' : '2625550102', person_name: null, line_type: id === 'L1' ? 'mobile' : 'landline', dnc_vendor: false, dnc_scrub: 'unknown', suppressed: false, dnc_app: false, source: null, status: 'ok', note: null }],
+    contacts: [{ id: `C-${id}`, lead_id: id, kind: 'phone', value: id === 'L1' ? '4145550101' : '2625550102', value_normalized: id === 'L1' ? '4145550101' : '2625550102', person_name: null, line_type: id === 'L1' ? 'mobile' : 'landline', dnc_vendor: id === 'L2', dnc_scrub: id === 'L2' ? 'dnc' : 'unknown', suppressed: false, dnc_app: false, source: null, status: 'ok', note: null }],
     messages: id === 'L1' ? [{ id: 'M1', lead_id: 'L1', direction: 'out', channel: 'sms', body: 'Hi Jane, still yours?', sent_at: '2026-10-21T15:00:00Z', seen_at: null, is_opt_out: false, is_opener: true, status: 'delivered', from_number: null, to_number: null }] : [],
   }),
 }))
@@ -69,6 +69,7 @@ describe('the call queue', () => {
     expect(finishTask).not.toHaveBeenCalled()
     expect(await screen.findByRole('heading', { name: 'BO KIM' })).toBeTruthy()
     expect(screen.getByTestId('queue-count').textContent).toBe('2 of 2')
+    expect(screen.queryByRole('button', { name: 'Call' })).toBeNull()               // vendor DNC: never expose the dial button
   })
 
   it('skip moves the card to the end; hand to Colin needs a line, then finishes the task', async () => {
@@ -98,5 +99,6 @@ describe('Settings', () => {
     await waitFor(() => expect(setMyAlerts).toHaveBeenCalledWith('414 555 0199', 'thalia@example.com'))
     expect(await screen.findByText(/Saved\. Hot pings now go to that phone and that email\./)).toBeTruthy()
     expect(screen.getByText(/tell him when you set or change this/)).toBeTruthy()
+    expect(screen.getByText(/On a computer, Chrome can show pings while the browser is running/)).toBeTruthy()
   })
 })
