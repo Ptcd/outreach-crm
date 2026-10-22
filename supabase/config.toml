@@ -26,3 +26,7 @@ verify_jwt = true
 # The seller's signing page: no login, the link token is the credential (only its hash is stored).
 [functions.contract-sign]
 verify_jwt = false
+
+# The conveyor (pg_cron every 15 minutes; checks the shared secret itself like send-openers).
+[functions.conveyor]
+verify_jwt = false
