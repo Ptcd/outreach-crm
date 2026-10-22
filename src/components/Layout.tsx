@@ -4,6 +4,7 @@ import { BarChart3, CalendarCheck, Inbox, ListChecks, MessageSquareText } from '
 import { useAuth } from '@/providers/AuthProvider'
 import { useRepliesWaiting } from '@/lib/queries'
 import { OfflineBanner } from '@/components/OfflineBanner'
+import { CallBar } from '@/components/CallBar'
 import { cn } from '@/lib/utils'
 
 const NAV = [
@@ -50,6 +51,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <OfflineBanner />
       </header>
       <main className="mx-auto max-w-5xl px-4 py-4">{children}</main>
+      <CallBar />
       <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-background sm:hidden" aria-label="Main">
         {NAV.map((n) => (
           <NavLink

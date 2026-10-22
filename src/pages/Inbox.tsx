@@ -7,6 +7,7 @@ import { api, useInbox, useOtherDrafts, useWaitingDrafts, useWrite } from '@/lib
 import { ReviewDeck } from '@/components/ReviewDeck'
 import { ConfirmButton } from '@/components/ui/confirm'
 import { DraftBox } from '@/components/DraftBox'
+import { CallButton } from '@/components/CallButton'
 import { NotifyPanel } from '@/components/NotifyPanel'
 import { PhoneLookup } from '@/components/PhoneLookup'
 import { fmtDateTime, localInputToIso, todayLocal } from '@/lib/format'
@@ -118,7 +119,11 @@ function InboxCard({ x, bucket }: { x: InboxLead; bucket: Bucket }) {
           </h2>
           <p className="truncate text-sm text-muted-foreground">{x.lead?.property_address ?? o.property_address}</p>
         </div>
-        <Badge tone={sendTone(o.send_status)}>{SEND_LABEL[o.send_status]}</Badge>
+        <div className="flex shrink-0 items-center gap-2">
+          <CallButton to={o.phone} name={x.lead?.owner_name ?? o.owner_name} address={x.lead?.property_address ?? o.property_address}
+            leadId={leadId ?? null} blocked={stopped} />
+          <Badge tone={sendTone(o.send_status)}>{SEND_LABEL[o.send_status]}</Badge>
+        </div>
       </div>
 
       <div className="mt-2 flex flex-wrap gap-1.5">

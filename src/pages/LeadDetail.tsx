@@ -10,6 +10,7 @@ import { ContractBlock } from '@/components/ContractBlock'
 import { CallScript } from '@/components/CallScript'
 import { HotBanner } from '@/components/HotBanner'
 import { gateFromCall, stopsFromCall, type CallFacts } from '@/lib/callGate'
+import { CallButton } from '@/components/CallButton'
 import { api, useDeals, useLead, useWrite } from '@/lib/queries'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
 import { DEAL_STATUS_LABEL, MILESTONES, PEOPLE, SELLER_FACTS, STAGES, STAGE_LABEL, TASK_KINDS, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
@@ -63,7 +64,7 @@ export default function LeadDetail() {
           hints={gateFromCall((lead.call_facts ?? {}) as CallFacts, facts)} hintStops={stopsFromCall((lead.call_facts ?? {}) as CallFacts)} />
       </Section>
       <Tasks leadId={lead.id} tasks={tasks.filter((t) => t.source !== 'reply')} />
-      <Contacts contacts={contacts} leadId={lead.id} />
+      <Contacts contacts={contacts} leadId={lead.id} lead={lead} />
       <Facts lead={lead} />
       <Milestones leadId={lead.id} done={milestones} />
       {isOwner && <ContractBlock lead={lead} contacts={contacts} />}
@@ -242,7 +243,7 @@ function contactFlags(c: Contact) {
   return flags
 }
 
-function Contacts({ contacts, leadId }: { contacts: Contact[]; leadId: string }) {
+function Contacts({ contacts, leadId, lead }: { contacts: Contact[]; leadId: string; lead?: Lead | null }) {
   const upd = useWrite(
     ({ id, patch }: { id: string; patch: Partial<Pick<Contact, 'status' | 'dnc_app'>> }) => api.updateContact(id, patch),
     [['lead', leadId]],
@@ -267,6 +268,10 @@ function Contacts({ contacts, leadId }: { contacts: Contact[]; leadId: string })
               {[c.person_name, c.source].filter(Boolean).join(' - ')}
             </div>
             <div className="mt-1 flex gap-2">
+              {c.kind === 'phone' && (
+                <CallButton to={c.value} name={c.person_name || lead?.owner_name} address={lead?.property_address}
+                  leadId={leadId} contactId={c.id} blocked={contactFlags(c).some((f) => f.tone === 'bad')} />
+              )}
               <Button
                 size="sm"
                 variant="outline"
