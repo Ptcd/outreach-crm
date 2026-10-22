@@ -129,7 +129,10 @@ export async function runReplyAgent(opts: {
     const ctx: ReplyContext = { inbound: (react ? reactionMeaning(react) : null) ?? t.body ?? '', priorInbound: (t.prior_inbound ?? []).filter(Boolean),
       lastAgentText: t.last_agent_text, propertyAddress: t.property_address, ownerName: t.owner_name,
       ourTurns: Math.max(0, (t.history ?? []).filter((h) => h.who === 'us').length - 1) }
-    const d = decide(ctx)
+    let d = decide(ctx)
+    // A held phone (reply_holds) gets nothing on its own: Colin answers. A removal stays final.
+    const held = (await opts.rpc('reply_is_held', { p_phone10: t.from10 })).data === true
+    if (held && d.kind === 'routine') d = { ...d, kind: 'candidate', reply: null, outcome: 'open', facts: undefined, note: `held for Colin: ${d.note}` }
     let body = d.reply
     let source = d.reply ? 'fixed_line' : 'none'
     let facts: Record<string, unknown> | null = d.facts ?? null
@@ -151,7 +154,7 @@ export async function runReplyAgent(opts: {
     if (r.error) throw new Error(r.error.message)
     if (facts && Object.keys(facts).length) await opts.rpc('reply_set_facts', { p_sid: t.sid, p_facts: facts })
     // A reply that shows interest or asks about selling: Colin's cell gets a text (hotLeads.ts).
-    if (isHotReply({ intent: d.intent, text: ctx.inbound, removal: d.removal })) {
+    if ((held && !d.removal) || isHotReply({ intent: d.intent, text: ctx.inbound, removal: d.removal })) {
       const h = await opts.rpc('hot_record', { p_sid: t.sid, p_lead_id: t.lead_id, p_phone10: t.from10,
         p_first_name: firstNameOf(t.owner_name), p_address: t.property_address, p_body: ctx.inbound,
         p_is_test: t.is_test === true, p_now: now().toISOString() })

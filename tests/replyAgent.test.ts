@@ -227,6 +227,22 @@ describe('work no text can do', () => {
   })
 })
 
+describe('held phones', () => {
+  it('get nothing on their own: a would-be routine reply is a draft for Colin with a hot alert; a STOP is still final', async () => {
+    await db.exec(`insert into public.reply_holds (phone10, reason) values ('4145550177', 'false opt-out corrected'), ('4145550178', 'test')`)
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMk1', '+14145550177', 'Yes'), text('SMk2', '+14145550178', 'STOP')]
+    await run(tw)
+    const d = (await db.query<{ inbound_sid: string; kind: string; status: string; outcome: string }>(
+      `select inbound_sid, kind, status, outcome from public.reply_drafts order by inbound_sid`)).rows
+    expect(d.find((x) => x.inbound_sid === 'SMk1')).toMatchObject({ kind: 'candidate', status: 'awaiting_approval' })
+    expect(d.find((x) => x.inbound_sid === 'SMk2')).toMatchObject({ kind: 'removal', outcome: 'dnc' })
+    expect((await db.query<{ inbound_sid: string }>(`select inbound_sid from public.hot_alerts`)).rows).toEqual([{ inbound_sid: 'SMk1' }])
+    expect((await db.query(`select 1 from public.suppressed_phones where phone10 = '4145550178'`)).rows).toHaveLength(1)
+    await db.exec(`truncate public.reply_holds`)
+  })
+})
+
 describe('hot replies', () => {
   it('a thumbs-up reaction (quoting our STOP line) is a yes: no suppression, no DNC, a hot alert', async () => {
     const tw = new FakeTwilio()
