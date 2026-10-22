@@ -312,7 +312,7 @@ describe('the routine switch', () => {
       `select phone10, kind, status, body, draft_source, facts from public.reply_drafts order by inbound_at, phone10`)).rows
     const yes = d.find((x) => x.phone10 === '4145550177')!
     expect(yes).toMatchObject({ kind: 'routine', draft_source: 'fixed_line',
-      body: "Hi Test, thanks for getting back to me. Colin Merrill here - I buy a few houses a year around here myself, as-is and on the owner's timeline. Would you ever consider selling that one? No pressure either way." })
+      body: "Thanks for getting back to me. I buy a few houses a year around here myself, as-is and on your timeline. Would you ever consider selling that one? No pressure either way." })
     expect(yes.facts).toMatchObject({ pitched: true, last_asked: 'interest' })
     expect(d.find((x) => x.phone10 === '4145550178')).toMatchObject({ kind: 'candidate', status: 'awaiting_approval' })
     expect(seen).toEqual(['Yes, how much?'])

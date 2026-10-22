@@ -249,11 +249,10 @@ export function pitchReply(x: { inbound: string; priorInbound: string[]; ourTurn
   // An old-style opener that already asked about selling: a yes is interest, never pitch twice.
   if (openerAskedSelling(x.openerText)) return null
   if (!AFFIRM.test(text) || INTEREST_WORDS.test(text) || text.split(/\s+/).filter(Boolean).length > 6) return null
-  const word = (x.ownerName ?? '').trim().split(/\s+/)[0] ?? ''
-  const first = word && !ENTITY_NAME.test(x.ownerName ?? '') ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : ''
-  const hi = first ? `Hi ${first}, ` : 'Hi, '
+  // The opener already said hello and who this is; the pitch does neither again (Colin 2026-10-22: "it
+  // shouldn't say Colin twice ... make the responses sound like I or a human actually wrote em").
   return {
-    reply: `${hi}${B.PITCH_LINE.charAt(0).toLowerCase()}${B.PITCH_LINE.slice(1)}`,
+    reply: B.PITCH_LINE,
     facts: { identity_confirmed: true, still_owns: true, interest: 'maybe', last_asked: 'interest', pitched: true },
   }
 }
