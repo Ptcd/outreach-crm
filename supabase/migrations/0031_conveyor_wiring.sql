@@ -1,4 +1,4 @@
--- Wiring every existing entry point into belt_event (0029), the conveyor's own SQL, and the health
+-- Wiring every existing entry point into belt_event (0030), the conveyor's own SQL, and the health
 -- checks. The reply agent's code (functions/_shared/reply*.ts) is not touched: it is hooked by triggers
 -- on the rows it writes (reply_drafts, tasks, hot_alerts) and on what the laptop syncs (reply_threads).
 
@@ -134,8 +134,24 @@ create trigger belt_on_task_done after update of done_at on public.tasks
 -- ------------------------------------------------------------------ e) a person's own text or call, and a STOP by text
 create or replace function public.belt_on_message() returns trigger
 language plpgsql security definer set search_path = public as $$
+declare label text;
 begin
   if new.lead_id is null then return new; end if;
+  if new.channel = 'call' and new.status in ('interested', 'not_now', 'not_interested', 'wrong_number', 'dnc', 'no_answer', 'reached_no_decision')
+     and not public.belt_in_event() and coalesce(current_setting('wpie.task_outcome', true), '') <> '1' then
+    -- a call logged from the script (log_call): the stop it was is logged with it, and the belt routes the outcome.
+    -- The rest of log_call's own writes (its stage, its +30 days) happen in this transaction and are the belt's doing.
+    perform set_config('wpie.call_logged', '1', true);
+    perform set_config('wpie.task_outcome', '1', true);
+    update public.tasks set done_at = coalesce(done_at, new.sent_at), note = coalesce(note, '') || ' [logged: ' || replace(new.status, '_', ' ') || ']'
+     where lead_id = new.lead_id and source in ('belt', 'call_list', 'after_stop') and done_at is null and kind in ('call', 'visit')
+       and due_at <= new.sent_at + interval '12 hours';
+    perform set_config('wpie.task_outcome', '', true);
+    label := nullif(btrim(regexp_replace(coalesce(new.body, ''), '^[^\n]*', '')), '');
+    perform public.belt_event(new.lead_id, 'call_logged', jsonb_build_object('outcome', new.status, 'note', label, 'said', label,
+      'phone', right(regexp_replace(coalesce(new.from_number, ''), '\D', '', 'g'), 10), 'key', 'call:' || new.id::text), null, new.sent_at);
+    return new;
+  end if;
   if new.direction = 'in' and new.is_opt_out then
     perform public.belt_event(new.lead_id, 'stop', jsonb_build_object('key', 'stopmsg:' || new.id::text, 'said', left(coalesce(new.body, ''), 300)), 'text', new.sent_at);
   elsif new.direction = 'out' and (new.channel = 'email' or (new.channel = 'sms' and (new.created_by is not null or coalesce(new.status, '') like 'human%' or coalesce(new.status, '') like 'sent by %'))) then
@@ -153,7 +169,7 @@ create or replace function public.belt_leads_guard() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare changed text[] := '{}';
 begin
-  if public.belt_in_event() then return new; end if;
+  if public.belt_in_event() or coalesce(current_setting('wpie.call_logged', true), '') = '1' then return new; end if;
   if new.stage is distinct from old.stage then changed := array_append(changed, 'stage'); end if;
   if new.next_action is distinct from old.next_action then changed := array_append(changed, 'next_action'); end if;
   if new.next_action_at is distinct from old.next_action_at then changed := array_append(changed, 'next_action_at'); end if;
@@ -179,51 +195,10 @@ drop trigger if exists belt_leads_stage_follow on public.leads;
 create trigger belt_leads_stage_follow after update of stage on public.leads
   for each row execute function public.belt_leads_stage_follow();
 
--- ------------------------------------------------------------------ g) the call desk: log_call and call_answer go through the belt
-create or replace function public.log_call(p_lead_id uuid, p_phone text, p_outcome text, p_note text default null)
-returns jsonb language plpgsql security definer set search_path = public as $$
-declare who text; d text := right(regexp_replace(coalesce(p_phone, ''), '\D', '', 'g'), 10); l public.leads;
-  phones text[]; label text; res jsonb;
-begin
-  if not public.is_team() then raise exception 'team only'; end if;
-  if p_outcome not in ('interested', 'not_now', 'not_interested', 'wrong_number', 'dnc', 'no_answer', 'reached_no_decision') then
-    return jsonb_build_object('ok', false, 'reason', 'pick an outcome');
-  end if;
-  select * into l from public.leads where id = p_lead_id for update;
-  if not found then return jsonb_build_object('ok', false, 'reason', 'no such lead'); end if;
-  select display_name into who from public.team_members where lower(email) = lower(auth.jwt() ->> 'email');
-  label := case p_outcome when 'interested' then 'Interested' when 'not_now' then 'Not now' when 'not_interested' then 'Not interested'
-                          when 'wrong_number' then 'Wrong number' when 'no_answer' then 'No answer' when 'reached_no_decision' then 'Reached, no decision yet'
-                          else 'Do not contact' end;
-  insert into public.messages (lead_id, direction, channel, body, from_number, sent_at, seen_at, status)
-  values (p_lead_id, (case when p_outcome = 'no_answer' then 'out' else 'in' end)::public.msg_direction, 'call', format('Call (%s)%s: %s%s', coalesce(who, 'team'),
-            case when d ~ '^[0-9]{10}$' then ' from ' || d else '' end, label,
-            coalesce(E'\n' || nullif(btrim(coalesce(p_note, '')), ''), '')),
-          case when d ~ '^[0-9]{10}$' then '+1' || d end, now(), now(), p_outcome);
-  update public.leads set call_facts = jsonb_set(call_facts, '{last_call}', jsonb_build_object('value', p_outcome, 'at', now(), 'by', who))
-   where id = p_lead_id;
-  if p_outcome = 'wrong_number' and d ~ '^[0-9]{10}$' then
-    update public.contacts set status = 'bad' where lead_id = p_lead_id and value_normalized = d;
-  elsif p_outcome = 'dnc' then
-    select array_agg(distinct c.value_normalized) into phones from public.contacts c
-     where c.lead_id = p_lead_id and c.kind = 'phone' and c.value_normalized ~ '^[0-9]{10}$';
-    phones := coalesce(phones, '{}');
-    if d ~ '^[0-9]{10}$' and not d = any(phones) then phones := array_append(phones, d); end if;
-    insert into public.suppressed_phones (phone10, reason, source)
-      select distinct p, 'dnc_call', 'app' from unnest(phones) p
-    on conflict (phone10) do nothing;
-    update public.contacts set suppressed = true, dnc_app = true where value_normalized = any(phones);
-  end if;
-  -- the stop this call was, if it was one, is logged with it (the call's outcome is the outcome)
-  perform set_config('wpie.task_outcome', '1', true);
-  update public.tasks set done_at = now(), note = coalesce(note, '') || ' [logged: ' || label || ']'
-   where lead_id = p_lead_id and source in ('belt', 'call_list', 'after_stop') and done_at is null and kind in ('call', 'visit')
-     and due_at <= now() + interval '12 hours';
-  perform set_config('wpie.task_outcome', '', true);
-  res := public.belt_event(p_lead_id, 'call_logged', jsonb_build_object('outcome', p_outcome, 'note', p_note, 'phone', d, 'said', nullif(btrim(coalesce(p_note, '')), '')), who, now());
-  return jsonb_build_object('ok', true, 'outcome', p_outcome, 'belt', res->>'belt', 'next_stop_at', res->>'next_stop_at');
-end $$;
-
+-- ------------------------------------------------------------------ g) the call desk
+-- log_call (0013, redefined in 0028 by the UI owner to accept no_answer / reached_no_decision) writes one call row on
+-- messages with status = the outcome: that row is the belt's hook (belt_on_message below). call_answer's next step
+-- books through the belt.
 create or replace function public.call_answer(p_lead_id uuid, p_key text, p_value jsonb)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare who text; at timestamptz; kind text; res jsonb;
@@ -702,3 +677,56 @@ grant execute on function public.belt_due_texts(timestamptz, integer), public.be
   public.belt_watch(timestamptz), public.belt_canary(timestamptz), public.belt_backfill(timestamptz) to service_role;
 grant select on public.belt_alerts_sent to authenticated;
 create policy belt_alerts_sent_read on public.belt_alerts_sent for select to authenticated using (public.is_team());
+
+-- ================================================================== what the pages read (the UI owner's names)
+-- belt_stops: every open stop (belt, call-list and after-STOP tasks) with the card's belt words.
+create or replace view public.belt_stops with (security_invoker = true) as
+  select t.id as task_id, t.lead_id, t.owner::text as person, t.due_at, t.kind, t.title, t.note, t.source, t.source_key, t.phone10, t.done_at,
+         l.owner_name, l.property_address, l.stage, l.belt, l.belt_step, l.next_stop_who, l.next_stop_say, l.elderly_or_ill, l.grief,
+         public.belt_label(l.belt) as belt_label, public.belt_max_step(l.belt) as belt_steps,
+         (t.due_at < now() - interval '1 minute') as late
+    from public.tasks t left join public.leads l on l.id = t.lead_id
+   where t.source in ('belt', 'call_list', 'after_stop');
+grant select on public.belt_stops to authenticated, service_role;
+
+-- belt_stops_for(person, until): that person's open stops due by `until` (null person: everyone), overdue first.
+create or replace function public.belt_stops_for(p_person text default null, p_until timestamptz default null)
+returns setof public.belt_stops language sql stable security definer set search_path = public as $$
+  select s.* from public.belt_stops s
+   where s.done_at is null and (p_person is null or s.person = p_person)
+     and s.due_at <= coalesce(p_until, (date_trunc('day', now() at time zone 'America/Chicago') + interval '1 day') at time zone 'America/Chicago')
+   order by s.due_at
+$$;
+revoke all on function public.belt_stops_for(text, timestamptz) from public, anon;
+grant execute on function public.belt_stops_for(text, timestamptz) to authenticated, service_role;
+
+-- belt_task_outcome(task, outcome, note, detail): the UI owner's name for belt_stop_done.
+create or replace function public.belt_task_outcome(p_task_id uuid, p_outcome text, p_note text default null, p_detail jsonb default '{}'::jsonb)
+returns jsonb language sql security definer set search_path = public as $$
+  select public.belt_stop_done(p_task_id, p_outcome, p_note, p_detail)
+$$;
+revoke all on function public.belt_task_outcome(uuid, text, text, jsonb) from public, anon;
+grant execute on function public.belt_task_outcome(uuid, text, text, jsonb) to authenticated, service_role;
+
+-- belt_card(lead): the one line under the card's header plus the last three moves, ready to show.
+create or replace function public.belt_card(p_lead_id uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'belt', l.belt, 'label', public.belt_label(l.belt), 'step', l.belt_step, 'steps', public.belt_max_step(l.belt),
+    'next_stop_at', l.next_stop_at, 'next_stop_who', l.next_stop_who, 'next_stop_say', l.next_stop_say,
+    'named_date', l.named_date, 'named_event', l.named_event, 'unanswered', l.unanswered_count, 'elderly_or_ill', l.elderly_or_ill, 'grief', l.grief,
+    'line', case when l.belt is null then 'Not on a belt yet'
+                 else concat_ws(' · ', 'On belt: ' || public.belt_label(l.belt),
+                        case when l.belt_step > 0 and public.belt_max_step(l.belt) > 0 then format('stop %s of %s', l.belt_step, public.belt_max_step(l.belt)) end,
+                        case when l.next_stop_at is null then (case when l.belt in ('dead', 'dnc', 'too_high_or_listed', 'cold_texts') or (l.belt = 'dormant' and l.dormant_round >= 3) then 'resting: no next stop' else 'NO NEXT STOP' end)
+                             else 'next: ' || (case l.next_stop_who when 'auto_text' then 'a text goes on its own' when 'draft_text' then 'a draft for Colin''s tap'
+                                                when 'thalia_call' then 'Thalia calls' when 'colin_call' then 'Colin calls' else 'Colin visits' end)
+                                  || ' ' || to_char(l.next_stop_at at time zone 'America/Chicago', 'Dy Mon FMDD FMHH12:MI AM') end,
+                        case when l.next_stop_say is not null then 'say: "' || l.next_stop_say || '"' end) end,
+    'events', coalesce((select jsonb_agg(jsonb_build_object('at', e.at, 'event', e.event, 'from_belt', e.from_belt, 'to_belt', e.to_belt, 'step', e.step,
+                                                             'outcome', e.payload->>'outcome', 'by', e.by) order by e.at desc)
+                          from (select * from public.belt_events x where x.lead_id = l.id order by x.at desc limit 3) e), '[]'::jsonb))
+    from public.leads l where l.id = p_lead_id
+$$;
+revoke all on function public.belt_card(uuid) from public, anon;
+grant execute on function public.belt_card(uuid) to authenticated, service_role;

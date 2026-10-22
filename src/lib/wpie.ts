@@ -157,6 +157,7 @@ export const MILESTONES: { id: MilestoneKind; label: string; hint: string }[] = 
 // Follow-up kinds from qualification.yaml (followups) plus everyday ones.
 export const TASK_KINDS: { id: string; label: string }[] = [
   { id: 'call', label: 'Call' },
+  { id: 'visit', label: 'Visit' },
   { id: 'text', label: 'Text (inside their thread only)' },
   { id: 'confirm_walk', label: 'Confirm walk' },
   { id: 'offer_thinking', label: 'Offer: thinking it over' },

@@ -1,4 +1,4 @@
-// The conveyor's vocabulary for the pages (migrations 0028-0031). The belts, their labels and ladders live in
+// The conveyor's vocabulary for the pages (migrations 0029-0032). The belts, their labels and ladders live in
 // the database (belt_rules, belt_steps); this file carries the words the pages show and the outcome buttons.
 import { fmtDateTime } from './format'
 

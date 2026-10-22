@@ -1,4 +1,4 @@
-// conveyor: called every 15 minutes by pg_cron (migration 0031). Executes the belts' due text stops,
+// conveyor: called every 15 minutes by pg_cron (migration 0032). Executes the belts' due text stops,
 // sweeps missed stops, runs the daily canary and writes the belt_health heartbeat. Dry (no Twilio call)
 // unless TWILIO_LIVE_SENDING=1 and every Twilio setting is set; a belt text also needs its own template
 // switch on, or it becomes a draft for Colin's tap.

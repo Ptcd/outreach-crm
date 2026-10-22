@@ -55,6 +55,53 @@ export interface Lead {
   updated_at: string
   // 0013: answers from the call script, { key: { value, at, by } }
   call_facts?: Record<string, { value: unknown; at: string; by?: string | null }> | null
+  // 0029: the conveyor
+  belt?: string | null
+  belt_step?: number
+  belt_round?: number
+  belt_entered_at?: string | null
+  next_stop_at?: string | null
+  next_stop_who?: string | null
+  next_stop_say?: string | null
+  belt_reference?: string | null
+  named_date?: string | null
+  named_event?: string | null
+  unanswered_count?: number
+  dormant_round?: number
+  elderly_or_ill?: boolean
+  grief?: boolean
+}
+
+/** One move of a card (0029 belt_events). */
+export interface BeltEvent {
+  id: number
+  lead_id: string
+  event: string
+  from_belt: string | null
+  to_belt: string | null
+  step: number | null
+  payload: Record<string, unknown>
+  at: string
+  by: string | null
+}
+
+export interface BeltHealth {
+  id: number
+  at: string
+  kind: 'run' | 'canary'
+  ok: boolean
+  checks: Record<string, unknown>
+  summary: string | null
+}
+
+export interface TouchTemplate {
+  key: string
+  label: string
+  wording: string
+  auto: boolean
+  enabled: boolean
+  changed_by: string | null
+  changed_at: string | null
 }
 
 export interface Contact {
@@ -104,6 +151,7 @@ export interface Task {
   quote?: string | null
   email_to?: string | null
   phone10?: string | null
+  source_key?: string | null
 }
 
 export interface GateScore {
@@ -221,14 +269,14 @@ export type DraftStatus =
 /** One inbound text and the drafted answer to it (migration 0004). */
 export interface ReplyDraft {
   id: string
-  inbound_sid: string
+  inbound_sid: string | null
   phone10: string
   our_number: string | null
   lead_id: string | null
   inbound_body: string | null
   inbound_at: string
   intent: string | null
-  kind: 'removal' | 'routine' | 'candidate'
+  kind: 'removal' | 'routine' | 'candidate' | 'after_close' | 'belt'
   outcome: string | null
   note: string | null
   body: string | null

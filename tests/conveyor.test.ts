@@ -237,7 +237,8 @@ describe('the belts move cards', () => {
   it('not now with a date: the permission text 4 days before, the call never before the date, then +7', async () => {
     const r = await as(THALIA, () => one<{ r: Record<string, unknown> }>(
       `select public.log_call($1, '4145550177', 'not_now', 'after the tenant moves out, mid November') as r`, [A]))
-    expect(r.r).toMatchObject({ ok: true, belt: 'not_now_condition' })                  // no date given: a condition
+    expect(r.r).toMatchObject({ ok: true })
+    expect((await lead()).belt).toBe('not_now_condition')                                 // no date given: a condition
     await ev('named_date', { named_date: '2026-11-16T18:00:00Z', named_event: 'the tenant moving out' })
     let l = await lead()
     expect(l).toMatchObject({ belt: 'not_now_dated', belt_step: 1, next_stop_who: 'auto_text' })
@@ -333,18 +334,27 @@ describe('the belts move cards', () => {
     expect(d[d.length - 1]).toMatchObject({ status: 'dry_sent', draft_source: 'belt_auto' })
   })
 
-  it('log_call: every outcome moves the card, no answer counts, reached with no decision plants Colin\'s +3 call', async () => {
+  it('a call logged from the script moves the card through its call row: no answer counts, reached with no decision plants Colin\'s +3 call', async () => {
     await ev('inbound_text', { intent: 'interested', interest: true })
+    // log_call (0013 / 0028) writes one call row with status = the outcome; the belt hooks that row
     const log = (o: string) => as(THALIA, () => one<{ r: Record<string, unknown> }>(`select public.log_call($1, '4145550177', $2, null) as r`, [A, o]))
-    expect((await log('no_answer')).r).toMatchObject({ ok: true, belt: 'yes_unbooked' })
-    expect((await lead())).toMatchObject({ belt_step: 2, unanswered_count: 1 })
-    expect((await log('reached_no_decision')).r).toMatchObject({ belt: 'after_call_quiet' })
-    expect((await lead())).toMatchObject({ next_stop_who: 'colin_call', unanswered_count: 0, stage: 'follow_up' })
-    expect((await log('interested')).r).toMatchObject({ belt: 'yes_unbooked' })
-    expect((await lead()).stage).toBe('colin_call')
-    expect((await log('wrong_number')).r).toMatchObject({ belt: null })
+    const row = (o: string) => db.query(`insert into public.messages (lead_id, direction, channel, body, from_number, sent_at, seen_at, status)
+      values ($1, 'in', 'call', 'Call (Thalia) from 4145550177: ' || $2, '+14145550177', now(), now(), $2)`, [A, o])
+    await row('no_answer')
+    expect((await lead())).toMatchObject({ belt: 'yes_unbooked', belt_step: 2, unanswered_count: 1 })
+    expect((await db.query(`select 1 from public.belt_direct_writes`)).rows).toHaveLength(0)
+    await row('reached_no_decision')
+    expect((await lead())).toMatchObject({ belt: 'after_call_quiet', next_stop_who: 'colin_call', unanswered_count: 0, stage: 'follow_up' })
+    expect((await log('interested')).r).toMatchObject({ ok: true })
+    expect((await lead())).toMatchObject({ belt: 'yes_unbooked', stage: 'colin_call' })
+    expect((await log('not_now')).r).toMatchObject({ ok: true })
+    expect((await lead())).toMatchObject({ belt: 'not_now_condition', stage: 'follow_up' })
+    expect((await log('wrong_number')).r).toMatchObject({ ok: true })
     expect((await lead())).toMatchObject({ belt: null, stage: 'data_fix', next_stop_at: null })
-    expect((await log('dnc')).r).toMatchObject({ belt: 'dnc' })
+    expect((await log('dnc')).r).toMatchObject({ ok: true })
+    expect((await lead())).toMatchObject({ belt: 'dnc', stage: 'dnc' })
+    // log_call's own stage writes in that transaction are the belt's doing, never flagged
+    expect((await db.query(`select 1 from public.belt_direct_writes`)).rows).toHaveLength(0)
   })
 
   it('the reply agent\'s rows move the card through triggers: a draft, a nurture, a hot reply, a synced thread, a STOP', async () => {

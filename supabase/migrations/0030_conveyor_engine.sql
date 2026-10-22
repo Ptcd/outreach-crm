@@ -1,4 +1,4 @@
--- The conveyor's engine (see 0028 for the state, the cadence table and the texts).
+-- The conveyor's engine (see 0029 for the state, the cadence table and the texts).
 --   belt_event(lead, event, payload)   the ONE door: every move of a card goes through here
 --   belt_enter(...)                    puts a card on a belt at a step and schedules the next stop
 --   belt_stop_done(task, outcome, ...) a person logged a stop (Today's outcome buttons)
@@ -612,6 +612,7 @@ begin
   else
     res := jsonb_build_object('ok', true);
   end if;
+  perform set_config('wpie.task_outcome', '1', true);
   if p_outcome in ('reached', 'reached_no_decision', 'booked', 'not_now', 'no', 'family', 'elderly', 'estate', 'hold', 'too_high', 'listed') then
     perform public.mark_called(t.lead_id, now());
     insert into public.messages (lead_id, direction, channel, body, sent_at, seen_at, status)
@@ -622,6 +623,7 @@ begin
     values (t.lead_id, 'out', 'call', format('%s (%s)%s', case when p_outcome = 'voicemail' then 'Left a voicemail' else 'No answer' end, coalesce(who, 'team'),
             coalesce(E'\n' || nullif(btrim(coalesce(p_note, '')), ''), '')), now(), now(), p_outcome);
   end if;
+  perform set_config('wpie.task_outcome', '', true);
   return res;
 end $$;
 revoke all on function public.belt_stop_done(uuid, text, text, jsonb) from public, anon;
@@ -629,13 +631,26 @@ grant execute on function public.belt_stop_done(uuid, text, text, jsonb) to auth
 
 -- The card's "move" (Colin or Thalia): a belt by hand, a flag, a named date. Replaces the stage form's direct write.
 create or replace function public.lead_move(p_lead_id uuid, p_belt text default null, p_reason text default null, p_named_date timestamptz default null,
-  p_named_event text default null, p_elderly boolean default null, p_grief boolean default null, p_assigned_to text default null, p_notes text default null)
+  p_named_event text default null, p_elderly boolean default null, p_grief boolean default null, p_assigned_to text default null, p_notes text default null,
+  p_stage text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
-declare who text; res jsonb := '{"ok":true}'::jsonb;
+declare who text; res jsonb := '{"ok":true}'::jsonb; l public.leads;
 begin
   if not public.is_team() then raise exception 'team only'; end if;
   select display_name into who from public.team_members where lower(email) = lower(auth.jwt() ->> 'email');
   if p_notes is not null then update public.leads set notes = nullif(btrim(p_notes), '') where id = p_lead_id; end if;
+  -- Colin's deal stages (offer, under contract, closed) are his to set; the belt follows (offer -> offer out)
+  if p_stage is not null then
+    if not public.is_owner() then raise exception 'only Colin (owner) sets a deal stage'; end if;
+    if p_stage not in ('offer', 'under_contract', 'closed_won', 'walk_decision', 'walkthrough_booked') then raise exception 'not a deal stage: %', p_stage; end if;
+    select * into l from public.leads where id = p_lead_id;
+    perform set_config('wpie.in_belt_event', '1', true);
+    update public.leads set stage = p_stage::public.lead_stage where id = p_lead_id;
+    insert into public.belt_events (lead_id, event, from_belt, to_belt, step, payload, at, by)
+    values (p_lead_id, 'stage_set', l.belt, l.belt, l.belt_step, jsonb_build_object('from', l.stage::text, 'to', p_stage, 'reason', p_reason), now(), who);
+    perform set_config('wpie.in_belt_event', '', true);
+    if p_stage = 'offer' and p_belt is null then res := public.belt_event(p_lead_id, 'move', jsonb_build_object('belt', 'offer_out', 'reason', coalesce(p_reason, 'offer out')), who); end if;
+  end if;
   if p_assigned_to is not null then
     perform set_config('wpie.in_belt_event', '1', true);
     update public.leads set assigned_to = nullif(p_assigned_to, '')::public.team_person where id = p_lead_id;
@@ -652,8 +667,8 @@ begin
   end if;
   return res;
 end $$;
-revoke all on function public.lead_move(uuid, text, text, timestamptz, text, boolean, boolean, text, text) from public, anon;
-grant execute on function public.lead_move(uuid, text, text, timestamptz, text, boolean, boolean, text, text) to authenticated;
+revoke all on function public.lead_move(uuid, text, text, timestamptz, text, boolean, boolean, text, text, text) from public, anon;
+grant execute on function public.lead_move(uuid, text, text, timestamptz, text, boolean, boolean, text, text, text) to authenticated;
 
 revoke all on function public.belt_event(uuid, text, jsonb, text, timestamptz), public.belt_enter(uuid, text, integer, text, jsonb, text, timestamptz),
   public.belt_cancel_pending(uuid, text, timestamptz), public.belt_route_no_answer(uuid, jsonb, text, timestamptz, text) from public, anon;

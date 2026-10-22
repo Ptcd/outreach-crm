@@ -3,8 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabaseClient'
 import type {
-  CampaignControl, Contact, Deal, FollowupDebt, GateScore, Lead, LeadStage, Message, Milestone, MilestoneKind,
-  OpenerDecision, Person, PlannedOpener, ReplyDraft, ReplyThread, ScoreboardWeek, SignalWeek, Task, TwilioInbound,
+  BeltEvent, BeltHealth, CampaignControl, Contact, Deal, FollowupDebt, GateScore, Lead, LeadStage, Message, Milestone, MilestoneKind,
+  OpenerDecision, Person, PlannedOpener, ReplyDraft, ReplyThread, ScoreboardWeek, SignalWeek, Task, TouchTemplate, TwilioInbound,
 } from './types'
 import type { InboxLead } from './inbox'
 
@@ -47,6 +47,98 @@ export function useUnseenReplies() {
   })
 }
 
+// ------------------------------------------------------------------ the conveyor (migrations 0029-0032)
+export type StopTask = Task & { lead: Pick<Lead, 'id' | 'owner_name' | 'property_address' | 'stage' | 'belt' | 'belt_step' | 'next_stop_say' | 'elderly_or_ill' | 'grief'> | null }
+
+/** The signed-in person's stops: belt and call-list tasks due by the end of today, overdue first. */
+export function useMyStops(untilIso: string, owner: Person | 'all') {
+  return useQuery({
+    queryKey: ['tasks', 'stops', untilIso, owner],
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      let q = supabase.from('tasks')
+        .select('*, lead:leads(id, owner_name, property_address, stage, belt, belt_step, next_stop_say, elderly_or_ill, grief)')
+        .in('source', ['belt', 'call_list', 'after_stop']).is('done_at', null).lte('due_at', untilIso).order('due_at').limit(200)
+      if (owner !== 'all') q = q.eq('owner', owner)
+      return check(await q) as StopTask[]
+    },
+  })
+}
+
+export type CardNoStop = { lead_id: string; owner_name: string; property_address: string | null; stage: LeadStage; belt: string | null; belt_step: number
+  assigned_to: Person | null; belt_entered_at: string | null; updated_at: string }
+
+/** Every live card must have a next stop; these do not (the belt's debt). */
+export function useCardsNoStop() {
+  return useQuery({
+    queryKey: ['cards_no_stop'],
+    refetchInterval: 60_000,
+    queryFn: async () => check(await supabase.from('cards_no_stop').select('*').order('updated_at').limit(200)) as CardNoStop[],
+  })
+}
+
+/** The conveyor's latest heartbeat and the latest canary. */
+export function useBeltHealth() {
+  return useQuery({
+    queryKey: ['belt_health'],
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const [run, canary] = await Promise.all([
+        supabase.from('belt_health').select('*').eq('kind', 'run').order('at', { ascending: false }).limit(1).maybeSingle(),
+        supabase.from('belt_health').select('*').eq('kind', 'canary').order('at', { ascending: false }).limit(1).maybeSingle(),
+      ])
+      return { run: check(run) as BeltHealth | null, canary: check(canary) as BeltHealth | null }
+    },
+  })
+}
+
+export function useBeltEvents(leadId: string, limit = 3) {
+  return useQuery({
+    queryKey: ['belt_events', leadId, limit],
+    queryFn: async () => check(await supabase.from('belt_events').select('*').eq('lead_id', leadId).order('at', { ascending: false }).limit(limit)) as BeltEvent[],
+  })
+}
+
+export function useBeltMaxSteps() {
+  return useQuery({
+    queryKey: ['belt_steps', 'max'],
+    staleTime: 3_600_000,
+    queryFn: async () => {
+      const rows = check(await supabase.from('belt_steps').select('belt, step')) as { belt: string; step: number }[]
+      const out: Record<string, number> = {}
+      for (const r of rows) out[r.belt] = Math.max(out[r.belt] ?? 0, r.step)
+      return out
+    },
+  })
+}
+
+export type BeltCount = { belt: string; label: string; n: number; overdue: number; no_stop: number }
+export function useBeltCounts() {
+  return useQuery({ queryKey: ['belt_counts'], refetchInterval: 60_000,
+    queryFn: async () => check(await supabase.from('belt_counts').select('*')) as BeltCount[] })
+}
+export type BeltStopsDay = { day: string; person: string; done_on_time: number; done_late: number; open_late: number }
+export function useBeltStopsDaily() {
+  return useQuery({ queryKey: ['belt_stops_daily'],
+    queryFn: async () => check(await supabase.from('belt_stops_daily').select('*').order('day', { ascending: false }).limit(60)) as BeltStopsDay[] })
+}
+export type BeltTouch = { template_key: string; belt: string; sent: number; replied: number; stops: number }
+export function useBeltTouches() {
+  return useQuery({ queryKey: ['belt_touch_replies'], queryFn: async () => check(await supabase.from('belt_touch_replies').select('*')) as BeltTouch[] })
+}
+export type BeltRevival = { week_start: string; belt: string; revived: number }
+export function useBeltRevivals() {
+  return useQuery({ queryKey: ['belt_revivals'],
+    queryFn: async () => check(await supabase.from('belt_revivals').select('*').order('week_start', { ascending: false }).limit(60)) as BeltRevival[] })
+}
+export type BeltUnanswered = { belt: string; unanswered_count: number; n: number }
+export function useBeltUnanswered() {
+  return useQuery({ queryKey: ['belt_unanswered'], queryFn: async () => check(await supabase.from('belt_unanswered').select('*')) as BeltUnanswered[] })
+}
+export function useTouchTemplates() {
+  return useQuery({ queryKey: ['touch_templates'], queryFn: async () => check(await supabase.from('touch_templates').select('*').order('key')) as TouchTemplate[] })
+}
+
 export function useFollowupDebt() {
   return useQuery({
     queryKey: ['followup_debt'],
@@ -66,6 +158,7 @@ export function usePipelineCounts() {
 
 export interface LeadFilter {
   stage: LeadStage | 'working' | 'all'
+  belt: string | 'all'
   lane: 'hold' | 'flip' | 'all'
   county: string | 'all'
   search: string
@@ -80,9 +173,10 @@ export function useLeads(f: LeadFilter, workingStages: LeadStage[]) {
     queryFn: async () => {
       let q = supabase
         .from('leads')
-        .select('id, owner_name, property_address, municipality, county, lane, stage, next_action_at, next_action, assigned_to, reasons_to_sell, last_inbound_at', { count: 'exact' })
+        .select('id, owner_name, property_address, municipality, county, lane, stage, next_action_at, next_action, assigned_to, reasons_to_sell, last_inbound_at, belt, belt_step, next_stop_at, next_stop_who', { count: 'exact' })
       if (f.stage === 'working') q = q.in('stage', workingStages)
       else if (f.stage !== 'all') q = q.eq('stage', f.stage)
+      if (f.belt && f.belt !== 'all') q = q.eq('belt', f.belt)
       if (f.lane !== 'all') q = q.eq('lane', f.lane)
       if (f.county !== 'all') q = q.eq('county', f.county)
       const s = f.search.trim().replace(/[%,()]/g, ' ')
@@ -173,13 +267,21 @@ export const api = {
   resumeFollowups: () => supabase.rpc('resume_followups'),
   approveDay: (day: string, except: string[]) => supabase.rpc('approve_day', { p_date: day, p_except: except }),
   withdrawDay: (day: string) => supabase.rpc('withdraw_day', { p_date: day }),
-  // Inbox one-tap actions
-  bookCall: async (leadId: string, atIso: string) => {
-    const a = await supabase.from('leads')
-      .update({ stage: 'colin_call', next_action: "Colin's call", next_action_at: atIso, assigned_to: 'colin' }).eq('id', leadId)
-    if (a.error) return a
-    return supabase.from('tasks').insert({ lead_id: leadId, due_at: atIso, kind: 'call', owner: 'colin', note: "Colin's call (booked from Inbox)" })
-  },
+  // Inbox one-tap actions, through the belt (0030): a booked call is the call_booked belt with its slot
+  bookCall: (leadId: string, atIso: string) =>
+    supabase.rpc('belt_event', { p_lead_id: leadId, p_event: 'next_step', p_payload: { kind: 'callback', at: atIso } }),
+  // The conveyor (migrations 0029-0032)
+  beltEvent: (leadId: string, event: string, payload: Record<string, unknown>) =>
+    supabase.rpc('belt_event', { p_lead_id: leadId, p_event: event, p_payload: payload }),
+  stopDone: (taskId: string, outcome: string, note: string | null, detail: Record<string, unknown>) =>
+    supabase.rpc('belt_stop_done', { p_task_id: taskId, p_outcome: outcome, p_note: note, p_detail: detail }),
+  leadMove: (leadId: string, x: { belt?: string | null; reason?: string | null; named_date?: string | null; named_event?: string | null
+    elderly?: boolean | null; grief?: boolean | null; assigned_to?: string | null; notes?: string | null; stage?: string | null }) =>
+    supabase.rpc('lead_move', { p_lead_id: leadId, p_belt: x.belt ?? null, p_reason: x.reason ?? null, p_named_date: x.named_date ?? null,
+      p_named_event: x.named_event ?? null, p_elderly: x.elderly ?? null, p_grief: x.grief ?? null, p_assigned_to: x.assigned_to ?? null,
+      p_notes: x.notes ?? null, p_stage: x.stage ?? null }),
+  verdictNo: (leadId: string, reason: string, note: string | null) => supabase.rpc('verdict_no', { p_lead_id: leadId, p_reason: reason, p_note: note }),
+  setTouchTemplate: (key: string, on: boolean) => supabase.rpc('set_touch_template', { p_key: key, p_on: on }),
   // drafted replies: Approve (with Colin's final words) or Skip, through the reply-send Edge Function
   replyAction: async (id: string, action: 'approve' | 'skip', text?: string) => {
     const r = await supabase.functions.invoke('reply-send', { body: { id, action, text } })
@@ -217,7 +319,7 @@ export const api = {
   setTestPhone: (phone: string) => supabase.rpc('set_test_phone', { p_phone: phone }),
   resetTestPhones: () => supabase.rpc('reset_test_phones'),
   notInterested: (leadId: string) =>
-    supabase.from('leads').update({ stage: 'dead', dead_reason: 'not interested', next_action_at: null, next_action: null }).eq('id', leadId),
+    supabase.rpc('belt_event', { p_lead_id: leadId, p_event: 'move', p_payload: { belt: 'dead', reason: 'not interested (Inbox)' } }),
 }
 
 // ------------------------------------------------------------- Sending

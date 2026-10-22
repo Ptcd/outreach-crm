@@ -198,13 +198,13 @@ describe('work no text can do', () => {
     const s = await run(tw)
     expect(s.tasks).toBe(1)
     const t = await db.query<{ owner: string; kind: string; quote: string; email_to: string; source: string; title: string }>(
-      `select owner::text, kind, quote, email_to, source, title from public.tasks where source = 'reply'`)   // the belt opens its own call stop (0030)
+      `select owner::text, kind, quote, email_to, source, title from public.tasks where source = 'reply'`)   // the belt opens its own call stop (0031)
     expect(t.rows).toEqual([{ owner: 'adil', kind: 'email', quote: 'Maybe. Can you email me the details? dale@example.com',
       email_to: 'dale@example.com', source: 'reply', title: 'Email them at dale@example.com' }])
     expect((await db.query(`select tasks_open from public.reply_waiting`)).rows).toEqual([{ tasks_open: 1 }])
     expect((await drafts())[0]).toMatchObject({ kind: 'candidate', status: 'awaiting_approval' })   // the text reply still waits for Colin
     await run(tw)                                                                                    // the same text again: no second task
-    expect((await db.query(`select count(*)::int as n from public.tasks where source = 'reply'`)).rows).toEqual([{ n: 1 }])   // the belt's own stop aside (0030)
+    expect((await db.query(`select count(*)::int as n from public.tasks where source = 'reply'`)).rows).toEqual([{ n: 1 }])   // the belt's own stop aside (0031)
     const first = await db.query<{ r: unknown[] }>(`select public.notify_claim_tasks(now()) as r`)
     const second = await db.query<{ r: unknown[] }>(`select public.notify_claim_tasks(now()) as r`)
     expect([first.rows[0].r.length, second.rows[0].r.length]).toEqual([1, 0])

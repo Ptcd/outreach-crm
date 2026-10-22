@@ -1,7 +1,7 @@
 // The conveyor's loop behind the conveyor Edge Function (pg_cron, every 15 minutes). No Deno globals,
 // so tests/conveyor.test.ts runs it against the real migrations on PGlite with a fake Twilio.
 // Every decision about a stop is made in Postgres (belt_claim_text, belt_sweep_missed, belt_canary,
-// belt_health_check, migration 0030); this file only moves texts to Twilio and records what happened.
+// belt_health_check, migration 0031); this file only moves texts to Twilio and records what happened.
 //   1. due text stops -> belt_claim_text: a queued belt text (switch on) goes out, or a draft waits for
 //      Colin's tap (switch off), or the stop slides / is skipped. A live send is checked once more by
 //      guardDraft (no price, offer or business name) before Twilio is called.

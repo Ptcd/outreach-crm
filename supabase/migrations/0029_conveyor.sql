@@ -10,7 +10,7 @@
 -- hour, no text ever to an elderly, ill or grieving owner, nothing to dead or DNC.
 -- Texts a stop sends are templates (touch_templates), each behind its own switch, default OFF: with the
 -- switch off the stop becomes a draft for Colin's tap instead, so nothing automatic goes out and the belt
--- does not stall. The conveyor Edge Function (pg_cron, every 15 minutes, migration 0029) executes due
+-- does not stall. The conveyor Edge Function (pg_cron, every 15 minutes, migration 0032) executes due
 -- stops and writes a belt_health heartbeat; belt_watch() texts Colin through ops_alerts when it breaks.
 
 -- ============================================================================ state on the lead
