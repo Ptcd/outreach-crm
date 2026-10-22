@@ -157,8 +157,11 @@ describe('pages render', () => {
     expect(screen.getByText(/Which place is this about, the one on 100 N Main St\?/)).toBeTruthy()   // open question: words to say
     expect(screen.getByText('This is Colin.', { exact: false })).toBeTruthy()
     expect(screen.getByText(/If they say\.\.\. \(22 answers\)/)).toBeTruthy()
-    expect(screen.getByText('Close: book the visit')).toBeTruthy()
-    expect(screen.getByText('Close: not ready yet')).toBeTruthy()
+    // The card has not decided yet (only the reason is in), so the close is held back: no Walk-through to tap.
+    expect(screen.getAllByText('Not decided yet').length).toBeGreaterThan(0)
+    expect(screen.getByText('Close: not decided yet')).toBeTruthy()
+    expect(screen.queryByText('Close: book the visit')).toBeNull()
+    expect(screen.getAllByText(/Still to ask:/).length).toBe(2)                         // on the card and at the close
     expect(screen.getByText(/Tired landlord/)).toBeTruthy()                              // answered on an earlier call
     expect(screen.getByText(/1\. Which property/)).toBeTruthy()
     expect(screen.getByText('Gate items this call settles')).toBeTruthy()

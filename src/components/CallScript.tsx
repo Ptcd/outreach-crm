@@ -8,6 +8,8 @@ import { api } from '@/lib/queries'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
 import { CALL_OUTCOMES, NEXT_STEP, PHONE_SCRIPT, callScript, scriptLine, type CallQuestion } from '@/lib/callScript'
 import { answerOf, answerText, gateFromCall, stopsFromCall, type CallFacts, type CallValue } from '@/lib/callGate'
+import { bookingVerdict, type BookingVerdict } from '@/lib/bookingVerdict'
+import { VerdictBox } from '@/components/BookingVerdict'
 import { DECISION_LABEL, GATE_ITEMS, HARD_STOPS, SELLER_FACTS, STAGE_LABEL } from '@/lib/wpie'
 import { cn } from '@/lib/utils'
 import type { Contact, GateScore, Lead, Message } from '@/lib/types'
@@ -28,10 +30,12 @@ function scriptVars(lead: Lead, facts: CallFacts): Record<string, string> {
 }
 
 // Read top to bottom while on the phone: what we already know, then each question to ask with the
-// exact words and one-tap answers (saved to the lead as you tap), then "log this call".
-export function CallScript({ lead, contacts, messages, replyFacts, latestGate, phone, startOpen }: {
+// exact words and one-tap answers (saved to the lead as you tap), then the close the card decided on
+// (book / one more call / not ready; src/lib/bookingVerdict.ts), then "log this call". Only Colin
+// (canOverride) can book a walk-through the card did not earn.
+export function CallScript({ lead, contacts, messages, replyFacts, latestGate, phone, startOpen, canOverride }: {
   lead: Lead; contacts: Contact[]; messages: Message[]; replyFacts: Record<string, unknown>; latestGate: GateScore | null
-  phone: string | null; startOpen: boolean
+  phone: string | null; startOpen: boolean; canOverride?: boolean
 }) {
   const qc = useQueryClient()
   const [open, setOpen] = useState(startOpen)
@@ -55,6 +59,7 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
 
   const hints = useMemo(() => gateFromCall(facts, replyFacts), [facts, replyFacts])
   const stops = useMemo(() => stopsFromCall(facts), [facts])
+  const verdict = useMemo(() => bookingVerdict(facts, replyFacts, lead), [facts, replyFacts, lead])
   const opener = messages.find((m) => m.is_opener && m.direction === 'out')
   const replies = messages.filter((m) => m.direction === 'in' && m.channel === 'sms')
   const known = SELLER_FACTS.map((f) => ({ ...f, v: replyFacts[f.id] })).filter((f) => typeof f.v === 'string' && (f.v as string).trim())
@@ -133,18 +138,11 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
         </ul>
       </details>
 
-      <div className="space-y-2 rounded-md border-2 border-emerald-300 p-3">
-        <p className="font-semibold">Close: book the visit</p>
-        <ScriptLines lines={PHONE_SCRIPT.booking.map((l) => scriptLine(l, vars))} />
-        <QuestionCard n={0} q={{ ...NEXT_STEP, qid: 'booking', gate: [], say: [] }} facts={facts} replyFacts={replyFacts} onSave={save} />
-      </div>
-      <div className="space-y-2 rounded-md border p-3">
-        <p className="font-semibold">Close: not ready yet</p>
-        <ScriptLines lines={PHONE_SCRIPT.not_ready.map((l) => scriptLine(l, vars))} />
-      </div>
+      <VerdictBox v={verdict} />
+      <Close verdict={verdict} vars={vars} facts={facts} replyFacts={replyFacts} onSave={save} canOverride={!!canOverride} />
 
-      <div className="rounded-md border p-3">
-        <p className="font-semibold">Gate items this call settles</p>
+      <details className="rounded-md border p-3">
+        <summary className="cursor-pointer font-semibold">Gate items this call settles</summary>
         <ul className="mt-1 space-y-1 text-sm">
           {GATE_ITEMS.map((g) => {
             const h = hints[g.id]
@@ -158,8 +156,8 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
           })}
           {stops.map((s) => <li key={s} className="font-medium text-red-700">Hard stop: {HARD_STOPS.find((h) => h.id === s)?.label ?? s}</li>)}
         </ul>
-        <p className="mt-1 text-xs text-muted-foreground">These fill in the walk gate below; Colin saves the score.</p>
-      </div>
+        <p className="mt-1 text-xs text-muted-foreground">These fill in Colin&apos;s score on the card; the booking decision above is the card&apos;s.</p>
+      </details>
 
       <LogCall lead={lead} contacts={contacts} phone={phone} />
     </section>
@@ -167,6 +165,60 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
 }
 
 const LABEL_OUTCOME: Record<string, string> = Object.fromEntries(CALL_OUTCOMES.map((o) => [o.id, o.label]))
+
+/** The close the card decided on. The Walk-through choice only exists when the card said book (or for Colin). */
+function Close({ verdict, vars, facts, replyFacts, onSave, canOverride }: {
+  verdict: BookingVerdict; vars: Record<string, string>; facts: CallFacts; replyFacts: Record<string, unknown>
+  onSave: (k: string, v: CallValue | null) => Promise<void>; canOverride: boolean
+}) {
+  const booked = answerOf(facts, 'next_step')
+  const walkAllowed = verdict.verdict === 'book' || canOverride || !!booked?.choices?.includes('walk')
+  const step: CallQuestion = { ...NEXT_STEP, qid: 'booking', gate: [], say: [],
+    choices: (NEXT_STEP.choices ?? []).filter((c) => c.id !== 'walk' || walkAllowed) }
+  const stepCard = <QuestionCard n={0} q={step} facts={facts} replyFacts={replyFacts} onSave={onSave} />
+  const lines = (keep: (id: string) => boolean) => PHONE_SCRIPT.booking.filter((l) => keep(l.id)).map((l) => scriptLine(l, vars))
+  const notReady = PHONE_SCRIPT.not_ready.map((l) => scriptLine(l, vars))
+  const override = canOverride && verdict.verdict !== 'book' && (
+    <p className="text-xs text-muted-foreground">Colin can still book a walk-through here; nobody else can until the card says book.</p>
+  )
+
+  if (verdict.verdict === 'book') return (
+    <div className="space-y-2 rounded-md border-2 border-emerald-300 p-3">
+      <p className="font-semibold">Close: book the visit</p>
+      <ScriptLines lines={lines((id) => id !== 'b8_call_instead')} />
+      {stepCard}
+    </div>
+  )
+  if (verdict.verdict === 'call_back') return (
+    <div className="space-y-2 rounded-md border-2 border-amber-300 p-3">
+      <p className="font-semibold">Close: one more call</p>
+      <p className="text-sm">For: {verdict.because.join('; ')}.</p>
+      <ScriptLines lines={lines((id) => id === 'b8_call_instead')} />
+      {stepCard}
+      {override}
+    </div>
+  )
+  if (verdict.verdict === 'no') return (
+    <div className="space-y-2 rounded-md border-2 border-red-300 p-3">
+      <p className="font-semibold">Close: not ready yet</p>
+      <ScriptLines lines={notReady} />
+      {(booked || canOverride) && stepCard}
+      {override}
+    </div>
+  )
+  return (
+    <div className="space-y-2 rounded-md border p-3">
+      <p className="font-semibold">Close: not decided yet</p>
+      <p className="text-sm text-muted-foreground">Keep going. The close (book, one more call, or not ready) shows once the card has the answers above.</p>
+      {(booked || canOverride) && stepCard}
+      {override}
+      <details>
+        <summary className="cursor-pointer text-sm font-medium">If they want out now: the not-ready lines</summary>
+        <div className="mt-2"><ScriptLines lines={notReady} /></div>
+      </details>
+    </div>
+  )
+}
 
 function QuestionCard({ n, q, facts, replyFacts, onSave }: {
   n: number; q: CallQuestion; facts: CallFacts; replyFacts: Record<string, unknown>; onSave: (k: string, v: CallValue | null) => Promise<void>

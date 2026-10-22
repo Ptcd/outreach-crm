@@ -10,6 +10,8 @@ import { ContractBlock } from '@/components/ContractBlock'
 import { CallScript } from '@/components/CallScript'
 import { HotBanner } from '@/components/HotBanner'
 import { gateFromCall, stopsFromCall, type CallFacts } from '@/lib/callGate'
+import { bookingVerdict } from '@/lib/bookingVerdict'
+import { VerdictBadge, VerdictBox } from '@/components/BookingVerdict'
 import { CallButton } from '@/components/CallButton'
 import { api, useDeals, useLead, useWrite } from '@/lib/queries'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
@@ -30,6 +32,8 @@ export default function LeadDetail() {
   const facts = q.data.facts ?? {}
   const replyTasks = tasks.filter((t) => t.source === 'reply' && !t.done_at)
   const email = contacts.find((c) => c.kind === 'email' && !c.dnc_app)?.value ?? null
+  const callFacts = (lead.call_facts ?? {}) as CallFacts
+  const verdict = bookingVerdict(callFacts, facts, lead)
 
   return (
     <div className="space-y-4">
@@ -40,6 +44,7 @@ export default function LeadDetail() {
         <h1 className="mt-1 text-xl font-semibold">{lead.owner_name}</h1>
         <div className="mt-1 flex flex-wrap gap-2">
           <Badge>{STAGE_LABEL[lead.stage]}</Badge>
+          {verdict.verdict !== 'open' && <VerdictBadge v={verdict} />}
           {lead.lane && <Badge tone="info">{lead.lane === 'hold' ? 'Hold lane' : 'Flip lane'}</Badge>}
           {lead.county && <Badge>{lead.county} County</Badge>}
         </div>
@@ -47,7 +52,7 @@ export default function LeadDetail() {
 
       <HotBanner leadId={lead.id} />
       <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}
-        phone={params.get('phone')} startOpen={params.get('call') === '1'} />
+        phone={params.get('phone')} startOpen={params.get('call') === '1'} canOverride={isOwner} />
       <NextAction lead={lead} />
       <SellerSaid facts={facts} />
       <Section title={`Tasks (${replyTasks.length})`}>
@@ -59,9 +64,16 @@ export default function LeadDetail() {
         <EmailAction leadId={lead.id} to={email} ownerName={lead.owner_name} address={lead.property_address} />
       </Section>
       <History leadId={lead.id} messages={messages} />
-      <Section title="Walk / don't-walk gate">
-        <GateBlock leadId={lead.id} latest={gates[0] ?? null} canEdit={isOwner}
-          hints={gateFromCall((lead.call_facts ?? {}) as CallFacts, facts)} hintStops={stopsFromCall((lead.call_facts ?? {}) as CallFacts)} />
+      <Section title="Book the visit?">
+        <p className="mb-2 text-sm text-muted-foreground">The card decides from the call&apos;s answers: a reason with a date behind it, every signer lined up, a number they&apos;d hear under or one resting on a need, who lives there and what&apos;s wrong, no hard stop.</p>
+        <VerdictBox v={verdict} />
+        <details className="mt-3">
+          <summary className="cursor-pointer text-sm font-medium">Colin&apos;s score: the six items, and whether the numbers are close</summary>
+          <div className="mt-2">
+            <GateBlock leadId={lead.id} latest={gates[0] ?? null} canEdit={isOwner}
+              hints={gateFromCall(callFacts, facts)} hintStops={stopsFromCall(callFacts)} />
+          </div>
+        </details>
       </Section>
       <Tasks leadId={lead.id} tasks={tasks.filter((t) => t.source !== 'reply')} />
       <Contacts contacts={contacts} leadId={lead.id} lead={lead} />
