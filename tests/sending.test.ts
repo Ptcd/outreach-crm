@@ -168,15 +168,15 @@ describe('follow-ups (texts 2 and 3)', () => {
   async function sentBefore(l: { id: string; owner: number; phone: string }, days: number, step = 1, status = 'delivered') {
     const at = new Date(new Date(T('15:00')).getTime() - days * 86_400_000).toISOString()
     await db.query(
-      `insert into public.planned_openers (plan_date, wpie_owner_id, attempt, step, lead_id, phone, body, body_sha256, scheduled_at,
+      `insert into public.planned_openers (plan_date, wpie_owner_id, attempt, lead_id, phone, body, body_sha256, scheduled_at,
          window_start_utc, window_end_utc, dnc_state, per_hour, decision, send_status, claim_mode, claimed_at, sent_at, provider_sid)
-       values (($1::timestamptz)::date, $2, 1, $3, $4, $5, $6, encode(sha256(convert_to($6, 'UTF8')), 'hex'), $1, $1, $1, 'unknown', 12,
+       values (($1::timestamptz)::date, $2, $3, $4, $5, $6, encode(sha256(convert_to($6, 'UTF8')), 'hex'), $1, $1, $1, 'unknown', 12,
          'approved', $7, 'live', $1, $1, $8)`,
-      [at, l.owner, step, l.id, `+1${l.phone}`, BODY, status, `SMprev${l.owner}${step}`])
+      [at, l.owner, step === 1 ? 1 : 10 + step, l.id, `+1${l.phone}`, BODY, status, `SMprev${l.owner}${step}`])
   }
   async function followUp(l: { id: string; owner: number; phone: string }, step: number) {
     const id = await opener(l)
-    await db.query(`update public.planned_openers set step = $2 where id = $1`, [id, step])
+    await db.query(`update public.planned_openers set attempt = $2 where id = $1`, [id, 10 + step])   // text <step> of opener attempt 1
     return id
   }
 
@@ -189,7 +189,16 @@ describe('follow-ups (texts 2 and 3)', () => {
     expect(await claim(T('15:05'))).toMatchObject({ outcome: 'send', opener: { id: fu, step: 2 } })
     await db.query(`select public.record_send_result($1, 'sent', 'SMfu1')`, [fu])
     const m = (await db.query<{ source_key: string; is_opener: boolean }>(`select source_key, is_opener from public.messages where provider_sid = 'SMfu1'`)).rows
-    expect(m).toEqual([{ source_key: `ledger:${l.owner}:1:text2`, is_opener: false }])
+    expect(m).toEqual([{ source_key: `ledger:${l.owner}:12:opener`, is_opener: false }])
+  })
+
+  it('derives step from attempt (opener_attempt * 10 + step), whatever the sync pushes', async () => {
+    const l = await lead()
+    const id = await opener(l)
+    await db.query(`update public.planned_openers set attempt = 13, step = 1 where id = $1`, [id])
+    expect((await db.query<{ step: number }>(`select step from public.planned_openers where id = $1`, [id])).rows[0].step).toBe(3)
+    await db.query(`update public.planned_openers set attempt = 2 where id = $1`, [id])
+    expect((await db.query<{ step: number }>(`select step from public.planned_openers where id = $1`, [id])).rows[0].step).toBe(1)
   })
 
   it('holds or skips a follow-up for each rule', async () => {
