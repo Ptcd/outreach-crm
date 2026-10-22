@@ -378,3 +378,65 @@ describe('the routine switch', () => {
     expect(tw.sends).toHaveLength(1)
   })
 })
+
+// A text after the thread was closed is not a conversation (migration 0026; Colin 2026-10-22, on a
+// "Reply needs you" email for "No problem, have a good day" after "Wrong number, STOP": "Why did I get this").
+describe('after the thread is closed', () => {
+  const count = async (table: string) => (await db.query<{ n: number }>(`select count(*)::int as n from public.${table}`)).rows[0].n
+
+  it('a thanks after a STOP is recorded silently: no draft, no task, no alert, the Inbox copy seen', async () => {
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMa', '+14145550177', 'Wrong number, STOP', new Date(NOON.getTime() - 600_000))]
+    await run(tw)
+    tw.inbound.push(text('SMb', '+14145550177', 'No problem, have a good day 😊', NOON))
+    const s = await run(tw)
+    expect(s.decided.after_close).toBe(1)
+    // The wrong-number STOP got our one goodbye line; the thanks after it gets nothing.
+    expect((await drafts()).map((d) => [d.kind, d.status])).toEqual([['removal', 'would_send'], ['after_close', 'no_reply']])
+    expect(await count('tasks')).toBe(0)
+    expect(await count('hot_alerts')).toBe(0)
+    expect(tw.sends).toEqual([])
+    // The Inbox copy syncs later from the ledger with no provider sid: it is born seen.
+    await db.query(`insert into public.messages (lead_id, direction, channel, body, sent_at) values ('00000000-0000-0000-0000-0000000000a1', 'in', 'sms', $1, $2)`,
+      ['No problem, have a good day 😊', new Date(NOON.getTime() - 60_000).toISOString()])
+    const seen = (await db.query<{ seen: boolean }>(`select seen_at is not null as seen from public.messages where direction = 'in'`)).rows[0]
+    expect(seen.seen).toBe(true)
+  })
+
+  it('interest after a STOP is never texted: one quiet call task for Colin, no draft, no alert', async () => {
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMa', '+14145550177', 'STOP', new Date(NOON.getTime() - 600_000))]
+    await run(tw)
+    tw.inbound.push(text('SMb', '+14145550177', 'Actually I would sell it, what would you pay?', NOON))
+    const s = await run(tw, LIVE)
+    expect(s.decided.after_close).toBe(1)
+    expect(s.tasks).toBe(1)
+    const task = (await db.query<{ owner: string; kind: string; source: string; title: string; quote: string }>(
+      `select owner::text, kind, source, title, quote from public.tasks`)).rows[0]
+    expect(task).toMatchObject({ owner: 'colin', kind: 'call', source: 'after_stop', title: 'Wrote back after STOP: call, never text',
+      quote: 'Actually I would sell it, what would you pay?' })
+    expect((await drafts()).map((d) => d.status)).toEqual(['no_reply', 'no_reply'])
+    expect(await count('hot_alerts')).toBe(0)
+    expect(tw.sends).toEqual([])
+  })
+
+  it('a second STOP, or a thanks after a no, gets nothing more', async () => {
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMa', '+14145550177', 'STOP', new Date(NOON.getTime() - 600_000))]
+    await run(tw)
+    tw.inbound.push(text('SMb', '+14145550177', 'STOP', NOON))
+    await run(tw)
+    expect((await drafts()).map((d) => d.kind)).toEqual(['removal', 'after_close'])
+    expect(await count('tasks')).toBe(0)
+
+    // A wrong number (closed with our one line) followed by a pleasantry: the same silence.
+    const tw2 = new FakeTwilio()
+    tw2.inbound = [text('SMc', '+14145550178', 'Wrong number', new Date(NOON.getTime() - 300_000))]
+    await run(tw2)
+    tw2.inbound.push(text('SMd', '+14145550178', 'Thanks, you too', NOON))
+    await run(tw2)
+    const last = (await db.query<{ kind: string; status: string; outcome: string }>(`select kind, status, outcome from public.reply_drafts where inbound_sid = 'SMd'`)).rows[0]
+    expect(last).toEqual({ kind: 'after_close', status: 'no_reply', outcome: 'wrong_number' })
+    expect((await db.query<{ n: number }>(`select count(*)::int as n from public.reply_drafts where status = 'awaiting_approval'`)).rows[0].n).toBe(0)
+  })
+})

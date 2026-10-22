@@ -10,6 +10,9 @@ import { classifyFailure, isOptOut, type Rpc, type SenderEnv, type TwilioPort } 
 import { guardDraft } from './replyGuard.ts'
 import { workNeeded } from './needsWork.ts'
 
+/** Selling or price words in a text that arrives after the thread was closed: a person may call back. */
+const LATE_INTEREST = /\b(sell|selling|sale|buy|buying|offer|price|pay|interested|changed (?:my|our) mind)\b/i
+
 export interface DraftInput {
   inbound: string
   history: { who: 'us' | 'them'; body: string }[]
@@ -41,7 +44,7 @@ export interface AgentSummary {
   redteam: string | null
   inbound_new: number
   inbound_errors: string[]
-  decided: { removal: number; routine: number; candidate: number; drafted: number }
+  decided: { removal: number; routine: number; candidate: number; drafted: number; after_close: number }
   tasks: number
   hot: number
   sent: number
@@ -85,7 +88,7 @@ export async function runReplyAgent(opts: {
   const live = opts.env.live && opts.twilio != null
   const version = rulesVersion()
   const s: AgentSummary = { mode: live ? 'live' : 'dry', rules_version: version, redteam: null, inbound_new: 0, inbound_errors: [],
-    decided: { removal: 0, routine: 0, candidate: 0, drafted: 0 }, tasks: 0, hot: 0, sent: 0, dry_sent: 0, queued: 0, failed: 0, uncertain: 0, refused: [] }
+    decided: { removal: 0, routine: 0, candidate: 0, drafted: 0, after_close: 0 }, tasks: 0, hot: 0, sent: 0, dry_sent: 0, queued: 0, failed: 0, uncertain: 0, refused: [] }
 
   // 0. Score the rules this build runs, once per version (the routine switch depends on it).
   if (opts.control.redteam_version !== version) {
@@ -133,6 +136,22 @@ export async function runReplyAgent(opts: {
       lastAgentText: t.last_agent_text, propertyAddress: t.property_address, ownerName: t.owner_name,
       ourTurns: Math.max(0, (t.history ?? []).filter((h) => h.who === 'us').length - 1) }
     let d = decide(ctx)
+    // A thread already closed before this text came in (a STOP, a wrong number, a no, a do-not-contact call,
+    // a dead lead) is not a conversation, whatever the text says: a thanks is recorded and its Inbox copy
+    // marked seen, with no draft, no "needs you" email, no push and no alert; interest becomes one call
+    // task for Colin, never a text (migration 0026; Colin 2026-10-22, on "No problem, have a good day"
+    // after "Wrong number, STOP": "Why did I get this" / "Fix it").
+    const closed = (await opts.rpc('reply_closed_state', { p_sid: t.sid })).data as string | null
+    if (closed) {
+      const interest = !d.removal && (LATE_INTEREST.test(ctx.inbound)
+        || isHotReply({ intent: d.intent, text: ctx.inbound, removal: false, afterPitch: PITCH_ASKED.test(ctx.lastAgentText ?? '') }))
+      const a = await opts.rpc('reply_record_after_close', { p_sid: t.sid, p_state: closed, p_interest: interest,
+        p_note: `after close (${closed}): ${d.note}`, p_rules_version: version, p_now: now().toISOString() })
+      if (a.error) throw new Error(a.error.message)
+      s.decided.after_close += 1
+      if ((a.data as { task_id?: string | null } | null)?.task_id) s.tasks += 1
+      continue
+    }
     // A held phone (reply_holds) gets nothing on its own: Colin answers. A removal stays final.
     const held = (await opts.rpc('reply_is_held', { p_phone10: t.from10 })).data === true
     if (held && d.kind === 'routine') d = { ...d, kind: 'candidate', reply: null, outcome: 'open', facts: undefined, note: `held for Colin: ${d.note}` }
