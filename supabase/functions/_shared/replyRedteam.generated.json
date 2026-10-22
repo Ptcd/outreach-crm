@@ -1,5 +1,5 @@
 {
- "generated": "tools/export_reply_prompt.py --app-dir, WPIE commit a4c81bc, 2026-10-22",
+ "generated": "tools/export_reply_prompt.py --app-dir, WPIE commit ca88434, 2026-10-22",
  "fixture": "tests/fixtures/reply_redteam.jsonl",
  "python_passed": 439,
  "rows": [
