@@ -8,6 +8,7 @@ import { EmailComposer } from '@/components/EmailComposer'
 import { ReplyTaskCard } from '@/components/ReplyTaskCard'
 import { ContractBlock } from '@/components/ContractBlock'
 import { CallScript } from '@/components/CallScript'
+import { HotBanner } from '@/components/HotBanner'
 import { gateFromCall, stopsFromCall, type CallFacts } from '@/lib/callGate'
 import { api, useDeals, useLead, useWrite } from '@/lib/queries'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
@@ -43,6 +44,7 @@ export default function LeadDetail() {
         </div>
       </div>
 
+      <HotBanner leadId={lead.id} />
       <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}
         phone={params.get('phone')} startOpen={params.get('call') === '1'} />
       <NextAction lead={lead} />

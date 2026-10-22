@@ -37,6 +37,7 @@ vi.mock('@/lib/queries', () => ({
   usePhoneLookup: (d: string) => ok(d.replace(/\D/g, '').length >= 3 ? [
     { lead_id: 'L1', owner_name: 'JANE ROE', property_address: '100 N MAIN ST', municipality: 'Milwaukee', lane: 'hold', stage: 'colin_call', phone: '4145550101', person_name: null, blocked: false, exact: false },
     { lead_id: 'L9', owner_name: 'BO KIM', property_address: '400 N PINE ST', municipality: 'Milwaukee', lane: 'flip', stage: 'dnc', phone: '2625550101', person_name: null, blocked: true, exact: false }] : []),
+  useHotAlerts: () => ok([{ id: 'H1', created_at: '2026-10-22T15:10:00Z', body: 'yes still mine', alert1_at: '2026-10-22T15:10:30Z', alert2_at: null, called_at: null, is_test: false, phone10: '4145550101' }]),
   useContracts: () => ok([{ id: 'K1', lead_id: 'L1', form: 'WB-11 10-1-2026', status: 'sent', created_at: '2026-10-21T19:00:00Z', signed_at: null,
     voided_at: null, void_reason: null, final_path: null, include_recr: true, terms: { price: 182500, closing: 'November 20, 2026', street: '100 N Main St' },
     contract_signers: [{ id: 'S1', position: 1, name: 'Jane Roe', email: null, phone: null, opened_at: '2026-10-21T20:00:00Z', signed_at: null, expires_at: '2026-11-04T19:00:00Z' }] }]),
@@ -161,6 +162,9 @@ describe('pages render', () => {
     expect(screen.getByText(/Tired landlord/)).toBeTruthy()                              // answered on an earlier call
     expect(screen.getByText(/1\. Which property/)).toBeTruthy()
     expect(screen.getByText('Gate items this call settles')).toBeTruthy()
+    expect(screen.getByText(/Hot reply/)).toBeTruthy()
+    expect(screen.getByText(/Not called yet/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'I called them' })).toBeTruthy()
     const script = within(document.getElementById('call-script')!)
     expect(script.getByRole('button', { name: 'Do not contact' })).toBeTruthy()
     expect((script.getByRole('button', { name: 'Save the call' }) as HTMLButtonElement).disabled).toBe(true)

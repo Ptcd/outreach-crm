@@ -7,6 +7,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
 import { runReplyAgent } from '../_shared/replyAgent.ts'
 import { claudeDrafter } from '../_shared/drafter.ts'
 import { runNotifications } from '../_shared/notify.ts'
+import { pmPhoneSender, runHotAlerts } from '../_shared/hotLeads.ts'
 import { notifyDeps } from '../_shared/notifyDeno.ts'
 import { senderEnv, twilioPort, type Rpc } from '../_shared/sending.ts'
 import type { RedteamRow } from '../_shared/replyBrain.ts'
@@ -40,8 +41,10 @@ Deno.serve(async (req) => {
     } catch (e) {
       notified = { error: String(e).slice(0, 200) }
     }
-    await rpc('note_agent_run', { p_summary: { ...summary, notified, drafter: key ? 'claude' : 'none (ANTHROPIC_API_KEY not set)' } })
-    return Response.json({ ...summary, notified })
+    const hot = await runHotAlerts({ rpc, send: pmPhoneSender((n) => Deno.env.get(n), fetch),
+      appUrl: Deno.env.get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com' }).catch((e) => ({ error: String(e).slice(0, 200) }))
+    await rpc('note_agent_run', { p_summary: { ...summary, notified, hot_alerts: hot, drafter: key ? 'claude' : 'none (ANTHROPIC_API_KEY not set)' } })
+    return Response.json({ ...summary, notified, hot_alerts: hot })
   } catch (e) {
     await rpc('note_agent_run', { p_summary: { error: String(e instanceof Error ? e.message : e).slice(0, 300) } })
     return Response.json({ error: String(e) }, { status: 500 })

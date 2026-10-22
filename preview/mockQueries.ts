@@ -123,3 +123,4 @@ export const useContracts = () => ok([{ id: 'K1', lead_id: 'L1', form: 'WB-11 10
 export const usePhoneLookup = (d: string) => ok(d.replace(/\D/g, '').length >= 3 ? [
   { lead_id: 'L1', owner_name: 'DALE NOVAK', property_address: '2847 N Burleigh St', municipality: 'Milwaukee', lane: 'hold', stage: 'reply_received', phone: '4145550177', person_name: 'DALE NOVAK', blocked: false, exact: false },
   { lead_id: 'L2', owner_name: 'RITA SCHMIDT', property_address: 'W220 N1765 Pewaukee Rd', municipality: 'Pewaukee', lane: 'flip', stage: 'follow_up', phone: '2625550177', person_name: null, blocked: false, exact: false }] : [])
+export const useHotAlerts = () => ok([{ id: 'H1', created_at: ago(9), body: "Yes it's still mine. What would you pay?", alert1_at: ago(9), alert2_at: null, called_at: null, is_test: false, phone10: '4145550177' }])

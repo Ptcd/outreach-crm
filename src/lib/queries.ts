@@ -195,6 +195,7 @@ export const api = {
     return { error: d.outcome === 'sent' ? null : { message: d.reason ?? 'The email did not go.' } }
   },
   assignTask: (id: string, owner: Person) => supabase.from('tasks').update({ owner }).eq('id', id),
+  markCalled: (leadId: string) => supabase.rpc('mark_called', { p_lead_id: leadId }),
   // Call desk (migration 0013)
   newCaller: (phone: string, name?: string) => supabase.rpc('new_caller', { p_phone: phone, p_name: name ?? null }),
   callAnswer: (leadId: string, key: string, value: unknown) => supabase.rpc('call_answer', { p_lead_id: leadId, p_key: key, p_value: value }),
@@ -430,5 +431,19 @@ export function usePhoneLookup(digits: string) {
     enabled: d.length >= 3,
     staleTime: 60_000,
     queryFn: async () => check(await supabase.rpc('phone_lookup', { p_digits: d })) as PhoneMatch[],
+  })
+}
+
+export type HotAlertRow = { id: string; created_at: string; body: string; alert1_at: string | null; alert2_at: string | null
+  called_at: string | null; is_test: boolean; phone10: string }
+
+/** Hot replies on a lead (newest first): when Colin was texted and how fast he called. */
+export function useHotAlerts(leadId: string) {
+  return useQuery({
+    queryKey: ['hot_alerts', leadId],
+    refetchInterval: 30_000,
+    queryFn: async () => check(await supabase.from('hot_alerts')
+      .select('id, created_at, body, alert1_at, alert2_at, called_at, is_test, phone10')
+      .eq('lead_id', leadId).order('created_at', { ascending: false }).limit(5)) as HotAlertRow[],
   })
 }

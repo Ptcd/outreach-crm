@@ -80,7 +80,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db.exec(`
-    truncate public.tasks, public.reply_drafts, public.opener_send_events, public.twilio_inbound, public.suppressed_phones,
+    truncate public.hot_alerts, public.tasks, public.reply_drafts, public.opener_send_events, public.twilio_inbound, public.suppressed_phones,
              public.planned_openers, public.messages, public.contacts, public.leads cascade;
     update public.campaign_control set routine_enabled = false, redteam_version = null, redteam_ok = false, agent_rules_version = null,
       agent_last_run_at = null;
@@ -224,6 +224,19 @@ describe('work no text can do', () => {
       drafter: async () => ({ message: 'Thanks - what were you hoping to get for it?', facts: { motivation: 'moving to Arizona', timeline: 'March', decision_makers: 'wife on title', condition: 'old roof' } }) })
     const f = await db.query<{ facts: Record<string, string> }>(`select facts from public.reply_drafts`)
     expect(f.rows[0].facts).toEqual({ motivation: 'moving to Arizona', timeline: 'March', decision_makers: 'wife on title', condition: 'old roof' })
+  })
+})
+
+describe('hot replies', () => {
+  it('queue a text to Colin for interest and price talk, never for STOP or a wrong number', async () => {
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMh1', '+14145550177', 'Yes, what would you pay?'), text('SMh2', '+14145550178', 'STOP'),
+      text('SMh3', '+14145550199', 'wrong number')]
+    const s = await run(tw)
+    expect(s.hot).toBe(1)
+    const h = (await db.query<{ inbound_sid: string; first_name: string; address: string; body: string }>(
+      `select inbound_sid, first_name, address, body from public.hot_alerts`)).rows
+    expect(h).toEqual([{ inbound_sid: 'SMh1', first_name: null, address: '2847 N Burleigh St', body: 'Yes, what would you pay?' }])
   })
 })
 

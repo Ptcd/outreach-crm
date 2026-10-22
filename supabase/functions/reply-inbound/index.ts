@@ -7,6 +7,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
 import { afterWebhook, recordWebhook } from '../_shared/inbound.ts'
 import { claudeDrafter } from '../_shared/drafter.ts'
 import { runNotifications } from '../_shared/notify.ts'
+import { pmPhoneSender, runHotAlerts } from '../_shared/hotLeads.ts'
 import { notifyDeps } from '../_shared/notifyDeno.ts'
 import { senderEnv, twilioPort, validTwilioSignature, type Rpc } from '../_shared/sending.ts'
 import type { RedteamRow } from '../_shared/replyBrain.ts'
@@ -41,7 +42,10 @@ Deno.serve(async (req) => {
           redteamRows: redteam.rows as unknown as RedteamRow[],
         })
         const notified = await runNotifications(notifyDeps(sb, rpc)).catch((e) => ({ error: String(e).slice(0, 200) }))
-        await rpc('note_agent_run', { p_summary: { via: 'webhook', sid: res.sid, runs, notified } })
+        // A hot reply texts Colin right away instead of waiting for the next minute's run.
+        const hot = await runHotAlerts({ rpc, send: pmPhoneSender((n) => Deno.env.get(n), fetch),
+          appUrl: Deno.env.get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com' }).catch((e) => ({ error: String(e).slice(0, 200) }))
+        await rpc('note_agent_run', { p_summary: { via: 'webhook', sid: res.sid, runs, notified, hot_alerts: hot } })
       } catch (e) {
         await rpc('note_agent_run', { p_summary: { via: 'webhook', sid: res.sid, error: String(e).slice(0, 300) } })
       }

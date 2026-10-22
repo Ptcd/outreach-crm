@@ -3,6 +3,7 @@
 // fake Twilio and a fake drafter. Whether a reply MAY go is decided in Postgres
 // (reply_claim_send, migration 0004); what the reply agent says is decided by replyBrain.decide and,
 // for a real conversation, by the drafter (Claude) whose text only Colin can approve.
+import { firstNameOf, isHotReply } from './hotLeads.ts'
 import { decide, rulesVersion, scoreRedteam, type RedteamRow, type ReplyContext } from './replyBrain.ts'
 import { classifyFailure, isOptOut, type Rpc, type SenderEnv, type TwilioPort } from './sending.ts'
 import { guardDraft } from './replyGuard.ts'
@@ -41,6 +42,7 @@ export interface AgentSummary {
   inbound_errors: string[]
   decided: { removal: number; routine: number; candidate: number; drafted: number }
   tasks: number
+  hot: number
   sent: number
   dry_sent: number
   queued: number
@@ -82,7 +84,7 @@ export async function runReplyAgent(opts: {
   const live = opts.env.live && opts.twilio != null
   const version = rulesVersion()
   const s: AgentSummary = { mode: live ? 'live' : 'dry', rules_version: version, redteam: null, inbound_new: 0, inbound_errors: [],
-    decided: { removal: 0, routine: 0, candidate: 0, drafted: 0 }, tasks: 0, sent: 0, dry_sent: 0, queued: 0, failed: 0, uncertain: 0, refused: [] }
+    decided: { removal: 0, routine: 0, candidate: 0, drafted: 0 }, tasks: 0, hot: 0, sent: 0, dry_sent: 0, queued: 0, failed: 0, uncertain: 0, refused: [] }
 
   // 0. Score the rules this build runs, once per version (the routine switch depends on it).
   if (opts.control.redteam_version !== version) {
@@ -145,6 +147,13 @@ export async function runReplyAgent(opts: {
       p_now: now().toISOString() })
     if (r.error) throw new Error(r.error.message)
     if (facts && Object.keys(facts).length) await opts.rpc('reply_set_facts', { p_sid: t.sid, p_facts: facts })
+    // A reply that shows interest or asks about selling: Colin's cell gets a text (hotLeads.ts).
+    if (isHotReply({ intent: d.intent, text: ctx.inbound, removal: d.removal })) {
+      const h = await opts.rpc('hot_record', { p_sid: t.sid, p_lead_id: t.lead_id, p_phone10: t.from10,
+        p_first_name: firstNameOf(t.owner_name), p_address: t.property_address, p_body: ctx.inbound,
+        p_is_test: t.is_test === true, p_now: now().toISOString() })
+      if (!h.error) s.hot += 1
+    }
     // Work no text can do (an email, paperwork, records, another person, a visit): a Task for a person.
     const work = d.removal ? null : workNeeded(ctx.inbound)
     if (work) {
