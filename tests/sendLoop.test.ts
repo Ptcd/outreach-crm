@@ -78,7 +78,7 @@ async function approvedOpener() {
     `insert into public.planned_openers (plan_date, wpie_owner_id, attempt, lead_id, phone, body, body_sha256, scheduled_at,
        window_start_utc, window_end_utc, dnc_state, per_hour, decision)
      values ('2026-10-22', $1, 1, $2, $3, $4, encode(sha256(convert_to($4, 'UTF8')), 'hex'), '2026-10-22T15:00:00Z',
-       '2026-10-22T15:00:00Z', '2026-10-22T23:15:00Z', 'unknown', 50, 'approved')`,
+       '2026-10-22T15:00:00Z', '2026-10-23T00:00:00Z', 'unknown', 50, 'approved')`,
     [5000 + n, l.rows[0].id, `+1${phone}`, BODY])
   return phone
 }

@@ -52,7 +52,7 @@ async function opener(l: { id: string; owner: number; phone: string }, o: Record
      values ($1, $2, 1, $3, $4, $5, encode(sha256(convert_to($6, 'UTF8')), 'hex'), $7, $8, $9, $10, $11, $12::public.opener_decision)
      returning id`,
     [o.plan_date ?? DAY, l.owner, l.id, o.phone ?? `+1${l.phone}`, o.body ?? BODY, o.hashed ?? o.body ?? BODY,
-     o.scheduled_at ?? T('15:00'), 'window_start' in o ? o.window_start : T('15:00'), 'window_end' in o ? o.window_end : T('23:15'),
+     o.scheduled_at ?? T('15:00'), 'window_start' in o ? o.window_start : T('15:00'), 'window_end' in o ? o.window_end : '2026-10-23T00:00:00Z',
      o.dnc_state ?? 'unknown', o.per_hour ?? 12, o.decision ?? 'approved'])
   return r.rows[0].id
 }
@@ -257,12 +257,12 @@ describe('follow-ups (texts 2 and 3)', () => {
 })
 
 describe('time', () => {
-  it('sends only 10:00-18:15 Central, never on Sunday', async () => {
+  it('sends only 10:00-19:00 Central, never on Sunday', async () => {
     await opener(await lead(), { scheduled_at: T('14:00'), window_start: T('14:00') })
     expect(await claim(T('14:59'))).toMatchObject({ outcome: 'idle', reason: 'outside_window' })     // 9:59 CT
-    expect(await claim(T('23:15'))).toMatchObject({ outcome: 'idle', reason: 'outside_window' })     // 18:15 CT
+    expect(await claim('2026-10-23T00:00:00Z')).toMatchObject({ outcome: 'idle', reason: 'outside_window' })  // 19:00 CT
     expect(await claim('2026-10-25T16:00:00Z')).toMatchObject({ outcome: 'idle', reason: 'sunday' })
-    expect(await claim(T('15:00'))).toMatchObject({ outcome: 'send' })
+    expect(await claim(T('23:30'))).toMatchObject({ outcome: 'send' })                                // 18:30 CT
   })
 
   it("waits for the scheduled slot and the recipient's own window; never sends another day's plan", async () => {
