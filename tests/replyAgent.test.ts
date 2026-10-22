@@ -80,7 +80,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db.exec(`
-    truncate public.hot_alerts, public.tasks, public.reply_drafts, public.opener_send_events, public.twilio_inbound, public.suppressed_phones,
+    truncate public.hot_alerts, public.tasks, public.reply_drafts, public.reply_threads, public.opener_send_events, public.twilio_inbound, public.suppressed_phones,
              public.planned_openers, public.messages, public.contacts, public.leads cascade;
     update public.campaign_control set routine_enabled = false, redteam_version = null, redteam_ok = false, agent_rules_version = null,
       agent_last_run_at = null;
@@ -418,6 +418,20 @@ describe('after the thread is closed', () => {
     expect((await drafts()).map((d) => d.status)).toEqual(['no_reply', 'no_reply'])
     expect(await count('hot_alerts')).toBe(0)
     expect(tw.sends).toEqual([])
+  })
+
+  it('a thread the laptop brain closed before the server agent ran counts as closed (no draft row needed)', async () => {
+    await db.query(`insert into public.reply_threads (phone10, lead_id, outcome, agent_stage, last_inbound_at) values
+      ('4145550178', '00000000-0000-0000-0000-0000000000a1', 'close_not_interested', 'closed', $1)`, [new Date(NOON.getTime() - 300_000).toISOString()])
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMe', '+14145550178', 'Thanks anyway ', NOON)]
+    const s = await run(tw)
+    expect(s.decided.after_close).toBe(1)
+    expect((await drafts()).map((d) => [d.kind, d.status])).toEqual([['after_close', 'no_reply']])
+    // the ledger copy may differ by a trailing space: still born seen
+    await db.query(`insert into public.messages (lead_id, direction, channel, body, sent_at) values ('00000000-0000-0000-0000-0000000000a1', 'in', 'sms', 'Thanks anyway', $1)`,
+      [new Date(NOON.getTime() - 60_000).toISOString()])
+    expect((await db.query<{ seen: boolean }>(`select seen_at is not null as seen from public.messages where direction = 'in'`)).rows[0].seen).toBe(true)
   })
 
   it('a second STOP, or a thanks after a no, gets nothing more', async () => {
