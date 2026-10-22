@@ -372,6 +372,9 @@ export function useWaitingDrafts() {
           ...ms.filter((m) => m.lead_id === d.lead_id && m.direction === 'out' && m.sent_at <= d.inbound_at)
             .map((m) => ({ key: m.id, who: 'us' as const, body: m.body ?? '', at: m.sent_at })),
         ].filter((l) => l.body).sort((a, b) => a.at.localeCompare(b.at))
+          // a sent reply is also logged in messages, an inbound text may be synced too: show each once
+          .filter((l, i, all) => !all.slice(0, i).some((p) => p.who === l.who && p.body.trim() === l.body.trim()
+            && Math.abs(new Date(p.at).getTime() - new Date(l.at).getTime()) < 3_600_000))
         const { lead, ...rest } = d
         return { ...rest, owner_name: lead?.owner_name ?? null, property_address: lead?.property_address ?? null, thread: lines }
       })
