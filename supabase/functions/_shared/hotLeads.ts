@@ -9,21 +9,36 @@
 //   * a web push to every phone registered in push_subscriptions, opening the lead card.
 // Alerts may quote the seller. Texts about the system itself (ops_claim) go to Colin only.
 import type { Rpc } from './sending.ts'
+import * as B from './replyBrain.generated.ts'
 import type { PushOutcome, PushSubscriptionKeys } from './webpush.ts'
 
-// Intents that mean "talk to this person now" (wpie/reply/rules.py names).
-const HOT_INTENTS = new Set(['interested', 'price_first', 'who_is_this', 'buyer_check', 'worth', 'terms', 'firm', 'number_only',
-  'wants_call', 'busy', 'think_it_over', 'foreclosure', 'other_property', 'estate'])
-// Never hot, whatever the words: removals, wrong numbers, "not for sale" and the like.
+// When is a reply hot (Colin 2026-10-22, on a bare "Yes" that only confirmed ownership: "we don't
+// even know that they want to sell")? Only when it shows they would sell:
+//   (a) the answer to the pitch question ("Would you ever consider selling that one?") is a yes;
+//   (b) the text itself talks selling / interest / price (brain.py _INTEREST_WORDS_RE), at any point;
+//   (c) they ask what we'd pay or name a number (price_first and the like: warm).
+// A bare yes to the question-only opener is NOT hot: it only says the place is theirs.
 const COLD_INTENTS = new Set(['opt_out', 'hostile', 'wrong_number', 'sold', 'not_interested', 'my_home', 'listed', 'signed_other',
   'tenant', 'manager', 'middleman', 'burned', 'bot_question', 'annoyed', 'not_now', 'joke_number'])
-// A plain statement that talks selling, price or timing.
-const SELLING_TALK = /\b(?:sell|selling|sale|price|offer|how much|worth|cash|value|timeline|when could|move|moving|listing|yes|yeah|yep|sure|maybe|still (?:own|mine|have)|interested)\b/i
+const PRICE_INTENTS = new Set(['price_first', 'number_only', 'worth', 'terms', 'wants_call'])
+const INTEREST_WORDS = new RegExp(B.INTEREST_WORDS_RE.source, B.INTEREST_WORDS_RE.flags)
+const AFFIRM = new RegExp(B.AFFIRM_RE.source, B.AFFIRM_RE.flags)
+// "...I'm not looking to sell", "no intention of selling": selling words that say no.
+const NOT_SELLING = /\bnot\s+(?:\w+\s+){0,3}sell|\bno\s+(?:interest|intention|plans?)\b|\bnot\s+interested\b/i
+/** Our last text was the pitch question. */
+export const PITCH_ASKED = /would you ever consider selling/i
 
-export function isHotReply(x: { intent: string; text: string; removal: boolean }): boolean {
-  if (x.removal || COLD_INTENTS.has(x.intent)) return false
-  if (HOT_INTENTS.has(x.intent)) return true
-  return SELLING_TALK.test(x.text ?? '')
+export function isHotReply(x: { intent: string; text: string; removal: boolean; afterPitch?: boolean }): boolean {
+  const text = x.text ?? ''
+  if (x.removal || COLD_INTENTS.has(x.intent) || NOT_SELLING.test(text)) return false
+  if (PRICE_INTENTS.has(x.intent)) return true
+  if (INTEREST_WORDS.test(text)) return true
+  return !!x.afterPitch && (x.intent === 'interested' || AFFIRM.test(text))
+}
+
+/** A reply that ends the interest: the lead's open hot alerts stop (no repeat, not on the 7 PM list). */
+export function endsInterest(x: { intent: string; removal: boolean; outcome: string }): boolean {
+  return x.removal || COLD_INTENTS.has(x.intent) || ['not_interested', 'dnc', 'wrong_number'].includes(x.outcome)
 }
 
 const ENTITY = /\b(?:LLC|L\.L\.C|INC|CORP|CO|COMPANY|TRUST|TRUSTEE|ESTATE|PROPERTIES|HOLDINGS|LP|LLP|BANK|CHURCH|CITY|COUNTY)\b/i

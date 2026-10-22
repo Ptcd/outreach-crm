@@ -244,7 +244,7 @@ describe('held phones', () => {
 })
 
 describe('hot replies', () => {
-  it('a thumbs-up reaction (quoting our STOP line) is a yes: no suppression, no DNC, a hot alert', async () => {
+  it('a thumbs-up reaction (quoting our STOP line) is a yes: no suppression, no DNC, the pitch (not hot yet: it only confirms the place is theirs)', async () => {
     const tw = new FakeTwilio()
     const quote = 'Hi, Colin Merrill here. Any interest in selling? No worries if not, just reply STOP.'
     tw.inbound = [text('SMr1', '+14145550177', '\u{1F44D}​ to “​' + quote + '​”')]
@@ -255,7 +255,37 @@ describe('hot replies', () => {
     const d = (await db.query<{ kind: string; body: string }>(`select kind, body from public.reply_drafts where inbound_sid = 'SMr1'`)).rows[0]
     expect(d.kind).toBe('routine')
     expect(d.body).toMatch(/Would you ever consider selling that one\?/)
-    expect((await db.query(`select 1 from public.hot_alerts where inbound_sid = 'SMr1'`)).rows).toHaveLength(1)
+    expect((await db.query(`select 1 from public.hot_alerts where inbound_sid = 'SMr1'`)).rows).toHaveLength(0)
+  })
+
+  it('Martin: a bare yes is not hot; a yes to the pitch is; a later no resolves the open alert', async () => {
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMm1', '+14145550177', 'Yes')]
+    await run(tw)
+    expect((await db.query(`select 1 from public.hot_alerts`)).rows).toHaveLength(0)
+    // pretend the pitch went out (the routine reply), then they say yes to it: hot
+    await db.query(`update public.reply_drafts set status = 'sent', sent_body = body, sent_at = $1 where inbound_sid = 'SMm1'`,
+      [new Date(NOON.getTime() + 60_000).toISOString()])
+    tw.inbound = [...tw.inbound, text('SMm2', '+14145550177', 'Yes I would', new Date(NOON.getTime() + 180_000))]
+    await run(tw, DRY, new Date(NOON.getTime() + 180_000))
+    expect((await db.query<{ inbound_sid: string }>(`select inbound_sid from public.hot_alerts`)).rows).toEqual([{ inbound_sid: 'SMm2' }])
+    // then a no: the open alert is resolved (no repeat, not on the 7 PM list)
+    tw.inbound = [...tw.inbound, text('SMm3', '+14145550177', "If you're looking to overpay. Then yes it's for sale but otherwise I'm not looking to sell",
+      new Date(NOON.getTime() + 300_000))]
+    await run(tw, DRY, new Date(NOON.getTime() + 300_000))
+    const h = (await db.query<{ inbound_sid: string; resolved: boolean }>(`select inbound_sid, resolved_at is not null as resolved from public.hot_alerts`)).rows
+    expect(h).toEqual([{ inbound_sid: 'SMm2', resolved: true }])
+    expect((await db.query<{ kind: string }>(`select kind from public.reply_drafts where inbound_sid = 'SMm3'`)).rows[0].kind).toBe('candidate')
+  })
+
+  it('puts back a text a run claimed but never decided, so it is not lost', async () => {
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMl1', '+14145550177', 'Who is this?')]
+    await run(tw)
+    await db.query(`delete from public.reply_drafts where inbound_sid = 'SMl1'`)       // the run died after claiming it
+    await db.query(`update public.twilio_inbound set processed_at = $1 where sid = 'SMl1'`, [new Date(NOON.getTime() - 300_000).toISOString()])
+    await run(tw)
+    expect((await db.query(`select 1 from public.reply_drafts where inbound_sid = 'SMl1'`)).rows).toHaveLength(1)
   })
 
   it('queue a text to Colin for interest and price talk, never for STOP or a wrong number', async () => {

@@ -73,14 +73,17 @@ beforeEach(async () => {
 })
 
 describe('which replies are hot', () => {
-  it('interest, questions about selling and price talk are; removals, wrong numbers and "not for sale" are not', () => {
-    for (const [intent, text] of [['interested', 'yes'], ['price_first', "what's your offer"], ['who_is_this', 'who is this and why'],
-      ['statement', 'maybe, depends on timing'], ['statement', 'still mine'], ['worth', 'what do you think it is worth']]) {
-      expect(isHotReply({ intent, text, removal: false })).toBe(true)
+  it('selling talk, price asks and a yes to the pitch are hot; a bare yes to the question-only opener is not', () => {
+    for (const [intent, text, afterPitch] of [['price_first', "what's your offer", false], ['statement', 'maybe, depends on timing', false],
+      ['worth', 'what do you think it is worth', false], ['statement', "I'd sell if the timing works", false],
+      ['interested', 'yes', true], ['statement', 'sure', true]] as const) {
+      expect(isHotReply({ intent, text, removal: false, afterPitch }), text).toBe(true)
     }
-    for (const [intent, text, removal] of [['opt_out', 'STOP', true], ['wrong_number', 'wrong number', false],
-      ['not_interested', 'not for sale', false], ['sold', 'sold it last year', false], ['statement', 'ok thanks', false]] as const) {
-      expect(isHotReply({ intent, text, removal })).toBe(false)
+    for (const [intent, text, removal, afterPitch] of [['interested', 'Yes', false, false], ['statement', 'still mine', false, false],
+      ['who_is_this', 'who is this and why', false, false], ['opt_out', 'STOP', true, true], ['wrong_number', 'wrong number', false, false],
+      ['not_interested', 'not for sale', false, true], ['sold', 'sold it last year', false, false], ['statement', 'ok thanks', false, false],
+      ['statement', "If you're looking to overpay then yes it's for sale but otherwise I'm not looking to sell", false, true]] as const) {
+      expect(isHotReply({ intent, text, removal, afterPitch }), text).toBe(false)
     }
   })
 

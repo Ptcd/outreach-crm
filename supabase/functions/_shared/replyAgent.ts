@@ -3,7 +3,7 @@
 // fake Twilio and a fake drafter. Whether a reply MAY go is decided in Postgres
 // (reply_claim_send, migration 0004); what the reply agent says is decided by replyBrain.decide and,
 // for a real conversation, by the drafter (Claude) whose text only Colin can approve.
-import { firstNameOf, isHotReply } from './hotLeads.ts'
+import { PITCH_ASKED, endsInterest, firstNameOf, isHotReply } from './hotLeads.ts'
 import { reactionKind, reactionMeaning } from './replyGuard.ts'
 import { decide, rulesVersion, scoreRedteam, type RedteamRow, type ReplyContext } from './replyBrain.ts'
 import { classifyFailure, isOptOut, type Rpc, type SenderEnv, type TwilioPort } from './sending.ts'
@@ -115,6 +115,9 @@ export async function runReplyAgent(opts: {
   }
 
   // 2. Decide each new text: removal / routine line / a draft for Colin.
+  // A text claimed by a run that died before deciding it (e.g. during a deploy) is put back first.
+  const rq = await opts.rpc('reply_requeue_lost', { p_now: now().toISOString() })
+  if (rq.error) s.inbound_errors.push(`requeue: ${rq.error.message.slice(0, 160)}`)
   const c = await opts.rpc('reply_claim_inbound', { p_limit: opts.batch ?? 10 })
   if (c.error) throw new Error(c.error.message)
   for (const t of (c.data as ClaimedInbound[]) ?? []) {
@@ -154,7 +157,12 @@ export async function runReplyAgent(opts: {
     if (r.error) throw new Error(r.error.message)
     if (facts && Object.keys(facts).length) await opts.rpc('reply_set_facts', { p_sid: t.sid, p_facts: facts })
     // A reply that shows interest or asks about selling: Colin's cell gets a text (hotLeads.ts).
-    if ((held && !d.removal) || isHotReply({ intent: d.intent, text: ctx.inbound, removal: d.removal })) {
+    if (endsInterest({ intent: d.intent, removal: d.removal, outcome: d.outcome })) {
+      await opts.rpc('hot_resolve', { p_phone10: t.from10, p_lead_id: t.lead_id, p_reason: `later reply: ${d.intent}`,
+        p_now: now().toISOString() })
+    }
+    const afterPitch = PITCH_ASKED.test(ctx.lastAgentText ?? '')
+    if ((held && !d.removal) || isHotReply({ intent: d.intent, text: ctx.inbound, removal: d.removal, afterPitch })) {
       const h = await opts.rpc('hot_record', { p_sid: t.sid, p_lead_id: t.lead_id, p_phone10: t.from10,
         p_first_name: firstNameOf(t.owner_name), p_address: t.property_address, p_body: ctx.inbound,
         p_is_test: t.is_test === true, p_now: now().toISOString() })
