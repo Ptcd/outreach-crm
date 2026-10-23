@@ -146,6 +146,31 @@ describe('the reply agent, end to end with no real text', () => {
     expect((await db.query<{ stage: string }>(`select stage::text from public.leads`)).rows[0].stage).toBe('dnc')
   })
 
+  it('a STOP closes every card that carries one of the stopped phones, one step out (Colin 2026-10-23)', async () => {
+    // card B is another owner's card that shares the STOP owner's second phone (a relative's number, one person
+    // behind two LLCs); card C only shares B's own phone, so it is two steps away and stays open
+    await db.exec(`
+      insert into public.leads (id, wpie_owner_id, owner_name, property_address, stage) values
+        ('00000000-0000-0000-0000-0000000000b2', 902, 'B OWNER', '2 Sample St', 'postcard_mailed'),
+        ('00000000-0000-0000-0000-0000000000c3', 903, 'C OWNER', '3 Sample St', 'opener_sent');
+      insert into public.contacts (lead_id, kind, value, value_normalized) values
+        ('00000000-0000-0000-0000-0000000000b2', 'phone', '4145550178', '4145550178'),
+        ('00000000-0000-0000-0000-0000000000b2', 'phone', '4145550300', '4145550300'),
+        ('00000000-0000-0000-0000-0000000000c3', 'phone', '4145550300', '4145550300'),
+        ('00000000-0000-0000-0000-0000000000c3', 'phone', '4145550400', '4145550400');
+    `)
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMs2', '+14145550177', 'STOP')]
+    await run(tw)
+    const stage = async (id: string) => (await db.query<{ stage: string }>(`select stage::text from public.leads where id = $1`, [id])).rows[0].stage
+    expect(await stage('00000000-0000-0000-0000-0000000000b2')).toBe('dnc')
+    const sup = (await db.query<{ phone10: string }>(`select phone10 from public.suppressed_phones order by 1`)).rows.map((r) => r.phone10)
+    expect(sup).toEqual(['4145550177', '4145550178', '4145550300'])     // B's own phone too
+    expect(sup).not.toContain('4145550400')
+    // C shares B's phone (now blocked) but is two steps from the STOP: its card stays open, its own phone reachable
+    expect(await stage('00000000-0000-0000-0000-0000000000c3')).toBe('opener_sent')
+  })
+
   it('a newer text makes the older draft stale; an opted-out phone is never sent a draft', async () => {
     const tw = new FakeTwilio()
     tw.inbound = [text('SM1', '+14145550177', 'yes interested', new Date(NOON.getTime() - 120_000))]

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { cn } from '@/lib/utils'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -48,15 +49,22 @@ export default function LeadDetail() {
         <Link to="/pipeline" className="inline-flex min-h-11 items-center text-sm underline">
           Back to pipeline
         </Link>
-        <h1 className="mt-1 text-xl font-semibold">{lead.owner_name}</h1>
+        <h1 className={cn('mt-1 text-xl font-semibold', lead.stage === 'dnc' && 'text-red-700')}>{lead.owner_name}</h1>
         <div className="mt-1 flex flex-wrap gap-2">
-          <Badge>{STAGE_LABEL[lead.stage]}</Badge>
+          <Badge tone={lead.stage === 'dnc' ? 'bad' : undefined}>{STAGE_LABEL[lead.stage]}</Badge>
           {verdict.verdict !== 'open' && <VerdictBadge v={verdict} />}
           {lead.lane && <Badge tone="info">{lead.lane === 'hold' ? 'Hold lane' : 'Flip lane'}</Badge>}
           {lead.county && <Badge>{lead.county} County</Badge>}
         </div>
       </div>
 
+      {lead.stage === 'dnc' && (
+        // a STOP (or a do-not-contact call) closes the whole card: every phone on it is blocked (Colin 2026-10-23)
+        <div role="alert" className="rounded-md border-2 border-red-500 bg-red-50 p-3 text-sm text-red-900">
+          <p className="font-semibold">Do not contact. They asked to stop.</p>
+          <p>Every phone on this card is blocked: no texts, no calls, no follow-ups, ever.</p>
+        </div>
+      )}
       <HotBanner leadId={lead.id} />
       <BeltStrip lead={lead} />
       {lead.human_takeover_at && (

@@ -110,10 +110,10 @@ export default function Pipeline() {
       <ul className="divide-y rounded-lg border bg-card">
         {leads.data?.rows.map((l) => (
           <li key={l.id}>
-            <Link to={`/lead/${l.id}`} className="block px-4 py-3 hover:bg-accent">
+            <Link to={`/lead/${l.id}`} className={`block px-4 py-3 hover:bg-accent${l.stage === 'dnc' ? ' border-l-4 border-red-500 bg-red-50/60' : ''}`}>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">{l.owner_name}</span>
-                <Badge>{STAGE_LABEL[l.stage]}</Badge>
+                <span className={`font-medium${l.stage === 'dnc' ? ' text-red-700' : ''}`}>{l.owner_name}</span>
+                <Badge tone={l.stage === 'dnc' ? 'bad' : undefined}>{STAGE_LABEL[l.stage]}</Badge>
                 {l.lane && <Badge tone="info">{l.lane === 'hold' ? 'Hold' : 'Flip'}</Badge>}
               </div>
               <div className="text-sm text-muted-foreground">

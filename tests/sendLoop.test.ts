@@ -231,7 +231,8 @@ describe('runSendOpeners', () => {
     tw.inbound = [{ sid: 'SMin', from: `+1${phone}`, to: '+12629996513', body: 'Stop texting me', dateSent: NOW.toISOString() }]
     const s = await runSendOpeners({ rpc, env: LIVE, twilio: tw, now: () => NOW })
     expect(s).toMatchObject({ inbound_new: 1, sent: 0 })
-    expect(s.skipped.map((x) => x.reason)).toEqual(['phone_suppressed'])
+    // the STOP closed the card as well (migration 0046): the card's stage is the first thing the send refuses on
+    expect(s.skipped.map((x) => x.reason)).toEqual(['lead_stage_dnc'])
     expect(tw.sends).toEqual([])
   })
 

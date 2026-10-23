@@ -81,7 +81,7 @@ beforeEach(async () => {
     truncate public.opener_send_events, public.twilio_inbound, public.suppressed_phones, public.planned_openers,
              public.messages, public.contacts, public.leads cascade;
     truncate public.ops_alerts;
-    update public.campaign_control set followups_paused = false, followups_pause_reason = null,
+    update public.campaign_control set followups_paused = false, followups_pause_reason = null, followups_brake = false,
       sending_enabled = true, paused = false, pause_reason = null, laptop_paused = false,
       daily_cap = 100, dnc_policy = 'allow_unknown', scrub_date = null, external_openers = 0, external_openers_date = null,
       banned_words = '{}';
@@ -205,13 +205,14 @@ describe('follow-ups (texts 2 and 3)', () => {
 
   it('holds or skips a follow-up for each rule', async () => {
     const cases: [string, (l: { id: string; owner: number; phone: string }) => Promise<void>, number][] = [
-      ['too_soon', async (l) => sentBefore(l, 2), 2],
+      ['too_soon', async (l) => sentBefore(l, 1), 2],                    // under 48 hours (0047)
       ['opener_not_delivered', async (l) => sentBefore(l, 4, 1, 'undelivered'), 2],
       ['text_2_not_delivered', async (l) => sentBefore(l, 8), 3],
       ['owner_replied', async (l) => { await sentBefore(l, 4); await db.query(
         `insert into public.twilio_inbound (sid, from10, to_number, body, received_at) values ($1, $2, '+12629996513', 'who is this', now())`, [`SMin${l.owner}`, l.phone]) }, 2],
       ['phone_marked_bad', async (l) => { await sentBefore(l, 4); await db.query(`update public.contacts set status = 'bad' where value_normalized = $1`, [l.phone]) }, 2],
-      ['phone_suppressed', async (l) => { await sentBefore(l, 4); await db.query(`insert into public.suppressed_phones (phone10, reason) values ($1, 'stop_reply')`, [l.phone]) }, 2],
+      // a STOP closes the whole card (migration 0046), so the card is what the send refuses on first
+      ['lead_stage_dnc', async (l) => { await sentBefore(l, 4); await db.query(`insert into public.suppressed_phones (phone10, reason) values ($1, 'stop_reply')`, [l.phone]) }, 2],
     ]
     for (const [reason, setup, step] of cases) {
       const l = await lead({ stage: 'opener_sent' })
@@ -236,6 +237,8 @@ describe('follow-ups (texts 2 and 3)', () => {
   })
 
   it('pauses follow-ups only when their opt-outs run high, texts Colin, keeps openers going, Colin restarts', async () => {
+    // the brake is off unless someone turns it on (0047; Colin: a STOP ends that owner, never everyone's follow-ups)
+    await db.exec(`update public.campaign_control set followups_brake = true`)
     // 50 delivered follow-ups, 2 opted out (4% > 2%)
     for (let i = 0; i < 50; i++) {
       const l = await lead({ stage: 'opener_sent' })

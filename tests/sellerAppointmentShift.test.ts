@@ -144,8 +144,10 @@ describe('human call takeover', () => {
   it('fails closed for STOP/DNC and an off-card number, and STOP clears an in-flight marker', async () => {
     expect(await begin('app', 'off_card_001', '4145550199')).toMatchObject({ ok: false, reason: 'that phone is not on this card' })
     await db.exec(`insert into public.suppressed_phones (phone10, reason, source) values ('4145550177', 'stop_reply', 'test')`)
-    expect(await begin('app', 'blocked_001')).toMatchObject({ ok: false, reason: 'suppressed: stop_reply' })
+    // a STOP closes the whole card too (migration 0046), so the gate answers with the card first
+    expect(await begin('app', 'blocked_001')).toMatchObject({ ok: false, reason: 'this card is closed or do-not-contact' })
     await db.exec(`delete from public.suppressed_phones`)
+    await db.query(`update public.leads set stage = 'opener_sent', belt = null where id = $1`, [LEAD])
     await begin('personal', 'stop_during_001')
     await belt('stop', { key: 'stop:during-call' })
     expect(await one<{ belt: string; paused: boolean }>(`

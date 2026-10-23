@@ -84,7 +84,8 @@ describe('provider-side human-call authorization', () => {
     await db.query(`update public.leads set stage = 'opener_sent', belt = null where id = $1`, [LEAD])
     await begin('blocked_after_begin_002')
     await db.exec(`insert into public.suppressed_phones (phone10, reason, source) values ('4145550177', 'stop_reply', 'test')`)
-    expect(await claim('blocked_after_begin_002', SID2)).toMatchObject({ allowed: false, reason: 'suppressed: stop_reply' })
+    // a STOP closes the whole card too (migration 0046)
+    expect(await claim('blocked_after_begin_002', SID2)).toMatchObject({ allowed: false, reason: 'this card is closed or do-not-contact' })
   })
 
   it('rejects a closed pause, logged outcome and reassignment without changing the conveyor', async () => {
