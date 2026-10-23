@@ -58,6 +58,25 @@ describe('call desk', () => {
     expect(await call(`select public.phone_lookup('9999') as r`)).toEqual([])
   })
 
+  it('makes a card from a text with no card, ties that number\'s drafts and texts to it, and reuses it', async () => {
+    await db.exec(`
+      insert into public.twilio_inbound (sid, from10, to_number, body, received_at) values
+        ('SMx1', '4147930000', '+12624180202', 'Derek here, you inquired about 1 Sample St', now());
+      insert into public.reply_drafts (id, phone10, our_number, inbound_sid, inbound_body, inbound_at, kind, status, body) values
+        ('00000000-0000-0000-0000-0000000000d1', '4147930000', '+12624180202', 'SMx1', 'Derek here, you inquired about 1 Sample St', now(),
+         'candidate', 'awaiting_approval', 'Thanks for getting back to me.');
+    `)
+    const r = await call<{ ok: boolean; lead_id: string; existing: boolean }>(
+      `select public.card_from_text('00000000-0000-0000-0000-0000000000d1') as r`)
+    expect(r).toMatchObject({ ok: true, existing: false })
+    expect(await one(`select owner_name, stage::text from public.leads where id = '${r.lead_id}'`))
+      .toEqual({ owner_name: 'New texter (414) 793-0000', stage: 'colin_call' })
+    expect(await one(`select lead_id from public.reply_drafts where id = '00000000-0000-0000-0000-0000000000d1'`)).toEqual({ lead_id: r.lead_id })
+    expect(await one(`select lead_id from public.twilio_inbound where sid = 'SMx1'`)).toEqual({ lead_id: r.lead_id })
+    expect(await call(`select public.card_from_text('00000000-0000-0000-0000-0000000000d1') as r`))
+      .toMatchObject({ ok: true, lead_id: r.lead_id, existing: true })
+  })
+
   it('makes a new-caller card once, and finds an existing number instead', async () => {
     expect(await call(`select public.new_caller('9999', null) as r`)).toMatchObject({ ok: false })
     const n = await call<{ ok: boolean; lead_id: string; existing: boolean }>(`select public.new_caller('262-555-0199', null) as r`)

@@ -85,7 +85,8 @@ export default function Inbox() {
       {(other.data ?? []).length > 0 && (chip === 'all' || chip === 'needs_me') && (
         <section className="space-y-2">
           <h2 className="pt-2 font-semibold">Texts from numbers not on these plans</h2>
-          {(other.data ?? []).filter((d) => chip === 'all' || d.status === 'awaiting_approval').map((d) => (
+          {/* a skipped text is done: it does not hang around here (Colin 2026-10-23) */}
+          {(other.data ?? []).filter((d) => d.status !== 'skipped' && (chip === 'all' || d.status === 'awaiting_approval')).map((d) => (
             <div key={d.id} className="rounded-lg border bg-card p-3 shadow-sm"><DraftBox d={d} showFrom /></div>
           ))}
         </section>

@@ -315,6 +315,7 @@ export const api = {
   resumeHumanCall: (leadId: string, key: string) => supabase.rpc('resume_human_call', { p_lead_id: leadId, p_key: key }),
   // Call desk (migration 0013)
   newCaller: (phone: string, name?: string) => supabase.rpc('new_caller', { p_phone: phone, p_name: name ?? null }),
+  cardFromText: (draftId: string) => supabase.rpc('card_from_text', { p_draft: draftId }),
   callAnswer: (leadId: string, key: string, value: unknown) => supabase.rpc('call_answer', { p_lead_id: leadId, p_key: key, p_value: value }),
   logCall: (leadId: string, phone: string | null, outcome: string, note: string | null, until: string | null = null) =>
     supabase.rpc('log_call', { p_lead_id: leadId, p_phone: phone, p_outcome: outcome, p_note: note, p_when: until }),

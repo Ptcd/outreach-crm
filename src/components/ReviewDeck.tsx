@@ -33,10 +33,10 @@ function displayName(d: WaitingDraft): string {
 
 // The main phone screen: one reply waiting for Colin at a time. The seller's latest text is
 // big, the draft is right under it, and Approve / Edit / Skip sit above the bottom bar where
-// the thumb is. After a tap the bar says what happened and offers Next; swipe works too.
+// the thumb is. After a tap the card leaves, the next one slides in and a line says what happened; swipe works too.
 export function ReviewDeck({ drafts, startId }: { drafts: WaitingDraft[]; startId?: string | null }) {
   const qc = useQueryClient()
-  // Order fixed for this visit; drafts that arrive later join the end, handled ones stay (with their result).
+  // Order fixed for this visit; drafts that arrive later join the end.
   const [ids, setIds] = useState(() => drafts.map((d) => d.id))
   const seen = useRef(new Map<string, WaitingDraft>())
   for (const x of drafts) seen.current.set(x.id, x)
@@ -45,33 +45,47 @@ export function ReviewDeck({ drafts, startId }: { drafts: WaitingDraft[]; startI
   const [texts, setTexts] = useState<Record<string, string>>({})
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [results, setResults] = useState<Record<string, Result>>({})
+  // drafts approved or skipped on this screen: they leave the deck at once (Colin 2026-10-23: "skipping it doesn't
+  // get rid of it"); the bar above the next card says what happened to the last one
+  const [handled, setHandled] = useState<Record<string, true>>({})
+  const [last, setLast] = useState<{ name: string; result: Result } | null>(null)
   // A draft that stopped waiting elsewhere (skipped on another phone, its lead marked do not contact, they texted
-  // again) leaves the deck; only the ones handled on this screen stay, with their result. The phone's saved copy
-  // can be hours old (Colin 2026-10-23: a skipped draft for a dnc lead was back in Needs you).
+  // again) leaves the deck too. The phone's saved copy can be hours old (Colin 2026-10-23: a skipped draft for a
+  // dnc lead was back in Needs you).
   useEffect(() => {
     const live = new Set(drafts.map((x) => x.id))
-    setIds((prev) => [...prev.filter((x) => live.has(x) || results[x]), ...drafts.map((x) => x.id).filter((x) => !prev.includes(x))])
-  }, [drafts, results])
-  useEffect(() => { setIdx((i) => Math.max(0, Math.min(i, ids.length - 1))) }, [ids.length])
+    setIds((prev) => [...prev.filter((x) => live.has(x)), ...drafts.map((x) => x.id).filter((x) => !prev.includes(x))])
+  }, [drafts])
+  const open = ids.filter((x) => !handled[x])
+  useEffect(() => { setIdx((i) => Math.max(0, Math.min(i, open.length - 1))) }, [open.length])
   const touch = useRef<number | null>(null)
   const area = useRef<HTMLTextAreaElement>(null)
+  const [carding, setCarding] = useState(false)
+  const [cardError, setCardError] = useState<string | null>(null)
 
-  const id = ids[idx]
+  const id = open[idx]
   const d = id ? byId.get(id) : undefined
-  const result = id ? results[id] : undefined
-  const left = ids.filter((x) => !results[x]).length
-  useEffect(() => { setEditing(false) }, [idx])
+  useEffect(() => { setEditing(false); setCardError(null) }, [idx, id])
   useEffect(() => { if (editing) area.current?.focus() }, [editing])
-  if (!ids.length) return null
+  if (!open.length && !last) return null
 
-  const go = (n: number) => setIdx((i) => Math.min(ids.length - 1, Math.max(0, i + n)))
-  const nextOpen = () => {
-    const after = ids.findIndex((x, i) => i > idx && !results[x])
-    const any = ids.findIndex((x) => !results[x])
-    setIdx(after >= 0 ? after : any >= 0 ? any : idx)
-  }
+  const go = (n: number) => setIdx((i) => Math.min(open.length - 1, Math.max(0, i + n)))
   const text = id ? (texts[id] ?? d?.body ?? '') : ''
+  // A text from a number with no card (a broker, someone answering a letter): make the card from here
+  const makeCard = async () => {
+    if (!d) return
+    setCarding(true); setCardError(null)
+    try {
+      const r = await api.cardFromText(d.id)
+      const data = r.data as { ok?: boolean; lead_id?: string; reason?: string } | null
+      if (r.error || !data?.ok || !data.lead_id) { setCardError(r.error?.message ?? data?.reason ?? 'Could not make the card.'); return }
+      byId.set(d.id, { ...d, lead_id: data.lead_id })
+      void qc.invalidateQueries({ queryKey: ['reply_drafts'] })
+      void qc.invalidateQueries({ queryKey: ['inbox'] })
+    } finally {
+      setCarding(false)
+    }
+  }
   // earlier texts for context (your opener, their last few), not the one being answered
   const prior = d ? d.thread.filter((l) => !(l.who === 'them' && l.body === d.inbound_body)).slice(-3) : []
 
@@ -81,11 +95,16 @@ export function ReviewDeck({ drafts, startId }: { drafts: WaitingDraft[]; startI
     try {
       const r = await api.replyAction(id, action, action === 'approve' ? text : undefined)
       const data = (r as { data?: { outcome: string; reason?: string } }).data
-      setResults((m) => ({ ...m, [id]: r.error ? { kind: 'error', text: r.error.message } : resultOf(data?.outcome, data?.reason, action) }))
+      const res: Result = r.error ? { kind: 'error', text: r.error.message } : resultOf(data?.outcome, data?.reason, action)
+      const name = d ? displayName(d) : ''
+      setLast({ name, result: res })
+      // an error keeps the card so it can be tried again; anything else is done with it
+      if (res.kind !== 'error') setHandled((m) => ({ ...m, [id]: true }))
       void qc.invalidateQueries({ queryKey: ['reply_waiting'] })
+      void qc.invalidateQueries({ queryKey: ['reply_drafts'] })
       void qc.invalidateQueries({ queryKey: ['inbox'] })
     } catch (e) {
-      setResults((m) => ({ ...m, [id]: { kind: 'error', text: e instanceof Error ? e.message : String(e) } }))
+      setLast({ name: d ? displayName(d) : '', result: { kind: 'error', text: e instanceof Error ? e.message : String(e) } })
     } finally {
       setBusy(false)
       setEditing(false)
@@ -103,12 +122,18 @@ export function ReviewDeck({ drafts, startId }: { drafts: WaitingDraft[]; startI
         if (dx > 70) go(-1)
       }}>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">Needs you <span className="text-muted-foreground">· {idx + 1} of {ids.length}</span></h2>
+        <h2 className="text-lg font-semibold">Needs you <span className="text-muted-foreground">· {open.length ? `${idx + 1} of ${open.length}` : 'all done'}</span></h2>
         <div className="flex gap-1">
           <Button variant="outline" className="h-11 w-12 text-2xl" aria-label="Previous" disabled={idx === 0} onClick={() => go(-1)}>‹</Button>
-          <Button variant="outline" className="h-11 w-12 text-2xl" aria-label="Next" disabled={idx >= ids.length - 1} onClick={() => go(1)}>›</Button>
+          <Button variant="outline" className="h-11 w-12 text-2xl" aria-label="Next" disabled={idx >= open.length - 1} onClick={() => go(1)}>›</Button>
         </div>
       </div>
+
+      {last && (
+        <p role="status" className={cn('rounded-lg px-3 py-2 text-sm font-medium', RESULT_TONE[last.result.kind])}>
+          {last.name ? `${last.name}: ` : ''}{last.result.text}
+        </p>
+      )}
 
       {d ? (
         <article id={`draft-${d.id}`} className="rounded-xl border bg-card p-4 shadow-sm">
@@ -119,10 +144,18 @@ export function ReviewDeck({ drafts, startId }: { drafts: WaitingDraft[]; startI
           <p className="text-sm text-muted-foreground">
             {d.property_address ? `${d.property_address} · ` : ''}{fmtPhone(d.phone10)}
           </p>
-          {d.lead_id && (
+          {d.lead_id ? (
             <Link to={`/lead/${d.lead_id}`} className="mt-1 inline-flex min-h-11 items-center text-sm font-medium text-primary underline">
               Open the full card (facts, gate, tasks)
             </Link>
+          ) : !d.is_test && (
+            <div className="mt-1">
+              <p className="text-sm text-muted-foreground">This number has no card yet.</p>
+              <Button variant="outline" className="mt-1 h-11" disabled={carding} onClick={() => void makeCard()}>
+                {carding ? 'Making the card...' : 'Make a card for this number'}
+              </Button>
+              {cardError && <p className="mt-1 text-sm text-red-600">{cardError}</p>}
+            </div>
           )}
 
           {prior.length > 0 && (
@@ -154,20 +187,13 @@ export function ReviewDeck({ drafts, startId }: { drafts: WaitingDraft[]; startI
           </div>
         </article>
       ) : (
-        <p className="rounded-xl border bg-card p-4">That reply was already handled.</p>
+        <p className="rounded-xl border bg-card p-4 text-base">Nothing else needs you right now.</p>
       )}
 
       {/* thumb bar: sits above the bottom navigation on a phone */}
-      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 !m-0 border-t bg-background p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:static sm:border-0 sm:bg-transparent sm:p-0">
+      {d && <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 !m-0 border-t bg-background p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] sm:static sm:border-0 sm:bg-transparent sm:p-0">
         <div className="mx-auto max-w-5xl">
-          {result ? (
-            <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-              <p role="status" className={cn('rounded-lg px-3 py-3 text-base font-medium', RESULT_TONE[result.kind])}>{result.text}</p>
-              {left > 0
-                ? <Button className="h-12 px-5 text-base" onClick={nextOpen}>Next ({left})</Button>
-                : <p className="px-2 text-sm font-medium">All done</p>}
-            </div>
-          ) : (
+          {d ? (
             <div className="grid grid-cols-3 gap-2">
               <Button className="h-12 text-base" disabled={busy || !text.trim()} onClick={() => void act('approve')}>Approve</Button>
               <Button className="h-12 text-base" variant="outline" disabled={busy} onClick={() => setEditing((e) => !e)}>
@@ -175,9 +201,9 @@ export function ReviewDeck({ drafts, startId }: { drafts: WaitingDraft[]; startI
               </Button>
               <Button className="h-12 text-base" variant="outline" disabled={busy} onClick={() => void act('skip')}>Skip</Button>
             </div>
-          )}
+          ) : null}
         </div>
-      </div>
+      </div>}
     </section>
   )
 }
