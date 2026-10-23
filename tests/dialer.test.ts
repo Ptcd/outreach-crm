@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { callLabel, callerDigits, fmtDuration, inboundLabel, pickInbound } from '../src/lib/dialer'
-import { humanCallAuthorized } from '../src/lib/callAttempt'
+import { humanCallAuthorized, humanCallProviderParams } from '../src/lib/callAttempt'
 import type { PhoneMatch } from '../src/lib/queries'
 
 const match = (x: Partial<PhoneMatch>): PhoneMatch => ({
@@ -14,6 +14,11 @@ describe('dialer helpers', () => {
     expect(humanCallAuthorized({ ok: true, duplicate: true, paused: false })).toBe(false)
     expect(humanCallAuthorized({ ok: true })).toBe(false)
     expect(humanCallAuthorized(null)).toBe(false)
+  })
+  it('binds the provider request to the exact lead and takeover key', () => {
+    expect(humanCallProviderParams('+14145550101', '+12629996513', 'lead-1', 'attempt-1')).toEqual({
+      To: '+14145550101', line: '+12629996513', leadId: 'lead-1', takeoverKey: 'attempt-1',
+    })
   })
   it('names the call after the person and the property', () => {
     expect(callLabel('Laurie', '3424 N Main St')).toBe('Laurie - 3424 N Main St')

@@ -9,3 +9,8 @@ export function humanCallAuthorized(value: unknown): value is { ok: true; paused
     && (value as { ok?: unknown }).ok === true
     && (value as { paused?: unknown }).paused === true
 }
+
+/** Custom TwiML-App parameters that bind the provider webhook to this exact database pause. */
+export function humanCallProviderParams(to: string, line: string, leadId: string, takeoverKey: string) {
+  return { To: to, line, leadId, takeoverKey }
+}
