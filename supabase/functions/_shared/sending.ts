@@ -22,9 +22,10 @@ export interface TwilioConfig {
   messagingServiceSid: string
   campaignNumber: string        // E.164 whose inbound texts are pulled before each run, or 'pool': every reply number
   statusCallbackUrl?: string    // set only when the auth token is available to verify callbacks
-  // CAMPAIGN_OPENER_FROM: first texts go out only from these pool numbers. A number just added to
-  // the pool waits days for carrier registration (30024 until then) and must stay in the pool for
-  // it, so without this list Twilio would pick it for real sellers. Empty = Twilio picks from the pool.
+  // CAMPAIGN_OPENER_FROM: every text that has no number of its own (a first text, or a follow-up to
+  // someone whose first number was never recorded) goes out from one of these pool numbers. A number
+  // just added to the pool waits days for carrier registration (30024 until then) and must stay in
+  // the pool for it, so without this list Twilio would pick it for real sellers. Empty = Twilio picks.
   openerFrom: string[]
 }
 
@@ -85,7 +86,9 @@ export function twilioPort(cfg: TwilioConfig, fetchFn: typeof fetch): TwilioPort
   return {
     async send(to, body, from, opts) {
       const form = new URLSearchParams({ To: to, Body: body, MessagingServiceSid: cfg.messagingServiceSid })
-      if (from) form.set('From', from)     // must be a number in the same Messaging Service
+      // must be a number in the same Messaging Service; none of its own -> a proven one (CAMPAIGN_OPENER_FROM)
+      const sender = from || openerFromFor(cfg.openerFrom ?? [], to)
+      if (sender) form.set('From', sender)
       if (cfg.statusCallbackUrl && (!from || opts?.statusCallback)) form.set('StatusCallback', cfg.statusCallbackUrl)
       let res: Response
       try {

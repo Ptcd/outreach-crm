@@ -298,6 +298,17 @@ describe('Twilio port', () => {
       ['+12629996513', null],
       [null, 'https://x.supabase.co/functions/v1/opener-status'],
     ])
+    // With the list set, a text with no number of its own (a follow-up whose first number was never
+    // recorded) still goes out from a proven number, and keeps its delivery callback.
+    const pinnedEnv = senderEnv((n) => ({ TWILIO_ACCOUNT_SID: 'ACtest', TWILIO_AUTH_TOKEN: 'tok', CAMPAIGN_MESSAGING_SERVICE_SID: 'MGtest',
+      CAMPAIGN_FROM_NUMBER: 'pool', CAMPAIGN_OPENER_FROM: '+12629996513,+12624180202' } as Record<string, string>)[n], 'https://x.supabase.co/functions/v1')
+    forms.length = 0
+    await twilioPort(pinnedEnv.twilio!, fake).send('+14145551234', 'hi')
+    await twilioPort(pinnedEnv.twilio!, fake).send('+14145551234', 'hi', '+12623812196')
+    expect(forms.map((f) => [f.get('From'), f.get('StatusCallback')])).toEqual([
+      [openerFromFor(['+12629996513', '+12624180202'], '+14145551234'), 'https://x.supabase.co/functions/v1/opener-status'],
+      ['+12623812196', null],
+    ])
   })
 })
 
