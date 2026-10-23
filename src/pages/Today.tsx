@@ -20,6 +20,8 @@ export default function Today() {
   const replies = useUnseenReplies()
   const debt = useFollowupDebt()
   const recovery = useSellerRecovery()
+  const missingDate = recovery.data?.filter((c) => c.reason === 'missing_next_action' || c.reason === 'missing_next_stop') ?? []
+  const otherRecovery = recovery.data?.filter((c) => c.reason !== 'missing_next_action' && c.reason !== 'missing_next_stop') ?? []
   const replyTasks = useReplyTasks()
   const done = useWrite((id: string) => api.finishTask(id), [['tasks'], ['lead']])
   const seen = useWrite((id: string) => api.markSeen(id, user!.id), [['messages'], ['lead']])
@@ -120,16 +122,27 @@ export default function Today() {
             </li>
           ))}
         </ul>
-        <p className="mt-3 mb-1 text-sm font-medium">Conversation recovery{recovery.data ? ` (${recovery.data.length})` : ''}</p>
-        <p className="mb-1 text-xs text-muted-foreground">Calls needing an outcome, touched leads missing a next step, and overdue belt stops. Closed and suppressed cards stay out.</p>
+        <p className="mt-3 mb-1 text-sm font-medium">Missing date / next stop{recovery.data ? ` (${missingDate.length})` : ''}</p>
+        <p className="mb-1 text-xs text-muted-foreground">Touched cards with no dated next action or no belt stop. Closed and suppressed cards stay out.</p>
         <ErrorNote error={recovery.error} />
-        {recovery.data?.length === 0 && <p className="text-sm text-muted-foreground">Every live conversation has a current next step.</p>}
+        {recovery.data && missingDate.length === 0 && <p className="text-sm text-muted-foreground">Every touched card has a dated next step.</p>}
         <ul className="divide-y">
-          {recovery.data?.map((c) => (
+          {missingDate.map((c) => (
+            <li key={c.lead_id} className="py-2 text-sm">
+              <Link to={`/lead/${c.lead_id}`} className="inline-flex min-h-11 items-center font-medium underline">{c.owner_name}</Link>{' '}
+              - {STAGE_LABEL[c.stage]} - <Badge tone="warn">missing date</Badge>{' '}<Badge>{personLabel(c.recovery_owner)}</Badge>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 mb-1 text-sm font-medium">Conversation recovery{recovery.data ? ` (${otherRecovery.length})` : ''}</p>
+        <p className="mb-1 text-xs text-muted-foreground">Calls needing an outcome and overdue belt stops.</p>
+        {recovery.data && otherRecovery.length === 0 && <p className="text-sm text-muted-foreground">No conversations need recovery.</p>}
+        <ul className="divide-y">
+          {otherRecovery.map((c) => (
             <li key={c.lead_id} className="py-2 text-sm">
               <Link to={`/lead/${c.lead_id}`} className="inline-flex min-h-11 items-center font-medium underline">{c.owner_name}</Link>{' '}
               - {STAGE_LABEL[c.stage]} - <Badge tone={c.reason === 'call_outcome_needed' ? 'bad' : 'warn'}>
-                {c.reason === 'call_outcome_needed' ? 'log call outcome' : c.reason === 'overdue' ? 'overdue' : c.reason === 'missing_next_stop' ? 'missing belt stop' : 'missing next action'}
+                {c.reason === 'call_outcome_needed' ? 'log call outcome' : 'overdue'}
               </Badge>{' '}<Badge>{personLabel(c.recovery_owner)}</Badge>
               {c.human_takeover_by && <span className="text-muted-foreground"> started by {c.human_takeover_by}</span>}
             </li>

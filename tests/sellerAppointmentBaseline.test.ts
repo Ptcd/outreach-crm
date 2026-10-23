@@ -57,7 +57,7 @@ describe('seller-to-appointment conveyor baseline', () => {
       from public.leads where id = $1`, [LEAD])
     expect(lead.belt).toBe('not_now_dated')
     expect(lead.named).toBe('2026-11-02T18:00:00Z')
-    expect(new Date(lead.stop).getTime()).toBeLessThanOrEqual(new Date(lead.named).getTime())
+    expect(new Date(lead.stop).getTime()).toBeGreaterThanOrEqual(new Date(lead.named).getTime())
   })
 
   it('shows live cards with no stop but excludes resting and terminal cards', async () => {

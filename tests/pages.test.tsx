@@ -47,7 +47,12 @@ vi.mock('@/lib/queries', () => ({
   // the conveyor's pieces (migrations 0029-0032): nothing on the belt in this fixture
   useMyStops: () => ok([]),
   useCardsNoStop: () => ok([]),
-  useSellerRecovery: () => ok([]),
+  useSellerRecovery: () => ok([{
+    lead_id: 'L3', owner_name: 'BO KIM', property_address: '400 N PINE ST', stage: 'reply_received', belt: 'yes_unbooked', belt_step: 1,
+    next_stop_at: null, next_stop_who: null, next_action_at: null, next_action: null, assigned_to: null,
+    reason: 'missing_next_action', recovery_owner: 'thalia', human_takeover_at: null, human_takeover_by: null, human_takeover_phone: null,
+    updated_at: '2026-10-22T16:00:00Z',
+  }]),
   useBeltEvents: () => ok([]),
   useBeltMaxSteps: () => ok({}),
   useBeltHealth: () => ok(null),
@@ -128,6 +133,8 @@ describe('pages render', () => {
     ]
     expect(required.every((heading, i) => i === 0 || Boolean(required[i - 1].compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true)
     expect((screen.getByLabelText('Whose follow-ups') as HTMLSelectElement).value).toBe('colin')
+    expect(screen.getByText('Missing date / next stop (1)')).toBeTruthy()
+    expect(screen.getByText('missing date')).toBeTruthy()
   })
 
   it('Pipeline shows stage counts and the lead', () => {

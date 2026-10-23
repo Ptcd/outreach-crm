@@ -234,29 +234,26 @@ describe('the belts move cards', () => {
     expect(await openTasks()).toEqual([])
   })
 
-  it('not now with a date: the permission text 4 days before, the call never before the date, then +7', async () => {
+  it('not now with a date: no seller contact before the exact date, then one +7 retry', async () => {
     const r = await as(THALIA, () => one<{ r: Record<string, unknown> }>(
       `select public.log_call($1, '4145550177', 'not_now', 'after the tenant moves out, mid November') as r`, [A]))
     expect(r.r).toMatchObject({ ok: true })
     expect((await lead()).belt).toBe('not_now_condition')                                 // no date given: a condition
     await ev('named_date', { named_date: '2026-11-16T18:00:00Z', named_event: 'the tenant moving out' })
     let l = await lead()
-    expect(l).toMatchObject({ belt: 'not_now_dated', belt_step: 1, next_stop_who: 'auto_text' })
-    expect(l.next_stop_at!.slice(0, 10)).toBe('2026-11-12')                               // 4 days before
-    await ev('auto_text_sent', {}, '2026-11-12T15:00:00Z')
-    l = await lead()
-    expect(l).toMatchObject({ belt: 'not_now_dated', belt_step: 2, next_stop_who: 'colin_call' })
+    expect(l).toMatchObject({ belt: 'not_now_dated', belt_step: 1, next_stop_who: 'colin_call' })
     expect(new Date(l.next_stop_at!).getTime()).toBeGreaterThanOrEqual(new Date('2026-11-16T18:00:00Z').getTime())
     expect(l.next_stop_say).toBe('You mentioned the tenant moving out for 100 N Main St; how did it go?')
     await ev('stop_done', { outcome: 'no_answer' }, '2026-11-16T20:00:00Z')
     l = await lead()
-    expect(l.belt_step).toBe(3)
+    expect(l.belt_step).toBe(2)
     expect(l.next_stop_at!.slice(0, 10)).toBe('2026-11-23')
-    // a date too near for the pre-date text: the belt starts at the call
+    // A near date follows the same quiet rule: the first and only initial stop is the call.
     await db.query(`update public.leads set belt = null, belt_step = 0 where id = $1`, [A])
     await ev('named_date', { named_date: '2026-10-24T18:00:00Z', named_event: 'the closing' }, NOW)
     l = await lead()
-    expect(l).toMatchObject({ belt: 'not_now_dated', belt_step: 2, next_stop_who: 'colin_call' })
+    expect(l).toMatchObject({ belt: 'not_now_dated', belt_step: 1, next_stop_who: 'colin_call' })
+    expect(new Date(l.next_stop_at!).getTime()).toBeGreaterThanOrEqual(new Date('2026-10-24T18:00:00Z').getTime())
   })
 
   it('STOP is final: nothing moves a DNC card, no text is ever claimed for it, and dead gets no text either', async () => {
