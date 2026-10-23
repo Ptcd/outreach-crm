@@ -1,6 +1,6 @@
 # Seller-to-appointment shift — handoff for Claude
 
-Date: 2026-10-23 UTC  
+Date: 2026-10-23 UTC
 Status: implemented and tested locally; not pushed, merged, deployed, or applied to a live database
 
 ## Exact source and deliverable
@@ -12,6 +12,7 @@ Status: implemented and tested locally; not pushed, merged, deployed, or applied
 - Baseline regression commit: `4a2b43335f1894441ed58d6d9cc08e9dac23d65c`
 - Implementation commit: `0841d39994b5c90157ddfa802912f4cb3526079a`
 - Operator-manual reconciliation commit: `bf9b1e9546a625d5b302c49c9131df9d0c743fe5`
+- Frozen code-review HEAD: `f4197db71ffb69f29ae7524756d019a88c123a96`
 - Prior reviewed audit milestone: `40105ed9fb01b37797ede365534d5e19243d102a`
 - Previous audit report: `CODEX_REPORT_day_in_the_life.md` (Library identity `libfile_9b6dab843d4081919dab90ee8f1bfcb6`)
 - WPIE compatibility reference: `origin/main` at `536606b78a1a8d160e9d0c3715aadce2672f39b6`
@@ -25,12 +26,14 @@ The existing migration `0035_not_now_date.sql` already stores a seller-named dat
 
 - “Not now” starts with no date preselected.
 - The caller must choose either a specific date or an event/condition with a written note.
-- A specific calendar date is stored at noon Milwaukee time, independent of the device time zone.
+- The UI carries a selected calendar date as noon Milwaukee time so it survives supported US time-zone conversion; migration `0039_seller_shift_review_hardening.sql` treats that value as a date token, not an explicit noon appointment.
+- The server resolves the selected local day to the belt's configured first-call hour (currently 10:00 in the lead's time zone). If today's 10:00 has passed, it uses the next legal call minute; Sunday and the 08:00-20:00 calling window still use `belt_slide`.
 - DST regressions cover both CST and CDT.
 - An event-only answer still has the existing 30-day internal review reminder, but the UI labels that as a review reminder rather than a date the seller gave.
 - Migration `0038_not_now_manual_alignment.sql` reconciles the implementation with WPIE operator-manual commit `536606b78a1a8d160e9d0c3715aadce2672f39b6`: an exact-date card now has no seller contact before that day. The first stop is Colin's call on or after the named instant, followed by one seven-day retry.
 - The migration supersedes a queued or approval-waiting legacy pre-date draft, closes its task, and remaps active old steps (`1/2 -> 1`, `3 -> 2`). It refuses to run while a matching draft is `sending`, because an uncertain provider outcome must be reconciled first.
 - Rescheduling updates the same stable belt task to the new date; the old due time is not left open.
+- Server tests cover same-day selection before and after 10:00, next-day selection, CST/CDT, Sunday sliding, past-date rejection, and rescheduling after the legacy queue migration.
 
 ### 2. No forgotten conversations
 
@@ -61,6 +64,8 @@ The RPC:
 - uses a client attempt key for retry and concurrent-click idempotency; and
 - refuses to overlap a provider-uncertain text already marked `sending`.
 
+Migration `0039` closes the independent review's stale-key authorization hole. A used key is successful only while the exact pause is still active and the current phone, block/DNC state, terminal state, caller identity, and assignment snapshot still match. A retry after STOP, suppression/DNC, outcome logging, explicit resume, reassignment, or destination change is rejected. Both browser and personal-phone clients additionally require `{ok:true, paused:true}` before they proceed; `{ok:true, paused:false}` cannot dial.
+
 `resume_human_call` is the explicit “call did not happen” path. It restores the exact held draft status and leaves the belt step/time untouched. A saved call outcome clears the pause only after the ordinary `belt_on_message` trigger routes that outcome to the next existing stop. STOP or another terminal transition clears the marker and remains final.
 
 The conveyor worker now calls `belt_claim_text_guarded`. The due-text scan, guarded claim, and missed-stop sweep all leave an active human takeover alone. An uncertain browser SDK error stays paused for recovery; it is not automatically resumed.
@@ -81,17 +86,19 @@ A booked visit now shows one deterministic Appointment packet on the lead card:
 - booking-gate result and hard stops; and
 - a generated unresolved list.
 
-The packet only reads persisted WPIE, call-script, reply, and gate facts. Missing fields display `Unknown — ask and record`; no fact, price, condition, signer, or visit time is inferred.
+The packet only reads persisted WPIE, call-script, reply, and gate facts. Every row now names its source kind. Call-script facts and gate scores display the stored timestamp and actor; structured reply facts do too when those fields exist. WPIE fields do not invent field-level timestamps or actors that are not stored. Missing fields display `Unknown — ask and record` with source `Not recorded`; no fact, price, condition, signer, or visit time is inferred.
 
 ## Database migration and contracts
 
-Apply migrations in numeric order. `0037` depends on `0035` (dated `log_call`) and `0036` (`phone_is_blocked`). `0038` then changes only the existing `not_now_dated` belt cadence and performs its targeted active-card reconciliation. `0037` adds nullable lead columns:
+Apply migrations in numeric order. `0037` depends on `0035` (dated `log_call`) and `0036` (`phone_is_blocked`). `0038` then changes only the existing `not_now_dated` belt cadence and performs its targeted active-card reconciliation. `0039` must follow both: it hardens the call door and normalizes date-only follow-ups to the configured call hour. `0037` adds nullable lead columns:
 
 - `human_takeover_at`
 - `human_takeover_by`
 - `human_takeover_phone`
 - `human_takeover_key`
 - `human_takeover_drafts`
+
+`0039` adds nullable `human_takeover_assigned_to`, backfilled only for a currently active takeover. It snapshots the assignment authorized at call start so a later reassignment invalidates a retry without preventing legitimate weekend coverage of an already-assigned card.
 
 New/replaced database interfaces:
 
@@ -102,19 +109,22 @@ New/replaced database interfaces:
 - `belt_claim_text_guarded(uuid, boolean, boolean, timestamptz)` — service role
 - `belt_due_texts(...)` — replaced to exclude active human takeover
 - `belt_sweep_missed(...)` — replaced to exclude active human takeover
+- `not_now_followup_at(date, text, timestamptz)` - date-only policy resolver used by `log_call`
+- `log_call(uuid, text, text, text, timestamptz)` - replaced to interpret the UI value as a local calendar day and store the resolved call instant
 - message/lead triggers clear a takeover after a logged outcome or terminal transition
 
-`0037` has no data backfill: existing rows receive null takeover fields, and the recovery view derives existing debt immediately. `0038` has a deliberately bounded backfill for active `not_now_dated` cards only: it supersedes unsent legacy pre-date drafts, closes their tasks, remaps their old step number, and schedules the replacement call. It does not rewrite stages, assignees, WPIE identifiers, terminal cards, or any other belt.
+`0037` has no data backfill: existing rows receive null takeover fields, and the recovery view derives existing debt immediately. `0038` has a deliberately bounded backfill for active `not_now_dated` cards only: it supersedes unsent legacy pre-date drafts, closes their tasks, remaps their old step number, and schedules the replacement call. It does not rewrite stages, assignees, WPIE identifiers, terminal cards, or any other belt. `0039` backfills the new assignment snapshot only on rows already paused; it does not rewrite dates on existing cards. Future date saves and reschedules use the corrected configured call hour.
 
-The Edge worker contract changes from `belt_claim_text` to `belt_claim_text_guarded`. Deploy both database migrations before the updated conveyor function. Deploying the worker first would make claims fail because the RPC would not exist; it would fail closed (no belt text), but the conveyor would be unhealthy.
+The Edge worker contract changes from `belt_claim_text` to `belt_claim_text_guarded`. Deploy migrations `0037`, `0038`, and `0039` before the updated conveyor function. Deploying the worker first would make claims fail because the RPC would not exist; it would fail closed (no belt text), but the conveyor would be unhealthy.
 
 Rollback considerations:
 
 1. First return the conveyor worker to `belt_claim_text`.
 2. Resolve or explicitly resume every row with `human_takeover_at is not null`; do not silently discard uncertain call state.
 3. If rolling back `0038`, resolve every exact-date task/draft first. Restoring the retired four-day-early text would contradict the current operator manual, so prefer a forward repair or a call-only cadence.
-4. Remove the `0037` view, RPCs, and triggers if rollback is still required.
-5. The additive nullable columns may safely remain. Dropping them is optional and should happen only after step 2.
+4. If rolling back `0039`, keep stale-key responses fail-closed; do not restore the historical `{ok:true, paused:false}` behavior. Reconcile any currently paused row before removing its assignment snapshot.
+5. Remove the `0037` view, RPCs, and triggers if rollback is still required.
+6. The additive nullable columns may safely remain. Dropping them is optional and should happen only after step 2.
 
 ## Conveyor invariants preserved
 
@@ -124,6 +134,7 @@ Rollback considerations:
 - Suppressed/bad/DNC phones are rejected by the app authorization RPC and excluded from callable recovery.
 - A booked visit remains Colin-owned, including reassignment attempts.
 - Exact retries and concurrent duplicate taps create one takeover event; a different attempt cannot begin until the active one is resolved.
+- A historical attempt key never grants a new dial after its pause has ended or any mutable authorization fact has changed; clients require an active pause response.
 - Rescheduling leaves one open belt task at the corrected time.
 - A paused card cannot be claimed for text or swept as missed.
 - A failed-to-start call can resume the exact prior stop and approval draft.
@@ -135,14 +146,15 @@ Rollback considerations:
 
 All tests used synthetic/PGlite data and mocked providers. No live call, text, email, database write, credential read, or schedule change occurred.
 
-- `npm test` - **307 passed**, 38 test files.
-  - Includes baseline matrix, no-early-contact exact date, CST/CDT boundaries, legacy queued-text migration, reschedule replacement, duplicate/concurrent takeover, interrupted resume, in-flight-text refusal, missed-call sweep, STOP/DNC, suppression, weekend ownership, Thalia -> Adil -> Colin simulated shift, and appointment unknowns.
+- `npm test -- --run` - **313 passed**, 38 test files.
+  - Includes baseline matrix, no-early-contact exact date, morning/afternoon same-day policy, configured call hour, CST/CDT boundaries, legacy queued-text migration, reschedule replacement, duplicate/concurrent takeover, valid active retry, stale retry after STOP/DNC/suppression/resume/outcome/reassignment/destination change, in-flight-text refusal, missed-call sweep, weekend ownership, Thalia -> Adil -> Colin simulated shift, appointment unknowns, and per-field provenance.
   - jsdom prints its known `HTMLCanvasElement.getContext` warning in the signing-page test; the test passes.
 - `npx tsc -b --force` — **passed**.
 - `npm run build` — **passed**; Vite emitted only the existing large-chunk advisory.
-- Changed-file ESLint command - **passed** for the changed files outside `src/lib/dialer.tsx`; that file remains covered by the full lint result below because of its pre-existing file-wide fast-refresh findings.
+- Changed-file ESLint produced only the same 8 baseline findings listed below; no new lint category or location was introduced.
 - `npm run lint` — **not green at baseline**: 8 pre-existing errors remain (7 `react-refresh/only-export-components` reports in `src/lib/dialer.tsx`, 1 unused `COLIN` fixture in `tests/alertsApprovalsHandoff.test.ts`). This shift added no new lint category/error.
 - WPIE `python -m pytest -q -p no:cacheprovider tests/test_live_conveyor.py tests/test_live_sync.py tests/test_morning_belts.py` — **26 passed**.
+  - The first sandboxed rerun could not create Python temporary directories (11 passed, 13 failed, 2 setup errors, all permission-related). The identical command was rerun outside that filesystem sandbox and all 26 passed; no test or source was changed between attempts.
 - `git diff --check` — **passed**.
 
 ## Unresolved blocker: provider-side DNC enforcement
@@ -166,15 +178,15 @@ That needs the exact `pm-phone` repository/deployment mapping and secrets/config
 1. Snapshot current migration version and counts for live belts, open belt tasks, `cards_no_stop`, and suppressed phones.
 2. Apply `0037` in a non-production/staging database; confirm it performs no backfill writes to existing belt/task rows.
 3. Before `0038`, confirm there are no `sending` belt drafts on `not_now_dated`; reconcile any uncertain provider outcome. Apply `0038`, then verify every active dated card has no queued pre-date draft and exactly one correct call stop on or after its named date.
-4. Deploy the updated conveyor function after both migrations and run it dry; verify heartbeat/canary and zero RPC errors.
+4. Apply `0039`; confirm only currently paused rows receive an assignment snapshot and future date-only saves resolve to the configured local call hour. Deploy the updated conveyor function after all three migrations and run it dry; verify heartbeat/canary and zero RPC errors.
 5. Use a synthetic lead/test phone: tap browser Call twice concurrently; confirm one `human_call_started` event and no text claim.
-6. Repeat with "Calling on personal phone"; confirm the same pause and a Conversation recovery row.
+6. Repeat with "Calling on personal phone"; confirm the same pause and a Conversation recovery row. After resume, STOP, reassignment, suppression, or destination change, retry the old key and confirm the client does not dial.
 7. With an approval draft waiting, pause and choose "call did not happen"; confirm the same draft status and belt stop return.
 8. Simulate an uncertain SDK failure; confirm the card remains paused until explicit resume or a logged outcome.
 9. Log no-answer, interested, exact-date not-now, and reached-no-decision outcomes; confirm one correct next stop each. Reschedule the dated outcome and confirm the old stop/draft stays closed.
 10. Send a synthetic STOP during a pause; confirm DNC, zero open outreach, and no recovery row.
 11. Reschedule a callback and visit; confirm one open task and Colin ownership for the visit.
-12. Open the appointment packet and confirm unknown source fields remain visibly unknown.
+12. Open the appointment packet and confirm each field shows its source; stored call/gate actors and times are exact, while unavailable attribution and unknown values remain visibly unknown.
 13. Verify WPIE dry push/pull and belt health queries remain compatible.
 14. Separately prove provider-side DNC rejection at the real `pm-phone` TwiML endpoint before enabling browser calling.
 
