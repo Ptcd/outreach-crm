@@ -1,5 +1,5 @@
 {
-"generated": "tools/export_reply_prompt.py --app-dir, WPIE commit 7f00623, 2026-10-23",
+"generated": "tools/export_reply_prompt.py --app-dir, WPIE commit ca6a185, 2026-10-23",
 "fixture": "tests/fixtures/reply_library.jsonl",
 "rows": [
 {
@@ -184,10 +184,7 @@
 "after": "pitch",
 "treat": "not_now",
 "hot": false,
-"why": "maybe after estate settles, will text",
-"known_miss": [
-"treat"
-]
+"why": "maybe after estate settles, will text"
 },
 {
 "id": "p1-024",
@@ -275,10 +272,7 @@
 "after": "pitch",
 "treat": "not_now",
 "hot": false,
-"why": "condition: probate closing",
-"known_miss": [
-"treat"
-]
+"why": "condition: probate closing"
 },
 {
 "id": "p1-035",
@@ -294,10 +288,7 @@
 "after": "pitch",
 "treat": "not_now",
 "hot": false,
-"why": "waiting until the roof is done",
-"known_miss": [
-"treat"
-]
+"why": "waiting until the roof is done"
 },
 {
 "id": "p1-037",
@@ -401,10 +392,7 @@
 "after": "pitch",
 "treat": "not_now",
 "hot": false,
-"why": "future event, not yet",
-"known_miss": [
-"treat"
-]
+"why": "future event, not yet"
 },
 {
 "id": "p1-050",
@@ -476,10 +464,7 @@
 "after": "pitch",
 "treat": "not_now",
 "hot": false,
-"why": "ask after December closing",
-"known_miss": [
-"treat"
-]
+"why": "ask after December closing"
 },
 {
 "id": "p1-059",
@@ -527,10 +512,7 @@
 "after": "pitch",
 "treat": "not_now",
 "hot": false,
-"why": "wait until husband out of hospital",
-"known_miss": [
-"treat"
-]
+"why": "wait until husband out of hospital"
 },
 {
 "id": "p1-065",
@@ -898,10 +880,7 @@
 "after": "pitch",
 "treat": "no",
 "hot": false,
-"why": "not selling, curt",
-"known_miss": [
-"treat"
-]
+"why": "not selling, curt"
 },
 {
 "id": "p1-111",
@@ -1259,12 +1238,9 @@
 "id": "p1-155",
 "text": "yes. who wants to know?",
 "after": "opener",
-"treat": "owns_only",
+"treat": "who",
 "hot": false,
-"why": "yes plus mild who question",
-"known_miss": [
-"treat"
-]
+"why": "confirms, then asks who we are: answer who we are"
 },
 {
 "id": "p1-156",
@@ -1358,12 +1334,9 @@
 "id": "p1-168",
 "text": "yes i do. whos this",
 "after": "opener",
-"treat": "owns_only",
+"treat": "who",
 "hot": false,
-"why": "owns, asks who",
-"known_miss": [
-"treat"
-]
+"why": "confirms, then asks who we are: answer who we are"
 },
 {
 "id": "p1-169",
@@ -1537,12 +1510,9 @@
 "id": "p1-190",
 "text": "Yes, my name is on the deed. What is this regarding?",
 "after": "opener",
-"treat": "owns_only",
+"treat": "who",
 "hot": false,
-"why": "owns, asks purpose",
-"known_miss": [
-"treat"
-]
+"why": "confirms, then asks who we are: answer who we are"
 },
 {
 "id": "p1-191",
@@ -2244,13 +2214,9 @@
 "id": "p2-029",
 "text": "ok yes i would sell the right offer or not im not sure yet",
 "after": "pitch",
-"treat": "interested",
-"hot": true,
-"why": "voice-to-text, would sell, unsure",
-"known_miss": [
-"not_hot",
-"treat"
-]
+"treat": "not_now",
+"hot": false,
+"why": "only at the right offer, and not sure yet: a not now"
 },
 {
 "id": "p2-030",
@@ -4818,11 +4784,7 @@
 "after": "pitch",
 "treat": "who",
 "hot": false,
-"why": "asks if cash-for-houses scammer in reply",
-"known_miss": [
-"false_stop",
-"treat"
-]
+"why": "asks if cash-for-houses scammer in reply"
 },
 {
 "id": "p3-105",
@@ -4838,10 +4800,7 @@
 "after": "opener",
 "treat": "who",
 "hot": false,
-"why": "doesn't know any Colin in reply",
-"known_miss": [
-"treat"
-]
+"why": "doesn't know any Colin in reply"
 },
 {
 "id": "p3-107",
@@ -5289,10 +5248,7 @@
 "after": "opener",
 "treat": "wrong_number",
 "hot": false,
-"why": "renter, never owned, wrong number",
-"known_miss": [
-"treat"
-]
+"why": "renter, never owned, wrong number"
 },
 {
 "id": "p3-164",
@@ -5380,10 +5336,7 @@
 "after": "opener",
 "treat": "wrong_number",
 "hot": false,
-"why": "wrong number with quoted opener",
-"known_miss": [
-"treat"
-]
+"why": "wrong number with quoted opener"
 },
 {
 "id": "p3-175",
@@ -6111,10 +6064,7 @@
 "after": "opener",
 "treat": "listed",
 "hot": false,
-"why": "listed",
-"known_miss": [
-"treat"
-]
+"why": "listed"
 },
 {
 "id": "p4-018",
@@ -6378,10 +6328,7 @@
 "after": "pitch",
 "treat": "no",
 "hot": false,
-"why": "has lawyer; declines",
-"known_miss": [
-"treat"
-]
+"why": "has lawyer; declines"
 },
 {
 "id": "p4-054",
@@ -6389,10 +6336,7 @@
 "after": "opener",
 "treat": "who",
 "hot": false,
-"why": "iPhone Questioned reaction means who",
-"known_miss": [
-"treat"
-]
+"why": "iPhone Questioned reaction means who"
 },
 {
 "id": "p4-055",
@@ -6856,10 +6800,7 @@
 "after": "pitch",
 "treat": "no",
 "hot": false,
-"why": "only for the right number: closed politely",
-"known_miss": [
-"treat"
-]
+"why": "only for the right number: closed politely"
 },
 {
 "id": "p4-117",

@@ -13,7 +13,7 @@
 //   (the exit question, then the close line on a second no)
 import * as B from './replyBrain.generated.ts'
 import { isOptOut } from './sending.ts'
-import { reactionKind, reactionMeaning } from './replyGuard.ts'
+import { reactionKind, reactionMeaning, reactionTail } from './replyGuard.ts'
 import type { RegexSpec } from './replyRules.generated.ts'
 
 const re = (spec: RegexSpec, extra = '') => new RegExp(spec.source, spec.flags + extra)
@@ -43,7 +43,8 @@ export function foldKeepCase(text: string): string {
 
 /** wpie.reply.rules.classify: coarse intent for one inbound line. */
 export function classify(text: string): string {
-  const t = (text ?? '').trim()
+  const raw = (text ?? '').trim()
+  const t = reactionTail(raw) || raw      // 'Liked “...” no it isnt mine': the words, never our quoted text
   if (!t) return 'empty'
   if (isOptOut(t)) return 'opt_out'
   const folded = foldKeepCase(t)
@@ -108,6 +109,8 @@ const toColin = (intent: string, note: string): Decision =>
 export function decide(ctx: ReplyContext): Decision {
   // A phone reaction quotes our own text back (STOP line included): answer what it means, never the
   // quote. 👍 / Liked = yes, 👎 / Disliked = no thanks, anything else is for Colin (WPIE 2026-10-22).
+  const tail = reactionTail(ctx.inbound)
+  if (tail) ctx = { ...ctx, inbound: tail }
   const react = reactionKind(ctx.inbound)
   if (react === 'neutral') return toColin('reaction', 'phone reaction - Colin reads it')
   if (react) ctx = { ...ctx, inbound: reactionMeaning(react)! }

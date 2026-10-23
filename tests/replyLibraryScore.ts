@@ -5,7 +5,7 @@
 // isHotReply() the live reply agent runs, without Claude: this measures the word rules on their own.
 import { decide } from '../supabase/functions/_shared/replyBrain'
 import { isHotReply } from '../supabase/functions/_shared/hotLeads'
-import { reactionKind, reactionMeaning } from '../supabase/functions/_shared/replyGuard'
+import { reactionKind, reactionMeaning, reactionTail } from '../supabase/functions/_shared/replyGuard'
 
 export type LibraryRow = { id: string; text: string; after: 'opener' | 'pitch'; treat: string; hot: boolean; why?: string
   known_miss?: string[] }
@@ -25,7 +25,7 @@ export const TREAT_INTENTS: Record<string, string[]> = {
   no: ['not_interested', 'my_home', 'joke_number', 'burned', 'annoyed'],
   sold: ['sold'],
   listed: ['listed', 'signed_other'],
-  who: ['who_is_this', 'bot_question', 'buyer_check', 'middleman'],
+  who: ['who_is_this', 'bot_question', 'buyer_check', 'middleman', 'reaction'],   // a 'Questioned' reaction goes to Colin to read
   family: ['relative', 'estate', 'elderly'],
   tenant: ['tenant', 'manager'],
   distress: ['foreclosure'],
@@ -45,7 +45,7 @@ export function scoreRow(row: LibraryRow): Scored {
   const d = decide({ inbound: row.text, priorInbound: [], lastAgentText: afterPitch ? PITCH : OPENER,
     propertyAddress: '2847 N BURLEIGH ST', ownerName: 'LINDA M SAMPLE', ourTurns: afterPitch ? 1 : 0 })
   const react = reactionKind(row.text)
-  const meaning = (react ? reactionMeaning(react) : null) ?? row.text
+  const meaning = reactionTail(row.text) || ((react ? reactionMeaning(react) : null) ?? row.text)
   const hot = isHotReply({ intent: d.intent, text: meaning, removal: d.removal, afterPitch })
   // A conditional no with a real condition is a not now (decide's nurture: a check-in in 30 days).
   const later = d.facts?.nurture === true

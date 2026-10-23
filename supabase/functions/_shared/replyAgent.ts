@@ -4,7 +4,7 @@
 // (reply_claim_send, migration 0004); what the reply agent says is decided by replyBrain.decide and,
 // for a real conversation, by the drafter (Claude) whose text only Colin can approve.
 import { AI_NOT_NOW, PITCH_ASKED, endsInterest, firstNameOf, isHotReply } from './hotLeads.ts'
-import { reactionKind, reactionMeaning } from './replyGuard.ts'
+import { reactionKind, reactionMeaning, reactionTail } from './replyGuard.ts'
 import { decide, rulesVersion, scoreRedteam, type RedteamRow, type ReplyContext } from './replyBrain.ts'
 import { classifyFailure, isOptOut, type Rpc, type SenderEnv, type TwilioPort } from './sending.ts'
 import { guardDraft } from './replyGuard.ts'
@@ -132,7 +132,7 @@ export async function runReplyAgent(opts: {
     }
     // A phone reaction is read for what it means (yes / no thanks), not the quote of our text it carries.
     const react = reactionKind(t.body ?? '')
-    const ctx: ReplyContext = { inbound: (react ? reactionMeaning(react) : null) ?? t.body ?? '', priorInbound: (t.prior_inbound ?? []).filter(Boolean),
+    const ctx: ReplyContext = { inbound: reactionTail(t.body ?? '') || ((react ? reactionMeaning(react) : null) ?? t.body ?? ''), priorInbound: (t.prior_inbound ?? []).filter(Boolean),
       lastAgentText: t.last_agent_text, propertyAddress: t.property_address, ownerName: t.owner_name,
       ourTurns: Math.max(0, (t.history ?? []).filter((h) => h.who === 'us').length - 1) }
     let d = decide(ctx)

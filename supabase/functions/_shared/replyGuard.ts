@@ -42,10 +42,21 @@ const REACTION = re(R.REACTION);
 const POSITIVE_REACTION = re(R.POSITIVE_REACTION);
 const NEGATIVE_REACTION = re(R.NEGATIVE_REACTION);
 
+/** webhooks.reaction_tail: the words typed after a reaction's quote ('Liked “Is it still yours?” no it isnt mine
+ * wrong number'), else "". Such a text is read for those words, never the quote (WPIE reply library, 2026-10-23). */
+export function reactionTail(text: string): string {
+  const t = (text ?? "").replace(ZERO_WIDTH, "");
+  if (!REACTION.test(t)) return "";
+  const end = Math.max(t.lastIndexOf("”"), t.lastIndexOf('"'));
+  if (end <= 0) return "";
+  const tail = t.slice(end + 1).replace(/^[\s.,;:-]+|[\s.,;:-]+$/g, "");
+  return /[A-Za-z]{2}/.test(tail) ? tail : "";
+}
+
 export type ReactionKind = "positive" | "negative" | "neutral" | "";
 export function reactionKind(text: string): ReactionKind {
   const t = (text ?? "").replace(ZERO_WIDTH, "");
-  if (!REACTION.test(t)) return "";
+  if (!REACTION.test(t) || reactionTail(t)) return "";
   if (NEGATIVE_REACTION.test(t)) return "negative";
   return POSITIVE_REACTION.test(t) ? "positive" : "neutral";
 }
@@ -58,6 +69,8 @@ export function reactionMeaning(kind: ReactionKind): string | null {
 // Any removal request: carrier keyword, plain language, abuse, a legal threat, Spanish.
 // A phone reaction (which quotes our own text, STOP line included) is never one.
 export function isOptOut(text: string): boolean {
+  const tail = reactionTail(text);
+  if (tail) return isOptOut(tail);
   if (reactionKind(text)) return false;
   const normalized = fold(text);
   if (OPTOUT_WORDS.has(squash(normalized))) return true;                       // "S T O P"
