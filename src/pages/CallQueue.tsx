@@ -7,7 +7,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge, Empty, ErrorNote, Textarea } from '@/components/ui/form'
-import { CallButton } from '@/components/CallButton'
+import { CallButton, PersonalCallButton } from '@/components/CallButton'
 import { CallScript } from '@/components/CallScript'
 import { useDueTasks, useLead, useWrite } from '@/lib/queries'
 import { handoffToColin } from '@/lib/apiExtra'
@@ -120,16 +120,32 @@ function QueueCard({ task, canOverride, onDone, onSkip }: { task: QueueTask; can
         <p className="text-sm font-medium">Numbers to dial</p>
         {phones.length === 0 && <p className="text-sm text-muted-foreground">No phone on the card.</p>}
         <ul className="mt-1 space-y-2">
-          {phones.map((c) => (
-            <li key={c.id} className="flex flex-wrap items-center gap-2 text-sm">
-              <span>{fmtPhone(c.value_normalized ?? c.value)}</span>
-              {c.line_type && <Badge>{c.line_type}</Badge>}
-              {c.person_name && <span className="text-muted-foreground">{c.person_name}</span>}
-              <CallButton to={c.value_normalized ?? c.value} name={lead.owner_name} address={lead.property_address} leadId={lead.id}
-                contactId={c.id} blocked={c.suppressed || c.dnc_app || c.dnc_vendor || c.dnc_scrub === 'dnc' || c.status === 'bad'} size="sm" />
-            </li>
-          ))}
+          {phones.map((c) => {
+            const blocked = c.suppressed || c.dnc_app || c.dnc_vendor || c.dnc_scrub === 'dnc' || c.status === 'bad'
+            const ten = (c.value_normalized ?? c.value).replace(/\D/g, '').slice(-10)
+            return (
+              <li key={c.id} className="flex flex-wrap items-center gap-2 text-sm">
+                <span>{fmtPhone(c.value_normalized ?? c.value)}</span>
+                {c.line_type && <Badge>{c.line_type}</Badge>}
+                {c.person_name && <span className="text-muted-foreground">{c.person_name}</span>}
+                <CallButton to={c.value_normalized ?? c.value} name={lead.owner_name} address={lead.property_address} leadId={lead.id}
+                  contactId={c.id} blocked={blocked} size="sm" />
+                {/* the same door as on the card: a call from your own phone pauses the texts too, and a call that
+                    never connected is undone here without leaving the list (2026-10-22) */}
+                {(!lead.human_takeover_at || lead.human_takeover_phone === ten) && (
+                  <PersonalCallButton to={c.value_normalized ?? c.value} leadId={lead.id} blocked={blocked}
+                    activeKey={lead.human_takeover_at ? lead.human_takeover_key : null} />
+                )}
+              </li>
+            )
+          })}
         </ul>
+        {lead.human_takeover_at && (
+          <p className="mt-2 rounded-md border-2 border-amber-400 bg-amber-50 p-2 text-sm">
+            A call is open on this card (started by {lead.human_takeover_by ?? 'the team'}): texts to them are paused. Log the
+            outcome below, or tap <span className="font-medium">Call did not happen — resume</span> if it never connected.
+          </p>
+        )}
       </div>
 
       <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}

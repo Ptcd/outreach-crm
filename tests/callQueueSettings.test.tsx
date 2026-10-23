@@ -22,6 +22,8 @@ const finishTask = vi.fn(async () => ({ data: null, error: null }))
 const logCall = vi.fn(async () => ({ data: { ok: true }, error: null }))
 const handoff = vi.fn(async () => ({ ok: true, task_id: 'TX' }))
 const setMyAlerts = vi.fn(async () => ({ ok: true, phone: '4145550199', email: 'thalia@example.com' }))
+const beginHumanCall = vi.fn(async () => ({ data: { ok: true, paused: true, key: 'k' }, error: null }))
+const resumeHumanCall = vi.fn(async () => ({ data: { ok: true, paused: false }, error: null }))
 const ok = <T,>(data: T) => ({ data, error: null, isLoading: false, isPending: false, isSuccess: false })
 
 vi.mock('@/lib/supabaseClient', () => ({ supabase: {}, supabaseConfigured: true }))
@@ -35,7 +37,8 @@ vi.mock('@/lib/apiExtra', () => ({
   handoffToColin: (id: string, note: string) => handoff(id, note),
 }))
 vi.mock('@/lib/queries', () => ({
-  api: { finishTask: (id: string) => finishTask(id), logCall: (...a: unknown[]) => logCall(...a), callAnswer: vi.fn(async () => ({ data: { ok: true }, error: null })) },
+  api: { finishTask: (id: string) => finishTask(id), logCall: (...a: unknown[]) => logCall(...a), callAnswer: vi.fn(async () => ({ data: { ok: true }, error: null })),
+    beginHumanCall: (...a: unknown[]) => beginHumanCall(...a), resumeHumanCall: (...a: unknown[]) => resumeHumanCall(...a) },
   useWrite: (fn: (x: unknown) => Promise<unknown>) => ({ mutate: (x: unknown) => { void fn(x) }, isPending: false, isSuccess: false, error: null }),
   useDueTasks: () => ok(tasks),
   useLead: (id: string) => ok({
@@ -90,6 +93,32 @@ describe('the call queue', () => {
     await waitFor(() => expect(handoff).toHaveBeenCalledWith('L2', 'Would sell, lease ends Dec, just him'))
     expect(finishTask).not.toHaveBeenCalled()
     expect(await screen.findByRole('heading', { name: 'JANE ROE' })).toBeTruthy()     // the skipped one comes back last
+  })
+
+  it('a call from your own phone pauses the texts from the list, and a call that never connected is undone there', async () => {
+    mount(<CallQueue />)
+    fireEvent.click(screen.getByRole('button', { name: 'Calling on personal phone' }))
+    await waitFor(() => expect(beginHumanCall).toHaveBeenCalledWith('L1', '4145550101', 'personal', expect.any(String)))
+    expect(await screen.findByText(/Automated follow-ups paused/)).toBeTruthy()
+    cleanup()
+    // the card comes back paused (a browser call that never connected looks the same)
+    const was = { ...LEADS.L1 }
+    Object.assign(LEADS.L1, { human_takeover_at: '2026-10-23T14:00:00Z', human_takeover_by: 'Thalia', human_takeover_phone: '4145550101', human_takeover_key: 'key-123' })
+    try {
+      mount(<CallQueue />)
+      expect(screen.getByText(/A call is open on this card/)).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: 'Call did not happen — resume' }))
+      await waitFor(() => expect(resumeHumanCall).toHaveBeenCalledWith('L1', 'key-123'))
+    } finally {
+      for (const k of Object.keys(LEADS.L1)) if (!(k in was)) delete (LEADS.L1 as Record<string, unknown>)[k]
+      Object.assign(LEADS.L1, was)
+    }
+    // a do-not-contact number gets neither button
+    cleanup()
+    mount(<CallQueue />)
+    fireEvent.click(screen.getByRole('button', { name: 'Skip for now' }))
+    expect(screen.getByRole('heading', { name: 'BO KIM' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Calling on personal phone' })).toBeNull()
   })
 })
 
