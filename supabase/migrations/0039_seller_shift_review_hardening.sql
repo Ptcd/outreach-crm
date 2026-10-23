@@ -1,9 +1,17 @@
 -- Independent-review hardening for the seller -> appointment shift.
 -- Keep the same conveyor and lock order: lead first, then reply drafts.
 
+-- An active 0037 pause has no immutable assignment snapshot. The card may have been reassigned after
+-- authorization, so copying its current owner would incorrectly bless an old key. Stop before any DDL or
+-- data write; operators must log the outcome or explicitly use "call did not happen - resume" first.
+do $$
+begin
+  if exists (select 1 from public.leads where human_takeover_at is not null) then
+    raise exception 'migration 0039 requires every legacy human call pause to be resolved first; log the outcome or explicitly resume it';
+  end if;
+end $$;
+
 alter table public.leads add column if not exists human_takeover_assigned_to public.team_person;
-update public.leads set human_takeover_assigned_to = assigned_to
- where human_takeover_at is not null and human_takeover_assigned_to is null;
 
 -- A date input is a calendar-day promise, not an explicit noon appointment. Resolve that day to the
 -- first call stop at the configured call hour. If that hour has already passed today, use the next
