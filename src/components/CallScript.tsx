@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Badge, Select, Textarea } from '@/components/ui/form'
 import { ConfirmButton } from '@/components/ui/confirm'
 import { api } from '@/lib/queries'
-import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
+import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso, todayLocal } from '@/lib/format'
 import { CALL_OUTCOMES, NEXT_STEP, PHONE_SCRIPT, callScript, scriptLine, type CallQuestion } from '@/lib/callScript'
 import { answerOf, answerText, gateFromCall, stopsFromCall, type CallFacts, type CallValue } from '@/lib/callGate'
 import { bookingVerdict, type BookingVerdict } from '@/lib/bookingVerdict'
@@ -313,13 +313,14 @@ function LogCall({ lead, contacts, phone, onLogged }: { lead: Lead; contacts: Co
   const [outcome, setOutcome] = useState<string>('')
   const [note, setNote] = useState('')
   // "Not now" carries the date they gave (Codex's walk, 2026-10-22: the generic 30 days lost the real date)
-  const [until, setUntil] = useState(() => new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10))
+  const [until, setUntil] = useState('')
+  const [notNowKind, setNotNowKind] = useState<'date' | 'condition'>('date')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const save = async () => {
     setBusy(true)
     setMsg(null)
-    const when = outcome === 'not_now' && until ? localInputToIso(`${until}T12:00`) : null
+    const when = outcome === 'not_now' && notNowKind === 'date' && until ? localInputToIso(`${until}T12:00`) : null
     const r = await api.logCall(lead.id, from || null, outcome, note.trim() || null, when)
     setBusy(false)
     const d = r.data as { ok: boolean; reason?: string } | null
@@ -328,7 +329,7 @@ function LogCall({ lead, contacts, phone, onLogged }: { lead: Lead; contacts: Co
     const logged = outcome
     setOutcome('')
     setNote('')
-    for (const k of [['lead', lead.id], ['leads'], ['pipeline_counts'], ['phone_lookup']]) void qc.invalidateQueries({ queryKey: k })
+    for (const k of [['lead', lead.id], ['leads'], ['pipeline_counts'], ['phone_lookup'], ['seller_recovery_queue']]) void qc.invalidateQueries({ queryKey: k })
     onLogged?.(logged)
   }
   const chosen = CALL_OUTCOMES.find((o) => o.id === outcome)
@@ -354,17 +355,29 @@ function LogCall({ lead, contacts, phone, onLogged }: { lead: Lead; contacts: Co
       </div>
       {chosen && <p className="text-xs text-muted-foreground">{chosen.hint}</p>}
       {outcome === 'not_now' && (
-        <label className="block text-sm font-medium">Check back on (the date they gave)
-          <Input type="date" className="mt-1 h-11" value={until} min={new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)}
-            onChange={(e) => setUntil(e.target.value)} />
-        </label>
+        <div className="space-y-2 rounded-md bg-muted p-2">
+          <label className="block text-sm font-medium">What did they give you?
+            <Select className="mt-1" value={notNowKind} onChange={(e) => setNotNowKind(e.target.value as 'date' | 'condition')}>
+              <option value="date">A specific date</option>
+              <option value="condition">An event or condition, no date</option>
+            </Select>
+          </label>
+          {notNowKind === 'date' && (
+            <label className="block text-sm font-medium">Check back on (the exact date they gave)
+              <Input type="date" className="mt-1 h-11" value={until} min={todayLocal()}
+                onChange={(e) => setUntil(e.target.value)} />
+            </label>
+          )}
+          {notNowKind === 'condition' && <p className="text-xs text-muted-foreground">Write the event in the notes below (for example, “after the tenant moves”). The 30-day date is only a review reminder, not a date the seller gave.</p>}
+        </div>
       )}
       <Textarea rows={3} placeholder="Notes from the call" value={note} onChange={(e) => setNote(e.target.value)} />
       {outcome === 'dnc' ? (
         <ConfirmButton disabled={busy} question="Block every phone of this owner? Nobody calls or texts them again." yes="Yes, do not contact"
           onConfirm={() => void save()}>Save: do not contact</ConfirmButton>
       ) : (
-        <Button className="h-12 w-full" disabled={busy || !outcome} onClick={() => void save()}>{busy ? 'Saving...' : 'Save the call'}</Button>
+        <Button className="h-12 w-full" disabled={busy || !outcome || (outcome === 'not_now' && ((notNowKind === 'date' && !until) || (notNowKind === 'condition' && !note.trim())))}
+          onClick={() => void save()}>{busy ? 'Saving...' : 'Save the call'}</Button>
       )}
       {msg && <p className={msg.ok ? 'text-sm font-medium text-emerald-700' : 'text-sm text-red-700'}>{msg.text}</p>}
     </div>

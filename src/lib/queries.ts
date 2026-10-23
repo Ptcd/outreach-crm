@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabaseClient'
 import type {
   BeltEvent, BeltHealth, CampaignControl, Contact, Deal, FollowupDebt, GateScore, Lead, LeadStage, Message, Milestone, MilestoneKind,
-  OpenerDecision, Person, PlannedOpener, ReplyDraft, ReplyThread, ScoreboardWeek, SignalWeek, Task, TouchTemplate, TwilioInbound,
+  OpenerDecision, Person, PlannedOpener, ReplyDraft, ReplyThread, ScoreboardWeek, SellerRecovery, SignalWeek, Task, TouchTemplate, TwilioInbound,
 } from './types'
 import type { InboxLead } from './inbox'
 
@@ -144,6 +144,15 @@ export function useFollowupDebt() {
     queryKey: ['followup_debt'],
     queryFn: async () =>
       check(await supabase.from('followup_debt').select('*').order('days_late', { ascending: false }).limit(200)) as FollowupDebt[],
+  })
+}
+
+/** Conversation recovery: outcome still needed, missing next stop/action, or overdue. */
+export function useSellerRecovery() {
+  return useQuery({
+    queryKey: ['seller_recovery_queue'],
+    refetchInterval: 60_000,
+    queryFn: async () => check(await supabase.from('seller_recovery_queue').select('*').limit(200)) as SellerRecovery[],
   })
 }
 
@@ -299,6 +308,9 @@ export const api = {
   },
   assignTask: (id: string, owner: Person) => supabase.from('tasks').update({ owner }).eq('id', id),
   markCalled: (leadId: string) => supabase.rpc('mark_called', { p_lead_id: leadId }),
+  beginHumanCall: (leadId: string, phone: string, source: 'app' | 'personal', key: string) =>
+    supabase.rpc('begin_human_call', { p_lead_id: leadId, p_phone: phone, p_source: source, p_key: key }),
+  resumeHumanCall: (leadId: string, key: string) => supabase.rpc('resume_human_call', { p_lead_id: leadId, p_key: key }),
   // Call desk (migration 0013)
   newCaller: (phone: string, name?: string) => supabase.rpc('new_caller', { p_phone: phone, p_name: name ?? null }),
   callAnswer: (leadId: string, key: string, value: unknown) => supabase.rpc('call_answer', { p_lead_id: leadId, p_key: key, p_value: value }),

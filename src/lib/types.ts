@@ -70,6 +70,11 @@ export interface Lead {
   dormant_round?: number
   elderly_or_ill?: boolean
   grief?: boolean
+  // 0037: an app or personal-phone call pauses this card's existing belt until its outcome is logged.
+  human_takeover_at?: string | null
+  human_takeover_by?: string | null
+  human_takeover_phone?: string | null
+  human_takeover_key?: string | null
 }
 
 /** One move of a card (0029 belt_events). */
@@ -371,4 +376,24 @@ export interface FollowupDebt {
   next_action: string | null
   assigned_to: Person | null
   days_late: number
+}
+
+export interface SellerRecovery {
+  lead_id: string
+  owner_name: string
+  property_address: string | null
+  stage: LeadStage
+  belt: string | null
+  belt_step: number
+  next_stop_at: string | null
+  next_stop_who: string | null
+  next_action_at: string | null
+  next_action: string | null
+  assigned_to: Person | null
+  reason: 'call_outcome_needed' | 'missing_next_action' | 'missing_next_stop' | 'overdue'
+  recovery_owner: Person
+  human_takeover_at: string | null
+  human_takeover_by: string | null
+  human_takeover_phone: string | null
+  updated_at: string
 }

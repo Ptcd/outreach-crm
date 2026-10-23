@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge, Empty, ErrorNote, Section, Select } from '@/components/ui/form'
-import { api, useCardsNoStop, useDueTasks, useFollowupDebt, useMyStops, useReplyTasks, useUnseenReplies, useWrite } from '@/lib/queries'
+import { api, useDueTasks, useFollowupDebt, useMyStops, useReplyTasks, useSellerRecovery, useUnseenReplies, useWrite } from '@/lib/queries'
 import { ReplyTaskCard } from '@/components/ReplyTaskCard'
 import { BeltHealthStrip } from '@/components/BeltHealthStrip'
 import { StopCard } from '@/components/StopCard'
@@ -19,7 +19,7 @@ export default function Today() {
   const stops = useMyStops(until, who)
   const replies = useUnseenReplies()
   const debt = useFollowupDebt()
-  const noStop = useCardsNoStop()
+  const recovery = useSellerRecovery()
   const replyTasks = useReplyTasks()
   const done = useWrite((id: string) => api.finishTask(id), [['tasks'], ['lead']])
   const seen = useWrite((id: string) => api.markSeen(id, user!.id), [['messages'], ['lead']])
@@ -120,15 +120,18 @@ export default function Today() {
             </li>
           ))}
         </ul>
-        {/* A touched card with no next date at all is debt too (Codex's walk, 2026-10-22, step 11) */}
-        <p className="mt-3 mb-1 text-sm font-medium">No next stop at all{noStop.data ? ` (${noStop.data.length})` : ''}</p>
-        <ErrorNote error={noStop.error} />
-        {noStop.data?.length === 0 && <p className="text-sm text-muted-foreground">Every live card has a next stop.</p>}
+        <p className="mt-3 mb-1 text-sm font-medium">Conversation recovery{recovery.data ? ` (${recovery.data.length})` : ''}</p>
+        <p className="mb-1 text-xs text-muted-foreground">Calls needing an outcome, touched leads missing a next step, and overdue belt stops. Closed and suppressed cards stay out.</p>
+        <ErrorNote error={recovery.error} />
+        {recovery.data?.length === 0 && <p className="text-sm text-muted-foreground">Every live conversation has a current next step.</p>}
         <ul className="divide-y">
-          {noStop.data?.map((c) => (
+          {recovery.data?.map((c) => (
             <li key={c.lead_id} className="py-2 text-sm">
               <Link to={`/lead/${c.lead_id}`} className="inline-flex min-h-11 items-center font-medium underline">{c.owner_name}</Link>{' '}
-              - {STAGE_LABEL[c.stage]} - <Badge tone="warn">missing date</Badge>{c.assigned_to ? ` ${personLabel(c.assigned_to)}` : ''}
+              - {STAGE_LABEL[c.stage]} - <Badge tone={c.reason === 'call_outcome_needed' ? 'bad' : 'warn'}>
+                {c.reason === 'call_outcome_needed' ? 'log call outcome' : c.reason === 'overdue' ? 'overdue' : c.reason === 'missing_next_stop' ? 'missing belt stop' : 'missing next action'}
+              </Badge>{' '}<Badge>{personLabel(c.recovery_owner)}</Badge>
+              {c.human_takeover_by && <span className="text-muted-foreground"> started by {c.human_takeover_by}</span>}
             </li>
           ))}
         </ul>

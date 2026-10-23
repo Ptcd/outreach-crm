@@ -33,6 +33,8 @@ describe('Log this call: Not now', () => {
     expect(screen.queryByLabelText(/Check back on/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
     const date = screen.getByLabelText(/Check back on/) as HTMLInputElement
+    expect(date.value).toBe('')
+    expect((screen.getByRole('button', { name: 'Save the call' }) as HTMLButtonElement).disabled).toBe(true)
     fireEvent.change(date, { target: { value: '2026-11-05' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save the call' }))
     await waitFor(() => expect(logCall).toHaveBeenCalled())

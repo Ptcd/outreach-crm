@@ -13,7 +13,8 @@ import { gateFromCall, stopsFromCall, type CallFacts } from '@/lib/callGate'
 import { bookingVerdict } from '@/lib/bookingVerdict'
 import { VerdictBadge, VerdictBox } from '@/components/BookingVerdict'
 import { BeltStrip } from '@/components/BeltStrip'
-import { CallButton } from '@/components/CallButton'
+import { CallButton, PersonalCallButton } from '@/components/CallButton'
+import { AppointmentPacket } from '@/components/AppointmentPacket'
 import { api, useDeals, useLead, useWrite } from '@/lib/queries'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
 import { DEAL_STATUS_LABEL, MILESTONES, PEOPLE, SELLER_FACTS, STAGES, STAGE_LABEL, TASK_KINDS, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
@@ -53,8 +54,17 @@ export default function LeadDetail() {
 
       <HotBanner leadId={lead.id} />
       <BeltStrip lead={lead} />
+      {lead.human_takeover_at && (
+        <div className="rounded-md border-2 border-amber-400 bg-amber-50 p-3 text-sm">
+          <p className="font-semibold">Human call in progress — automated follow-ups are paused</p>
+          <p>Started by {lead.human_takeover_by ?? 'the team'} at {fmtDateTime(lead.human_takeover_at)}. Log the call outcome below when it ends.</p>
+        </div>
+      )}
       <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}
         phone={params.get('phone')} startOpen={params.get('call') === '1'} canOverride={isOwner} />
+      {(lead.belt === 'visit_booked' || lead.stage === 'walkthrough_booked') && (
+        <AppointmentPacket lead={lead} callFacts={callFacts} replyFacts={facts} latestGate={gates[0] ?? null} />
+      )}
       <NextAction lead={lead} />
       <SellerSaid facts={facts} />
       <Section title={`Tasks (${replyTasks.length})`}>
@@ -283,8 +293,14 @@ function Contacts({ contacts, leadId, lead }: { contacts: Contact[]; leadId: str
             </div>
             <div className="mt-1 flex gap-2">
               {c.kind === 'phone' && (
-                <CallButton to={c.value} name={c.person_name || lead?.owner_name} address={lead?.property_address}
-                  leadId={leadId} contactId={c.id} blocked={contactFlags(c).some((f) => f.tone === 'bad')} />
+                <>
+                  <CallButton to={c.value} name={c.person_name || lead?.owner_name} address={lead?.property_address}
+                    leadId={leadId} contactId={c.id} blocked={contactFlags(c).some((f) => f.tone === 'bad')} />
+                  {(!lead?.human_takeover_at || lead.human_takeover_phone === (c.value_normalized ?? c.value).replace(/\D/g, '').slice(-10)) && (
+                    <PersonalCallButton to={c.value} leadId={leadId} blocked={contactFlags(c).some((f) => f.tone === 'bad')}
+                      activeKey={lead?.human_takeover_at ? lead.human_takeover_key : null} />
+                  )}
+                </>
               )}
               <Button
                 size="sm"

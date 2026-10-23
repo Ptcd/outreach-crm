@@ -38,7 +38,7 @@ export async function runConveyor(opts: {
   const due = await opts.rpc('belt_due_texts', { p_now: now().toISOString(), p_limit: opts.maxTexts ?? 40 })
   if (due.error) err('due', due.error.message)
   for (const l of ((due.data as { id: string }[] | null) ?? [])) {
-    const c = await opts.rpc('belt_claim_text', { p_lead_id: l.id, p_dry: !live, p_force: false, p_now: now().toISOString() })
+    const c = await opts.rpc('belt_claim_text_guarded', { p_lead_id: l.id, p_dry: !live, p_force: false, p_now: now().toISOString() })
     if (c.error) { err(`claim ${l.id}`, c.error.message); continue }
     const j = c.data as { outcome: string; reason?: string; id?: string; to?: string; from?: string | null; body?: string }
     if (!j) continue

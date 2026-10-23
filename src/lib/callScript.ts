@@ -96,7 +96,7 @@ export const CALL_OUTCOMES: { id: 'interested' | 'reached_no_decision' | 'no_ans
   { id: 'no_answer', label: 'No answer', hint: 'Rang out or voicemail; nothing changes on the card' },
   { id: 'interested', label: 'Interested', hint: "Stage: Colin's call (or Walk booked)" },
   { id: 'reached_no_decision', label: 'Reached, no decision', hint: "Talked, nothing settled yet; stage: Colin's call" },
-  { id: 'not_now', label: 'Not now', hint: 'Stage: Follow up later, check back in 30 days' },
+  { id: 'not_now', label: 'Not now', hint: 'Use the exact date they gave, or record the event/condition they named' },
   { id: 'not_interested', label: 'Not interested', hint: 'Stage: Dead' },
   { id: 'wrong_number', label: 'Wrong number', hint: 'That phone marked bad; stage: Wrong number' },
   { id: 'dnc', label: 'Do not contact', hint: 'Every phone of this owner blocked, like a texted STOP' },

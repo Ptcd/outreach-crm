@@ -2,6 +2,10 @@
 // up, and never shown for a number the card flags (bad, do-not-contact, STOP, DNC list).
 import { Button } from '@/components/ui/button'
 import { callLabel, useDialer } from '@/lib/dialer'
+import { callAttemptKey } from '@/lib/callAttempt'
+import { api } from '@/lib/queries'
+import { useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 
 export function CallButton(props: {
   to: string | null | undefined
@@ -23,5 +27,54 @@ export function CallButton(props: {
       onClick={() => void start({ to, label: callLabel(props.name, props.address), leadId: props.leadId, contactId: props.contactId ?? null })}>
       Call
     </Button>
+  )
+}
+
+/** Explicit takeover for a call placed outside the browser. It uses the same database door as Call. */
+export function PersonalCallButton(props: {
+  to: string
+  leadId: string
+  blocked?: boolean
+  activeKey?: string | null
+  size?: 'sm' | 'default'
+}) {
+  const qc = useQueryClient()
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  if (props.blocked) return null
+  const refresh = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ['lead', props.leadId] }),
+      qc.invalidateQueries({ queryKey: ['seller_recovery_queue'] }),
+      qc.invalidateQueries({ queryKey: ['cards_no_stop'] }),
+    ])
+  }
+  const begin = async () => {
+    setBusy(true); setMessage(null)
+    const r = await api.beginHumanCall(props.leadId, props.to, 'personal', callAttemptKey())
+    const d = r.data as { ok?: boolean; reason?: string } | null
+    setBusy(false)
+    if (r.error || !d?.ok) { setMessage(r.error?.message ?? d?.reason ?? 'Call not paused'); return }
+    setMessage('Automated follow-ups paused. Log the call outcome when you finish.')
+    await refresh()
+  }
+  const resume = async () => {
+    if (!props.activeKey) return
+    setBusy(true); setMessage(null)
+    const r = await api.resumeHumanCall(props.leadId, props.activeKey)
+    const d = r.data as { ok?: boolean; reason?: string } | null
+    setBusy(false)
+    if (r.error || !d?.ok) { setMessage(r.error?.message ?? d?.reason ?? 'Could not resume'); return }
+    setMessage('The original follow-up is active again.')
+    await refresh()
+  }
+  return (
+    <span className="inline-flex flex-col items-start gap-1">
+      <Button size={props.size ?? 'sm'} variant="outline" disabled={busy}
+        onClick={() => void (props.activeKey ? resume() : begin())}>
+        {busy ? 'Saving...' : props.activeKey ? 'Call did not happen — resume' : 'Calling on personal phone'}
+      </Button>
+      {message && <span className="max-w-64 text-xs text-muted-foreground">{message}</span>}
+    </span>
   )
 }
