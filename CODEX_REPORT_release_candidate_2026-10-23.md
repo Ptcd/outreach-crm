@@ -1,0 +1,119 @@
+# WPIE seller workflow release candidate - handoff for Claude
+
+Date: 2026-10-23 UTC
+
+Status: code frozen and verified locally; not pushed, merged, deployed, migrated, or activated
+
+## Outcome
+
+This shift produced a cohesive local release candidate from the already reviewed seller-to-appointment and provider-call safety work. The refreshed outreach and pm-phone upstream tips already contained all prior milestones, so this work added tests and endpoint hardening without replaying migrations or building a parallel conveyor.
+
+Frozen code commits:
+
+- outreach-crm `codex/release-candidate-20261023`: `f3ba5e8324883a71cda95b08f5752b64b2c3c9ba`, based directly on `origin/wpie-live` `a708f20db4594336de3cc7dbd212f7024eb86950`.
+- pm-phone `codex/phone-release-candidate-20261023`: `41e3ee48f89c2f55416cbab87b4f5b4558dc0f00`, based directly on `origin/main` `cabb8ba2bb32a48e231a6d4250b4bc89459a0879`.
+- WPIE compatibility was rerun in a detached read-only worktree at refreshed `origin/main` `62309d4b33fe69161cc1095a8c45f50833061240`.
+
+The exact migration/deploy/rollback sequence and copyable commands are in `RELEASE_CANDIDATE_2026-10-23.md` beside this report.
+
+## What this shift added
+
+### End-to-end seller journey gate
+
+`tests/releaseCandidateJourney.test.ts` drives one synthetic seller through the existing system:
+
+- inbound interest enters the existing `yes_unbooked` belt;
+- Thalia records an exact Not-now date, corrects it, and leaves exactly one queued action owned by Colin, never before the named day;
+- Thalia starts and safely retries a personal-phone authorization, then explicitly resumes when the call did not happen;
+- Adil starts the app call, and the provider gate claims and idempotently replays the exact CallSid;
+- Adil logs interest; Thalia records motivation, timing, signer, condition, and asking price;
+- the repeat-safe handoff creates one Colin visit task and Colin books the visit;
+- the appointment packet preserves recorded actor provenance and visibly leaves unanswered facts unknown; and
+- STOP before a provider claim and STOP after a claim both fail closed, remove open work, and refuse a new personal-phone authorization.
+
+The focused gate also includes the existing Thalia, Adil, Colin, handoff, exact-date, takeover, provider-gate, incoming-call, and call-queue suites. It is exposed as `npm run test:release-candidate`.
+
+### Actual pm-phone endpoint coverage and hardening
+
+The new test calls the real Next route `POST /api/twilio/voice/client` in `NODE_ENV=production` using synthetic requests and locally generated Twilio signatures. It proves:
+
+- a correctly signed request carries `To`, seller line, lead ID, takeover key, and CallSid into the WPIE provider-claim contract and emits `<Dial>` only after an allowed verdict;
+- a tampered signature is rejected with HTTP 403 before WPIE is called;
+- a foreign account SID and a non-Voice-SDK/PSTN `From` are rejected with HTTP 403;
+- an empty seller caller-ID pool produces refusal TwiML and never falls back to the PM number;
+- a stale key or wrong destination produces refusal TwiML with no `<Dial>`; and
+- exact same-CallSid replay remains idempotently dialable while a new or changed authorization is still governed by the database gate.
+
+The route now explicitly requires an account SID equal to the configured parent or seller account and a bounded `client:` source identity in addition to the existing production signature check. `npm run test:voice-client` runs this route suite with the lower-level dial contract.
+
+### Clean repository gates
+
+The 11 pre-existing outreach lint errors were small mixed-export/unused-test-fixture problems. Targeted explanations and fixture cleanup make the full repository lint pass without moving runtime logic or changing the conveyor.
+
+## Conveyor and safety invariants preserved
+
+- `belt_event` and `belt_enter` remain the only conveyor. No second scheduler, task stream, or follow-up engine was added.
+- Migration order remains `0039` zero-active-pause preflight, `0040` shared-phone people, then additive `0041` provider claim gate.
+- Exact-date Not-now work never runs before the named date, is reassigned to Colin, and rescheduling leaves one current task rather than parallel old/new work.
+- Missing-date and conversation-recovery paths remain visible; terminal, STOP, DNC, suppressed, and bad-number records do not re-enter outreach.
+- Personal-phone and app calls both require an active paused authorization. A refusal means no dialing. Valid active retries remain idempotent; resume, outcome, reassignment, wrong destination, or STOP invalidates old authority.
+- Provider claims retain the established lead-first lock order and do not edit belts, tasks, drafts, messages, or alerts.
+- Handoff remains repeat-safe while genuinely corrected same-time handoffs keep distinct alerts.
+- Visit ownership stays with Colin; appointment packets report recorded provenance and use explicit unknowns instead of guesses.
+- Thalia and Adil share the current caller list. Sunday seller-text restrictions, role controls, Colin-first-person wording, and pricing/company/cash guards are unchanged.
+- The PM number cannot become seller caller ID when the seller pool is missing.
+
+## Manual and current-WPIE reconciliation
+
+Current WPIE `origin/main` contains the October 22 operator-manual changes: the shared Thalia/Adil list, Colin-owned exact-date callbacks, required personal-phone authorization, and the rule that a refusal means do not dial. The RC journey directly tests those data-plane cases.
+
+Commit `62309d4` calls the refusal gate “live.” That is a documentation statement, not deployment evidence. This shift did not inspect credentials, query production, or deploy anything, so the actual live version remains unverified.
+
+Current WPIE also contains `9cd7dd2`, which treats a one-unit record with conflicting duplex/other-residential land use as unknown. Its four classification tests pass. The commit message reports a 200-confirmed/zero-unknown October 23 plan, but this shift deliberately did not inspect or send campaign files; that count remains unverified operational context.
+
+## Verification evidence
+
+All data was synthetic/PGlite or mocked HTTP. No provider request or external message was sent.
+
+### outreach-crm
+
+- `npm run test:release-candidate`: 43 passed in 8 files.
+- `npm test -- --run`: 333 passed in 43 files.
+- `npx tsc -b --force`: passed.
+- `npm run build`: passed; only the existing Vite large-chunk advisory appeared.
+- `npm run lint`: passed.
+- `git diff --check`: passed.
+- The known jsdom canvas warning still prints during the signing-page test; that test passes.
+
+### pm-phone
+
+- `npm run test:voice-client`: 17 passed in 2 files.
+- `npm test`: 115 passed in 9 files.
+- `npm run typecheck`: passed.
+- `npm run build`: passed.
+- `git diff --check`: passed.
+
+### WPIE
+
+- At refreshed `62309d4`, live conveyor/sync/morning-belt compatibility: 26 passed.
+- `tests/test_single_family_plan.py`: 4 passed.
+
+### Not completed and why
+
+- Real separate-session PostgreSQL contention: not run. This host has no `psql`, PostgreSQL server, Docker, or Podman. PGlite uses one local handle and is not represented as proof of server concurrency. Run the exact races in staging before enablement.
+- Local synthetic browser clicks: not run. The browser-control runtime crashed twice before creating a tab; no click had an uncertain outcome. Component/UI flows remain in the passing test suites, but interactive rendering is still a staging smoke item.
+- Live state and provider delivery: not checked by design. Production credentials and calls were outside authorization.
+
+## Claude review and rollout instructions
+
+1. Review both frozen code commits and `RELEASE_CANDIDATE_2026-10-23.md`; do not cherry-pick older milestones separately because they are already ancestors of the bases.
+2. Keep browser calling disabled. Apply migrations only in the documented order, with the `0039` zero-active-pause preflight.
+3. Deploy pm-phone before outreach. Roll back outreach before pm-phone.
+4. Require a production-mode staging signature/custom-parameter smoke and the real two-session PostgreSQL race before any enablement decision.
+5. Verify staging config exists and the approved seller pool is nonempty without printing secrets.
+6. Treat the phone persona as display/list state, not individual security identity; the shared Colin row authorizes the team.
+7. Re-verify current campaign inputs independently. Repository documentation does not authorize or prove a send.
+
+## No-live-action statement
+
+No `.env` or secret was read. No live call, SMS, email, push, seller/staff contact, campaign send, database migration, production mutation, scheduler installation, credential/configuration change, deployment, push, merge, or PR occurred. The statewide branch frozen at `07aa1872` was not touched.
