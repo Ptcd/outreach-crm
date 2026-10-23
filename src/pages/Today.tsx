@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge, Empty, ErrorNote, Section, Select } from '@/components/ui/form'
-import { api, useDueTasks, useFollowupDebt, useMyStops, useReplyTasks, useUnseenReplies, useWrite } from '@/lib/queries'
+import { api, useCardsNoStop, useDueTasks, useFollowupDebt, useMyStops, useReplyTasks, useUnseenReplies, useWrite } from '@/lib/queries'
 import { ReplyTaskCard } from '@/components/ReplyTaskCard'
 import { BeltHealthStrip } from '@/components/BeltHealthStrip'
 import { StopCard } from '@/components/StopCard'
@@ -19,6 +19,7 @@ export default function Today() {
   const stops = useMyStops(until, who)
   const replies = useUnseenReplies()
   const debt = useFollowupDebt()
+  const noStop = useCardsNoStop()
   const replyTasks = useReplyTasks()
   const done = useWrite((id: string) => api.finishTask(id), [['tasks'], ['lead']])
   const seen = useWrite((id: string) => api.markSeen(id, user!.id), [['messages'], ['lead']])
@@ -116,6 +117,18 @@ export default function Today() {
                 {d.owner_name}
               </Link>{' '}
               - {STAGE_LABEL[d.stage]} - {d.days_late} days late{d.next_action ? ` (${d.next_action})` : ''}
+            </li>
+          ))}
+        </ul>
+        {/* A touched card with no next date at all is debt too (Codex's walk, 2026-10-22, step 11) */}
+        <p className="mt-3 mb-1 text-sm font-medium">No next stop at all{noStop.data ? ` (${noStop.data.length})` : ''}</p>
+        <ErrorNote error={noStop.error} />
+        {noStop.data?.length === 0 && <p className="text-sm text-muted-foreground">Every live card has a next stop.</p>}
+        <ul className="divide-y">
+          {noStop.data?.map((c) => (
+            <li key={c.lead_id} className="py-2 text-sm">
+              <Link to={`/lead/${c.lead_id}`} className="inline-flex min-h-11 items-center font-medium underline">{c.owner_name}</Link>{' '}
+              - {STAGE_LABEL[c.stage]} - <Badge tone="warn">missing date</Badge>{c.assigned_to ? ` ${personLabel(c.assigned_to)}` : ''}
             </li>
           ))}
         </ul>

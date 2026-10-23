@@ -69,7 +69,7 @@ describe('the call queue', () => {
     expect(screen.getByRole('button', { name: 'No answer' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'No answer' }))
     fireEvent.click(screen.getByRole('button', { name: 'Save the call' }))
-    await waitFor(() => expect(logCall).toHaveBeenCalledWith('L1', '4145550101', 'no_answer', null))
+    await waitFor(() => expect(logCall).toHaveBeenCalledWith('L1', '4145550101', 'no_answer', null, null))
     // the server closes the stop off the logged call; the queue never marks it Done by hand
     expect(finishTask).not.toHaveBeenCalled()
     expect(await screen.findByRole('heading', { name: 'BO KIM' })).toBeTruthy()

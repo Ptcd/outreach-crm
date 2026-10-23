@@ -312,12 +312,15 @@ function LogCall({ lead, contacts, phone, onLogged }: { lead: Lead; contacts: Co
   const [from, setFrom] = useState<string>(phone ?? phones[0] ?? '')
   const [outcome, setOutcome] = useState<string>('')
   const [note, setNote] = useState('')
+  // "Not now" carries the date they gave (Codex's walk, 2026-10-22: the generic 30 days lost the real date)
+  const [until, setUntil] = useState(() => new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10))
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const save = async () => {
     setBusy(true)
     setMsg(null)
-    const r = await api.logCall(lead.id, from || null, outcome, note.trim() || null)
+    const when = outcome === 'not_now' && until ? localInputToIso(`${until}T12:00`) : null
+    const r = await api.logCall(lead.id, from || null, outcome, note.trim() || null, when)
     setBusy(false)
     const d = r.data as { ok: boolean; reason?: string } | null
     if (r.error || !d?.ok) { setMsg({ ok: false, text: r.error?.message ?? d?.reason ?? 'Not saved' }); return }
@@ -350,6 +353,12 @@ function LogCall({ lead, contacts, phone, onLogged }: { lead: Lead; contacts: Co
         ))}
       </div>
       {chosen && <p className="text-xs text-muted-foreground">{chosen.hint}</p>}
+      {outcome === 'not_now' && (
+        <label className="block text-sm font-medium">Check back on (the date they gave)
+          <Input type="date" className="mt-1 h-11" value={until} min={new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)}
+            onChange={(e) => setUntil(e.target.value)} />
+        </label>
+      )}
       <Textarea rows={3} placeholder="Notes from the call" value={note} onChange={(e) => setNote(e.target.value)} />
       {outcome === 'dnc' ? (
         <ConfirmButton disabled={busy} question="Block every phone of this owner? Nobody calls or texts them again." yes="Yes, do not contact"

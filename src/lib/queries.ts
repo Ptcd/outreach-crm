@@ -302,8 +302,8 @@ export const api = {
   // Call desk (migration 0013)
   newCaller: (phone: string, name?: string) => supabase.rpc('new_caller', { p_phone: phone, p_name: name ?? null }),
   callAnswer: (leadId: string, key: string, value: unknown) => supabase.rpc('call_answer', { p_lead_id: leadId, p_key: key, p_value: value }),
-  logCall: (leadId: string, phone: string | null, outcome: string, note: string | null) =>
-    supabase.rpc('log_call', { p_lead_id: leadId, p_phone: phone, p_outcome: outcome, p_note: note }),
+  logCall: (leadId: string, phone: string | null, outcome: string, note: string | null, until: string | null = null) =>
+    supabase.rpc('log_call', { p_lead_id: leadId, p_phone: phone, p_outcome: outcome, p_note: note, p_when: until }),
   // Send contract (Colin): preview / send / new_link / void / pdf / seal. Errors come back as { ok: false, reason }.
   contract: async (body: Record<string, unknown>): Promise<{ ok: boolean; reason?: string } & Record<string, unknown>> => {
     const r = await supabase.functions.invoke('contract', { body })

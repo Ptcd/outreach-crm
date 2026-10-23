@@ -46,6 +46,7 @@ vi.mock('@/lib/queries', () => ({
   useFollowupDebt: () => ok([]),
   // the conveyor's pieces (migrations 0029-0032): nothing on the belt in this fixture
   useMyStops: () => ok([]),
+  useCardsNoStop: () => ok([]),
   useBeltEvents: () => ok([]),
   useBeltMaxSteps: () => ok({}),
   useBeltHealth: () => ok(null),
