@@ -462,10 +462,12 @@ export function useWaitingDrafts() {
     queryKey: ['reply_drafts', 'waiting'],
     refetchInterval: 30_000,
     queryFn: async (): Promise<WaitingDraft[]> => {
-      const drafts = check(
-        await supabase.from('reply_drafts').select('*, lead:leads(owner_name, property_address)')
+      const drafts = (check(
+        await supabase.from('reply_drafts').select('*, lead:leads(owner_name, property_address, stage, belt)')
           .eq('status', 'awaiting_approval').order('inbound_at').limit(50),
-      ) as (ReplyDraft & { lead: { owner_name: string | null; property_address: string | null } | null })[]
+      ) as (ReplyDraft & { lead: { owner_name: string | null; property_address: string | null; stage?: string | null; belt?: string | null } | null })[])
+        // a lead marked do not contact waits for nobody (Approve refuses it too; migration 0044)
+        .filter((d) => d.lead?.stage !== 'dnc' && d.lead?.belt !== 'dnc')
       if (!drafts.length) return []
       const phones = [...new Set(drafts.map((d) => d.phone10))]
       const leadIds = [...new Set(drafts.map((d) => d.lead_id).filter((x): x is string => Boolean(x)))]

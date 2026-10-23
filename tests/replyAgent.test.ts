@@ -163,6 +163,23 @@ describe('the reply agent, end to end with no real text', () => {
     expect(tw.sends).toEqual([])
   })
 
+  it('a lead marked do not contact gets no approved reply, and its draft leaves the badge (Colin 2026-10-23)', async () => {
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMd', '+14145550177', 'Maybe why?')]
+    await run(tw)
+    const d = (await drafts())[0]
+    expect(d.status).toBe('awaiting_approval')
+    const lead = (await db.query<{ lead_id: string }>(`select lead_id from public.reply_drafts where id = $1`, [d.id])).rows[0].lead_id
+    expect(lead).toBeTruthy()
+    const before = (await db.query<{ n: number }>(`select drafts_waiting as n from public.reply_waiting`)).rows[0].n
+    await db.query(`update public.leads set stage = 'dnc' where id = $1`, [lead])
+    expect((await db.query<{ n: number }>(`select drafts_waiting as n from public.reply_waiting`)).rows[0].n).toBe(before - 1)
+    expect(await approveReply({ rpc, env: LIVE, twilio: tw, id: d.id, text: 'Sure - what would you need?', actor: 'Colin', now: () => NOON }))
+      .toMatchObject({ outcome: 'refused', reason: 'this lead is marked do not contact' })
+    expect((await drafts())[0].status).toBe('skipped')
+    expect(tw.sends).toEqual([])
+  })
+
   it("refuses a price or the business name in Colin's edit instead of changing his words", async () => {
     const tw = new FakeTwilio()
     tw.inbound = [text('SMp', '+14145550177', 'interested, make me an offer')]

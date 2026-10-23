@@ -41,14 +41,19 @@ export function ReviewDeck({ drafts, startId }: { drafts: WaitingDraft[]; startI
   const seen = useRef(new Map<string, WaitingDraft>())
   for (const x of drafts) seen.current.set(x.id, x)
   const byId = seen.current
-  useEffect(() => {
-    setIds((prev) => [...prev, ...drafts.map((x) => x.id).filter((x) => !prev.includes(x))])
-  }, [drafts])
   const [idx, setIdx] = useState(() => Math.max(0, startId ? ids.indexOf(startId) : 0))
   const [texts, setTexts] = useState<Record<string, string>>({})
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [results, setResults] = useState<Record<string, Result>>({})
+  // A draft that stopped waiting elsewhere (skipped on another phone, its lead marked do not contact, they texted
+  // again) leaves the deck; only the ones handled on this screen stay, with their result. The phone's saved copy
+  // can be hours old (Colin 2026-10-23: a skipped draft for a dnc lead was back in Needs you).
+  useEffect(() => {
+    const live = new Set(drafts.map((x) => x.id))
+    setIds((prev) => [...prev.filter((x) => live.has(x) || results[x]), ...drafts.map((x) => x.id).filter((x) => !prev.includes(x))])
+  }, [drafts, results])
+  useEffect(() => { setIdx((i) => Math.max(0, Math.min(i, ids.length - 1))) }, [ids.length])
   const touch = useRef<number | null>(null)
   const area = useRef<HTMLTextAreaElement>(null)
 
