@@ -11,7 +11,7 @@ Status: implemented and tested locally; not pushed, merged, deployed, or applied
 - Base: `origin/wpie-live` at `0e2df5217b03bde38c1dcfce525f4fbe79105691`
 - Baseline regression commit: `4a2b43335f1894441ed58d6d9cc08e9dac23d65c`
 - Implementation commit: `0841d39994b5c90157ddfa802912f4cb3526079a`
-- Operator-manual reconciliation commit: `bf9b1e9` (`align exact-date followups with operator manual`)
+- Operator-manual reconciliation commit: `bf9b1e9546a625d5b302c49c9131df9d0c743fe5`
 - Prior reviewed audit milestone: `40105ed9fb01b37797ede365534d5e19243d102a`
 - Previous audit report: `CODEX_REPORT_day_in_the_life.md` (Library identity `libfile_9b6dab843d4081919dab90ee8f1bfcb6`)
 - WPIE compatibility reference: `origin/main` at `536606b78a1a8d160e9d0c3715aadce2672f39b6`
