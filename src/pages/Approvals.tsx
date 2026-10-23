@@ -8,6 +8,7 @@ import { api, useCampaignControl, usePlannedOpeners, useWrite } from '@/lib/quer
 import { fmtDateTime, fmtPhone, todayLocal } from '@/lib/format'
 import { SEND_LABEL, WORDING, reasonText, sendTone } from '@/lib/inbox'
 import { useAuth } from '@/providers/AuthProvider'
+import { useColinHere } from '@/components/OnPhonePicker'
 import { TouchSwitches } from '@/components/TouchSwitches'
 import type { CampaignControl, OpenerDecision, PlannedOpener } from '@/lib/types'
 
@@ -15,7 +16,8 @@ const DECISION_LABEL: Record<OpenerDecision, string> = { pending: 'Waiting', app
 const UNSENT = new Set(['planned', 'would_send'])
 
 export default function Approvals() {
-  const { isOwner, member } = useAuth()
+  const { member } = useAuth()
+  const isOwner = useColinHere()   // the switches are Colin's: on the shared login, the phone set to Colin
   const [day, setDay] = useState(todayLocal())
   const [ticked, setTicked] = useState<Set<string>>(new Set())
   const q = usePlannedOpeners(day)

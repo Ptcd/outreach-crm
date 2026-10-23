@@ -8,6 +8,7 @@ import { CallBar } from '@/components/CallBar'
 import { IncomingCallBar } from '@/components/IncomingCallBar'
 import { useDialer } from '@/lib/dialer'
 import { cn } from '@/lib/utils'
+import { OnPhoneSwitch } from '@/components/OnPhonePicker'
 
 const NAV = [
   { to: '/today', label: 'Today', icon: CalendarCheck },
@@ -52,7 +53,8 @@ export function Layout({ children }: { children: ReactNode }) {
                 <span className="sr-only sm:not-sr-only">Ready for calls</span>
               </span>
             )}
-            <span className="hidden text-muted-foreground sm:inline">{member?.display_name}</span>
+            {member?.role === 'caller' && <span className="hidden text-muted-foreground sm:inline">{member?.display_name}</span>}
+            <OnPhoneSwitch />
             <NavLink to="/settings" aria-label="Settings" title="Settings: your alert email and phone, notifications"
               className={({ isActive }) => cn('flex h-11 w-11 items-center justify-center rounded-md', isActive ? 'text-primary' : 'text-muted-foreground hover:bg-accent')}>
               <SettingsIcon className="h-5 w-5" aria-hidden />

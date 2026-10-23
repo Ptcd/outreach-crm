@@ -9,11 +9,15 @@ import { StopCard } from '@/components/StopCard'
 import { endOfTodayIso, fmtDateTime } from '@/lib/format'
 import { STAGE_LABEL, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
-import type { Person } from '@/lib/types'
+import { ownerFilterFor, useOnPhone, workerFor, type TaskOwner } from '@/lib/onPhone'
+import { OnPhonePrompt } from '@/components/OnPhonePicker'
 
 export default function Today() {
   const { member, user } = useAuth()
-  const [who, setWho] = useState<Person | 'all'>(member?.person ?? 'all')
+  const [picked] = useOnPhone()
+  const worker = workerFor(member, picked)
+  const [chosen, setWho] = useState<TaskOwner | null>(null)
+  const who: TaskOwner = chosen ?? ownerFilterFor(worker, member?.person)
   const until = endOfTodayIso()
   const tasks = useDueTasks(until, who)
   const stops = useMyStops(until, who)
@@ -30,6 +34,7 @@ export default function Today() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Today</h1>
+      <OnPhonePrompt />
       <BeltHealthStrip />
       <Section title={`Tasks from replies${replyTasks.data ? ` (${replyTasks.data.length})` : ''}`}>
         <p className="mb-2 text-sm text-muted-foreground">Things a seller asked for that a text can&apos;t do. Adil by default.</p>
@@ -69,7 +74,8 @@ export default function Today() {
       <Section
         title="Follow-ups due"
         right={
-          <Select value={who} onChange={(e) => setWho(e.target.value as Person | 'all')} className="w-32" aria-label="Whose follow-ups">
+          <Select value={who} onChange={(e) => setWho(e.target.value as TaskOwner)} className="w-32" aria-label="Whose follow-ups">
+            <option value="callers">Thalia + Adil</option>
             <option value="all">Everyone</option>
             <option value="colin">Colin</option>
             <option value="adil">Adil</option>
@@ -153,7 +159,8 @@ export default function Today() {
       <Section
         title={`Your stops${stops.data ? ` (${stops.data.length})` : ''}`}
         right={
-          <Select value={who} onChange={(e) => setWho(e.target.value as Person | 'all')} className="w-32" aria-label="Whose stops">
+          <Select value={who} onChange={(e) => setWho(e.target.value as TaskOwner)} className="w-32" aria-label="Whose stops">
+            <option value="callers">Thalia + Adil</option>
             <option value="all">Everyone</option>
             <option value="colin">Colin</option>
             <option value="adil">Adil</option>

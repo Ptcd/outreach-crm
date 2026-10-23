@@ -19,12 +19,13 @@ import { api, useDeals, useLead, useWrite } from '@/lib/queries'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
 import { DEAL_STATUS_LABEL, MILESTONES, PEOPLE, SELLER_FACTS, STAGES, STAGE_LABEL, TASK_KINDS, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
+import { useColinHere } from '@/components/OnPhonePicker'
 import type { Contact, Deal, DealStatus, Lead, LeadStage, Person } from '@/lib/types'
 
 export default function LeadDetail() {
   const { id = '' } = useParams()
   const q = useLead(id)
-  const { isOwner } = useAuth()
+  const isOwner = useColinHere()   // Colin's controls: on the shared login, the phone set to Colin
   const [params] = useSearchParams()
 
   if (q.isLoading) return <Empty>Loading...</Empty>

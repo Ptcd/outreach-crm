@@ -14,14 +14,21 @@ import { handoffToColin } from '@/lib/apiExtra'
 import { endOfTodayIso, fmtDateTime, fmtPhone } from '@/lib/format'
 import { STAGE_LABEL } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
+import { ownerFilterFor, useOnPhone, workerFor } from '@/lib/onPhone'
+import { OnPhonePrompt, useColinHere } from '@/components/OnPhonePicker'
 import type { Task } from '@/lib/types'
 
 type QueueTask = Task & { lead: { id: string; owner_name: string; property_address: string | null; stage: string } | null }
 
 export default function CallQueue() {
-  const { member, isOwner } = useAuth()
+  const { member } = useAuth()
+  const [picked] = useOnPhone()
+  const worker = workerFor(member, picked)
   const until = endOfTodayIso()
-  const tasks = useDueTasks(until, member?.person ?? 'all')
+  // Thalia and Adil work the callers' list (the call list and caller stops are in Thalia's name); Colin his own
+  const tasks = useDueTasks(until, ownerFilterFor(worker, member?.person))
+  // the Walk-through override is Colin's alone, so on the shared login it follows the person on the phone
+  const canOverride = useColinHere()
   const [skipped, setSkipped] = useState<string[]>([])
   const [done, setDone] = useState<string[]>([])
   const queue = useMemo(() => {
@@ -45,6 +52,7 @@ export default function CallQueue() {
           {total === 0 ? 'nothing to call' : `${Math.min(done.length + 1, total)} of ${total}${skipped.length ? `, ${skipped.length} skipped for now` : ''}`}
         </p>
       </div>
+      <OnPhonePrompt />
       <ErrorNote error={tasks.error} />
       {tasks.isLoading && <Empty>Loading...</Empty>}
       {!tasks.isLoading && !current && (
@@ -53,7 +61,7 @@ export default function CallQueue() {
         </Empty>
       )}
       {current && (
-        <QueueCard key={current.id} task={current} canOverride={isOwner}
+        <QueueCard key={current.id} task={current} canOverride={canOverride}
           onDone={() => { setDone((d) => [...d, current.id]); refresh.mutate(undefined) }}
           onSkip={() => setSkipped((s) => [...s, current.id])} />
       )}

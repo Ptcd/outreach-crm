@@ -14,7 +14,7 @@ function check<T>(res: { data: T | null; error: { message: string } | null }): T
 }
 
 // ------------------------------------------------------------------ Today
-export function useDueTasks(untilIso: string, owner: Person | 'all') {
+export function useDueTasks(untilIso: string, owner: Person | 'all' | 'callers') {
   return useQuery({
     queryKey: ['tasks', 'due', untilIso, owner],
     queryFn: async () => {
@@ -25,7 +25,8 @@ export function useDueTasks(untilIso: string, owner: Person | 'all') {
         .lte('due_at', untilIso)
         .order('due_at')
         .limit(200)
-      if (owner !== 'all') q = q.eq('owner', owner)
+      if (owner === 'callers') q = q.in('owner', ['thalia', 'adil'])
+      else if (owner !== 'all') q = q.eq('owner', owner)
       return check(await q) as (Task & { lead: Pick<Lead, 'id' | 'owner_name' | 'property_address' | 'stage'> | null })[]
     },
   })
@@ -51,7 +52,7 @@ export function useUnseenReplies() {
 export type StopTask = Task & { lead: Pick<Lead, 'id' | 'owner_name' | 'property_address' | 'stage' | 'belt' | 'belt_step' | 'next_stop_say' | 'elderly_or_ill' | 'grief'> | null }
 
 /** The signed-in person's stops: belt and call-list tasks due by the end of today, overdue first. */
-export function useMyStops(untilIso: string, owner: Person | 'all') {
+export function useMyStops(untilIso: string, owner: Person | 'all' | 'callers') {
   return useQuery({
     queryKey: ['tasks', 'stops', untilIso, owner],
     refetchInterval: 60_000,
@@ -59,7 +60,8 @@ export function useMyStops(untilIso: string, owner: Person | 'all') {
       let q = supabase.from('tasks')
         .select('*, lead:leads(id, owner_name, property_address, stage, belt, belt_step, next_stop_say, elderly_or_ill, grief)')
         .in('source', ['belt', 'call_list', 'after_stop']).is('done_at', null).lte('due_at', untilIso).order('due_at').limit(200)
-      if (owner !== 'all') q = q.eq('owner', owner)
+      if (owner === 'callers') q = q.in('owner', ['thalia', 'adil'])
+      else if (owner !== 'all') q = q.eq('owner', owner)
       return check(await q) as StopTask[]
     },
   })

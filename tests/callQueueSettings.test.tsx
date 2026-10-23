@@ -21,7 +21,7 @@ const tasks = [
 const finishTask = vi.fn(async () => ({ data: null, error: null }))
 const logCall = vi.fn(async () => ({ data: { ok: true }, error: null }))
 const handoff = vi.fn(async () => ({ ok: true, task_id: 'TX' }))
-const setMyAlerts = vi.fn(async () => ({ ok: true, phone: '4145550199', email: 'thalia@example.com' }))
+const setMyAlerts = vi.fn(async (..._a: unknown[]) => ({ ok: true, phone: '4145550199', email: 'thalia@example.com' }))
 const beginHumanCall = vi.fn(async () => ({ data: { ok: true, paused: true, key: 'k' }, error: null }))
 const resumeHumanCall = vi.fn(async () => ({ data: { ok: true, paused: false }, error: null }))
 const ok = <T,>(data: T) => ({ data, error: null, isLoading: false, isPending: false, isSuccess: false })
@@ -32,8 +32,8 @@ vi.mock('@/providers/AuthProvider', () => ({
     isOwner: false, loading: false, signOut: vi.fn() }),
 }))
 vi.mock('@/lib/apiExtra', () => ({
-  myAlerts: async () => ({ alert_phone: null, alert_email: null }),
-  setMyAlerts: (p: string, e: string) => setMyAlerts(p, e),
+  personAlerts: async () => ({ alert_phone: null, alert_email: null }),
+  setPersonAlerts: (who: string, p: string, e: string) => setMyAlerts(who, p, e),
   handoffToColin: (id: string, note: string) => handoff(id, note),
 }))
 vi.mock('@/lib/queries', () => ({
@@ -130,7 +130,7 @@ describe('Settings', () => {
     fireEvent.change(email, { target: { value: 'thalia@example.com' } })
     fireEvent.change(screen.getByLabelText(/Phone for text pings/), { target: { value: '414 555 0199' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-    await waitFor(() => expect(setMyAlerts).toHaveBeenCalledWith('414 555 0199', 'thalia@example.com'))
+    await waitFor(() => expect(setMyAlerts).toHaveBeenCalledWith('thalia', '414 555 0199', 'thalia@example.com'))
     expect(await screen.findByText(/Saved\. Hot pings now go to that phone and that email\./)).toBeTruthy()
     expect(screen.getByText(/tell him when you set or change this/)).toBeTruthy()
     expect(screen.getByText(/On a computer, Chrome can show pings while the browser is running/)).toBeTruthy()
