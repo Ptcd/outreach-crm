@@ -12,7 +12,6 @@ import { HANDOFF_RE, alertText, type HotAlert } from '../supabase/functions/_sha
 const MIGRATIONS_DIR = path.resolve(__dirname, '../supabase/migrations')
 const MIGRATION = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort()
   .map((f) => readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8')).join('\n')
-const COLIN = { sub: '00000000-0000-0000-0000-00000000000c', email: 'colin@example.com' }
 const THALIA = { sub: '00000000-0000-0000-0000-00000000000d', email: 'thalia@example.com' }
 const LEAD = '00000000-0000-0000-0000-0000000000a1'
 

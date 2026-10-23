@@ -21,7 +21,7 @@ const tasks = [
 const finishTask = vi.fn(async () => ({ data: null, error: null }))
 const logCall = vi.fn(async () => ({ data: { ok: true }, error: null }))
 const handoff = vi.fn(async () => ({ ok: true, task_id: 'TX' }))
-const setMyAlerts = vi.fn(async (..._a: unknown[]) => ({ ok: true, phone: '4145550199', email: 'thalia@example.com' }))
+const setMyAlerts = vi.fn(async () => ({ ok: true, phone: '4145550199', email: 'thalia@example.com' }))
 const beginHumanCall = vi.fn(async () => ({ data: { ok: true, paused: true, key: 'k' }, error: null }))
 const resumeHumanCall = vi.fn(async () => ({ data: { ok: true, paused: false }, error: null }))
 const ok = <T,>(data: T) => ({ data, error: null, isLoading: false, isPending: false, isSuccess: false })

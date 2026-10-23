@@ -13,6 +13,8 @@ const WHO: { id: OnPhone; label: string }[] = [
 /** Colin's own controls (the sending switch, the visit override, his score, contracts, deals) show only when
  *  this phone is Colin's: on the shared login everyone is the owner account, so the phone's answer decides.
  *  A phone that has not answered yet is treated as Colin's, as before the picker. */
+// This hook intentionally shares the picker module so both controls use the same phone identity contract.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useColinHere(): boolean {
   const { isOwner } = useAuth()
   const [picked] = useOnPhone()

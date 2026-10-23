@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:release-candidate": "vitest run tests/releaseCandidateJourney.test.ts tests/humanCallProviderGate.test.ts tests/sellerAppointmentShift.test.ts tests/dayInLifeThalia.test.ts tests/dayInLifeAdil.test.ts tests/dayInLifeColin.test.ts tests/callQueueSettings.test.tsx tests/incomingCall.test.tsx",
     "db:local": "node scripts/local-db.mjs",
     "preview:mock": "vite --config vite.preview.config.ts"
   },

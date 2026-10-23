@@ -7,7 +7,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ownerFilterFor, workerFor } from '@/lib/onPhone'
 
-const useDueTasks = vi.fn((..._a: unknown[]) => ({ data: [], error: null, isLoading: false }))
+const useDueTasks = vi.fn(() => ({ data: [], error: null, isLoading: false }))
 vi.mock('@/lib/supabaseClient', () => ({ supabase: {}, supabaseConfigured: true }))
 vi.mock('@/providers/AuthProvider', () => ({
   // the one shared login: Colin's team row, the owner role

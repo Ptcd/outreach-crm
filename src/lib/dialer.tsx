@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- provider module intentionally exports its tested call helpers */
 // The app's own dialer (Colin 2026-10-22: "make it so we can call out right from the property card ...
 // app/browser based dialer"). Tap Call on a lead: the browser places the call through Twilio's Voice SDK
 // from the signed-in person's identity; Twilio asks the TwiML App "WPIE app dialer" (pm-phone's
