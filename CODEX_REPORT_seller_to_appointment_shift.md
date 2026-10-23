@@ -12,7 +12,7 @@ Status: implemented and tested locally; not pushed, merged, deployed, or applied
 - Baseline regression commit: `4a2b43335f1894441ed58d6d9cc08e9dac23d65c`
 - Implementation commit: `0841d39994b5c90157ddfa802912f4cb3526079a`
 - Operator-manual reconciliation commit: `bf9b1e9546a625d5b302c49c9131df9d0c743fe5`
-- Frozen code-review HEAD: `f4197db71ffb69f29ae7524756d019a88c123a96`
+- Frozen code-review HEAD: `eb67d32ffbf7685ce4b51be5e34de8f274781dcb`
 - Prior reviewed audit milestone: `40105ed9fb01b37797ede365534d5e19243d102a`
 - Previous audit report: `CODEX_REPORT_day_in_the_life.md` (Library identity `libfile_9b6dab843d4081919dab90ee8f1bfcb6`)
 - WPIE compatibility reference: `origin/main` at `536606b78a1a8d160e9d0c3715aadce2672f39b6`
@@ -98,7 +98,7 @@ Apply migrations in numeric order. `0037` depends on `0035` (dated `log_call`) a
 - `human_takeover_key`
 - `human_takeover_drafts`
 
-`0039` adds nullable `human_takeover_assigned_to`, backfilled only for a currently active takeover. It snapshots the assignment authorized at call start so a later reassignment invalidates a retry without preventing legitimate weekend coverage of an already-assigned card.
+`0039` adds nullable `human_takeover_assigned_to` only after an atomic preflight confirms there are zero active legacy pauses. A `0037` pause has no immutable original-assignment snapshot, so `0039` refuses to infer one from the card's current assignee. If any `human_takeover_at` is non-null, the migration raises before DDL or data mutation. Operators must investigate each uncertain call and either log its outcome or explicitly use “call did not happen — resume,” then recheck that the count is zero. The migration never clears a pause or resumes outreach itself. New calls after the upgrade snapshot the assignment authorized at call start, so later reassignment invalidates retry without preventing legitimate weekend coverage.
 
 New/replaced database interfaces:
 
@@ -113,7 +113,14 @@ New/replaced database interfaces:
 - `log_call(uuid, text, text, text, timestamptz)` - replaced to interpret the UI value as a local calendar day and store the resolved call instant
 - message/lead triggers clear a takeover after a logged outcome or terminal transition
 
-`0037` has no data backfill: existing rows receive null takeover fields, and the recovery view derives existing debt immediately. `0038` has a deliberately bounded backfill for active `not_now_dated` cards only: it supersedes unsent legacy pre-date drafts, closes their tasks, remaps their old step number, and schedules the replacement call. It does not rewrite stages, assignees, WPIE identifiers, terminal cards, or any other belt. `0039` backfills the new assignment snapshot only on rows already paused; it does not rewrite dates on existing cards. Future date saves and reschedules use the corrected configured call hour.
+`0037` has no data backfill: existing rows receive null takeover fields, and the recovery view derives existing debt immediately. `0038` has a deliberately bounded backfill for active `not_now_dated` cards only: it supersedes unsent legacy pre-date drafts, closes their tasks, remaps their old step number, and schedules the replacement call. It does not rewrite stages, assignees, WPIE identifiers, terminal cards, or any other belt. `0039` has no takeover backfill: active legacy pauses block the whole migration, while inactive rows receive a null assignment snapshot. It does not rewrite dates on existing cards. Future date saves and reschedules use the corrected configured call hour.
+
+Required `0039` deployment preflight and order:
+
+1. Count and inspect rows with `human_takeover_at is not null`; do not apply `0039` while any exist.
+2. For every row, determine the real call outcome. Log the outcome when the call may have started, or explicitly resume only when the call did not start. Do not clear columns directly.
+3. Recheck that the active-pause count is zero, then apply `0039` in its normal migration transaction.
+4. Confirm `human_takeover_assigned_to` exists and is null on pre-existing inactive rows. Exercise a synthetic new authorization and verify its assignment snapshot before deploying the clients.
 
 The Edge worker contract changes from `belt_claim_text` to `belt_claim_text_guarded`. Deploy migrations `0037`, `0038`, and `0039` before the updated conveyor function. Deploying the worker first would make claims fail because the RPC would not exist; it would fail closed (no belt text), but the conveyor would be unhealthy.
 
@@ -122,7 +129,7 @@ Rollback considerations:
 1. First return the conveyor worker to `belt_claim_text`.
 2. Resolve or explicitly resume every row with `human_takeover_at is not null`; do not silently discard uncertain call state.
 3. If rolling back `0038`, resolve every exact-date task/draft first. Restoring the retired four-day-early text would contradict the current operator manual, so prefer a forward repair or a call-only cadence.
-4. If rolling back `0039`, keep stale-key responses fail-closed; do not restore the historical `{ok:true, paused:false}` behavior. Reconcile any currently paused row before removing its assignment snapshot.
+4. If rolling back `0039`, keep stale-key responses fail-closed; do not restore the historical `{ok:true, paused:false}` behavior. Reconcile any currently paused post-upgrade row before removing its assignment snapshot. A failed preflight needs no rollback because it occurs before mutation; resolve the legacy pauses and retry the same migration.
 5. Remove the `0037` view, RPCs, and triggers if rollback is still required.
 6. The additive nullable columns may safely remain. Dropping them is optional and should happen only after step 2.
 
@@ -146,8 +153,8 @@ Rollback considerations:
 
 All tests used synthetic/PGlite data and mocked providers. No live call, text, email, database write, credential read, or schedule change occurred.
 
-- `npm test -- --run` - **313 passed**, 38 test files.
-  - Includes baseline matrix, no-early-contact exact date, morning/afternoon same-day policy, configured call hour, CST/CDT boundaries, legacy queued-text migration, reschedule replacement, duplicate/concurrent takeover, valid active retry, stale retry after STOP/DNC/suppression/resume/outcome/reassignment/destination change, in-flight-text refusal, missed-call sweep, weekend ownership, Thalia -> Adil -> Colin simulated shift, appointment unknowns, and per-field provenance.
+- `npm test -- --run` - **315 passed**, 39 test files.
+  - Includes baseline matrix, no-early-contact exact date, morning/afternoon same-day policy, configured call hour, CST/CDT boundaries, legacy queued-text migration, reschedule replacement, duplicate/concurrent takeover, valid active retry, stale retry after STOP/DNC/suppression/resume/outcome/reassignment/destination change, a legacy-pause/reassignment upgrade rejection before mutation, a zero-pause successful upgrade, in-flight-text refusal, missed-call sweep, weekend ownership, Thalia -> Adil -> Colin simulated shift, appointment unknowns, and per-field provenance.
   - jsdom prints its known `HTMLCanvasElement.getContext` warning in the signing-page test; the test passes.
 - `npx tsc -b --force` — **passed**.
 - `npm run build` — **passed**; Vite emitted only the existing large-chunk advisory.
@@ -178,7 +185,7 @@ That needs the exact `pm-phone` repository/deployment mapping and secrets/config
 1. Snapshot current migration version and counts for live belts, open belt tasks, `cards_no_stop`, and suppressed phones.
 2. Apply `0037` in a non-production/staging database; confirm it performs no backfill writes to existing belt/task rows.
 3. Before `0038`, confirm there are no `sending` belt drafts on `not_now_dated`; reconcile any uncertain provider outcome. Apply `0038`, then verify every active dated card has no queued pre-date draft and exactly one correct call stop on or after its named date.
-4. Apply `0039`; confirm only currently paused rows receive an assignment snapshot and future date-only saves resolve to the configured local call hour. Deploy the updated conveyor function after all three migrations and run it dry; verify heartbeat/canary and zero RPC errors.
+4. Confirm there are zero active legacy call pauses, then apply `0039`; a nonzero count must abort before mutation. Confirm inactive existing rows have no invented assignment snapshot and future date-only saves resolve to the configured local call hour. Deploy the updated conveyor function after all three migrations and run it dry; verify heartbeat/canary and zero RPC errors.
 5. Use a synthetic lead/test phone: tap browser Call twice concurrently; confirm one `human_call_started` event and no text claim.
 6. Repeat with "Calling on personal phone"; confirm the same pause and a Conversation recovery row. After resume, STOP, reassignment, suppression, or destination change, retry the old key and confirm the client does not dial.
 7. With an approval draft waiting, pause and choose "call did not happen"; confirm the same draft status and belt stop return.
