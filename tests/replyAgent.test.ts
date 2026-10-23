@@ -205,8 +205,9 @@ describe('work no text can do', () => {
     expect((await drafts())[0]).toMatchObject({ kind: 'candidate', status: 'awaiting_approval' })   // the text reply still waits for Colin
     await run(tw)                                                                                    // the same text again: no second task
     expect((await db.query(`select count(*)::int as n from public.tasks where source = 'reply'`)).rows).toEqual([{ n: 1 }])   // the belt's own stop aside (0031)
-    const first = await db.query<{ r: unknown[] }>(`select public.notify_claim_tasks(now()) as r`)
-    const second = await db.query<{ r: unknown[] }>(`select public.notify_claim_tasks(now()) as r`)
+    // Keep this deterministic: whether the developer runs the suite during Central quiet hours is irrelevant.
+    const first = await db.query<{ r: unknown[] }>(`select public.notify_claim_tasks('2026-10-22T17:00:00Z') as r`)
+    const second = await db.query<{ r: unknown[] }>(`select public.notify_claim_tasks('2026-10-22T17:00:00Z') as r`)
     expect([first.rows[0].r.length, second.rows[0].r.length]).toEqual([1, 0])
   })
 
