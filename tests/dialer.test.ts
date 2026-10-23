@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { callLabel, callerDigits, fmtDuration, inboundLabel, pickInbound } from '../src/lib/dialer'
+import { humanCallAuthorized } from '../src/lib/callAttempt'
 import type { PhoneMatch } from '../src/lib/queries'
 
 const match = (x: Partial<PhoneMatch>): PhoneMatch => ({
@@ -8,6 +9,12 @@ const match = (x: Partial<PhoneMatch>): PhoneMatch => ({
 })
 
 describe('dialer helpers', () => {
+  it('requires an active database pause before any client starts a call', () => {
+    expect(humanCallAuthorized({ ok: true, paused: true })).toBe(true)
+    expect(humanCallAuthorized({ ok: true, duplicate: true, paused: false })).toBe(false)
+    expect(humanCallAuthorized({ ok: true })).toBe(false)
+    expect(humanCallAuthorized(null)).toBe(false)
+  })
   it('names the call after the person and the property', () => {
     expect(callLabel('Laurie', '3424 N Main St')).toBe('Laurie - 3424 N Main St')
     expect(callLabel(null, ' 1 Sample St ')).toBe('1 Sample St')

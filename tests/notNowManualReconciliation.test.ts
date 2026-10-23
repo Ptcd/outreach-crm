@@ -8,6 +8,7 @@ const MIGRATIONS_DIR = path.resolve(__dirname, '../supabase/migrations')
 const files = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort()
 const BEFORE = files.filter((f) => f < '0038_').map((f) => readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8')).join('\n')
 const ALIGN = readFileSync(path.join(MIGRATIONS_DIR, '0038_not_now_manual_alignment.sql'), 'utf8')
+const HARDEN = readFileSync(path.join(MIGRATIONS_DIR, '0039_seller_shift_review_hardening.sql'), 'utf8')
 const LEAD = '00000000-0000-0000-0000-0000000000e1'
 let db: PGlite
 
@@ -62,6 +63,8 @@ describe('operator-manual exact-date reconciliation', () => {
         from public.tasks where lead_id = $1 and source = 'belt' and done_at is null`, [LEAD])).rows
     expect(tasks).toEqual([{ due: '2026-11-02T18:00:00Z', kind: 'call', owner: 'colin',
       source_key: `belt:${LEAD}:not_now_dated:1:1`, title: 'Not now, with a date: stop 1 of 2' }])
+
+    await db.exec(HARDEN)
   })
 
   it('reschedules the same stop, cancels the old due time, and keeps the exact CST date boundary', async () => {
@@ -71,11 +74,11 @@ describe('operator-manual exact-date reconciliation', () => {
       select to_char(due_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') due, source_key
         from public.tasks where lead_id = $1 and source = 'belt' and done_at is null`, [LEAD])).rows
     expect(tasks).toHaveLength(1)
-    expect(tasks[0].due).toBe('2026-11-09T18:00:00Z')
+    expect(tasks[0].due).toBe('2026-11-09T16:00:00Z')
     expect(await one<{ named: string; stop: string }>(`
       select to_char(named_date at time zone 'America/Chicago', 'YYYY-MM-DD HH24:MI') named,
         to_char(next_stop_at at time zone 'America/Chicago', 'YYYY-MM-DD HH24:MI') stop
         from public.leads where id = $1`, [LEAD]))
-      .toEqual({ named: '2026-11-09 12:00', stop: '2026-11-09 12:00' })
+      .toEqual({ named: '2026-11-09 10:00', stop: '2026-11-09 10:00' })
   })
 })

@@ -2,7 +2,7 @@
 // up, and never shown for a number the card flags (bad, do-not-contact, STOP, DNC list).
 import { Button } from '@/components/ui/button'
 import { callLabel, useDialer } from '@/lib/dialer'
-import { callAttemptKey } from '@/lib/callAttempt'
+import { callAttemptKey, humanCallAuthorized } from '@/lib/callAttempt'
 import { api } from '@/lib/queries'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -52,9 +52,9 @@ export function PersonalCallButton(props: {
   const begin = async () => {
     setBusy(true); setMessage(null)
     const r = await api.beginHumanCall(props.leadId, props.to, 'personal', callAttemptKey())
-    const d = r.data as { ok?: boolean; reason?: string } | null
+    const d = r.data as { ok?: boolean; paused?: boolean; reason?: string } | null
     setBusy(false)
-    if (r.error || !d?.ok) { setMessage(r.error?.message ?? d?.reason ?? 'Call not paused'); return }
+    if (r.error || !humanCallAuthorized(d)) { setMessage(r.error?.message ?? d?.reason ?? 'Call not paused'); return }
     setMessage('Automated follow-ups paused. Log the call outcome when you finish.')
     await refresh()
   }

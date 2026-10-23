@@ -40,7 +40,8 @@ describe('Log this call: Not now', () => {
     await waitFor(() => expect(logCall).toHaveBeenCalled())
     const [id, phone, outcome, note, until] = logCall.mock.calls[0] as unknown[]
     expect([id, phone, outcome, note]).toEqual(['L1', '4145550101', 'not_now', null])
-    expect(String(until)).toMatch(/^2026-11-05T/)
+    // Noon Central is only an unambiguous date carrier. The database resolves the configured call hour.
+    expect(until).toBe('2026-11-05T18:00:00.000Z')
     // other outcomes carry no date
     fireEvent.click(screen.getByRole('button', { name: 'No answer' }))
     fireEvent.click(screen.getByRole('button', { name: 'Save the call' }))

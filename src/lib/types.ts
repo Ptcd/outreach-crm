@@ -75,6 +75,7 @@ export interface Lead {
   human_takeover_by?: string | null
   human_takeover_phone?: string | null
   human_takeover_key?: string | null
+  human_takeover_assigned_to?: Person | null
 }
 
 /** One move of a card (0029 belt_events). */

@@ -17,7 +17,7 @@ import { supabase } from './supabaseClient'
 import { fmtPhone } from './format'
 import { useAuth } from '@/providers/AuthProvider'
 import type { PhoneMatch } from './queries'
-import { callAttemptKey } from './callAttempt'
+import { callAttemptKey, humanCallAuthorized } from './callAttempt'
 
 // The seller line the call shows (the pool's main texting number). Any number in the seller pool works;
 // pm-phone refuses one that is not ours.
@@ -183,8 +183,8 @@ export function DialerProvider({ children }: { children: ReactNode }) {
       const gate = await supabase.rpc('begin_human_call', {
         p_lead_id: leadId, p_phone: to, p_source: 'app', p_key: takeoverKey,
       })
-      const allowed = gate.data as { ok?: boolean; reason?: string } | null
-      if (gate.error || !allowed?.ok) throw new Error(gate.error?.message ?? allowed?.reason ?? 'Call not allowed')
+      const allowed = gate.data as { ok?: boolean; paused?: boolean; reason?: string } | null
+      if (gate.error || !humanCallAuthorized(allowed)) throw new Error(gate.error?.message ?? allowed?.reason ?? 'Call authorization is not active')
       void contactId
       const call = await dev.connect({ params: { To: to, line: CALLER_ID } })
       callRef.current = call

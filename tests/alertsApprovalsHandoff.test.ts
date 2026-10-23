@@ -133,17 +133,19 @@ describe('logging a dial', () => {
     expect(await as(THALIA, () => rpc('log_call', { p_lead_id: LEAD, p_phone: null, p_outcome: 'busy', p_note: null }))).toMatchObject({ ok: false })
   })
 
-  it('not now with the date they gave: the card waits for that date, never before it (migration 0035)', async () => {
+  it('not now with the date they gave: the card waits for that local day and configured call hour', async () => {
     const when = new Date(Date.now() + 14 * 86_400_000).toISOString()
     const r = await as(THALIA, () => rpc('log_call', { p_lead_id: LEAD, p_phone: '4145550177', p_outcome: 'not_now', p_note: 'after the lease ends', p_when: when }))
     expect(r).toMatchObject({ ok: true, outcome: 'not_now' })
     const l = await one<{ stage: string; named_date: string; next_action_at: string; belt: string; next_stop_at: string }>(
       `select stage::text, named_date, next_action_at, belt, next_stop_at from public.leads where id = '${LEAD}'`)
     expect(l.stage).toBe('follow_up')
-    expect(new Date(l.named_date).toISOString()).toBe(when)
-    expect(new Date(l.next_action_at).toISOString()).toBe(when)
+    const expected = await one<{ at: string }>(
+      `select public.not_now_followup_at(($1::timestamptz at time zone public.belt_tz('WI'))::date, 'WI')::text at`, [when])
+    expect(new Date(l.named_date).toISOString()).toBe(new Date(expected.at).toISOString())
+    expect(new Date(l.next_action_at).toISOString()).toBe(new Date(expected.at).toISOString())
     expect(l.belt).toBe('not_now_dated')
-    expect(new Date(l.next_stop_at).getTime()).toBeLessThanOrEqual(new Date(when).getTime())   // the permission text runs a few days before, never after
+    expect(new Date(l.next_stop_at).toISOString()).toBe(new Date(expected.at).toISOString())
     expect(await one<{ body: string }>(`select body from public.messages where channel = 'call'`)).toMatchObject({ body: expect.stringMatching(/Not now until \w{3} \d{2}/) })
     // a date in the past is refused
     expect(await as(THALIA, () => rpc('log_call', { p_lead_id: LEAD, p_phone: null, p_outcome: 'not_now', p_note: null, p_when: '2026-01-01T12:00:00Z' }))).toMatchObject({ ok: false })

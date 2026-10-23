@@ -56,7 +56,7 @@ describe('seller-to-appointment conveyor baseline', () => {
         to_char(next_stop_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') stop
       from public.leads where id = $1`, [LEAD])
     expect(lead.belt).toBe('not_now_dated')
-    expect(lead.named).toBe('2026-11-02T18:00:00Z')
+    expect(lead.named).toBe('2026-11-02T16:00:00Z')
     expect(new Date(lead.stop).getTime()).toBeGreaterThanOrEqual(new Date(lead.named).getTime())
   })
 

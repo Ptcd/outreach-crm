@@ -17,16 +17,27 @@ describe('booked-visit appointment packet', () => {
       price: fact({ number: '185000' }),
       decision_makers: fact({ choices: ['spouse'], text: 'Jane and Pat' }),
     } as CallFacts
-    const gate = { decision: 'walk', total: 10, hard_stops: [] } as GateScore
-    const packet = buildAppointmentPacket(lead, callFacts, { condition: 'roof is old', timeline: 'before winter' }, gate)
+    const gate = { decision: 'walk', total: 10, hard_stops: [], at: '2026-10-23T12:30:00Z', decided_by_name: 'Colin' } as GateScore
+    const packet = buildAppointmentPacket(lead, callFacts, {
+      condition: { value: 'roof is old', at: '2026-10-22T16:00:00Z', by: 'seller reply' },
+      timeline: 'before winter',
+    }, gate)
     expect(packet.appointment).toContain('Monday, November 2, 2026')
     expect(packet.rows.find((r) => r.id === 'property')?.value).toBe('100 N MAIN ST, Milwaukee, 53202')
     expect(packet.rows.find((r) => r.id === 'motivation')?.value).toContain('moving near family')
     expect(packet.rows.find((r) => r.id === 'condition')?.value).toBe('roof is old')
     expect(packet.rows.find((r) => r.id === 'asking_price')?.value).toBe('$185000')
+    expect(packet.rows.find((r) => r.id === 'motivation')?.provenance).toEqual({
+      source: 'Call script', recordedAt: '2026-10-23T12:00:00Z', recordedBy: 'Thalia',
+    })
+    expect(packet.rows.find((r) => r.id === 'condition')?.provenance).toEqual({
+      source: 'Seller text reply', recordedAt: '2026-10-22T16:00:00Z', recordedBy: 'seller reply',
+    })
+    expect(packet.rows.find((r) => r.id === 'property')?.provenance).toEqual({ source: 'WPIE lead record', recordedAt: null, recordedBy: null })
     expect(packet.unresolved).toEqual(expect.arrayContaining(['Who is speaking', 'Occupancy / access']))
     expect(packet.rows.filter((r) => !r.known).every((r) => r.value === 'Unknown — ask and record')).toBe(true)
     expect(packet.gate).toBe('walk (10/12)')
+    expect(packet.gateProvenance).toEqual({ source: 'Booking gate score', recordedAt: '2026-10-23T12:30:00Z', recordedBy: 'Colin' })
   })
 
   it('does not invent a price, condition, timing, signers, or visit time', () => {
@@ -34,6 +45,7 @@ describe('booked-visit appointment packet', () => {
     expect(packet.appointment).toBe('Unknown — confirm the visit time')
     for (const id of ['condition', 'asking_price', 'timing', 'decision_makers']) {
       expect(packet.rows.find((r) => r.id === id)).toMatchObject({ known: false, value: 'Unknown — ask and record' })
+      expect(packet.rows.find((r) => r.id === id)?.provenance.source).toBe('Not recorded')
     }
     expect(packet.gate).toBe('Not scored')
   })

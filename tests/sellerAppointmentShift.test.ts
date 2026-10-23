@@ -109,7 +109,9 @@ describe('human call takeover', () => {
       select human_takeover_at is not null paused, belt, next_stop_who who from public.leads where id = $1`, [LEAD])
     expect(state).toMatchObject({ paused: false, belt: 'yes_unbooked', who: 'auto_text' })
     expect(await one<{ n: number }>(`select count(*)::int n from public.tasks where lead_id = $1 and done_at is null`, [LEAD])).toEqual({ n: 0 })
-    expect(await begin('personal', 'personal_outcome_001')).toMatchObject({ ok: true, duplicate: true, paused: false })
+    expect(await begin('personal', 'personal_outcome_001')).toMatchObject({
+      ok: false, duplicate: true, paused: false, reason: 'that call authorization is no longer active',
+    })
     expect(await one<{ paused: boolean }>(`select human_takeover_at is not null paused from public.leads where id = $1`, [LEAD])).toEqual({ paused: false })
   })
 
@@ -135,6 +137,39 @@ describe('human call takeover', () => {
     expect(await one<{ belt: string; paused: boolean }>(`
       select belt, human_takeover_at is not null paused from public.leads where id = $1`, [LEAD]))
       .toEqual({ belt: 'dnc', paused: false })
+    expect(await begin('personal', 'stop_during_001')).toMatchObject({
+      ok: false, paused: false, reason: 'this card is closed or do-not-contact',
+    })
+  })
+
+  it('never reauthorizes an old key after resume or an active key after suppression changes', async () => {
+    await begin('app', 'resume_retry_001')
+    await as(THALIA, () => db.query(`select public.resume_human_call($1, 'resume_retry_001', $2::timestamptz)`, [LEAD, NOW]))
+    expect(await begin('app', 'resume_retry_001')).toMatchObject({
+      ok: false, duplicate: true, paused: false, reason: 'that call authorization is no longer active',
+    })
+
+    await begin('app', 'dnc_change_002')
+    await db.exec(`insert into public.suppressed_phones (phone10, reason, source) values ('4145550177', 'vendor_dnc', 'test')`)
+    expect(await begin('app', 'dnc_change_002')).toMatchObject({ ok: false, paused: true, reason: 'suppressed: vendor_dnc' })
+  })
+
+  it('revalidates caller ownership and the exact destination on an active retry', async () => {
+    await begin('personal', 'authority_retry_001')
+    await db.query(`update public.leads set assigned_to = 'adil' where id = $1`, [LEAD])
+    expect(await begin('personal', 'authority_retry_001')).toMatchObject({
+      ok: false, paused: true, reason: 'the card assignment changed after authorization',
+    })
+
+    await db.query(`update public.leads set assigned_to = 'thalia' where id = $1`, [LEAD])
+    await db.query(`insert into public.contacts (lead_id, kind, value, value_normalized, line_type)
+      values ($1, 'phone', '4145550188', '4145550188', 'mobile')`, [LEAD])
+    const changed = await as(THALIA, async () => (await one<{ r: Record<string, unknown> }>(
+      `select public.begin_human_call($1, '4145550188', 'personal', 'authority_retry_001', $2::timestamptz) r`, [LEAD, NOW])).r)
+    expect(changed).toMatchObject({ ok: false, paused: true, reason: 'the active call has a different destination' })
+    expect(await begin('personal', 'authority_retry_001', '4145550199')).toMatchObject({
+      ok: false, paused: true, reason: 'that phone is not on this card',
+    })
   })
 
   it('does not let the missed-stop sweep move a paused call', async () => {
@@ -196,11 +231,14 @@ describe('simulated Thalia → Adil → Colin shift', () => {
       '2026-11-05T18:00:00Z'::timestamptz)`, [LEAD]))
     expect(await one<{ belt: string; named: string }>(`
       select belt, to_char(named_date at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') named from public.leads where id = $1`, [LEAD]))
-      .toEqual({ belt: 'not_now_dated', named: '2026-11-05T18:00:00Z' })
+      .toEqual({ belt: 'not_now_dated', named: '2026-11-05T16:00:00Z' })
 
     const started = await as(ADIL, async () => (await one<{ r: Record<string, unknown> }>(
       `select public.begin_human_call($1, '4145550177', 'personal', 'adil_weekend_001', '2026-10-25T16:00:00Z') r`, [LEAD])).r)
     expect(started).toMatchObject({ ok: true, paused: true })
+    const retry = await as(ADIL, async () => (await one<{ r: Record<string, unknown> }>(
+      `select public.begin_human_call($1, '4145550177', 'personal', 'adil_weekend_001', '2026-10-25T16:00:00Z') r`, [LEAD])).r)
+    expect(retry).toMatchObject({ ok: true, duplicate: true, paused: true })
     expect(await one<{ by: string }>(`select human_takeover_by by from public.leads where id = $1`, [LEAD])).toEqual({ by: 'Adil' })
     await as(ADIL, () => db.query(`select public.log_call($1, '4145550177', 'interested', 'ready to schedule', null)`, [LEAD]))
     expect(await one<{ paused: boolean }>(`select human_takeover_at is not null paused from public.leads where id = $1`, [LEAD])).toEqual({ paused: false })
@@ -212,5 +250,27 @@ describe('simulated Thalia → Adil → Colin shift', () => {
       select l.belt, l.stage::text, l.assigned_to::text owner,
         (select count(*)::int from public.tasks t where t.lead_id = l.id and t.done_at is null and t.kind = 'visit') tasks
       from public.leads l where l.id = $1`, [LEAD])).toEqual({ belt: 'visit_booked', stage: 'walkthrough_booked', owner: 'colin', tasks: 1 })
+  })
+})
+
+describe('date-only follow-up policy', () => {
+  const followAt = async (day: string, now: string, state = 'WI') => (await one<{ at: string }>(`
+    select to_char(public.not_now_followup_at($1::date, $2, $3::timestamptz) at time zone 'UTC',
+      'YYYY-MM-DD"T"HH24:MI:SS"Z"') at`, [day, state, now])).at
+
+  it('uses the configured 10:00 local call hour for the next day across CST and CDT', async () => {
+    expect(await followAt('2026-11-03', '2026-11-02T20:00:00Z')).toBe('2026-11-03T16:00:00Z')
+    expect(await followAt('2026-03-09', '2026-03-08T20:00:00Z')).toBe('2026-03-09T15:00:00Z')
+  })
+
+  it('accepts today consistently: 10:00 before the call hour, then the next legal minute', async () => {
+    expect(await followAt('2026-11-02', '2026-11-02T14:00:00Z')).toBe('2026-11-02T16:00:00Z')
+    expect(await followAt('2026-11-02', '2026-11-02T20:00:00Z')).toBe('2026-11-02T20:01:00Z')
+  })
+
+  it('never schedules before a Sunday seller date and rejects an already-past local date', async () => {
+    expect(await followAt('2026-11-01', '2026-11-01T13:00:00Z')).toBe('2026-11-02T16:00:00Z')
+    const past = await one<{ at: string | null }>(`select public.not_now_followup_at('2026-11-01', 'WI', '2026-11-02T14:00:00Z')::text at`)
+    expect(past.at).toBeNull()
   })
 })
