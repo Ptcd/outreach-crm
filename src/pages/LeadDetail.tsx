@@ -16,6 +16,7 @@ import { BeltStrip } from '@/components/BeltStrip'
 import { CallButton, PersonalCallButton } from '@/components/CallButton'
 import { AppointmentPacket } from '@/components/AppointmentPacket'
 import { api, useDeals, useLead, useWrite } from '@/lib/queries'
+import { useDialer } from '@/lib/dialer'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
 import { DEAL_STATUS_LABEL, MILESTONES, PEOPLE, SELLER_FACTS, STAGES, STAGE_LABEL, TASK_KINDS, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
@@ -27,6 +28,7 @@ export default function LeadDetail() {
   const q = useLead(id)
   const isOwner = useColinHere()   // Colin's controls: on the shared login, the phone set to Colin
   const [params] = useSearchParams()
+  const dialer = useDialer()
 
   if (q.isLoading) return <Empty>Loading...</Empty>
   if (q.error) return <ErrorNote error={q.error} />
@@ -34,6 +36,8 @@ export default function LeadDetail() {
   const { lead, contacts, messages, tasks, gates, milestones } = q.data
   const facts = q.data.facts ?? {}
   const replyTasks = tasks.filter((t) => t.source === 'reply' && !t.done_at)
+  const liveHere = !!dialer.active && dialer.active.leadId === lead.id
+    && ['connecting', 'ringing', 'in_call'].includes(dialer.active.status)
   const email = contacts.find((c) => c.kind === 'email' && !c.dnc_app)?.value ?? null
   const callFacts = (lead.call_facts ?? {}) as CallFacts
   const verdict = bookingVerdict(callFacts, facts, lead)
@@ -57,8 +61,17 @@ export default function LeadDetail() {
       <BeltStrip lead={lead} />
       {lead.human_takeover_at && (
         <div className="rounded-md border-2 border-amber-400 bg-amber-50 p-3 text-sm">
-          <p className="font-semibold">Human call in progress — automated follow-ups are paused</p>
-          <p>Started by {lead.human_takeover_by ?? 'the team'} at {fmtDateTime(lead.human_takeover_at)}. Log the call outcome below when it ends.</p>
+          {liveHere ? (
+            <>
+              <p className="font-semibold">Call in progress — automated follow-ups are paused</p>
+              <p>Started by {lead.human_takeover_by ?? 'the team'} at {fmtDateTime(lead.human_takeover_at)}. Log the call outcome below when it ends.</p>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold">A call was started and has no outcome yet — automated follow-ups are paused</p>
+              <p>Started by {lead.human_takeover_by ?? 'the team'} at {fmtDateTime(lead.human_takeover_at)}. If it rang, log the outcome below. If it never rang, tap &quot;Call did not happen — resume&quot; by the number.</p>
+            </>
+          )}
         </div>
       )}
       <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}

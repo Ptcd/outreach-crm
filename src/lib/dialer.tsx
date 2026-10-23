@@ -14,6 +14,7 @@
 // owner and property; Accept runs the call in the same in-call bar, opens the lead card, and marks the hot
 // alert as called. Only an app that is open on screen rings; otherwise the cell rings as before.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabaseClient'
 import { fmtPhone } from './format'
 import { useAuth } from '@/providers/AuthProvider'
@@ -91,6 +92,7 @@ export function inboundLabel(from: string, matches: PhoneMatch[] | null | undefi
 
 export function DialerProvider({ children }: { children: ReactNode }) {
   const { member } = useAuth()
+  const qc = useQueryClient()
   const [active, setActive] = useState<ActiveCall | null>(null)
   const [incoming, setIncoming] = useState<IncomingCall | null>(null)
   const [ready, setReady] = useState(false)
@@ -172,6 +174,21 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     return () => { alive = false; window.removeEventListener('online', kick); document.removeEventListener('visibilitychange', kick) }
   }, [supported, member, device])
 
+  // A call that ended or failed before pm-phone claimed it never rang anyone: un-pause its card at once.
+  // The database decides (migration 0043); a call that was placed stays paused for its outcome.
+  const releaseIfUnclaimed = useCallback((leadId: string, key: string) => {
+    void Promise.resolve(supabase.rpc('release_unclaimed_human_call', { p_lead_id: leadId, p_key: key }))
+      .then(() => qc.invalidateQueries({ queryKey: ['lead', leadId] }))
+      .catch(() => undefined)   // the minute sweep releases it anyway
+  }, [qc])
+
+  // Closing or leaving the page hangs up: no call is left running in a tab nobody is looking at.
+  useEffect(() => {
+    const hang = () => { callRef.current?.disconnect() }
+    window.addEventListener('pagehide', hang)
+    return () => window.removeEventListener('pagehide', hang)
+  }, [])
+
   const start = useCallback<DialerApi['start']>(async ({ to, label, leadId, contactId }) => {
     if (callRef.current || incomingRef.current) return
     answeredRef.current = false
@@ -180,6 +197,10 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     try {
       const dev = await device()
       if (!leadId) throw new Error('Open the property card before calling this number.')
+      // The microphone first, before anything is authorized: a permission prompt nobody answers, or a
+      // refusal, never leaves the card paused.
+      const mic = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mic.getTracks().forEach((t) => t.stop())
       takeoverKey = callAttemptKey()
       const gate = await supabase.rpc('begin_human_call', {
         p_lead_id: leadId, p_phone: to, p_source: 'app', p_key: takeoverKey,
@@ -194,17 +215,20 @@ export function DialerProvider({ children }: { children: ReactNode }) {
         answeredRef.current = true
         setActive((a) => (a ? { ...a, status: 'in_call', startedAt: Date.now() } : a))
       })
-      call.on('disconnect', () => finish('ended', null))
-      call.on('cancel', () => finish('ended', null))
-      call.on('reject', () => finish('ended', 'They declined the call.'))
-      call.on('error', (e: { message?: string }) => finish('error', e?.message ?? 'Call failed'))
+      const key = takeoverKey
+      const ended = () => releaseIfUnclaimed(leadId, key)
+      call.on('disconnect', () => { finish('ended', null); ended() })
+      call.on('cancel', () => { finish('ended', null); ended() })
+      call.on('reject', () => { finish('ended', 'They declined the call.'); ended() })
+      call.on('error', (e: { message?: string }) => { finish('error', e?.message ?? 'Call failed'); ended() })
     } catch (e) {
-      // Once authorization succeeds, an SDK failure may still be an uncertain provider outcome. Leave
-      // the belt paused; the card exposes an explicit "call did not happen — resume" action.
+      // Authorized but the call failed: released if pm-phone never claimed it (nobody rang); a claimed
+      // call stays paused for its outcome, with "call did not happen — resume" on the card.
+      if (takeoverKey && leadId) releaseIfUnclaimed(leadId, takeoverKey)
       const msg = e instanceof Error ? e.message : String(e)
       finish('error', /Permission|NotAllowed|microphone/i.test(msg) ? 'Allow the microphone to call from here.' : msg)
     }
-  }, [device, finish])
+  }, [device, finish, releaseIfUnclaimed])
 
   // Accept the ringing call: it runs in the in-call bar; the matched lead (once the lookup is back) is
   // marked called and handed to the caller so the bar can open its card.
