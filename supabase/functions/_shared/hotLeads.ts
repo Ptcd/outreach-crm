@@ -18,14 +18,25 @@ import type { PushOutcome, PushSubscriptionKeys } from './webpush.ts'
 //   (b) the text itself talks selling / interest / price (brain.py _INTEREST_WORDS_RE), at any point;
 //   (c) they ask what we'd pay or name a number (price_first and the like: warm).
 // A bare yes to the question-only opener is NOT hot: it only says the place is theirs.
+//   (d) another property they would sell, or trouble they want out of (other_property, foreclosure);
+//   (e) they ask for a call ("call me after 5", "can we talk on the phone"), even with a "not today".
+// "Let me think about it" is a not now (the reply library, tests/fixtures/reply_library.jsonl, 2026-10-23).
 const COLD_INTENTS = new Set(['opt_out', 'hostile', 'wrong_number', 'sold', 'not_interested', 'my_home', 'listed', 'signed_other',
-  'tenant', 'manager', 'middleman', 'burned', 'bot_question', 'annoyed', 'not_now', 'joke_number'])
+  'tenant', 'manager', 'middleman', 'burned', 'bot_question', 'annoyed', 'not_now', 'joke_number', 'think_it_over'])
 const PRICE_INTENTS = new Set(['price_first', 'number_only', 'worth', 'terms', 'wants_call'])
+const HOT_INTENTS = new Set(['other_property'])
 const INTEREST_WORDS = new RegExp(B.INTEREST_WORDS_RE.source, B.INTEREST_WORDS_RE.flags)
 const AFFIRM = new RegExp(B.AFFIRM_RE.source, B.AFFIRM_RE.flags)
 // "...I'm not looking to sell", "no intention of selling", "not ready to think about selling, but I'll keep
-// you in mind" (3325 Linden, 2026-10-23): selling words that say no, or not now.
-const NOT_SELLING = /\bnot\s+(?:\w+\s+){0,5}sell|\bno\s+(?:interest|intention|plans?)\b|\bnot\s+interested\b|\bnot\s+(?:quite\s+|really\s+|yet\s+)?ready\b|\bkeep\s+you\s+in\s+mind\b/i
+// you in mind" (3325 Linden, 2026-10-23), "maybe, but not until the estate settles": selling words that say no, or not now.
+const NOT_SELLING = /\bnot\s+(?:\w+\s+){0,5}sell|\bno\s+(?:interest|intention|plans?)\b|\bnot\s+interested\b|\bnot\s+(?:quite\s+|really\s+|yet\s+)?ready\b|\bkeep\s+you\s+in\s+mind\b|\bnot\s+until\b|\bfor\s+the\s+right\s+(?:number|price)\b|\bonce\s+(?:probate|the\s+estate|\w+)\s+(?:closes|settles|is\s+(?:done|over|final))/i
+// A call request: hot whatever else the line says, unless it closes the thread.
+const CALL_ME = /(?<!\b(?:not|don'?t|dont|never|no)\s)\b(?:call|ring|buzz|phone)\s+(?:me|us)\b|\bgive\s+me\s+a\s+(?:call|ring|buzz)|\b(?:can|could)\s+(?:you|u|we|i)\s+(?:call|talk|speak)\b|\btalk\s+on\s+the\s+phone|\b(?:speak|talk)\s+by\s+(?:tele)?phone|\btry\s+me\s+on\s+the\s+phone|\bcall\s+(?:tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|whenever|at|after|between|anytime)\b|\bllamame\b|\bavailable\s+to\s+talk|\bcall\s+(?:me\s+)?back\b|\bcall\s+(?:him|her)\s+at\b|\byou\s+may\s+call\b|\bcan\s+talk\s+on\s+the\s+phone/i
+const CLOSES_THREAD = new Set(['opt_out', 'hostile', 'wrong_number', 'sold', 'not_interested', 'my_home', 'listed', 'signed_other',
+  'tenant', 'manager', 'middleman', 'annoyed', 'joke_number'])
+const DOUBLE_NEGATIVE_YES = /\bwouldn'?t\s+say\s+no\b|\bcan'?t\s+say\s+(?:i'?m\s+|im\s+)?not\s+interested|\bnot\s+not\s+interested|\bnot\s+against\s+it\b|\bi'?m\s+not\s+opposed/i
+// After the pitch question, a soft yes is a yes: "I'm listening", "I could be persuaded", "I wouldn't say no".
+const SOFT_YES = /\b(?:i\s+(?:guess|suppose|think)\s+(?:i\s+)?(?:would|could|might)|i'?d\s+(?:listen|consider|think\s+about)|i'?m\s+(?:listening|curious|open|interested)|probably|persuaded|kinda|^\W*(?:kind|sort)\s+of|might\s+be|i\s+might|mayb|tal\s+vez|wouldn'?t\s+say\s+no|not\s+against|can'?t\s+say\s+i'?m\s+not|not\s+not|open\s+to|what'?s\s+next|what\s+do\s+i\s+need|how\s+(?:u|you)\s+do\s+it|process|thought\s+about\s+it|got\s+me\s+thinking|thinkin|been\s+thinking|cuentame)\b/i
 /** Our last text was the pitch question. */
 export const PITCH_ASKED = /would you ever consider selling/i
 
@@ -35,12 +46,18 @@ export const AI_NOT_NOW = new Set(['later', 'no'])
 
 export function isHotReply(x: { intent: string; text: string; removal: boolean; afterPitch?: boolean; aiInterest?: string | null }): boolean {
   const text = x.text ?? ''
-  if (x.removal || COLD_INTENTS.has(x.intent) || NOT_SELLING.test(text)) return false
+  if (x.removal) return false
+  // A price question or a call request stays hot, even beside a "not now"; anything softer is not when Claude read later or no.
+  if (!CLOSES_THREAD.has(x.intent) && CALL_ME.test(text)) return true
   if (PRICE_INTENTS.has(x.intent)) return true
-  // A price question or a call request stays hot; anything softer is not when Claude read later or no.
+  // Another property they would sell is hot beside "not selling that one"; so is "can't say I'm not interested".
+  if (HOT_INTENTS.has(x.intent)) return true
+  if (x.intent === 'interested' && DOUBLE_NEGATIVE_YES.test(text)) return true
+  if (COLD_INTENTS.has(x.intent) || NOT_SELLING.test(text)) return false
+  if (x.intent === 'foreclosure') return true
   if (AI_NOT_NOW.has(x.aiInterest ?? '')) return false
   if (INTEREST_WORDS.test(text)) return true
-  return !!x.afterPitch && (x.intent === 'interested' || AFFIRM.test(text))
+  return !!x.afterPitch && (x.intent === 'interested' || AFFIRM.test(text) || SOFT_YES.test(text))
 }
 
 /** A reply that ends the interest: the lead's open hot alerts stop (no repeat, not on the 7 PM list). */

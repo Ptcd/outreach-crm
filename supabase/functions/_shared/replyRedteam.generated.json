@@ -1,5 +1,5 @@
 {
- "generated": "tools/export_reply_prompt.py --app-dir, WPIE commit 28af68f, 2026-10-23",
+ "generated": "tools/export_reply_prompt.py --app-dir, WPIE commit 7f00623, 2026-10-23",
  "fixture": "tests/fixtures/reply_redteam.jsonl",
  "python_passed": 439,
  "rows": [
@@ -13728,7 +13728,7 @@
   },
   {
    "text": "Is this the city? Am I getting fined?",
-   "classify": "statement",
+   "classify": "who_is_this",
    "is_spanish": false,
    "is_carrier_keyword": false,
    "is_opt_out": false
@@ -14442,7 +14442,7 @@
   },
   {
    "text": "How did you know my mother died?",
-   "classify": "estate",
+   "classify": "who_is_this",
    "is_spanish": false,
    "is_carrier_keyword": false,
    "is_opt_out": false
@@ -14484,7 +14484,7 @@
   },
   {
    "text": "My father is in hospice, we'll need to sell soon",
-   "classify": "elderly",
+   "classify": "estate",
    "is_spanish": false,
    "is_carrier_keyword": false,
    "is_opt_out": false
@@ -14540,7 +14540,7 @@
   },
   {
    "text": "I am an old woman please call my son Mark 262-555-0177",
-   "classify": "elderly",
+   "classify": "relative",
    "is_spanish": false,
    "is_carrier_keyword": false,
    "is_opt_out": false
@@ -14736,7 +14736,7 @@
   },
   {
    "text": "This is Dale's wife. What's this about?",
-   "classify": "relative",
+   "classify": "who_is_this",
    "is_spanish": false,
    "is_carrier_keyword": false,
    "is_opt_out": false
@@ -14981,7 +14981,7 @@
   },
   {
    "text": "I haven't sold it yet, still deciding",
-   "classify": "statement",
+   "classify": "not_now",
    "is_spanish": false,
    "is_carrier_keyword": false,
    "is_opt_out": false
@@ -15212,7 +15212,7 @@
   },
   {
    "text": "Voicemail: Hello? Hello? ...I guess I'll try again later",
-   "classify": "statement",
+   "classify": "not_now",
    "is_spanish": false,
    "is_carrier_keyword": false,
    "is_opt_out": false
@@ -15583,7 +15583,7 @@
   },
   {
    "text": "nope sold it years ago",
-   "classify": "wrong_number",
+   "classify": "sold",
    "is_spanish": false,
    "is_carrier_keyword": false,
    "is_opt_out": false
@@ -15646,7 +15646,7 @@
   },
   {
    "text": "I'm 80, call my daughter instead",
-   "classify": "elderly",
+   "classify": "relative",
    "is_spanish": false,
    "is_carrier_keyword": false,
    "is_opt_out": false

@@ -101,7 +101,7 @@ describe('the reply agent, end to end with no real text', () => {
     const seen: Parameters<Drafter>[0][] = []
     const capture: Drafter = async (x) => { seen.push(x); return 'Thanks for getting back to me, John. Is the place on Logan still yours?' }
     const tw = new FakeTwilio()
-    tw.inbound = [text('SMt', '+12627770909', 'Test - what is this about?')]
+    tw.inbound = [text('SMt', '+12627770909', 'Test - possibly. What would you need from me?')]
     await runReplyAgent({ rpc, env: DRY, twilio: tw, drafter: capture, control: await control(), redteamRows: ROWS, now: () => NOON })
     expect(seen).toHaveLength(1)
     expect(seen[0]).toMatchObject({ ownerName: 'JOHN W PANKIEWICZ JR', propertyAddress: '2825 S LOGAN AV, Milwaukee' })
@@ -321,7 +321,7 @@ describe('hot replies', () => {
 
   it("Claude's 'later' beats a one-line yes: no hot alert, and the card goes to not now, not the call-now list", async () => {
     const tw = new FakeTwilio()
-    tw.inbound = [text('SMl', '+14145550177', "Yes it's still mine, we'll see. Have a great day")]
+    tw.inbound = [text('SMl', '+14145550177', 'Maybe. Have a great day')]
     const s = await runReplyAgent({ rpc, env: DRY, twilio: tw, control: await control(), redteamRows: ROWS, now: () => NOON,
       drafter: async () => ({ message: 'Got it, thanks for letting me know.', facts: { interest: 'later', still_owns: 'true' } }) })
     expect(s.hot).toBe(0)
@@ -330,7 +330,7 @@ describe('hot replies', () => {
     expect(d.intent).toBe('not_now')
     expect(d.note).toMatch(/Claude read: later/)
     const ev = (await db.query<{ to_belt: string | null }>(
-      `select to_belt from public.belt_events where event = 'inbound_text' and payload->>'said' like 'Yes it''s still mine%' order by at desc limit 1`)).rows
+      `select to_belt from public.belt_events where event = 'inbound_text' and payload->>'said' like 'Maybe. Have%' order by at desc limit 1`)).rows
     if (ev.length) expect(ev[0].to_belt).not.toBe('yes_unbooked')
   })
 

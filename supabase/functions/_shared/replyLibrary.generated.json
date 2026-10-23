@@ -1,0 +1,7857 @@
+{
+"generated": "tools/export_reply_prompt.py --app-dir, WPIE commit 7f00623, 2026-10-23",
+"fixture": "tests/fixtures/reply_library.jsonl",
+"rows": [
+{
+"id": "p1-001",
+"text": "Not ready yet but keep me in mind",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "not ready, keep in mind"
+},
+{
+"id": "p1-002",
+"text": "yes it's mine. not right now tho",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "starts yes, but not right now"
+},
+{
+"id": "p1-003",
+"text": "Maybe in a year or two. Not now.",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "maybe later, explicitly not now"
+},
+{
+"id": "p1-004",
+"text": "let me think about it",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "let me think about it"
+},
+{
+"id": "p1-005",
+"text": "Not at this point. Ask me again after the first of the year",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "asks to be contacted after New Year"
+},
+{
+"id": "p1-006",
+"text": "once the tenants lease is up in june i might look at it",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "condition: lease ends in June"
+},
+{
+"id": "p1-007",
+"text": "Yes but not right now, I'll keep you in mind",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "yes then not now, keep in mind"
+},
+{
+"id": "p1-008",
+"text": "we're waiting til after the holidays to decide anything",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "decision deferred until after holidays"
+},
+{
+"id": "p1-009",
+"text": "mayb someday. not yet",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "someday, not yet"
+},
+{
+"id": "p1-010",
+"text": "Check back with me in the spring",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "asks for spring follow-up"
+},
+{
+"id": "p1-011",
+"text": "I need to talk to my wife first, will let you know",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "needs spouse, will let you know"
+},
+{
+"id": "p1-012",
+"text": "Yes. Not in a position to sell currently but thank you for reaching out.",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "not in position currently, polite"
+},
+{
+"id": "p1-013",
+"text": "after my surgery in november ill know more",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "decision after surgery in November"
+},
+{
+"id": "p1-014",
+"text": "Possibly down the road. Right now we are in the middle of renovating the kitchen",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "possibly down the road, renovating"
+},
+{
+"id": "p1-015",
+"text": "give me till after tax season",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "wait until after tax season"
+},
+{
+"id": "p1-016",
+"text": "not now. maybe when my son graduates",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "condition: son graduates"
+},
+{
+"id": "p1-017",
+"text": "I'll reach out if I change my mind. Not ready.",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "not ready, will reach out if changes"
+},
+{
+"id": "p1-018",
+"text": "not at this time. you can try me again next summer",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "try again next summer"
+},
+{
+"id": "p1-019",
+"text": "not right now maybe in a few months ill let you know thanks",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "voice-to-text, few months, will let know"
+},
+{
+"id": "p1-020",
+"text": "Hold off until my tenant moves out in August",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "condition: tenant moves out August"
+},
+{
+"id": "p1-021",
+"text": "Thanks for the offer to chat. We're just not at that stage yet. Might be in a couple years.",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "not at that stage, maybe in years"
+},
+{
+"id": "p1-022",
+"text": "ask me in 6 months",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "ask again in six months"
+},
+{
+"id": "p1-023",
+"text": "Maybe, but not until the estate stuff settles down. I'll text you.",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "maybe after estate settles, will text",
+"known_miss": [
+"treat"
+]
+},
+{
+"id": "p1-024",
+"text": "yes sometime. not this year though",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "sometime, not this year"
+},
+{
+"id": "p1-025",
+"text": "Not at the moment. When the market comes back up I'll think about it.",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "waiting for the market, not now"
+},
+{
+"id": "p1-026",
+"text": "im not ready to make that decision yet",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "not ready to decide"
+},
+{
+"id": "p1-027",
+"text": "Keep my info and well see in the fall",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "revisit in the fall"
+},
+{
+"id": "p1-028",
+"text": "Ok maybe later. Busy with the kids right now, not thinking about that",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "maybe later, not thinking about it"
+},
+{
+"id": "p1-029",
+"text": "after the wedding in october we'll sit down and talk about it",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "after the October wedding"
+},
+{
+"id": "p1-030",
+"text": "Yes I own it and yes I'd consider it at some point, just not today",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "some point, just not today"
+},
+{
+"id": "p1-031",
+"text": "NOT RIGHT NOW BUT THANKS",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "all caps, not right now"
+},
+{
+"id": "p1-032",
+"text": "Perhaps when I retire. 3 yrs.",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "when I retire in three years"
+},
+{
+"id": "p1-033",
+"text": "Not sure yet, let me sleep on it and get back to you",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "sleep on it, get back"
+},
+{
+"id": "p1-034",
+"text": "once probate closes maybe",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "condition: probate closing",
+"known_miss": [
+"treat"
+]
+},
+{
+"id": "p1-035",
+"text": "Ill keep you in mind if anything changes",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "keep in mind if changes"
+},
+{
+"id": "p1-036",
+"text": "yeah the place is mine but I'm not looking to do anything till the roof is done",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "waiting until the roof is done",
+"known_miss": [
+"treat"
+]
+},
+{
+"id": "p1-037",
+"text": "Maybe next year. Contact me then.",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "maybe next year, contact then"
+},
+{
+"id": "p1-038",
+"text": "i dont know. not now. maybe",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "undecided, not now"
+},
+{
+"id": "p1-039",
+"text": "Need to wait until after my divorce is final",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "condition: divorce final"
+},
+{
+"id": "p1-040",
+"text": "Thank you Colin. I'm not ready yet but I appreciate you asking. If that changes I'll reach out.",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "polite, not ready, will reach out"
+},
+{
+"id": "p1-041",
+"text": "Haha ask me in the new year",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "ask in the new year"
+},
+{
+"id": "p1-042",
+"text": "mebbe but ill have to run it by my brother. give us a few weeks",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "run by brother, few weeks"
+},
+{
+"id": "p1-043",
+"text": "Tenants are in there til next march so no",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "tenants until March, timing blocker"
+},
+{
+"id": "p1-044",
+"text": "yes. but not at this time",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "yes then not at this time"
+},
+{
+"id": "p1-045",
+"text": "Possibly in the future, not at this time. Thank you.",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "possibly future, not now"
+},
+{
+"id": "p1-046",
+"text": "check with me after we get back from florida in april",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "after returning in April"
+},
+{
+"id": "p1-047",
+"text": "Maybe someday when I get tired of dealing with it. Not yet",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "maybe someday, not yet"
+},
+{
+"id": "p1-048",
+"text": "Still thinking on it, nothing for now",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "still thinking, nothing now"
+},
+{
+"id": "p1-049",
+"text": "um not yet. when my mom passes into assisted living ill have to figure it out. not yet tho",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "future event, not yet",
+"known_miss": [
+"treat"
+]
+},
+{
+"id": "p1-050",
+"text": "I might be open down the line but we just refinanced so not for a while",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "open down the line, not for a while"
+},
+{
+"id": "p1-051",
+"text": "yes!! later though 🙂",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "enthusiastic yes but later"
+},
+{
+"id": "p1-052",
+"text": "Sure, maybe in the summer once the kids are out of school",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "sure but maybe summer, condition"
+},
+{
+"id": "p1-053",
+"text": "Not ready to sell. Might be soon. Keep in touch.",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "not ready, keep in touch"
+},
+{
+"id": "p1-054",
+"text": "not interested at this time but I'll keep your number",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "not at this time, keeps number"
+},
+{
+"id": "p1-055",
+"text": "hmm. let me look at some things and ill get back to u",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "will look into it and get back"
+},
+{
+"id": "p1-056",
+"text": "After Christmas",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "timing: after Christmas"
+},
+{
+"id": "p1-057",
+"text": "We're not there yet. Keep us on your list for down the road",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "not there yet, down the road"
+},
+{
+"id": "p1-058",
+"text": "not now. i have a closing on another one in december, ask me after that",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "ask after December closing",
+"known_miss": [
+"treat"
+]
+},
+{
+"id": "p1-059",
+"text": "Interesting. Not today but I may reach out. Is this number good to text?",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "not today, may reach out later"
+},
+{
+"id": "p1-060",
+"text": "can you check back in about 3 months",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "check back in three months"
+},
+{
+"id": "p1-061",
+"text": "Hi Colin yes I still own it. Maybe at some point down the road I will sell but nothing planned.",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "someday, nothing planned"
+},
+{
+"id": "p1-062",
+"text": "when the mortgage is paid off in 2 years maybe",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "condition: mortgage paid in two years"
+},
+{
+"id": "p1-063",
+"text": "Not yet. We still got renters. Maybe when they leave",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "when renters leave"
+},
+{
+"id": "p1-064",
+"text": "Wait until my husband is out of the hospital then ask",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "wait until husband out of hospital",
+"known_miss": [
+"treat"
+]
+},
+{
+"id": "p1-065",
+"text": "no hurry. maybe next spring",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "no hurry, maybe next spring"
+},
+{
+"id": "p1-066",
+"text": "give me some time",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "needs time"
+},
+{
+"id": "p1-067",
+"text": "Right now isnt a good time. Ill think it over and text if I'm interested",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "not a good time, will text"
+},
+{
+"id": "p1-068",
+"text": "ya maybe but not for like 5 years",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "maybe in five years"
+},
+{
+"id": "p1-069",
+"text": "I appreciate the message. Not at this time. We will revisit after the new year.",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "revisit after the new year"
+},
+{
+"id": "p1-070",
+"text": "Yes it's still mine. I'm going to wait on selling until we see how the election shakes out",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "waiting on an event"
+},
+{
+"id": "p1-071",
+"text": "Thinking about it but not ready to talk about it",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "thinking, not ready to talk"
+},
+{
+"id": "p1-072",
+"text": "once we move out up north then ya",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "condition: after they move up north"
+},
+{
+"id": "p1-073",
+"text": "Not interested right now, maybe later",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "not now, maybe later"
+},
+{
+"id": "p1-074",
+"text": "idk yet lol ask me later",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "don't know yet, ask later"
+},
+{
+"id": "p1-075",
+"text": "Sorry, not ready. Life is crazy right now. If we decide to sell I'll let you know.",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "not ready, will let you know"
+},
+{
+"id": "p1-076",
+"text": "mmm after the inspection on the foundation is done i might consider something",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "after foundation inspection, vague"
+},
+{
+"id": "p1-077",
+"text": "Not for now. Possibly in the future.",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "not for now, possibly future"
+},
+{
+"id": "p1-078",
+"text": "Yes still mine, my sister and I need to decide. We're not meeting till Thanksgiving.",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "decision deferred to Thanksgiving"
+},
+{
+"id": "p1-079",
+"text": "dont have time to think about it now, maybe in a couple months",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "no time now, maybe in months"
+},
+{
+"id": "p1-080",
+"text": "Not at this point in time. Thanks!",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "not at this point in time"
+},
+{
+"id": "p1-081",
+"text": "No thanks",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "plain polite no"
+},
+{
+"id": "p1-082",
+"text": "No. It's my home and I plan on staying.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "home, staying"
+},
+{
+"id": "p1-083",
+"text": "lol no",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "rude dismissal, no stop request"
+},
+{
+"id": "p1-084",
+"text": "Nice try",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "sarcastic brush off"
+},
+{
+"id": "p1-085",
+"text": "Yes it's mine but it's not for sale",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "yes but not for sale"
+},
+{
+"id": "p1-086",
+"text": "not selling",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "not selling"
+},
+{
+"id": "p1-087",
+"text": "NOT INTERESTED",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "all caps not interested"
+},
+{
+"id": "p1-088",
+"text": "I will never sell this house. My husband built it.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "never selling, sentimental"
+},
+{
+"id": "p1-089",
+"text": "no we are good thanks",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "polite no"
+},
+{
+"id": "p1-090",
+"text": "Absolutely not. Do you people ever quit? The answer was no last time too.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "irritated no, no stop request"
+},
+{
+"id": "p1-091",
+"text": "Yes this is my house. I live here. I'm not selling it. Have a nice day.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "lives there, not selling"
+},
+{
+"id": "p1-092",
+"text": "naw",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "slang no"
+},
+{
+"id": "p1-093",
+"text": "Not interested but thanks for asking",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "polite not interested"
+},
+{
+"id": "p1-094",
+"text": "nope. keeping it.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "keeping it"
+},
+{
+"id": "p1-095",
+"text": "Oh sure, let me just hand over my house to a stranger who texts me. 🙄",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "sarcastic refusal"
+},
+{
+"id": "p1-096",
+"text": "The property is not for sale at any time. Thank you.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "formal firm no"
+},
+{
+"id": "p1-097",
+"text": "no im good",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "casual no"
+},
+{
+"id": "p1-098",
+"text": "Yes but I'm not selling and never will, my kids are getting it",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "yes but passing to kids"
+},
+{
+"id": "p1-099",
+"text": "Hell no",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "emphatic no"
+},
+{
+"id": "p1-100",
+"text": "We are not interested in selling at any price. Please note that.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "not selling at any price"
+},
+{
+"id": "p1-101",
+"text": "nah it's my home",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "home, no"
+},
+{
+"id": "p1-102",
+"text": "I'm not interested in selling. Thank you for your interest.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "formal polite no"
+},
+{
+"id": "p1-103",
+"text": "dont think so",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "soft no"
+},
+{
+"id": "p1-104",
+"text": "Sorry no. We love it here.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "loves living there"
+},
+{
+"id": "p1-105",
+"text": "Investors like you are why nobody can afford a house anymore. No.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "angry no, no stop request"
+},
+{
+"id": "p1-106",
+"text": "no no no no",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "repeated no"
+},
+{
+"id": "p1-107",
+"text": "nO thank u",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "typo-style polite no"
+},
+{
+"id": "p1-108",
+"text": "Yes it is mine. No I will not sell it.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "owns, will not sell"
+},
+{
+"id": "p1-109",
+"text": "its a rental we keep as retirement income. not for sale",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "keeping rental, not for sale"
+},
+{
+"id": "p1-110",
+"text": "Wrong time wrong guy. Not selling.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "not selling, curt",
+"known_miss": [
+"treat"
+]
+},
+{
+"id": "p1-111",
+"text": "I live in that house and I'm not moving",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "lives there, not moving"
+},
+{
+"id": "p1-112",
+"text": "pass",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "one-word pass"
+},
+{
+"id": "p1-113",
+"text": "Not for sale. It's been in the family for 60 years.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "family-held, not for sale"
+},
+{
+"id": "p1-114",
+"text": "no gracias",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "Spanish polite no"
+},
+{
+"id": "p1-115",
+"text": "Not selling. Mind your own business",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "rude no, no stop request"
+},
+{
+"id": "p1-116",
+"text": "no thank you I am happy here",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "happy where they are"
+},
+{
+"id": "p1-117",
+"text": "voice to text no i am not interested in selling my house thank you very much",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "voice-to-text polite no"
+},
+{
+"id": "p1-118",
+"text": "I just spent 40k fixing it up. Why would I sell it? No.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "just renovated, no"
+},
+{
+"id": "p1-119",
+"text": "Yea right 😂",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "laughing dismissal"
+},
+{
+"id": "p1-120",
+"text": "I'm all set. Thanks.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "I'm all set"
+},
+{
+"id": "p1-121",
+"text": "no sorry, we're staying put",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "staying put"
+},
+{
+"id": "p1-122",
+"text": "Why would I sell my house to you? Answer is no",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "skeptical no"
+},
+{
+"id": "p1-123",
+"text": "Not at all interested.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "not at all interested"
+},
+{
+"id": "p1-124",
+"text": "nope not happening",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "not happening"
+},
+{
+"id": "p1-125",
+"text": "Thanks but I plan to die in this house",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "staying for life"
+},
+{
+"id": "p1-126",
+"text": "Yes i own it, no its not for sale, thank you",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "not for sale, mild request not to ask"
+},
+{
+"id": "p1-127",
+"text": "negative",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "one-word no"
+},
+{
+"id": "p1-128",
+"text": "I appreciate you reaching out but I have no plans to ever sell.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "no plans to ever sell"
+},
+{
+"id": "p1-129",
+"text": "noooo",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "drawn out no"
+},
+{
+"id": "p1-130",
+"text": "Not interested, my daughter lives in it",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "family lives there, not interested"
+},
+{
+"id": "p1-131",
+"text": "Ya no. I'm a landlord too, you're not getting this one.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "landlord keeping it"
+},
+{
+"id": "p1-132",
+"text": "its not for sale. the horse is our home",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "autocorrect house to horse, home"
+},
+{
+"id": "p1-133",
+"text": "No thanks. Already got a plan for that property.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "has other plans, no thanks"
+},
+{
+"id": "p1-134",
+"text": "Maybe in your dreams buddy",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "sarcastic, starts with maybe, a no"
+},
+{
+"id": "p1-135",
+"text": "Not a chance",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "not a chance"
+},
+{
+"id": "p1-136",
+"text": "Hi Colin. I appreciate the kind text but this house has been my home for 31 years and I intend to remain. God bless.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "long polite no, home"
+},
+{
+"id": "p1-137",
+"text": "no. it's not for sale and neither is the one next to it",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "not for sale"
+},
+{
+"id": "p1-138",
+"text": "nein",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "German no"
+},
+{
+"id": "p1-139",
+"text": "wow ok. no.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "put off, no"
+},
+{
+"id": "p1-140",
+"text": "I am not selling that property. It is not on the market.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "not on the market"
+},
+{
+"id": "p1-141",
+"text": "yes thats my home. we are not selling",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "yes, home, not selling"
+},
+{
+"id": "p1-142",
+"text": "Sorry I'm not interested 😊",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "polite not interested with emoji"
+},
+{
+"id": "p1-143",
+"text": "You're wasting your time with me, it's not for sale",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "wasting time, not for sale"
+},
+{
+"id": "p1-144",
+"text": "no i dont want to sell",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "doesn't want to sell"
+},
+{
+"id": "p1-145",
+"text": "Yes owner. Not selling now or ever.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "owner, not selling ever"
+},
+{
+"id": "p1-146",
+"text": "No sir. Thank you.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "polite no"
+},
+{
+"id": "p1-147",
+"text": "nah we're keeping that building. cash flows too good",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "landlord keeping building"
+},
+{
+"id": "p1-148",
+"text": "ha. no.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "amused no"
+},
+{
+"id": "p1-149",
+"text": "Not selling. It's where my grandkids come for the summer.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "sentimental, not selling"
+},
+{
+"id": "p1-150",
+"text": "no tks",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "abbreviated no thanks"
+},
+{
+"id": "p1-151",
+"text": "Yes",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "bare yes after ownership question"
+},
+{
+"id": "p1-152",
+"text": "yes it is",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "confirms ownership"
+},
+{
+"id": "p1-153",
+"text": "Yep still mine",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "still mine"
+},
+{
+"id": "p1-154",
+"text": "That's me",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "identity confirmation"
+},
+{
+"id": "p1-155",
+"text": "yes. who wants to know?",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "yes plus mild who question",
+"known_miss": [
+"treat"
+]
+},
+{
+"id": "p1-156",
+"text": "Yes it is. Why do you ask?",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "confirms, curious why"
+},
+{
+"id": "p1-157",
+"text": "yes, since 2009",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "ownership with tenure detail"
+},
+{
+"id": "p1-158",
+"text": "Yes I own it.",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "owns it"
+},
+{
+"id": "p1-159",
+"text": "yes thats right",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "confirms ownership"
+},
+{
+"id": "p1-160",
+"text": "Yes it is still mine, Colin. How can I help you?",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "confirms, asks how to help"
+},
+{
+"id": "p1-161",
+"text": "yea",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "one-word yes"
+},
+{
+"id": "p1-162",
+"text": "Yes. My wife and I own it.",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "owned jointly with spouse"
+},
+{
+"id": "p1-163",
+"text": "yup",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "yup"
+},
+{
+"id": "p1-165",
+"text": "Yes, that is correct",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "formal confirmation"
+},
+{
+"id": "p1-166",
+"text": "Yes it is. Is there a problem?",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "confirms, asks if problem"
+},
+{
+"id": "p1-167",
+"text": "ya its mine",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "casual confirmation"
+},
+{
+"id": "p1-168",
+"text": "yes i do. whos this",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "owns, asks who",
+"known_miss": [
+"treat"
+]
+},
+{
+"id": "p1-169",
+"text": "Yes still own it",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "still own it"
+},
+{
+"id": "p1-170",
+"text": "Yes 👍",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "yes with thumbs up"
+},
+{
+"id": "p1-171",
+"text": "yes thats my place",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "that's my place"
+},
+{
+"id": "p1-172",
+"text": "Yes I am the owner",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "identifies as owner"
+},
+{
+"id": "p1-173",
+"text": "Si, es mia",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "Spanish confirms it's theirs"
+},
+{
+"id": "p1-174",
+"text": "yes sir",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "yes sir"
+},
+{
+"id": "p1-175",
+"text": "Yes. Hello Colin",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "yes with greeting"
+},
+{
+"id": "p1-176",
+"text": "yes it is still mine for now",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "still mine, no selling talk"
+},
+{
+"id": "p1-177",
+"text": "yes thats me, this is Dave",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "identity confirmation with name"
+},
+{
+"id": "p1-178",
+"text": "I do. Been there 20 years",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "owns, tenure"
+},
+{
+"id": "p1-179",
+"text": "Yes ma'am, speaking",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "identity confirmation"
+},
+{
+"id": "p1-180",
+"text": "yes. what's up?",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "yes, what's up"
+},
+{
+"id": "p1-181",
+"text": "Yes thats mine.",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "that's mine"
+},
+{
+"id": "p1-182",
+"text": "yes it is hello",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "yes plus greeting"
+},
+{
+"id": "p1-183",
+"text": "Yes me and my brother both",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "co-owned with brother"
+},
+{
+"id": "p1-184",
+"text": "yesss",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "stretched yes"
+},
+{
+"id": "p1-185",
+"text": "Yes it is. Thanks for checking.",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "confirms, thanks"
+},
+{
+"id": "p1-186",
+"text": "yes. wasnt expecting a text about it",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "confirms, mild surprise"
+},
+{
+"id": "p1-187",
+"text": "Mine. Why?",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "owns, asks why"
+},
+{
+"id": "p1-188",
+"text": "yes owner here",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "owner here"
+},
+{
+"id": "p1-189",
+"text": "correct",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "confirms with correct"
+},
+{
+"id": "p1-190",
+"text": "Yes, my name is on the deed. What is this regarding?",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "owns, asks purpose",
+"known_miss": [
+"treat"
+]
+},
+{
+"id": "p1-191",
+"text": "Thanks Colin",
+"after": "pitch",
+"treat": "chit_chat",
+"hot": false,
+"why": "just thanks"
+},
+{
+"id": "p1-192",
+"text": "👍",
+"after": "opener",
+"treat": "chit_chat",
+"hot": false,
+"why": "thumbs up only"
+},
+{
+"id": "p1-193",
+"text": "Liked “Thanks for getting back to me. I buy a few houses a year around here myself, as-is and on your timeline.”",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "a Like on the pitch text is a yes"
+},
+{
+"id": "p1-194",
+"text": "Have a great day!",
+"after": "pitch",
+"treat": "chit_chat",
+"hot": false,
+"why": "pleasantry"
+},
+{
+"id": "p1-195",
+"text": "lol",
+"after": "opener",
+"treat": "chit_chat",
+"hot": false,
+"why": "lol only"
+},
+{
+"id": "p1-196",
+"text": "Happy Friday!",
+"after": "pitch",
+"treat": "chit_chat",
+"hot": false,
+"why": "greeting only"
+},
+{
+"id": "p1-197",
+"text": "no worries",
+"after": "opener",
+"treat": "chit_chat",
+"hot": false,
+"why": "no worries pleasantry"
+},
+{
+"id": "p1-198",
+"text": "God bless you",
+"after": "pitch",
+"treat": "chit_chat",
+"hot": false,
+"why": "blessing only"
+},
+{
+"id": "p1-199",
+"text": "Loved “Hi Linda, this is Colin Merrill. Is 2847 N Burleigh St still yours?”",
+"after": "opener",
+"treat": "chit_chat",
+"hot": false,
+"why": "iPhone love reaction"
+},
+{
+"id": "p1-200",
+"text": "Thanks, you too",
+"after": "opener",
+"treat": "chit_chat",
+"hot": false,
+"why": "thanks you too"
+},
+{
+"id": "p1-201",
+"text": "Emphasized “Thanks for getting back to me.”",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "a positive reaction to the pitch text is a yes"
+},
+{
+"id": "p1-202",
+"text": "haha ok",
+"after": "opener",
+"treat": "chit_chat",
+"hot": false,
+"why": "haha ok"
+},
+{
+"id": "p1-203",
+"text": "Thank you and Merry Christmas",
+"after": "pitch",
+"treat": "chit_chat",
+"hot": false,
+"why": "holiday greeting"
+},
+{
+"id": "p1-204",
+"text": "Hope you're having a good week",
+"after": "opener",
+"treat": "chit_chat",
+"hot": false,
+"why": "pleasantry"
+},
+{
+"id": "p1-205",
+"text": "🙏",
+"after": "pitch",
+"treat": "chit_chat",
+"hot": false,
+"why": "praying hands emoji"
+},
+{
+"id": "p1-206",
+"text": "Wow this weather huh",
+"after": "opener",
+"treat": "chit_chat",
+"hot": false,
+"why": "weather small talk"
+},
+{
+"id": "p1-207",
+"text": "Thanks for the text",
+"after": "pitch",
+"treat": "chit_chat",
+"hot": false,
+"why": "thanks for the text"
+},
+{
+"id": "p1-208",
+"text": "k",
+"after": "opener",
+"treat": "chit_chat",
+"hot": false,
+"why": "single letter ack"
+},
+{
+"id": "p1-209",
+"text": "Go Packers!",
+"after": "pitch",
+"treat": "chit_chat",
+"hot": false,
+"why": "sports small talk"
+},
+{
+"id": "p1-210",
+"text": "Thumbs up",
+"after": "opener",
+"treat": "chit_chat",
+"hot": false,
+"why": "thumbs up written out"
+},
+{
+"id": "p1-211",
+"text": "Laughed at “Hi Linda, this is Colin Merrill. Is 2847 N Burleigh St still yours?”",
+"after": "opener",
+"treat": "chit_chat",
+"hot": false,
+"why": "reaction, no content"
+},
+{
+"id": "p1-212",
+"text": "thx",
+"after": "pitch",
+"treat": "chit_chat",
+"hot": false,
+"why": "thx"
+},
+{
+"id": "p1-213",
+"text": "You too!",
+"after": "pitch",
+"treat": "chit_chat",
+"hot": false,
+"why": "you too"
+},
+{
+"id": "p1-214",
+"text": "Ok great",
+"after": "opener",
+"treat": "chit_chat",
+"hot": false,
+"why": "ack with nothing about selling"
+},
+{
+"id": "p1-215",
+"text": "Happy Thanksgiving to you and your family",
+"after": "pitch",
+"treat": "chit_chat",
+"hot": false,
+"why": "holiday greeting"
+},
+{
+"id": "p1-216",
+"text": "😊",
+"after": "opener",
+"treat": "chit_chat",
+"hot": false,
+"why": "smiley only"
+},
+{
+"id": "p1-217",
+"text": "Appreciate it",
+"after": "pitch",
+"treat": "chit_chat",
+"hot": false,
+"why": "appreciate it, no content"
+},
+{
+"id": "p1-218",
+"text": "haha thats a funny name my cousin is a Colin too",
+"after": "opener",
+"treat": "chit_chat",
+"hot": false,
+"why": "small talk about name"
+},
+{
+"id": "p1-219",
+"text": "Thanks! Take care",
+"after": "pitch",
+"treat": "chit_chat",
+"hot": false,
+"why": "thanks, take care"
+},
+{
+"id": "p1-220",
+"text": "Sounds good",
+"after": "opener",
+"treat": "chit_chat",
+"hot": false,
+"why": "sounds good, nothing about selling"
+},
+{
+"id": "p1-221",
+"text": "At work right now",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "at work"
+},
+{
+"id": "p1-222",
+"text": "Driving, will text you later",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "driving, text later"
+},
+{
+"id": "p1-223",
+"text": "busy rn",
+"after": "opener",
+"treat": "busy",
+"hot": false,
+"why": "busy right now"
+},
+{
+"id": "p1-224",
+"text": "Can't talk right now, text me later today",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "text later today"
+},
+{
+"id": "p1-225",
+"text": "in a meeting. text only please, no calls",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "in meeting, prefers text"
+},
+{
+"id": "p1-226",
+"text": "I prefer text. Please do not call me",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "prefers text, no calls"
+},
+{
+"id": "p1-227",
+"text": "on the job, ill get back to you tonite",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "on the job, tonight"
+},
+{
+"id": "p1-228",
+"text": "Sorry just got off a 12 hr shift, I'll text you tomorrow",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "after shift, text tomorrow"
+},
+{
+"id": "p1-229",
+"text": "im driving right now",
+"after": "opener",
+"treat": "busy",
+"hot": false,
+"why": "driving now"
+},
+{
+"id": "p1-230",
+"text": "Slammed today. Talk later.",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "slammed today"
+},
+{
+"id": "p1-231",
+"text": "give me a bit im with a customer",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "with a customer"
+},
+{
+"id": "p1-232",
+"text": "Text is better for me, I'm hard of hearing so calls don't work",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "text preferred, no calls"
+},
+{
+"id": "p1-233",
+"text": "can't chat now, in class",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "in class"
+},
+{
+"id": "p1-234",
+"text": "At the doctors, I will reply when I get home",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "at doctor, reply later"
+},
+{
+"id": "p1-235",
+"text": "Working. Message me after 5",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "working, message after 5"
+},
+{
+"id": "p1-236",
+"text": "yes but im on a roof right now lol, text later",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "a yes to the pitch, busy right now"
+},
+{
+"id": "p1-237",
+"text": "voice to text driving to work will respond later",
+"after": "opener",
+"treat": "busy",
+"hot": false,
+"why": "voice-to-text, driving"
+},
+{
+"id": "p1-238",
+"text": "Not a good time, hectic day. Text me this evening.",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "hectic day, text evening"
+},
+{
+"id": "p1-239",
+"text": "I'm at my kids game. Will get back to you",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "at kid's game, back later"
+},
+{
+"id": "p1-240",
+"text": "texting is fine but no phone calls ok",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "text fine, no calls"
+},
+{
+"id": "p1-241",
+"text": "bz at the moment, ttyl",
+"after": "opener",
+"treat": "busy",
+"hot": false,
+"why": "busy, ttyl"
+},
+{
+"id": "p1-242",
+"text": "On a call with a client, can I get back to you in a few hours?",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "on call, back in hours"
+},
+{
+"id": "p1-243",
+"text": "Cooking dinner for the family, can we do this later tonight",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "cooking dinner, later tonight"
+},
+{
+"id": "p1-244",
+"text": "traveling today, will text when I land",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "traveling, text on landing"
+},
+{
+"id": "p1-245",
+"text": "Sorry I'm at work what's up",
+"after": "opener",
+"treat": "busy",
+"hot": false,
+"why": "at work, asks what's up"
+},
+{
+"id": "p1-246",
+"text": "I work nights, text me later this afternoon",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "works nights, text this afternoon"
+},
+{
+"id": "p1-247",
+"text": "cant look at this now. swamped. later today",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "swamped, later today"
+},
+{
+"id": "p1-248",
+"text": "I can't take calls at work but I can text. Give me an hour",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "no calls at work, text in an hour"
+},
+{
+"id": "p1-249",
+"text": "Just pulling into a job site, will message you in a bit",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "pulling into job site"
+},
+{
+"id": "p1-250",
+"text": "in the middle of something, text u this afternoon",
+"after": "pitch",
+"treat": "busy",
+"hot": false,
+"why": "in the middle of something"
+},
+{
+"id": "p2-001",
+"text": "Maybe. What did you have in mind?",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "open to idea, asks what he has in mind"
+},
+{
+"id": "p2-002",
+"text": "depends",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "one word, conditional openness to selling"
+},
+{
+"id": "p2-003",
+"text": "I'd consider it",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "says would consider selling"
+},
+{
+"id": "p2-004",
+"text": "Possibly. I've been thinking about it for a while now.",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "possibly, has been considering selling"
+},
+{
+"id": "p2-006",
+"text": "sure",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "bare sure to pitch"
+},
+{
+"id": "p2-007",
+"text": "yeah i might be open to that",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "might be open to selling"
+},
+{
+"id": "p2-008",
+"text": "hmm maybe. whats the deal exactly",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "curious, maybe, wants to know the deal"
+},
+{
+"id": "p2-009",
+"text": "Yes I would",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "yes would consider selling"
+},
+{
+"id": "p2-010",
+"text": "ive been thinkin about sellin actually",
+"after": "opener",
+"treat": "interested",
+"hot": true,
+"why": "volunteers they are thinking of selling"
+},
+{
+"id": "p2-011",
+"text": "Good timing, I've been going back and forth on selling this place.",
+"after": "opener",
+"treat": "interested",
+"hot": true,
+"why": "considering selling, good timing"
+},
+{
+"id": "p2-012",
+"text": "I might. Who's buying?",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "might sell, curious who buys"
+},
+{
+"id": "p2-013",
+"text": "Possibly, it depends on a few things",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "possibly, depends on conditions"
+},
+{
+"id": "p2-014",
+"text": "maybe yes maybe no lol",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "ambivalent but open to selling"
+},
+{
+"id": "p2-015",
+"text": "Si me interesa, tal vez",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "Spanish: interested, maybe"
+},
+{
+"id": "p2-016",
+"text": "Yes. I am open to hearing what you have.",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "open to hearing the proposal"
+},
+{
+"id": "p2-017",
+"text": "i guess i would",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "lukewarm yes to selling"
+},
+{
+"id": "p2-018",
+"text": "Eh maybe",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "lukewarm maybe, not a refusal"
+},
+{
+"id": "p2-019",
+"text": "I have thought about it. Tell me more",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "has considered it, asks for more"
+},
+{
+"id": "p2-020",
+"text": "yes thats something i could do if it works out",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "conditional yes to selling"
+},
+{
+"id": "p2-021",
+"text": "Hmm. Not opposed. What are you thinking?",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "not opposed, asks what he is thinking"
+},
+{
+"id": "p2-022",
+"text": "might be. been getting tired of the upkeep",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "might sell, tired of upkeep"
+},
+{
+"id": "p2-023",
+"text": "yea sure why not",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "casual yes to selling"
+},
+{
+"id": "p2-024",
+"text": "Yes, I would think about it for the right situation.",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "would consider in the right situation"
+},
+{
+"id": "p2-025",
+"text": "yes thinking about it lately since the kids are grown",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "yes, thinking about selling lately"
+},
+{
+"id": "p2-026",
+"text": "maybe. how does this work",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "maybe, asks how the process works"
+},
+{
+"id": "p2-027",
+"text": "Interesting. Possibly.",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "interesting and possibly"
+},
+{
+"id": "p2-028",
+"text": "I'm listening",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "invites him to continue"
+},
+{
+"id": "p2-029",
+"text": "ok yes i would sell the right offer or not im not sure yet",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "voice-to-text, would sell, unsure",
+"known_miss": [
+"not_hot",
+"treat"
+]
+},
+{
+"id": "p2-030",
+"text": "Probably. What do I need to do?",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "probably, asks next steps"
+},
+{
+"id": "p2-031",
+"text": "Yup. It's been sitting empty and I'm over it.",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "yes, empty house, over it"
+},
+{
+"id": "p2-032",
+"text": "Maybe!! Who is this by the way? Id like to hear more",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "maybe, wants to hear more"
+},
+{
+"id": "p2-034",
+"text": "I could be persuaded",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "could be persuaded to sell"
+},
+{
+"id": "p2-035",
+"text": "Well, I'm not against it. What would the process look like?",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "not against it, asks process"
+},
+{
+"id": "p2-036",
+"text": "possibly. my wife and I talked about downsizing",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "possibly, couple discussed downsizing"
+},
+{
+"id": "p2-037",
+"text": "yes maybe i dont know. depends how it all works",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "yes maybe, depends on how it works"
+},
+{
+"id": "p2-038",
+"text": "I'm curious",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "states curiosity"
+},
+{
+"id": "p2-039",
+"text": "Open to it",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "open to selling"
+},
+{
+"id": "p2-040",
+"text": "Could be, depends on timing and the condition of things",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "could be, depends on timing"
+},
+{
+"id": "p2-041",
+"text": "yes i've considered it. the tenants have been a headache",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "has considered selling, tenant headaches"
+},
+{
+"id": "p2-042",
+"text": "ok so what are you proposing",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "asks what he is proposing"
+},
+{
+"id": "p2-043",
+"text": "I might be interested",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "might be interested"
+},
+{
+"id": "p2-044",
+"text": "mm maybe. if its easy",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "maybe if easy"
+},
+{
+"id": "p2-045",
+"text": "Yes, I would sell if the circumstances were right.",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "formal, would sell if circumstances right"
+},
+{
+"id": "p2-046",
+"text": "yea i been thinking bout it. whats ur plan",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "been thinking, asks his plan"
+},
+{
+"id": "p2-047",
+"text": "Thinking about it for sure",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "actively thinking about selling"
+},
+{
+"id": "p2-048",
+"text": "I may consider selling. Is this a legit company?",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "may consider, checks legitimacy"
+},
+{
+"id": "p2-049",
+"text": "Kinda. It's a lot of house for just me now.",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "kinda yes, too much house"
+},
+{
+"id": "p2-050",
+"text": "Yeah sorta open to it",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "sort of open to selling"
+},
+{
+"id": "p2-051",
+"text": "you know what, maybe it is time. what did you have in mind",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "maybe time, asks what he has in mind"
+},
+{
+"id": "p2-052",
+"text": "Who knows, maybe. Depends on what you offer in terms of how it closes",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "maybe, depends on closing structure"
+},
+{
+"id": "p2-053",
+"text": "Tal vez. Cuentame mas",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "Spanish: maybe, tell me more"
+},
+{
+"id": "p2-054",
+"text": "Yes if the numbers work",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "yes if numbers work"
+},
+{
+"id": "p2-055",
+"text": "I'd be open to a conversation about it",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "open to a conversation"
+},
+{
+"id": "p2-056",
+"text": "possibly yes. just inherited some repairs so we'll see",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "possibly yes, repairs a factor"
+},
+{
+"id": "p2-057",
+"text": "Hey Colin yes it is still mine and honestly I might be ready to let it go",
+"after": "opener",
+"treat": "interested",
+"hot": true,
+"why": "owns it and might let it go"
+},
+{
+"id": "p2-058",
+"text": "Yes. Why do you ask, are you looking to buy? I might sell.",
+"after": "opener",
+"treat": "interested",
+"hot": true,
+"why": "owns it, volunteers might sell"
+},
+{
+"id": "p2-059",
+"text": "yes thats me. been wondering if i should sell it",
+"after": "opener",
+"treat": "interested",
+"hot": true,
+"why": "owner, wondering about selling"
+},
+{
+"id": "p2-060",
+"text": "Yes but I'm open to offers",
+"after": "opener",
+"treat": "interested",
+"hot": true,
+"why": "owner open to offers, no price asked"
+},
+{
+"id": "p2-061",
+"text": "uh huh maybe",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "mumbled maybe"
+},
+{
+"id": "p2-062",
+"text": "Sounds interesting",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "sounds interesting"
+},
+{
+"id": "p2-063",
+"text": "yes!! been wanting to get out from under this building",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "eager yes, wants out of building"
+},
+{
+"id": "p2-064",
+"text": "Ya I would. Thx for asking",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "yes would sell, thanks"
+},
+{
+"id": "p2-065",
+"text": "Never really thought about it but you got me thinking",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "now thinking about it, not a no"
+},
+{
+"id": "p2-066",
+"text": "Well it depends who's asking and what the plan is. Go ahead",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "depends, invites him to go on"
+},
+{
+"id": "p2-067",
+"text": "yes im interested in knowing more",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "interested in knowing more"
+},
+{
+"id": "p2-068",
+"text": "mayb. can u tell me how u do it",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "maybe, asks how he does it"
+},
+{
+"id": "p2-069",
+"text": "Yes we have talked about selling for the last year",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "yes, discussed selling for a year"
+},
+{
+"id": "p2-070",
+"text": "I suppose I would. What's next?",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "supposes yes, asks next step"
+},
+{
+"id": "p2-071",
+"text": "What would you pay for it?",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks what he would pay"
+},
+{
+"id": "p2-072",
+"text": "make me an offer",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks for an offer"
+},
+{
+"id": "p2-073",
+"text": "I want 250k",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "names their price"
+},
+{
+"id": "p2-074",
+"text": "what's it worth to you",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks his valuation"
+},
+{
+"id": "p2-075",
+"text": "Would you do a land contract?",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks about land contract terms"
+},
+{
+"id": "p2-076",
+"text": "Not selling unless the price is right",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "a no unless the price is right: Colin closes it politely"
+},
+{
+"id": "p2-077",
+"text": "not now but what would you pay?",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "not now but asks what he would pay"
+},
+{
+"id": "p2-078",
+"text": "how much",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks how much"
+},
+{
+"id": "p2-079",
+"text": "How much are you offering?",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks offer amount"
+},
+{
+"id": "p2-080",
+"text": "depends on the number. what are you thinking",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "depends on number, asks his number"
+},
+{
+"id": "p2-081",
+"text": "I'd take 180",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "names a price"
+},
+{
+"id": "p2-082",
+"text": "give me a number",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks for a number"
+},
+{
+"id": "p2-083",
+"text": "whats your offer",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks his offer"
+},
+{
+"id": "p2-084",
+"text": "Zillow says 310 so I'd want at least that",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "states price expectation"
+},
+{
+"id": "p2-085",
+"text": "yes if you pay what its worth. what is your number",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "yes if fair, asks his number"
+},
+{
+"id": "p2-086",
+"text": "do you pay cash? how much would that be",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks cash and amount"
+},
+{
+"id": "p2-087",
+"text": "What kind of money are we talking about",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks what money is involved"
+},
+{
+"id": "p2-088",
+"text": "Ill sell for 400 take it or leave it",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "names take it or leave it price"
+},
+{
+"id": "p2-089",
+"text": "can you do payments over time? like owner financing",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks about owner financing terms"
+},
+{
+"id": "p2-090",
+"text": "What would you offer me",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks for offer"
+},
+{
+"id": "p2-091",
+"text": "I'm not looking to sell, but if somebody threw 275 at me I'd listen",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "would listen at named price"
+},
+{
+"id": "p2-092",
+"text": "wat would u give me",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "typos, asks what he would give"
+},
+{
+"id": "p2-093",
+"text": "How much do you think it's worth?",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks his estimate of value"
+},
+{
+"id": "p2-094",
+"text": "300",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "bare number, naming a price"
+},
+{
+"id": "p2-095",
+"text": "what are you offering. i have a lot of equity in it",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks offer, mentions equity"
+},
+{
+"id": "p2-096",
+"text": "Not selling it unless someone makes it worth my while",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "a no unless worth my while: closed politely"
+},
+{
+"id": "p2-097",
+"text": "Not interested at this time, but I would like to know what it is worth to you.",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "not now but asks his valuation"
+},
+{
+"id": "p2-098",
+"text": "I owe 120 on it so I need at least 150 to walk away",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "states price needed"
+},
+{
+"id": "p2-099",
+"text": "ok how much would you give me for it? no lowball",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks offer, warns against lowball"
+},
+{
+"id": "p2-100",
+"text": "can you give me a ballpark",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks for ballpark price"
+},
+{
+"id": "p2-101",
+"text": "I would need 90 thousand for the duplex",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "names a price"
+},
+{
+"id": "p2-102",
+"text": "Si, cuanto me ofrece?",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "Spanish: how much would you offer"
+},
+{
+"id": "p2-103",
+"text": "What do you pay? I know what mine is worth.",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks what he pays"
+},
+{
+"id": "p2-104",
+"text": "what's the most you can pay",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks max price"
+},
+{
+"id": "p2-105",
+"text": "Would you take payments or does it have to be all cash up front",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks about payment terms"
+},
+{
+"id": "p2-106",
+"text": "Depends how much. What would you pay for a house that needs a new roof?",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "depends on how much, asks price"
+},
+{
+"id": "p2-107",
+"text": "I got an appraisal at 220k. Can you match that?",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "cites appraisal, asks if he matches"
+},
+{
+"id": "p2-108",
+"text": "id sell for the right price. whats yours",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "would sell for right price, asks his"
+},
+{
+"id": "p2-109",
+"text": "What can you offer",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks what he can offer"
+},
+{
+"id": "p2-110",
+"text": "Less than 200 isn't worth my time. Make me a real offer.",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "floor price, asks for real offer"
+},
+{
+"id": "p2-111",
+"text": "how much do you pay for a building like this one",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks how much he pays"
+},
+{
+"id": "p2-112",
+"text": "Not sure. Depends on price. What are you paying these days?",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "depends on price, asks what he pays"
+},
+{
+"id": "p2-113",
+"text": "do you do seller financing or land contracts",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks about land contract terms"
+},
+{
+"id": "p2-114",
+"text": "Ok I'll bite. Number?",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks for his number"
+},
+{
+"id": "p2-115",
+"text": "what would the price be",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks the price"
+},
+{
+"id": "p2-116",
+"text": "Yes I will sell for 325,000 as is",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "yes and names price"
+},
+{
+"id": "p2-117",
+"text": "id have to see an offer first",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "wants to see an offer"
+},
+{
+"id": "p2-118",
+"text": "Everything has a price. What's yours?",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "everything has a price, asks his"
+},
+{
+"id": "p2-119",
+"text": "about how much cash are we talking",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks cash amount"
+},
+{
+"id": "p2-120",
+"text": "what is the offer? I have had other people ask too",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks offer, mentions other buyers"
+},
+{
+"id": "p2-121",
+"text": "would you do a lease option or contract for deed? I need monthly income",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks about contract terms"
+},
+{
+"id": "p2-122",
+"text": "Possibly. What would you pay and how fast could you close",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "possibly, asks price and close speed"
+},
+{
+"id": "p2-123",
+"text": "uh tell me what its worth first",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "wants his valuation first"
+},
+{
+"id": "p2-124",
+"text": "Will you give me fair market value or are you one of those lowball guys",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks about fair value offer"
+},
+{
+"id": "p2-125",
+"text": "i want what i paid plus the 40k i put in",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "states price expectation"
+},
+{
+"id": "p2-126",
+"text": "Ya what do you have in mind price wise",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks price he has in mind"
+},
+{
+"id": "p2-127",
+"text": "money talks. How much?",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks how much"
+},
+{
+"id": "p2-128",
+"text": "I wouldnt sell it unless it was 350 or better",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "conditional on named price"
+},
+{
+"id": "p2-129",
+"text": "yes. how much would you give me for it",
+"after": "opener",
+"treat": "price",
+"hot": true,
+"why": "owns it, jumps straight to price"
+},
+{
+"id": "p2-130",
+"text": "Yes it's mine. Are you making an offer?",
+"after": "opener",
+"treat": "price",
+"hot": true,
+"why": "owner asks if making offer"
+},
+{
+"id": "p2-131",
+"text": "that's my house. Why do you want to know? What's it worth to you",
+"after": "opener",
+"treat": "price",
+"hot": true,
+"why": "owner asks what it is worth to him"
+},
+{
+"id": "p2-132",
+"text": "yes. I'd sell for 260. is that something you could do",
+"after": "opener",
+"treat": "price",
+"hot": true,
+"why": "owner names price unprompted"
+},
+{
+"id": "p2-133",
+"text": "How much do you buy houses for in this area",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks how much he buys for"
+},
+{
+"id": "p2-134",
+"text": "what percent of market value do you pay",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks pay level vs market"
+},
+{
+"id": "p2-135",
+"text": "I might do it with a land contract at the right rate and down payment",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks about land contract terms"
+},
+{
+"id": "p2-136",
+"text": "Is 200 realistic or are you gonna come back with 120",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "floats a price, worries about lowball"
+},
+{
+"id": "p2-137",
+"text": "Make an offer and I'll tell you if it's crazy or not",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks for an offer"
+},
+{
+"id": "p2-138",
+"text": "ok whats it worth. i dont wanna waste my time",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks worth, no time wasting"
+},
+{
+"id": "p2-139",
+"text": "Thanks but not for sale... unless you're offering 500",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "a no that names a number: a draft for Colin, no alert"
+},
+{
+"id": "p2-140",
+"text": "If you can pay full price I will talk",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "will talk if full price"
+},
+{
+"id": "p2-141",
+"text": "Call me",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "asks him to call"
+},
+{
+"id": "p2-142",
+"text": "call me after 5",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "gives time to call"
+},
+{
+"id": "p2-143",
+"text": "can we talk on the phone",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "asks to talk by phone"
+},
+{
+"id": "p2-144",
+"text": "give me a ring tomorrow morning",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "asks for call tomorrow"
+},
+{
+"id": "p2-145",
+"text": "Yes please call me. My number is the one you texted.",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "asks for a call"
+},
+{
+"id": "p2-146",
+"text": "easier to talk. call me when you can",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "prefers talking, asks for call"
+},
+{
+"id": "p2-147",
+"text": "Can you call me at 6 tonight?",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "specific time for a call"
+},
+{
+"id": "p2-148",
+"text": "I dont text much just call",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "prefers a call over texting"
+},
+{
+"id": "p2-149",
+"text": "give me a call tomorrow around noon",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "call tomorrow noon"
+},
+{
+"id": "p2-150",
+"text": "Call me thurs",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "asks for call Thursday"
+},
+{
+"id": "p2-151",
+"text": "yes call",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "yes, call me"
+},
+{
+"id": "p2-152",
+"text": "ya i can talk now call me",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "free now, call me"
+},
+{
+"id": "p2-153",
+"text": "Please give me a call, I'd rather discuss this than type. Evenings are best.",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "prefers phone, evenings"
+},
+{
+"id": "p2-154",
+"text": "Phone call would be better, I'm free after 3",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "phone better, free after 3"
+},
+{
+"id": "p2-155",
+"text": "call me on my cell 414 555 0192 saturday",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "gives number and day to call"
+},
+{
+"id": "p2-156",
+"text": "can u call, my thumbs hurt lol",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "asks him to call"
+},
+{
+"id": "p2-157",
+"text": "Call me, I might be interested",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "call me, might be interested"
+},
+{
+"id": "p2-158",
+"text": "yes i would like to talk to you give me a call",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "wants to talk, asks for call"
+},
+{
+"id": "p2-159",
+"text": "Can I call you? Whats a good time",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "wants a phone conversation"
+},
+{
+"id": "p2-160",
+"text": "give me a buzz",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "slang for call me"
+},
+{
+"id": "p2-161",
+"text": "Can we talk? Call me today if you can",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "can we talk, call today"
+},
+{
+"id": "p2-162",
+"text": "Llamame manana por favor",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "Spanish: call me tomorrow"
+},
+{
+"id": "p2-163",
+"text": "Call me. I work nights so after 2pm is fine",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "call after 2pm"
+},
+{
+"id": "p2-164",
+"text": "yes thats my house call me and we can chat",
+"after": "opener",
+"treat": "wants_call",
+"hot": true,
+"why": "owner asks for a call"
+},
+{
+"id": "p2-165",
+"text": "Yes its mine. Call me if you want to talk about it",
+"after": "opener",
+"treat": "wants_call",
+"hot": true,
+"why": "owner invites a call"
+},
+{
+"id": "p2-166",
+"text": "call me at lunch 12-1",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "gives call window"
+},
+{
+"id": "p2-167",
+"text": "I'm at work now but call me tonight after 7",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "gives time to call tonight"
+},
+{
+"id": "p2-168",
+"text": "my husband handles it call him at 262 555 0147",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "gives number to call"
+},
+{
+"id": "p2-169",
+"text": "Try me on the phone",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "invites a phone call"
+},
+{
+"id": "p2-170",
+"text": "Call me tomorrow, not today, ok",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "call tomorrow"
+},
+{
+"id": "p2-171",
+"text": "Hello Colin. I would prefer to speak by telephone. You may call between 10 and 2.",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "formal, call between 10 and 2"
+},
+{
+"id": "p2-173",
+"text": "ya ill talk. call monday",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "agrees to talk, call Monday"
+},
+{
+"id": "p2-174",
+"text": "Not sure yet but give me a call and we can see",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "not sure, asks him to call"
+},
+{
+"id": "p2-175",
+"text": "can you give me a call back in about an hour i'm driving",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "asks call back in an hour"
+},
+{
+"id": "p2-176",
+"text": "i can talk on the phone but not text. 414-555-0166",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "phone only, gives number"
+},
+{
+"id": "p2-177",
+"text": "Give me a call anytime today",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "call anytime today"
+},
+{
+"id": "p2-178",
+"text": "Okay lets talk. When can you call",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "lets talk, asks when he can call"
+},
+{
+"id": "p2-179",
+"text": "yes call me please im 82 and cant see this tiny screen well",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "elderly, wants a phone call"
+},
+{
+"id": "p2-180",
+"text": "Call tomorrow after church",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "call tomorrow after church"
+},
+{
+"id": "p2-181",
+"text": "Is this Colin? Call me please",
+"after": "opener",
+"treat": "wants_call",
+"hot": true,
+"why": "asks Colin to call"
+},
+{
+"id": "p2-182",
+"text": "I'm available to talk this afternoon, call whenever",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "available this afternoon, call"
+},
+{
+"id": "p2-183",
+"text": "call me, i'm interested in talkin",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "call me, interested in talking"
+},
+{
+"id": "p2-184",
+"text": "yes call the number on my other phone 262 555 0133 after 4",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "alternate number and time to call"
+},
+{
+"id": "p2-185",
+"text": "Rather talk in person or on the phone. Call me",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "prefers phone, call me"
+},
+{
+"id": "p2-186",
+"text": "That isn't my house but I own another place on Cedar that I'd sell",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "not that one, offers a different property"
+},
+{
+"id": "p2-187",
+"text": "Not that one but I have another place I'd sell",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "not that one, another property"
+},
+{
+"id": "p2-188",
+"text": "I sold that one but I own a duplex on the south side you could look at",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "sold that one, has another duplex"
+},
+{
+"id": "p2-189",
+"text": "no not that house but i have a rental on 22nd i want to get rid of",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "different rental they want to sell"
+},
+{
+"id": "p2-190",
+"text": "That one's not for sale but I have a vacant lot and a 4-plex that might be",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "other properties might be for sale"
+},
+{
+"id": "p2-191",
+"text": "Wrong house, but I own a place over by the lake I'd consider selling",
+"after": "opener",
+"treat": "other_property",
+"hot": true,
+"why": "wrong house, other property to sell"
+},
+{
+"id": "p2-192",
+"text": "Not selling that one. Have you looked at my other building on Fond du Lac Ave?",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "not that one, points to other building"
+},
+{
+"id": "p2-193",
+"text": "I'm keeping that house but I'd talk about the one next door, I own both",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "keeping that one, will talk other"
+},
+{
+"id": "p2-194",
+"text": "not that one. my other house is the one i want out of",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "other house is the one to sell"
+},
+{
+"id": "p2-195",
+"text": "I own 3 properties in the area. That one no, the others maybe",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "that one no, others maybe"
+},
+{
+"id": "p2-196",
+"text": "Funny you text about that one, I actually want to sell my property in West Bend",
+"after": "opener",
+"treat": "other_property",
+"hot": true,
+"why": "wants to sell a different property"
+},
+{
+"id": "p2-197",
+"text": "no that one is my home. I have a rental in Waukesha thats giving me trouble though",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "home no, troublesome rental to sell"
+},
+{
+"id": "p2-198",
+"text": "that one is already gone. got a different one tho, an old farmhouse on 5 acres",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "that one gone, offers farmhouse"
+},
+{
+"id": "p2-199",
+"text": "I have a different property I'd entertain offers on",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "different property open to offers"
+},
+{
+"id": "p2-200",
+"text": "wrong number for that but I have a house on Lisbon thats vacant. you want it?",
+"after": "opener",
+"treat": "other_property",
+"hot": true,
+"why": "offers a vacant house"
+},
+{
+"id": "p2-201",
+"text": "No thanks on that one. I have a 12 unit in Racine though",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "no on that one, has 12 unit"
+},
+{
+"id": "p2-202",
+"text": "That one is not available but my other house is. Its a mess though",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "other house available, a mess"
+},
+{
+"id": "p2-203",
+"text": "not that one but if you buy houses i got a few you can look at",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "offers a few other houses"
+},
+{
+"id": "p2-204",
+"text": "that one stays in the family. I'd sell my commercial building on Mitchell St",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "keeps that one, will sell commercial"
+},
+{
+"id": "p2-205",
+"text": "Not that house. I have another one on the east side that I would sell.",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "not that house, another to sell"
+},
+{
+"id": "p2-206",
+"text": "hey that was my old place. my new rental at 4th and Vine is what i want to sell",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "old place, wants to sell other rental"
+},
+{
+"id": "p2-207",
+"text": "Dont want to sell that but ive got 2 other buildings that i might",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "not that one, two others might sell"
+},
+{
+"id": "p2-208",
+"text": "Not that property no. Do you also buy mobile homes? I have a park model",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "not that one, offers other property"
+},
+{
+"id": "p2-209",
+"text": "No to that one. Yes to my cottage up north, any interest?",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "no to that, yes to cottage"
+},
+{
+"id": "p2-210",
+"text": "mine is the other house on that block not that one. i'd sell it",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "owns a different house, would sell"
+},
+{
+"id": "p2-211",
+"text": "Not selling the one you texted. Got a 2 flat in Milwaukee, tenants moved out, want out of it.",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "not that one, vacant 2 flat to sell"
+},
+{
+"id": "p2-212",
+"text": "Es otra casa, no esa. Tengo otra que vendo",
+"after": "opener",
+"treat": "other_property",
+"hot": true,
+"why": "Spanish: other house, they sell"
+},
+{
+"id": "p2-213",
+"text": "I keep that one but would you look at a lot I own on Hwy 83",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "keeps that one, offers a lot"
+},
+{
+"id": "p2-214",
+"text": "no that's wrong address but we do have another property we are trying to sell",
+"after": "opener",
+"treat": "other_property",
+"hot": true,
+"why": "wrong address, another property to sell"
+},
+{
+"id": "p2-215",
+"text": "That one no but do you buy apartment buildings? I have an 8 unit",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "no on that, offers 8 unit"
+},
+{
+"id": "p2-216",
+"text": "different house. i got one near the river that needs everything. ill sell",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "different house, will sell"
+},
+{
+"id": "p2-217",
+"text": "Not interested in that house, my other rental yes",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "not that one, other rental yes"
+},
+{
+"id": "p2-218",
+"text": "I have a couple of others you should look at, that one is staying",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "has others to look at, keeps that"
+},
+{
+"id": "p2-219",
+"text": "That house is my moms. but i own a condo i'd be happy to sell",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "mom's house, own condo to sell"
+},
+{
+"id": "p2-220",
+"text": "not interested in that one but my buddy and I own a fourplex in Wauwatosa we want to move",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "no on that, fourplex to move"
+},
+{
+"id": "p2-221",
+"text": "I'm behind on my taxes and I need help",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "behind on taxes, asks for help"
+},
+{
+"id": "p2-222",
+"text": "The bank is foreclosing. Can you help me?",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "foreclosure, asks for help"
+},
+{
+"id": "p2-223",
+"text": "I need to sell fast",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "needs to sell fast"
+},
+{
+"id": "p2-224",
+"text": "going thru a divorce and need out asap",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "divorce, needs out quickly"
+},
+{
+"id": "p2-225",
+"text": "this house is falling apart and I want out of it",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "house falling apart, wants out"
+},
+{
+"id": "p2-226",
+"text": "Yes. I'm 4 months behind on the mortgage and they sent a letter. What can you do",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "behind on mortgage, asks what he can do"
+},
+{
+"id": "p2-227",
+"text": "sheriff sale is coming up and i dont know what to do",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "sheriff sale pending, wants guidance"
+},
+{
+"id": "p2-228",
+"text": "yes!! please help I am about to lose the house",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "about to lose house, pleads for help"
+},
+{
+"id": "p2-229",
+"text": "We got served foreclosure papers last month. Would you be able to buy before it goes to sale?",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "foreclosure served, wants buyer before sale"
+},
+{
+"id": "p2-230",
+"text": "Taxes are 3 years behind and the county is going to take it. I'd rather sell",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "tax delinquent, would rather sell"
+},
+{
+"id": "p2-231",
+"text": "i lost my job and cant make the payments anymore. yes id sell",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "lost job, cannot pay, would sell"
+},
+{
+"id": "p2-232",
+"text": "Need to get rid of it quick, the city is fining me for the roof and I can't afford it",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "city fines, cannot afford, get rid of"
+},
+{
+"id": "p2-233",
+"text": "my ex and I are splitting and the house has to go. need it done in 30 days",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "divorce, house has to go in 30 days"
+},
+{
+"id": "p2-234",
+"text": "Honestly I'm drowning in this property. Behind on everything.",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "drowning, behind on everything"
+},
+{
+"id": "p2-235",
+"text": "Yes its mine and the bank is taking it in a few weeks. please call someone",
+"after": "opener",
+"treat": "distress",
+"hot": true,
+"why": "owner, bank taking it, asks for help"
+},
+{
+"id": "p2-236",
+"text": "I'm in foreclosure, yes I'd sell, anything to get out from under the loan",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "foreclosure, would sell to escape loan"
+},
+{
+"id": "p2-237",
+"text": "the place is a wreck, fire damage, no insurance. I need out",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "fire damage, no insurance, needs out"
+},
+{
+"id": "p2-238",
+"text": "we are behind on the property taxes and have a judgement. we would like to sell it fast",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "tax and judgment trouble, sell fast"
+},
+{
+"id": "p2-239",
+"text": "Estoy atrasado con la hipoteca. Necesito vender rapido, me ayuda?",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "Spanish: behind on mortgage, needs fast sale"
+},
+{
+"id": "p2-240",
+"text": "got a notice on the door saying the sheriff is selling my house next month. yes i want to talk about selling",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "sheriff sale notice, wants to talk selling"
+},
+{
+"id": "p2-241",
+"text": "2 years behind on property taxes, treasurer sent a final notice. I'd like to sell before they take it",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "behind on taxes, final notice, wants to sell"
+},
+{
+"id": "p2-242",
+"text": "Divorce is final next month and neither of us can afford the house. Need to unload it",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "divorce, cannot afford, needs to unload"
+},
+{
+"id": "p2-243",
+"text": "my mom passed and i cant keep up with the payments or repairs, i need to sell soon",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "cannot keep up with payments, needs to sell"
+},
+{
+"id": "p2-244",
+"text": "yes im way behind on the mortgage. been getting calls from the bank every day",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "way behind on mortgage, bank calling"
+},
+{
+"id": "p2-245",
+"text": "Roof caved in, basement floods, I have no money to fix it. Want out.",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "house failing, no money, wants out"
+},
+{
+"id": "p2-246",
+"text": "I am in chapter 13 and falling behind. Is there any way you can take over the house",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "bankruptcy and behind, asks for takeover"
+},
+{
+"id": "p2-247",
+"text": "foreclosure hearing is next week. yes i would like to talk",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "foreclosure hearing, wants to talk"
+},
+{
+"id": "p2-248",
+"text": "We have until the 15th to catch up or lose it. We'd rather sell. Please help",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "deadline to catch up, would rather sell"
+},
+{
+"id": "p2-249",
+"text": "yes thats my house and i need to get rid of it quick, owe back taxes and utilities",
+"after": "opener",
+"treat": "distress",
+"hot": true,
+"why": "owner, back taxes, needs to get rid of it"
+},
+{
+"id": "p2-250",
+"text": "The bank sent a notice of default. I'm a single mom and I don't know what to do. Can you buy it fast?",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "notice of default, wants fast buyer"
+},
+{
+"id": "p3-001",
+"text": "STOP",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "bare STOP opt-out keyword in caps"
+},
+{
+"id": "p3-003",
+"text": "stop texting me",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "plain request to stop texting"
+},
+{
+"id": "p3-004",
+"text": "Remove me from your list",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "asks to be removed from list"
+},
+{
+"id": "p3-005",
+"text": "UNSUBSCRIBE",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "unsubscribe keyword in all caps"
+},
+{
+"id": "p3-006",
+"text": "dont text this number again",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "do not text this number again"
+},
+{
+"id": "p3-007",
+"text": "lose my number",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "tells sender to lose number"
+},
+{
+"id": "p3-008",
+"text": "quit",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "quit is an opt-out keyword"
+},
+{
+"id": "p3-009",
+"text": "Take me off your list please.",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "politely asks to be taken off"
+},
+{
+"id": "p3-010",
+"text": "f off",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "hostile, tells sender to go away"
+},
+{
+"id": "p3-011",
+"text": "I will report you to the FTC if you text me again",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "regulator threat, demands no more texts"
+},
+{
+"id": "p3-012",
+"text": "this is harassment. stop.",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "calls it harassment and says stop"
+},
+{
+"id": "p3-013",
+"text": "scam. stop texting me",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "scam accusation plus stop texting"
+},
+{
+"id": "p3-014",
+"text": "STOPPPPP",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "stretched STOP with extra letters"
+},
+{
+"id": "p3-015",
+"text": "Stp",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "typo of stop, missing letter"
+},
+{
+"id": "p3-016",
+"text": "STOP ALL",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "STOP ALL carrier opt-out keyword"
+},
+{
+"id": "p3-017",
+"text": "stop please stop",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "repeated plea to stop in reply"
+},
+{
+"id": "p3-018",
+"text": "Please remove my number from your database. Thank you.",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "formal request to remove number"
+},
+{
+"id": "p3-019",
+"text": "how much would you pay? actually never mind just stop texting me",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "price question then stop; stop wins"
+},
+{
+"id": "p3-020",
+"text": "how much? nah. stop texting me.",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "asks how much, then says stop"
+},
+{
+"id": "p3-021",
+"text": "I'm on the do not call list. Stop or I'll call my lawyer.",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "do not call list and legal threat"
+},
+{
+"id": "p3-022",
+"text": "Delete my number",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "asks to delete their number"
+},
+{
+"id": "p3-023",
+"text": "opt out",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "types opt out directly in reply"
+},
+{
+"id": "p3-024",
+"text": "END",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "END is a carrier stop keyword"
+},
+{
+"id": "p3-025",
+"text": "CANCEL",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "CANCEL is a carrier stop keyword"
+},
+{
+"id": "p3-026",
+"text": "Not interested stop texting",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "not interested and asks to stop"
+},
+{
+"id": "p3-027",
+"text": "No. Do not contact me again.",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "firm no plus do not contact again"
+},
+{
+"id": "p3-028",
+"text": "Who gave you this number?? Stop texting me or I'm reporting this",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "angry question, demands stop, threatens report"
+},
+{
+"id": "p3-029",
+"text": "I told u already. STOP",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "frustrated repeat of stop request"
+},
+{
+"id": "p3-030",
+"text": "stop sending me these texts",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "asks to stop sending texts"
+},
+{
+"id": "p3-031",
+"text": "Leave me alone",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "leave me alone, wants contact to end"
+},
+{
+"id": "p3-032",
+"text": "leave me the hell alone",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "hostile leave me alone in reply"
+},
+{
+"id": "p3-033",
+"text": "GO AWAY",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "shouted go away, hostile in reply"
+},
+{
+"id": "p3-034",
+"text": "STOP texting my phone you scammers",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "scam accusation with stop command"
+},
+{
+"id": "p3-035",
+"text": "this is a scam. blocking u. stop",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "calls scam, blocking, says stop"
+},
+{
+"id": "p3-036",
+"text": "Please don't text me anymore. I'm an old woman and these texts frighten me.",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "elderly asks to stop being texted"
+},
+{
+"id": "p3-037",
+"text": "STOP. I am reporting this number to my attorney general.",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "stop plus attorney general threat"
+},
+{
+"id": "p3-038",
+"text": "Stop. I'm having this number blocked.",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "says stop and will block number"
+},
+{
+"id": "p3-039",
+"text": "stop stop stop",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "stop repeated three times in reply"
+},
+{
+"id": "p3-040",
+"text": "stoo",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "typo for stop, adjacent key"
+},
+{
+"id": "p3-041",
+"text": "ssstop",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "stop with stuttered first letter"
+},
+{
+"id": "p3-042",
+"text": "Plz stop",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "short polite plea to stop"
+},
+{
+"id": "p3-043",
+"text": "Stop texting me or else",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "stop with vague threat in reply"
+},
+{
+"id": "p3-044",
+"text": "no more texts",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "says no more texts in reply"
+},
+{
+"id": "p3-045",
+"text": "remove this number from ur list",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "text-speak remove number from list"
+},
+{
+"id": "p3-046",
+"text": "take me off ur list or ill call the cops",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "remove request with police threat"
+},
+{
+"id": "p3-047",
+"text": "unsub",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "shortened unsubscribe in this short reply"
+},
+{
+"id": "p3-048",
+"text": "Stop sending messages",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "asks to stop sending messages"
+},
+{
+"id": "p3-049",
+"text": "STOP I DONT OWN ANYTHING THERE ANYMORE",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "caps stop, also says no longer owns"
+},
+{
+"id": "p3-050",
+"text": "yes thats me. now stop texting me",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "confirms identity then asks to stop"
+},
+{
+"id": "p3-051",
+"text": "not selling. STOP",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "not selling and says STOP"
+},
+{
+"id": "p3-052",
+"text": "Please stop. My husband passed and I dont want to be bothered with this",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "grieving widow asks to stop"
+},
+{
+"id": "p3-053",
+"text": "please stop texting me this is the third time ive asked period",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "voice-to-text third request to stop"
+},
+{
+"id": "p3-054",
+"text": "i said stop",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "reminds sender they already said stop"
+},
+{
+"id": "p3-055",
+"text": "WHY ARE YOU STILL TEXTING ME I SAID STOP",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "caps rage about continued texting"
+},
+{
+"id": "p3-056",
+"text": "Unsubscribe me from these messages immediately",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "formal immediate unsubscribe demand in reply"
+},
+{
+"id": "p3-057",
+"text": "How much are you offering. Wait never mind. Take me off this list.",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "price question retracted, wants removal"
+},
+{
+"id": "p3-058",
+"text": "what would u give me for it? ... nvm stop texting i changed my mind",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "price curiosity then stop; stop wins"
+},
+{
+"id": "p3-059",
+"text": "Stop the texts. Do you hear me. This is illegal",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "stop command claiming it is illegal"
+},
+{
+"id": "p3-060",
+"text": "no thx. dont text again",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "no thanks plus don't text again"
+},
+{
+"id": "p3-061",
+"text": "I'm calling the police. STOP.",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "police threat with stop in reply"
+},
+{
+"id": "p3-062",
+"text": "Remove. Me.",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "terse two-word removal demand in reply"
+},
+{
+"id": "p3-063",
+"text": "STOP 🛑",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "stop with stop sign emoji"
+},
+{
+"id": "p3-064",
+"text": "Fuck off and stop texting me",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "profane hostility plus stop texting"
+},
+{
+"id": "p3-065",
+"text": "DNC me",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "wants to be added to do-not-contact"
+},
+{
+"id": "p3-066",
+"text": "Do not text. Do not call. Do not mail. Remove me.",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "blanket no contact on all channels"
+},
+{
+"id": "p3-067",
+"text": "stop its harassment i will file a complaint with the state of wisconsin",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "harassment claim and state complaint threat"
+},
+{
+"id": "p3-068",
+"text": "I've asked you nicely to stop",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "says they already asked nicely to stop"
+},
+{
+"id": "p3-069",
+"text": "Para de mandarme mensajes por favor",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "Spanish: stop sending me messages please"
+},
+{
+"id": "p3-070",
+"text": "Stoppp texting me!! what part of leave me alone dont u get",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "angry stretched stop, leave me alone"
+},
+{
+"id": "p3-071",
+"text": "who is this",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks who is texting in reply"
+},
+{
+"id": "p3-072",
+"text": "Who's this?",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "short who's this question in reply"
+},
+{
+"id": "p3-073",
+"text": "how did you get my number",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks how number was obtained"
+},
+{
+"id": "p3-074",
+"text": "What is this about?",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks purpose of the text"
+},
+{
+"id": "p3-075",
+"text": "is this a bot",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "asks if sender is a bot"
+},
+{
+"id": "p3-076",
+"text": "Are you a realtor?",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "asks whether sender is a realtor"
+},
+{
+"id": "p3-077",
+"text": "are you a wholesaler",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "asks if sender is wholesaler"
+},
+{
+"id": "p3-078",
+"text": "Is this a scam?",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks if this is a scam"
+},
+{
+"id": "p3-079",
+"text": "Who is Colin",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks who Colin is in reply"
+},
+{
+"id": "p3-080",
+"text": "who's colin merrill and what do you want with my house",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks who Colin is and why"
+},
+{
+"id": "p3-081",
+"text": "Who are you? Do I know you?",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "doesn't recognise the sender in reply"
+},
+{
+"id": "p3-083",
+"text": "whos this",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "lowercase quick who's this in reply"
+},
+{
+"id": "p3-084",
+"text": "Do I know you?",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks if they know the sender"
+},
+{
+"id": "p3-085",
+"text": "how do you know my address",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks how sender knows address"
+},
+{
+"id": "p3-086",
+"text": "Where did you get my phone number from?",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "asks source of phone number"
+},
+{
+"id": "p3-087",
+"text": "what company are you with",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "asks which company sender represents"
+},
+{
+"id": "p3-088",
+"text": "Who do you work for?",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "asks who sender works for"
+},
+{
+"id": "p3-089",
+"text": "is this a real person or a computer",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks if human or automated"
+},
+{
+"id": "p3-090",
+"text": "Am I talking to a real person?",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "wants to know if human"
+},
+{
+"id": "p3-091",
+"text": "Is this a robot",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks if sender is robot"
+},
+{
+"id": "p3-092",
+"text": "are you some kind of investor",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "asks if sender is an investor"
+},
+{
+"id": "p3-093",
+"text": "what do you want",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks what sender wants in reply"
+},
+{
+"id": "p3-094",
+"text": "Why are you asking?",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "wary question about motive in reply"
+},
+{
+"id": "p3-095",
+"text": "why do you want to know if i still own it",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "questions motive for ownership question"
+},
+{
+"id": "p3-096",
+"text": "who r u",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "text-speak who are you in reply"
+},
+{
+"id": "p3-097",
+"text": "Sorry who is this again",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "forgot who texted earlier in reply"
+},
+{
+"id": "p3-098",
+"text": "wat is this regarding",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "typo-laden what is this regarding"
+},
+{
+"id": "p3-099",
+"text": "Are you with the county or something?",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "wonders if sender is government"
+},
+{
+"id": "p3-100",
+"text": "is this the city? what is this about",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks if sender is the city"
+},
+{
+"id": "p3-101",
+"text": "Are you a real estate agent",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "asks if sender is agent"
+},
+{
+"id": "p3-102",
+"text": "are u a wholesaler or a realtor? who is this",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "asks type of buyer and identity"
+},
+{
+"id": "p3-103",
+"text": "Is this one of those we buy houses people",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "suspects we-buy-houses outfit in this reply"
+},
+{
+"id": "p3-104",
+"text": "Are you one of those cash for houses scammers?",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "asks if cash-for-houses scammer in reply",
+"known_miss": [
+"false_stop",
+"treat"
+]
+},
+{
+"id": "p3-105",
+"text": "This number is not in my contacts. Who are you?",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "unknown number asks identity in reply"
+},
+{
+"id": "p3-106",
+"text": "who is colin?? i dont know a colin",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "doesn't know any Colin in reply",
+"known_miss": [
+"treat"
+]
+},
+{
+"id": "p3-107",
+"text": "Who gave you my info",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks who gave out their info"
+},
+{
+"id": "p3-108",
+"text": "how'd you get my number??",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "surprised how number was found"
+},
+{
+"id": "p3-109",
+"text": "hou did you get my numbr",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "typos asking how number was found"
+},
+{
+"id": "p3-110",
+"text": "whoever this is how did you find my cell",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks how sender found cell"
+},
+{
+"id": "p3-111",
+"text": "Is this spam?",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks whether message is spam"
+},
+{
+"id": "p3-112",
+"text": "this is a weird text who are you",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "finds text odd, asks identity"
+},
+{
+"id": "p3-113",
+"text": "Sorry, I don't recognize this number. How do you know about my property?",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "unknown number and how they know property"
+},
+{
+"id": "p3-114",
+"text": "Who is this and what is your interest in my property.",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "formal who and what interest"
+},
+{
+"id": "p3-115",
+"text": "who tf is this",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "rude but only asks who"
+},
+{
+"id": "p3-116",
+"text": "WHO IS THIS AND WHERE DID YOU GET THIS NUMBER",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "caps who and where number came from"
+},
+{
+"id": "p3-117",
+"text": "Hello? who is this? whats this regarding",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "who is this and regarding what"
+},
+{
+"id": "p3-118",
+"text": "can you tell me who this is before i answer anything",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "wants identity before answering in reply"
+},
+{
+"id": "p3-119",
+"text": "whos colin and how do you know me",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks who Colin is in reply"
+},
+{
+"id": "p3-120",
+"text": "are you an ai",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "asks if sender is AI"
+},
+{
+"id": "p3-121",
+"text": "Is this an automated message",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks if message is automated"
+},
+{
+"id": "p3-122",
+"text": "r u a real person",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "text-speak real person question in reply"
+},
+{
+"id": "p3-123",
+"text": "are u a bank or what",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "asks if sender is a bank"
+},
+{
+"id": "p3-124",
+"text": "What are you buying houses for? Who are you with?",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "asks who sender is with"
+},
+{
+"id": "p3-125",
+"text": "who is this? i dont give out my info to strangers",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "wary stranger asks identity in reply"
+},
+{
+"id": "p3-126",
+"text": "huh? who dis",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "slang who is this in reply"
+},
+{
+"id": "p3-127",
+"text": "who is this who is this who is this",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "repeated who is this in reply"
+},
+{
+"id": "p3-128",
+"text": "quien es",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "Spanish: who is this in reply"
+},
+{
+"id": "p3-129",
+"text": "Que es esto? Quien me escribe?",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "Spanish: what is this, who writes"
+},
+{
+"id": "p3-130",
+"text": "Is this a legit business? What's the name of your company?",
+"after": "pitch",
+"treat": "who",
+"hot": false,
+"why": "asks legitimacy and company name"
+},
+{
+"id": "p3-131",
+"text": "wrong number",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "plain wrong number in this reply"
+},
+{
+"id": "p3-132",
+"text": "Wrong number.",
+"after": "pitch",
+"treat": "wrong_number",
+"hot": false,
+"why": "wrong number after the pitch"
+},
+{
+"id": "p3-134",
+"text": "this is not Linda's number",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "number doesn't belong to named person"
+},
+{
+"id": "p3-135",
+"text": "Not me",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "says it is not them"
+},
+{
+"id": "p3-136",
+"text": "I dont know that person",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "doesn't know the named person"
+},
+{
+"id": "p3-137",
+"text": "never heard of her",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "never heard of named person"
+},
+{
+"id": "p3-138",
+"text": "I never owned that house",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "never owned the property in reply"
+},
+{
+"id": "p3-139",
+"text": "Never owned that. You have the wrong person.",
+"after": "pitch",
+"treat": "wrong_number",
+"hot": false,
+"why": "never owned, wrong person in reply"
+},
+{
+"id": "p3-140",
+"text": "i've had this number for 3 years. nobody by that name here",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "long-held number, no such person"
+},
+{
+"id": "p3-141",
+"text": "You have the wrong number sir",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "polite wrong number in this reply"
+},
+{
+"id": "p3-142",
+"text": "sorry wrong number",
+"after": "pitch",
+"treat": "wrong_number",
+"hot": false,
+"why": "apologetic wrong number in this reply"
+},
+{
+"id": "p3-143",
+"text": "I think you have the wrong number, I don't own any property in Wisconsin",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "owns nothing in Wisconsin in reply"
+},
+{
+"id": "p3-144",
+"text": "new number, new phone. whoever you want doesnt have this number anymore",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "recycled number, previous owner gone"
+},
+{
+"id": "p3-145",
+"text": "I just got this number last month. Don't know anyone named Don.",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "new number, doesn't know Don"
+},
+{
+"id": "p3-146",
+"text": "wrong person",
+"after": "pitch",
+"treat": "wrong_number",
+"hot": false,
+"why": "says wrong person in this reply"
+},
+{
+"id": "p3-147",
+"text": "Think you have the wrong guy",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "wrong guy in this short reply"
+},
+{
+"id": "p3-148",
+"text": "i dont live in milwaukee and never owned a house there",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "never owned, doesn't live there"
+},
+{
+"id": "p3-149",
+"text": "No i dont own that. never did",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "doesn't own it, never did"
+},
+{
+"id": "p3-150",
+"text": "Not my house. I live in Texas",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "not their house, lives elsewhere"
+},
+{
+"id": "p3-151",
+"text": "that address isnt mine",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "address is not theirs in reply"
+},
+{
+"id": "p3-152",
+"text": "I have never lived or owned property at that address.",
+"after": "pitch",
+"treat": "wrong_number",
+"hot": false,
+"why": "never lived or owned there"
+},
+{
+"id": "p3-153",
+"text": "wrong numbr",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "typo wrong number in this reply"
+},
+{
+"id": "p3-154",
+"text": "Rong number buddy",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "misspelled wrong number in this reply"
+},
+{
+"id": "p3-155",
+"text": "Nope, wrong number, good luck finding him",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "wrong number, wishes luck in reply"
+},
+{
+"id": "p3-156",
+"text": "this phone number belonged to someone else before me",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "number reassigned from prior owner"
+},
+{
+"id": "p3-157",
+"text": "You've got the wrong number. I don't know anyone with that name.",
+"after": "pitch",
+"treat": "wrong_number",
+"hot": false,
+"why": "wrong number and unknown name"
+},
+{
+"id": "p3-158",
+"text": "who? no one here by that name",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "nobody by that name here"
+},
+{
+"id": "p3-159",
+"text": "That's not me. Wrong person.",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "that's not me, wrong person"
+},
+{
+"id": "p3-160",
+"text": "I think you meant to text someone else",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "thinks text meant for someone else"
+},
+{
+"id": "p3-161",
+"text": "Im not who you think i am",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "not the person sought in reply"
+},
+{
+"id": "p3-162",
+"text": "sir this is my personal number and i dont own a house",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "owns no house at all"
+},
+{
+"id": "p3-163",
+"text": "i rent and have never owned anything on that street. wrong number",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "renter, never owned, wrong number",
+"known_miss": [
+"treat"
+]
+},
+{
+"id": "p3-164",
+"text": "no idea who that is. wrong number",
+"after": "pitch",
+"treat": "wrong_number",
+"hot": false,
+"why": "no idea who, wrong number"
+},
+{
+"id": "p3-165",
+"text": "Wrong number, I've had this phone since 2021",
+"after": "pitch",
+"treat": "wrong_number",
+"hot": false,
+"why": "wrong number, phone since 2021"
+},
+{
+"id": "p3-166",
+"text": "wrong numer this is a new number",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "typo wrong number, new number"
+},
+{
+"id": "p3-167",
+"text": "I dont know anybody named Gary",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "doesn't know anyone named Gary"
+},
+{
+"id": "p3-168",
+"text": "Wrong number. This is a business line and no one here owns a house.",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "business line, nobody owns house"
+},
+{
+"id": "p3-169",
+"text": "Never owned property in Waukesha County. Wrong number.",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "never owned in Waukesha County"
+},
+{
+"id": "p3-170",
+"text": "Esta equivocado, no conozco esa persona",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "Spanish: wrong number, don't know them"
+},
+{
+"id": "p3-171",
+"text": "numero equivocado",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "Spanish: wrong number in this reply"
+},
+{
+"id": "p3-172",
+"text": "think this text was ment for someone else, i dont own that",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "text meant for someone else, no ownership"
+},
+{
+"id": "p3-173",
+"text": "Wrong number my friend. Never been to that address in my life.",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "never been to that address"
+},
+{
+"id": "p3-174",
+"text": "Liked “Hi Linda, this is Colin Merrill. Is 2847 N Burleigh St still yours?” no it isnt mine wrong number",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "wrong number with quoted opener",
+"known_miss": [
+"treat"
+]
+},
+{
+"id": "p3-175",
+"text": "you text the wrong person im not david",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "not the David sought in reply"
+},
+{
+"id": "p3-176",
+"text": "This is Janet. No Linda here. And I've never had a house on that road.",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "different person, never had house there"
+},
+{
+"id": "p3-177",
+"text": "not my property. i dont even live in wisconsin",
+"after": "pitch",
+"treat": "wrong_number",
+"hot": false,
+"why": "not their property, out of state"
+},
+{
+"id": "p3-178",
+"text": "Wrong number lol have a good one",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "friendly wrong number in this reply"
+},
+{
+"id": "p3-179",
+"text": "you have the wrong number. please check your records",
+"after": "pitch",
+"treat": "wrong_number",
+"hot": false,
+"why": "wrong number, check your records"
+},
+{
+"id": "p3-180",
+"text": "i got this number from verizon last year, previous owner of this number not known to me",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "recycled Verizon number, prior owner unknown"
+},
+{
+"id": "p3-181",
+"text": "sold it last year",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold the property last year"
+},
+{
+"id": "p3-182",
+"text": "I don't own it anymore",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "no longer owns it in reply"
+},
+{
+"id": "p3-183",
+"text": "sold it to my nephew",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold to nephew in this reply"
+},
+{
+"id": "p3-184",
+"text": "We sold that house in March",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold the house in March"
+},
+{
+"id": "p3-185",
+"text": "Sold",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "one-word sold in this short reply"
+},
+{
+"id": "p3-186",
+"text": "already sold it",
+"after": "pitch",
+"treat": "sold",
+"hot": false,
+"why": "already sold it after pitch"
+},
+{
+"id": "p3-187",
+"text": "Sold that place back in 2019",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold in 2019 in this reply"
+},
+{
+"id": "p3-188",
+"text": "no longer mine, sold it a few months ago",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold a few months ago"
+},
+{
+"id": "p3-189",
+"text": "i sold that house years ago",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold years ago in this reply"
+},
+{
+"id": "p3-190",
+"text": "That one sold in the spring",
+"after": "pitch",
+"treat": "sold",
+"hot": false,
+"why": "sold in the spring in reply"
+},
+{
+"id": "p3-191",
+"text": "dont own it any more. sold it",
+"after": "pitch",
+"treat": "sold",
+"hot": false,
+"why": "doesn't own, sold it in reply"
+},
+{
+"id": "p3-192",
+"text": "Sold it to a guy from Chicago 2 years ago",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold to Chicago buyer in reply"
+},
+{
+"id": "p3-193",
+"text": "we sold it. the new owners are a young couple",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold, new owners a couple"
+},
+{
+"id": "p3-194",
+"text": "Sorry I sold that property in 2022",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold in 2022 in this reply"
+},
+{
+"id": "p3-195",
+"text": "sold it last summer to an investor",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold last summer to investor"
+},
+{
+"id": "p3-196",
+"text": "SOLD IT LONG TIME AGO",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "caps sold long ago in reply"
+},
+{
+"id": "p3-197",
+"text": "Not mine anymore. I sold it in the fall.",
+"after": "pitch",
+"treat": "sold",
+"hot": false,
+"why": "not mine anymore, sold in fall"
+},
+{
+"id": "p3-198",
+"text": "i gave the keys to the new owner in june",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "handed keys to new owner"
+},
+{
+"id": "p3-199",
+"text": "We closed on that one last october. New owners now.",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "closed sale last October in reply"
+},
+{
+"id": "p3-200",
+"text": "i sold that horse like 6 yrs ago",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "autocorrect horse, sold years ago"
+},
+{
+"id": "p3-201",
+"text": "I sold it to my daughter and son in law",
+"after": "pitch",
+"treat": "sold",
+"hot": false,
+"why": "sold to daughter and son-in-law"
+},
+{
+"id": "p3-202",
+"text": "sold it, my brother bought it from me",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "brother bought it in this reply"
+},
+{
+"id": "p3-203",
+"text": "I transferred it to my kids last year, not mine anymore",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "transferred to kids, not theirs"
+},
+{
+"id": "p3-204",
+"text": "no we sold it. the house is gone now they tore it down",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold and new owner demolished"
+},
+{
+"id": "p3-205",
+"text": "Vendi esa casa hace años",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "Spanish: sold that house years ago"
+},
+{
+"id": "p3-206",
+"text": "ya la vendimos",
+"after": "pitch",
+"treat": "sold",
+"hot": false,
+"why": "Spanish: we already sold it"
+},
+{
+"id": "p3-207",
+"text": "sold it to a flipper in january, check the register of deeds",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold to flipper, check deeds"
+},
+{
+"id": "p3-208",
+"text": "that was sold last year. you need to update your list",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold last year, update your list"
+},
+{
+"id": "p3-209",
+"text": "No longer own. Sold in August.",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold in August in this reply"
+},
+{
+"id": "p3-210",
+"text": "sold it already lol",
+"after": "pitch",
+"treat": "sold",
+"hot": false,
+"why": "already sold, casual in this reply"
+},
+{
+"id": "p3-211",
+"text": "i sold that duplex a couple years back, dont have it anymore",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold duplex couple years back"
+},
+{
+"id": "p3-212",
+"text": "Sold it to my cousin Ray last year for a dollar basically",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold to cousin last year"
+},
+{
+"id": "p3-213",
+"text": "we sold the building in 2020 to a company",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold building to company in reply"
+},
+{
+"id": "p3-214",
+"text": "solde it",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "typo of sold it in reply"
+},
+{
+"id": "p3-215",
+"text": "I do not own the property any longer. It was sold.",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "formal no longer owns, sold"
+},
+{
+"id": "p3-216",
+"text": "hi sold that house sorry, closed last month",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold, closed last month in reply"
+},
+{
+"id": "p3-217",
+"text": "That's not mine now, sold it in the divorce",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold during divorce in this reply"
+},
+{
+"id": "p3-218",
+"text": "sold it a while back to a family friend",
+"after": "pitch",
+"treat": "sold",
+"hot": false,
+"why": "sold to family friend in reply"
+},
+{
+"id": "p3-219",
+"text": "we dont have that house any more we sold it when we moved to florida",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold when moving to Florida"
+},
+{
+"id": "p3-220",
+"text": "SOLD!! 2 yrs ago. new people live there",
+"after": "pitch",
+"treat": "sold",
+"hot": false,
+"why": "sold two years ago, new people"
+},
+{
+"id": "p3-221",
+"text": "its listed with an agent",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "currently listed with an agent"
+},
+{
+"id": "p3-222",
+"text": "I have a realtor",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "already has a realtor in reply"
+},
+{
+"id": "p3-223",
+"text": "under contract",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "already under contract in this reply"
+},
+{
+"id": "p3-224",
+"text": "It's under contract right now, closing next month",
+"after": "opener",
+"treat": "listed",
+"hot": false,
+"why": "under contract, closing next month"
+},
+{
+"id": "p3-225",
+"text": "we have it listed",
+"after": "opener",
+"treat": "listed",
+"hot": false,
+"why": "has it listed in this reply"
+},
+{
+"id": "p3-226",
+"text": "Already on the market with Keller Williams",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "on market with a brokerage"
+},
+{
+"id": "p3-227",
+"text": "signed with an agent last week",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "signed with agent last week"
+},
+{
+"id": "p3-228",
+"text": "my realtor is handling it, contact her",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "realtor handling it, contact her"
+},
+{
+"id": "p3-229",
+"text": "its for sale already. check zillow",
+"after": "opener",
+"treat": "listed",
+"hot": false,
+"why": "already for sale, see Zillow"
+},
+{
+"id": "p3-230",
+"text": "House is listed. Have an accepted offer already.",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "listed with accepted offer in reply"
+},
+{
+"id": "p3-231",
+"text": "I'm working with a real estate agent already",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "already working with agent in reply"
+},
+{
+"id": "p3-232",
+"text": "listed it two weeks ago with a lady from re/max",
+"after": "opener",
+"treat": "listed",
+"hot": false,
+"why": "listed two weeks ago with RE/MAX"
+},
+{
+"id": "p3-233",
+"text": "LISTED WITH AGENT",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "caps listed with agent in reply"
+},
+{
+"id": "p3-234",
+"text": "already under contract with someone else sorry",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "under contract with someone else"
+},
+{
+"id": "p3-235",
+"text": "we just signed a listing agreement",
+"after": "opener",
+"treat": "listed",
+"hot": false,
+"why": "signed a listing agreement in reply"
+},
+{
+"id": "p3-236",
+"text": "My agent says not to talk to investors, house is listed",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "agent advises, house listed in reply"
+},
+{
+"id": "p3-237",
+"text": "it's pending, offer accepted",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "pending with accepted offer in reply"
+},
+{
+"id": "p3-238",
+"text": "Its on the mls already, sign is in the yard",
+"after": "opener",
+"treat": "listed",
+"hot": false,
+"why": "on MLS, sign in yard"
+},
+{
+"id": "p3-239",
+"text": "got a realtor and a contract. thanks tho",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "has realtor and a contract"
+},
+{
+"id": "p3-240",
+"text": "House is on the market right now with Bob at Century 21",
+"after": "opener",
+"treat": "listed",
+"hot": false,
+"why": "on market with Century 21 agent"
+},
+{
+"id": "p3-241",
+"text": "we have a buyer already and closing is set for the 30th",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "buyer in place, closing set"
+},
+{
+"id": "p3-242",
+"text": "listd with realtor already",
+"after": "opener",
+"treat": "listed",
+"hot": false,
+"why": "typo, listed with realtor in reply"
+},
+{
+"id": "p3-243",
+"text": "Ya esta en venta con una agente",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "Spanish: already for sale with agent"
+},
+{
+"id": "p3-244",
+"text": "I've got it listed with a broker until december, contract's signed",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "broker listing contract until December"
+},
+{
+"id": "p3-245",
+"text": "yes thats mine but its listed rn. call my agent",
+"after": "opener",
+"treat": "listed",
+"hot": false,
+"why": "owns it, listed, call agent"
+},
+{
+"id": "p3-246",
+"text": "It's with a listing agent, we're doing open house sunday",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "with listing agent, open house"
+},
+{
+"id": "p3-247",
+"text": "no, its listed w/ agent. ty",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "already listed, thanks in this reply"
+},
+{
+"id": "p3-248",
+"text": "we are under contract and the inspection is done. not available",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "under contract, inspection done in reply"
+},
+{
+"id": "p3-249",
+"text": "houses already listed through my sister who is a realtor",
+"after": "opener",
+"treat": "listed",
+"hot": false,
+"why": "listed through realtor sister in reply"
+},
+{
+"id": "p3-250",
+"text": "I already have it listed with someone. Thanks for reaching out though.",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "already listed with someone, polite"
+},
+{
+"id": "p4-001",
+"text": "I don't own it, I rent from an LLC",
+"after": "pitch",
+"treat": "tenant",
+"hot": false,
+"why": "tenant of LLC"
+},
+{
+"id": "p4-002",
+"text": "no. and please stop",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "no and stop"
+},
+{
+"id": "p4-003",
+"text": "the tenants are driving me crazy so honestly maybe",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "maybe; landlord fatigue"
+},
+{
+"id": "p4-004",
+"text": "my husband died in june. i dont know anything about the house, talk to my son Mike",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "widow redirects to son"
+},
+{
+"id": "p4-005",
+"text": "Thats my moms place. Shes 91 and in a home. Im her POA",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "mom in nursing home; POA replying"
+},
+{
+"id": "p4-006",
+"text": "Haven't listed it with anyone. What's your offer?",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks offer"
+},
+{
+"id": "p4-007",
+"text": "Sure. Maybe in a couple years",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "maybe years away"
+},
+{
+"id": "p4-009",
+"text": "Please contact my sisters husband he's the executor of the estate",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "executor named, no selling statement"
+},
+{
+"id": "p4-011",
+"text": "owner died, im just cleaning out the house for the family",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "owner died; relative clearing house"
+},
+{
+"id": "p4-012",
+"text": "Thanks but my mom passed and we haven't decided what to do with the house",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "mom died; family undecided"
+},
+{
+"id": "p4-013",
+"text": "This is Carol's daughter. Mom passed in September",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "owner died, daughter replies"
+},
+{
+"id": "p4-014",
+"text": "I rent. Not mine to sell. Landlord is a guy named Jim in Illinois",
+"after": "pitch",
+"treat": "tenant",
+"hot": false,
+"why": "tenant redirects"
+},
+{
+"id": "p4-015",
+"text": "Sorry for the confusion, my mother died in April",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "mom died, apologizes"
+},
+{
+"id": "p4-016",
+"text": "Mom is no longer with us. We're the three kids.",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "mom died; three heirs"
+},
+{
+"id": "p4-017",
+"text": "Why are you asking? Its listed with Shorewest",
+"after": "opener",
+"treat": "listed",
+"hot": false,
+"why": "listed",
+"known_miss": [
+"treat"
+]
+},
+{
+"id": "p4-018",
+"text": "I manage the building for Greenfield Mgmt. All owner inquiries go to the office",
+"after": "pitch",
+"treat": "tenant",
+"hot": false,
+"why": "manager redirect"
+},
+{
+"id": "p4-019",
+"text": "yes I'm interested but I'm not ready, I'll keep you in mind",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "yes then keep in mind"
+},
+{
+"id": "p4-020",
+"text": "Estate of Harold. Please contact the attorney handling it",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "estate, points to attorney"
+},
+{
+"id": "p4-021",
+"text": "Owner passed. I am trustee of the family trust",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "owner died, trustee replying"
+},
+{
+"id": "p4-022",
+"text": "Hubby has Alzheimers and is in a care center. I'm his wife and handle the finances",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "husband in care center; wife handles"
+},
+{
+"id": "p4-024",
+"text": "yeah sure",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "yes to the pitch"
+},
+{
+"id": "p4-025",
+"text": "it's not like I haven't thought about it",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "has thought about selling"
+},
+{
+"id": "p4-026",
+"text": "grandpa passed in January and the house is in his estate",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "grandfather died, in estate"
+},
+{
+"id": "p4-027",
+"text": "I'd never sell this house, my husband built it",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "never sell"
+},
+{
+"id": "p4-028",
+"text": "I'd need 250 minimum",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "names their number"
+},
+{
+"id": "p4-029",
+"text": "Not that one but I have a fourplex on 12th I'd sell",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "other property to sell"
+},
+{
+"id": "p4-030",
+"text": "I'll sue if you text again",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "legal threat"
+},
+{
+"id": "p4-032",
+"text": "Haven't sold it, no. Never listed it either.",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "not sold not listed, just ownership"
+},
+{
+"id": "p4-033",
+"text": "This is a rental property and I'm the resident manager",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "resident manager"
+},
+{
+"id": "p4-034",
+"text": "no worries, thanks for asking",
+"after": "opener",
+"treat": "chit_chat",
+"hot": false,
+"why": "no worries"
+},
+{
+"id": "p4-035",
+"text": "not sold. still mine",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "still owns it"
+},
+{
+"id": "p4-036",
+"text": "I'd listen",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "willing to listen"
+},
+{
+"id": "p4-037",
+"text": "thanks",
+"after": "opener",
+"treat": "chit_chat",
+"hot": false,
+"why": "thanks only"
+},
+{
+"id": "p4-038",
+"text": "Talk to my brother Dan he handles the property",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "redirects to brother"
+},
+{
+"id": "p4-039",
+"text": "This is the tenants phone. Landlord's name is Ray something",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "tenant"
+},
+{
+"id": "p4-040",
+"text": "Not looking to sell but if someone made a real offer I'd listen",
+"after": "opener",
+"treat": "no",
+"hot": false,
+"why": "a no unless a real offer: fishing, closed politely"
+},
+{
+"id": "p4-041",
+"text": "we sold in 2019",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold years ago"
+},
+{
+"id": "p4-042",
+"text": "She died. Please stop contacting this number about her house and talk to the executor, my sister Jen",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "asks us to stop contacting: stop beats everything"
+},
+{
+"id": "p4-043",
+"text": "Not the owner, I'm renting with 2 roommates",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "tenant roommates"
+},
+{
+"id": "p4-044",
+"text": "Hmm. Depends who's asking and how much hassle",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "depends; open"
+},
+{
+"id": "p4-045",
+"text": "It's a lot of house for one person now so maybe",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "maybe, downsizing"
+},
+{
+"id": "p4-046",
+"text": "Yes I'd consider selling someday. Not this year",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "someday not this year"
+},
+{
+"id": "p4-047",
+"text": "At work text me later",
+"after": "opener",
+"treat": "busy",
+"hot": false,
+"why": "at work"
+},
+{
+"id": "p4-048",
+"text": "driving",
+"after": "opener",
+"treat": "busy",
+"hot": false,
+"why": "driving"
+},
+{
+"id": "p4-049",
+"text": "Yes im in foreclosure, call me",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "foreclosure and wants contact"
+},
+{
+"id": "p4-051",
+"text": "dad passed in august, my brother and i are the heirs and we'd like to sell. what are you thinking",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "heirs want to sell, ask terms"
+},
+{
+"id": "p4-052",
+"text": "dad's gone, mom's in memory care, my sister & I are co-POA. It's complicated",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "parents gone or in care; co-POA"
+},
+{
+"id": "p4-053",
+"text": "Yes it's in foreclosure but I'm handling it with my lawyer. Not interested",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "has lawyer; declines",
+"known_miss": [
+"treat"
+]
+},
+{
+"id": "p4-054",
+"text": "Questioned “Hi Ann, this is Colin Merrill. Is 3302 N Linden Ave still yours? Reply STOP to opt out.”",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "iPhone Questioned reaction means who",
+"known_miss": [
+"treat"
+]
+},
+{
+"id": "p4-055",
+"text": "¿Quién es?",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "Spanish: who is this"
+},
+{
+"id": "p4-056",
+"text": "I'm the executor. Yes, we want to sell the house, all 3 heirs agree",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "executor wants to sell"
+},
+{
+"id": "p4-058",
+"text": "renting from my cousin. he lives in vegas now",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "tenant of out-of-state cousin"
+},
+{
+"id": "p4-059",
+"text": "My late husband's house. I'm not sure what I'm supposed to do with it",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "widow unsure"
+},
+{
+"id": "p4-060",
+"text": "under contract. closing 11/3",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "under contract"
+},
+{
+"id": "p4-061",
+"text": "I just signed with an agent last week so no",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "signed with agent"
+},
+{
+"id": "p4-062",
+"text": "I work for the management company that runs this property",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "property management employee"
+},
+{
+"id": "p4-063",
+"text": "he died, im his ex wife dont know who has the house now",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "owner died; ex-wife unsure"
+},
+{
+"id": "p4-064",
+"text": "I only pay the rent I dont own anything",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "tenant"
+},
+{
+"id": "p4-065",
+"text": "This was my mom's house. She passed away in March.",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "owner died; daughter or son replying"
+},
+{
+"id": "p4-066",
+"text": "not interested in the low ball stuff. what number are you at",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks what number"
+},
+{
+"id": "p4-067",
+"text": "texting is a pain call me",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "prefers call"
+},
+{
+"id": "p4-068",
+"text": "I don't own it, my parents do. They're in their 90s and in assisted living",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "parents in assisted living"
+},
+{
+"id": "p4-069",
+"text": "are you a wholesaler?",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "wholesaler question"
+},
+{
+"id": "p4-070",
+"text": "its my parents house, theyre both gone",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "both parents deceased"
+},
+{
+"id": "p4-071",
+"text": "never really thought about it. what are you thinking",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "curious, asks what in mind"
+},
+{
+"id": "p4-073",
+"text": "What do you pay for a house like mine",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks what we pay"
+},
+{
+"id": "p4-074",
+"text": "Which company are you with",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "company question"
+},
+{
+"id": "p4-075",
+"text": "ahorita no, quizás más adelante",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "Spanish: not now maybe later"
+},
+{
+"id": "p4-076",
+"text": "Yes it's mine and it's my home. I'm not going anywhere",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "owns; staying"
+},
+{
+"id": "p4-077",
+"text": "We rent! Month to month",
+"after": "pitch",
+"treat": "tenant",
+"hot": false,
+"why": "month-to-month tenant"
+},
+{
+"id": "p4-078",
+"text": "Sir, my wife's father passed and I'm helping her with his things",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "father-in-law died; helping"
+},
+{
+"id": "p4-079",
+"text": "I'm not the owner, my husband's mother is. She's 88 and in a facility",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "owner elderly in facility"
+},
+{
+"id": "p4-080",
+"text": "Wouldn't say no to a fair offer",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "open to offer"
+},
+{
+"id": "p4-081",
+"text": "Sra, yo soy inquilina, no soy la dueña",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "Spanish: I'm a tenant"
+},
+{
+"id": "p4-082",
+"text": "After my lease ends in May",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "timing condition"
+},
+{
+"id": "p4-083",
+"text": "are you a realtor",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "realtor question"
+},
+{
+"id": "p4-084",
+"text": "Would you consider seller financing? Thats the only way I'd do it",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks about terms"
+},
+{
+"id": "p4-085",
+"text": "that was my aunts house shes deceased",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "aunt deceased"
+},
+{
+"id": "p4-086",
+"text": "Its on the market already, see zillow",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "already listed"
+},
+{
+"id": "p4-087",
+"text": "ella falleció hace dos años, mi hermano maneja la propiedad",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "Spanish: she died, brother manages"
+},
+{
+"id": "p4-088",
+"text": "This is a rental. I just live here",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "tenant"
+},
+{
+"id": "p4-089",
+"text": "I only lease it, been here 3 years",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "leaseholder"
+},
+{
+"id": "p4-091",
+"text": "Take me off your list",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "remove me"
+},
+{
+"id": "p4-092",
+"text": "My landlord is Pat. I pay rent to a PO box",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "tenant"
+},
+{
+"id": "p4-093",
+"text": "My brother Tom is handling dads estate. Ask him",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "redirects to brother handling estate"
+},
+{
+"id": "p4-094",
+"text": "Owner is deceased.",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "owner deceased, terse"
+},
+{
+"id": "p4-095",
+"text": "My neighbor got 310 last month. Beat that and we can talk",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "names comp, wants offer"
+},
+{
+"id": "p4-096",
+"text": "Who told you my dad died? Oh you didn't. Well he did last week.",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "owner just died"
+},
+{
+"id": "p4-097",
+"text": "yeah its been in my family 30 yrs",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "owns, no sale signal"
+},
+{
+"id": "p4-098",
+"text": "how much longer will you text me",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "annoyed but not asking stop"
+},
+{
+"id": "p4-099",
+"text": "this is my dads old number hes in a rehab/nursing facility. text me instead its his daughter Beth",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "dad in facility; daughter takes over"
+},
+{
+"id": "p4-100",
+"text": "Ask me again in a year",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "ask again later"
+},
+{
+"id": "p4-101",
+"text": "Yes sir that's my place",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "confirms only"
+},
+{
+"id": "p4-102",
+"text": "can you do payments over time instead of lump sum",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks about payment terms"
+},
+{
+"id": "p4-103",
+"text": "No me escriban mas",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "Spanish: don't write me"
+},
+{
+"id": "p4-104",
+"text": "I'm not interested in selling the duplex but the lot next door yes",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "other property yes"
+},
+{
+"id": "p4-105",
+"text": "I'm just the daughter. Dad's in a nursing home. You'd have to talk to my mom",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "owner in nursing home; talk to mom"
+},
+{
+"id": "p4-106",
+"text": "Liked “Hi Teri, this is Colin Merrill. Is 912 Elm Ave still yours? Reply STOP to opt out.”",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "iPhone Liked reaction is a bare confirm"
+},
+{
+"id": "p4-107",
+"text": "No, and I don't want to discuss it",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "no"
+},
+{
+"id": "p4-108",
+"text": "yes please phone me this evening",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "evening call"
+},
+{
+"id": "p4-109",
+"text": "what would you pay",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "asks what we'd pay"
+},
+{
+"id": "p4-110",
+"text": "Which one? I have 4. The one on Center St I'd sell",
+"after": "opener",
+"treat": "other_property",
+"hot": true,
+"why": "other property"
+},
+{
+"id": "p4-111",
+"text": "How much do you know about my house?",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "sounds like price but is who"
+},
+{
+"id": "p4-112",
+"text": "Uncle Ron died in 2022, no will. Family is sorting it out",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "owner died intestate"
+},
+{
+"id": "p4-113",
+"text": "Voicemail: hey it's Bob, got your text, might be interested, call me when you get this",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "voicemail callback request"
+},
+{
+"id": "p4-114",
+"text": "not interested thx",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "polite no"
+},
+{
+"id": "p4-116",
+"text": "I can't say I wouldn't sell for the right number",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "only for the right number: closed politely",
+"known_miss": [
+"treat"
+]
+},
+{
+"id": "p4-117",
+"text": "I rent here. Landlord is Mark",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "renter"
+},
+{
+"id": "p4-118",
+"text": "I've never lived there. Got this number last month",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "new number never lived"
+},
+{
+"id": "p4-119",
+"text": "i owe 120 on it, would you cover that?",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "payoff and number"
+},
+{
+"id": "p4-120",
+"text": "Grandma is in hospice. We are not going to talk about the house right now",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "owner in hospice; family declines"
+},
+{
+"id": "p4-121",
+"text": "I live in apartment 2. The owner is some guy in Brookfield",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "tenant"
+},
+{
+"id": "p4-122",
+"text": "just a tenant. I will tell my landlord somebody asked",
+"after": "pitch",
+"treat": "tenant",
+"hot": false,
+"why": "tenant"
+},
+{
+"id": "p4-123",
+"text": "No I haven't sold it",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "denies selling; just confirms ownership"
+},
+{
+"id": "p4-125",
+"text": "I'm the property manager, not the owner",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "property manager"
+},
+{
+"id": "p4-126",
+"text": "yes ... 🙂",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "yes with smiley only"
+},
+{
+"id": "p4-127",
+"text": "Voicemail transcript: Hi this is Judy, I got your text about the house on Maple, give me a call back please.",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "voicemail asks for callback"
+},
+{
+"id": "p4-128",
+"text": "Renter here. You want the owner, not me",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "renter"
+},
+{
+"id": "p4-129",
+"text": "How much? actually just stop texting me",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "price question overridden by stop"
+},
+{
+"id": "p4-130",
+"text": "I owe back taxes and may lose it. Can we talk?",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "back taxes, wants to talk"
+},
+{
+"id": "p4-131",
+"text": "keep your number, I may reach out",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "will reach out"
+},
+{
+"id": "p4-132",
+"text": "Probate is not finished. Come back to me when letters are issued",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "probate pending; wait"
+},
+{
+"id": "p4-133",
+"text": "yes but id need to see what you offer first",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "wants an offer"
+},
+{
+"id": "p4-134",
+"text": "I'm the super for the building. Owner doesn't live here",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "building super"
+},
+{
+"id": "p4-135",
+"text": "Yup. 2 units, I live in the top one.",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "confirms and describes"
+},
+{
+"id": "p4-136",
+"text": "Not for sale. Period.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "firm no"
+},
+{
+"id": "p4-137",
+"text": "mi papa esta en un asilo, hable con mi hermana",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "Spanish: dad in nursing home, ask sister"
+},
+{
+"id": "p4-139",
+"text": "Im the personal rep for the estate, you'd have to go through my lawyer",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "personal rep redirects to lawyer"
+},
+{
+"id": "p4-140",
+"text": "Tenant. Lease runs till July",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "tenant with lease"
+},
+{
+"id": "p4-141",
+"text": "my dad is in a nursing home now, i handle his stuff",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "owner in nursing home; child handles affairs"
+},
+{
+"id": "p4-142",
+"text": "Voicemail transcript: You've reached the voicemail of Denise. Wrong person, I don't have a property there.",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "voicemail says wrong person"
+},
+{
+"id": "p4-143",
+"text": "this was dads. hes passed. i live in colorado dont know whats going on with it",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "father died, out-of-state heir"
+},
+{
+"id": "p4-144",
+"text": "its in my fathers name. he is very ill in the hospital, my brother has power of attorney",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "father ill, brother POA"
+},
+{
+"id": "p4-145",
+"text": "Yes! I'll think about it and text you back",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "will think about it"
+},
+{
+"id": "p4-146",
+"text": "esa no, pero tengo otra casa que vendería",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "Spanish: another house I'd sell"
+},
+{
+"id": "p4-147",
+"text": "not selling to you, it's under contract",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "under contract"
+},
+{
+"id": "p4-148",
+"text": "My mother-in-law passed. House is tied up in the estate",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "mother-in-law died, estate pending"
+},
+{
+"id": "p4-149",
+"text": "vendi esa casa hace un año",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "Spanish: sold it a year ago"
+},
+{
+"id": "p4-150",
+"text": "Yes call me tomorrow morning around 9",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "call time"
+},
+{
+"id": "p4-151",
+"text": "I'm the tenant, but if the landlord sells I'd love a heads up. Don't have his number",
+"after": "pitch",
+"treat": "tenant",
+"hot": false,
+"why": "tenant, no owner contact"
+},
+{
+"id": "p4-152",
+"text": "I'm not the owner I just rent the house. Owner lives in Madison",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "tenant"
+},
+{
+"id": "p4-153",
+"text": "Can't talk right now, in a meeting, will text back",
+"after": "opener",
+"treat": "busy",
+"hot": false,
+"why": "in a meeting"
+},
+{
+"id": "p4-154",
+"text": "Can you call me after 5",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "gives call time"
+},
+{
+"id": "p4-155",
+"text": "the property belonged to my brother. he passed unexpectedly",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "brother died"
+},
+{
+"id": "p4-156",
+"text": "remove me",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "remove"
+},
+{
+"id": "p4-157",
+"text": "not interested in selling now or later",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "no now or later"
+},
+{
+"id": "p4-158",
+"text": "yes i own it why do you ask",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "owns; neutral question"
+},
+{
+"id": "p4-159",
+"text": "Yes that's me",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "confirms identity only"
+},
+{
+"id": "p4-161",
+"text": "we have a realtor, ask her",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "has realtor"
+},
+{
+"id": "p4-162",
+"text": "Rather talk on the phone, easier than texting",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "prefers phone"
+},
+{
+"id": "p4-163",
+"text": "Sorry to say Linda passed last year",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "owner deceased"
+},
+{
+"id": "p4-164",
+"text": "What is this about",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "what's this about"
+},
+{
+"id": "p4-165",
+"text": "can't say I'm not interested",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "double negative means interested"
+},
+{
+"id": "p4-166",
+"text": "Not at this point. I'll let you know",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "not now; will reach out"
+},
+{
+"id": "p4-167",
+"text": "we rent the lower unit. dont know who owns the building",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "tenant, unknown owner"
+},
+{
+"id": "p4-168",
+"text": "Yes but I'm not selling",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "yes then not selling"
+},
+{
+"id": "p4-170",
+"text": "Lost my job, mortgage 4 months behind, will you buy",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "behind, asks buy"
+},
+{
+"id": "p4-171",
+"text": "that one is my home but I'd sell the vacant lot",
+"after": "pitch",
+"treat": "other_property",
+"hot": true,
+"why": "other property"
+},
+{
+"id": "p4-172",
+"text": "Not for any price",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "no even at any price"
+},
+{
+"id": "p4-173",
+"text": "Im the executor of my mothers estate and we're looking to sell it",
+"after": "opener",
+"treat": "interested",
+"hot": true,
+"why": "executor says looking to sell"
+},
+{
+"id": "p4-174",
+"text": "The owner is deceased. I'm one of 4 heirs",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "owner deceased; one of four heirs"
+},
+{
+"id": "p4-175",
+"text": "Never. Over my dead body.",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "firm no"
+},
+{
+"id": "p4-176",
+"text": "yes im open to it",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "open to selling"
+},
+{
+"id": "p4-178",
+"text": "Ask me again after the holidays",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "after holidays"
+},
+{
+"id": "p4-179",
+"text": "haha no",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "amused no"
+},
+{
+"id": "p4-180",
+"text": "The owner is out of the country. I look after it and collect rent",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "caretaker, owner abroad"
+},
+{
+"id": "p4-181",
+"text": "property manager here. The owners live out of state, I can pass your info along",
+"after": "pitch",
+"treat": "tenant",
+"hot": false,
+"why": "manager, passes info"
+},
+{
+"id": "p4-182",
+"text": "I'm in a meeting, call me at 4",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "busy but gives call time"
+},
+{
+"id": "p4-183",
+"text": "That house sold. I moved to Florida",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold"
+},
+{
+"id": "p4-184",
+"text": "Nope never owned anything on that street",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "never owned"
+},
+{
+"id": "p4-185",
+"text": "who is this? my grandmother passed away last month",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "grandmother died; family reply"
+},
+{
+"id": "p4-186",
+"text": "The agent already has it",
+"after": "pitch",
+"treat": "listed",
+"hot": false,
+"why": "listed with agent"
+},
+{
+"id": "p4-187",
+"text": "Don't call, text only, I'm at work",
+"after": "opener",
+"treat": "busy",
+"hot": false,
+"why": "prefers text"
+},
+{
+"id": "p4-188",
+"text": "dont know a gary",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "unknown person"
+},
+{
+"id": "p4-189",
+"text": "cuanto dan por la casa?",
+"after": "pitch",
+"treat": "price",
+"hot": true,
+"why": "Spanish: how much do you give"
+},
+{
+"id": "p4-190",
+"text": "mom has dementia and lives in assisted living now. i am her daughter",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "mom in assisted living; daughter replies"
+},
+{
+"id": "p4-191",
+"text": "this number was my fathers. he passed in april",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "father deceased, inherited number"
+},
+{
+"id": "p4-192",
+"text": "im the tenant. i dont own it",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "tenant"
+},
+{
+"id": "p4-193",
+"text": "City wants to raze it. Would you take it?",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "raze order, wants out"
+},
+{
+"id": "p4-194",
+"text": "landlord lives in arizona. i just rent the upstairs",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "landlord out of state; tenant"
+},
+{
+"id": "p4-195",
+"text": "Mom passed in June. Probate hasn't opened yet. Not my call yet",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "mom died, probate not opened"
+},
+{
+"id": "p4-196",
+"text": "have a good day",
+"after": "pitch",
+"treat": "chit_chat",
+"hot": false,
+"why": "goodbye"
+},
+{
+"id": "p4-197",
+"text": "my mother in law owned it. we are still in probate",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "owner died, in probate"
+},
+{
+"id": "p4-198",
+"text": "possibly. Tell me more",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "possibly; wants more"
+},
+{
+"id": "p4-200",
+"text": "Not until my son graduates in June",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "timing condition"
+},
+{
+"id": "p4-201",
+"text": "I'm renting this duplex. My landlord lives in the other unit though, ask him",
+"after": "pitch",
+"treat": "tenant",
+"hot": false,
+"why": "tenant"
+},
+{
+"id": "p4-202",
+"text": "Tenant. Please don't contact me about selling the house, I'd lose my home",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "asks us to stop contacting: stop beats everything"
+},
+{
+"id": "p4-203",
+"text": "she's in memory care, power of attorney is my sister",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "owner in memory care; POA is sister"
+},
+{
+"id": "p4-204",
+"text": "Voicemail transcript: this is Bob, got your text, not interested, don't call or text again.",
+"after": "pitch",
+"treat": "stop",
+"hot": false,
+"why": "voicemail asks stop"
+},
+{
+"id": "p4-206",
+"text": "father passed this winter. my siblings and i are still figuring out the estate",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "father died, estate unresolved"
+},
+{
+"id": "p4-207",
+"text": "i am a section 8 tenant here, you need my landlord",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "tenant"
+},
+{
+"id": "p4-208",
+"text": "wrong person this is a rental, owners a company out of milwaukee",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "tenant, owner is company"
+},
+{
+"id": "p4-209",
+"text": "my sister and i inherited it from our dad",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "inherited house, siblings"
+},
+{
+"id": "p4-210",
+"text": "Foreclosure is coming, I need help",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "foreclosure, wants help"
+},
+{
+"id": "p4-211",
+"text": "rip my uncle, he passed in 2023. his kids own it now i think",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "uncle died, kids may own"
+},
+{
+"id": "p4-212",
+"text": "Got it, thx",
+"after": "pitch",
+"treat": "chit_chat",
+"hot": false,
+"why": "thanks"
+},
+{
+"id": "p4-213",
+"text": "Ma'am you have reached the son of the late Walter. The estate is with an attorney.",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "late owner, estate with attorney"
+},
+{
+"id": "p4-214",
+"text": "sold it in august",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold recently"
+},
+{
+"id": "p4-215",
+"text": "No longer mine, sold to my nephew in 2021",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold to nephew"
+},
+{
+"id": "p4-216",
+"text": "I manage this property for the owner. Please don't text tenants",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "asks us to stop contacting: stop beats everything"
+},
+{
+"id": "p4-217",
+"text": "I'm reporting this number to the FTC",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "legal threat"
+},
+{
+"id": "p4-218",
+"text": "Renting. Landlord lives in california and never comes by",
+"after": "pitch",
+"treat": "tenant",
+"hot": false,
+"why": "tenant"
+},
+{
+"id": "p4-219",
+"text": "Mi mamá falleció, la casa es de la familia",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "Spanish: mom died, family home"
+},
+{
+"id": "p4-220",
+"text": "this is my landlords house im just living in it",
+"after": "pitch",
+"treat": "tenant",
+"hot": false,
+"why": "tenant"
+},
+{
+"id": "p4-221",
+"text": "Im just the renter lol ask my landlord",
+"after": "pitch",
+"treat": "tenant",
+"hot": false,
+"why": "renter"
+},
+{
+"id": "p4-222",
+"text": "I wouldn't say no",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "double negative means open"
+},
+{
+"id": "p4-223",
+"text": "Not not interested lol",
+"after": "pitch",
+"treat": "interested",
+"hot": true,
+"why": "double negative interested"
+},
+{
+"id": "p4-224",
+"text": "Who's Colin?",
+"after": "opener",
+"treat": "who",
+"hot": false,
+"why": "who"
+},
+{
+"id": "p4-225",
+"text": "I sold that but I have another rental I'd sell",
+"after": "opener",
+"treat": "other_property",
+"hot": true,
+"why": "other property"
+},
+{
+"id": "p4-226",
+"text": "it's not listed",
+"after": "opener",
+"treat": "owns_only",
+"hot": false,
+"why": "not listed; implies still owns"
+},
+{
+"id": "p4-227",
+"text": "i'm just the tennant",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "tenant, typo"
+},
+{
+"id": "p4-228",
+"text": "gracias pero no vendo",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "Spanish: no thanks not selling"
+},
+{
+"id": "p4-229",
+"text": "yes it's mine. stop texting me",
+"after": "opener",
+"treat": "stop",
+"hot": false,
+"why": "confirms then stop"
+},
+{
+"id": "p4-230",
+"text": "Im renting this place from a lady in florida",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "tenant, owner out of state"
+},
+{
+"id": "p4-231",
+"text": "check back in spring",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "spring"
+},
+{
+"id": "p4-232",
+"text": "text me this evening",
+"after": "opener",
+"treat": "busy",
+"hot": false,
+"why": "later today"
+},
+{
+"id": "p4-233",
+"text": "I sold it. Why do you keep texting about it?",
+"after": "opener",
+"treat": "sold",
+"hot": false,
+"why": "sold; annoyed but no stop"
+},
+{
+"id": "p4-234",
+"text": "estate is still open with the court, nothing to discuss",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "estate open, nothing to discuss"
+},
+{
+"id": "p4-235",
+"text": "Hes in hospice. Please call my brother Steve not me",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "owner in hospice; redirect to brother"
+},
+{
+"id": "p4-236",
+"text": "You want my brother. He took over after dad died",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "redirects to brother who manages estate"
+},
+{
+"id": "p4-239",
+"text": "Disliked “Thanks for getting back to me. I buy a few houses a year around here myself, as-is and on your timeline. Would you ever consider selling that one? No pressure either way.”",
+"after": "pitch",
+"treat": "no",
+"hot": false,
+"why": "iPhone Disliked reaction means no"
+},
+{
+"id": "p4-240",
+"text": "Dad passed 2 yrs ago, house is in probate still",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "owner died, probate open"
+},
+{
+"id": "p4-241",
+"text": "yo rento aqui, el dueño vive en Texas",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "Spanish: I rent, owner in Texas"
+},
+{
+"id": "p4-242",
+"text": "She passed away. You might try her son, he's at the property mostly",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "owner died; try son"
+},
+{
+"id": "p4-243",
+"text": "Im the caretaker. Landlord is in Florida for the winter",
+"after": "opener",
+"treat": "tenant",
+"hot": false,
+"why": "caretaker, landlord away"
+},
+{
+"id": "p4-244",
+"text": "Mom is in a nursing home and the house is empty. I'm her son, she can't decide anything",
+"after": "pitch",
+"treat": "family",
+"hot": false,
+"why": "mom incapacitated, son replying"
+},
+{
+"id": "p4-245",
+"text": "That's my grandmothers old house. She's been gone since 2021 and my uncle is the executor",
+"after": "opener",
+"treat": "family",
+"hot": false,
+"why": "grandmother gone; uncle executor"
+},
+{
+"id": "p4-246",
+"text": "Do you buy houses that are in tax foreclosure",
+"after": "pitch",
+"treat": "distress",
+"hot": true,
+"why": "tax foreclosure question"
+},
+{
+"id": "p4-248",
+"text": "sure give me a call 414-555-0142",
+"after": "pitch",
+"treat": "wants_call",
+"hot": true,
+"why": "gives number to call"
+},
+{
+"id": "p4-249",
+"text": "Not sure. Need to talk to my wife and get back to you",
+"after": "pitch",
+"treat": "not_now",
+"hot": false,
+"why": "will get back"
+},
+{
+"id": "p4-250",
+"text": "Who is Linda? this is a new number",
+"after": "opener",
+"treat": "wrong_number",
+"hot": false,
+"why": "new number"
+}
+]
+}
