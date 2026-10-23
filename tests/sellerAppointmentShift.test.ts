@@ -101,6 +101,20 @@ describe('human call takeover', () => {
     expect(await one<{ status: string }>(`select status from public.reply_drafts where lead_id = $1`, [LEAD])).toEqual({ status: 'awaiting_approval' })
   })
 
+  it('can resume an active pause after the card is rescheduled to a future exact date', async () => {
+    expect(await begin('app', 'rescheduled_pause_001')).toMatchObject({ ok: true, paused: true })
+    await db.query(`update public.leads set belt = 'not_now_dated', named_date = now() + interval '30 days',
+      next_stop_at = now() + interval '30 days' where id = $1`, [LEAD])
+    expect(await begin('app', 'rescheduled_pause_001')).toMatchObject({
+      ok: false, paused: true, reason: 'the seller asked us to wait until the scheduled date',
+    })
+    const resumed = await as(THALIA, async () => (await one<{ r: Record<string, unknown> }>(
+      `select public.resume_human_call($1, 'rescheduled_pause_001', $2::timestamptz) r`, [LEAD, NOW])).r)
+    expect(resumed).toMatchObject({ ok: true, paused: false })
+    expect(await one<{ paused: boolean }>(`select human_takeover_at is not null paused from public.leads where id = $1`, [LEAD]))
+      .toEqual({ paused: false })
+  })
+
   it('hands back to the existing belt when an outcome is logged and keeps one next task', async () => {
     await belt('inbound_text', { intent: 'interested', interest: true })
     await begin('personal', 'personal_outcome_001')

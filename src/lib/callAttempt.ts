@@ -17,6 +17,12 @@ export function outboundCallWaits(notBefore: string | null | undefined, nowMs = 
   return Number.isFinite(at) && at > nowMs
 }
 
+/** A paused attempt keeps its recovery button even if the card is later moved to a future date. */
+export function personalCallControlHidden(blocked: boolean | undefined, activeKey: string | null | undefined,
+  notBefore: string | null | undefined, nowMs = Date.now()): boolean {
+  return !!blocked || (!activeKey && outboundCallWaits(notBefore, nowMs))
+}
+
 /** Custom TwiML-App parameters that bind the provider webhook to this exact database pause. */
 export function humanCallProviderParams(to: string, line: string, leadId: string, takeoverKey: string) {
   return { To: to, line, leadId, takeoverKey }

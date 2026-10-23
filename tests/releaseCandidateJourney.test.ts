@@ -64,6 +64,10 @@ describe('release-candidate seller journey', () => {
       p_lead_id: LEAD, p_phone: '4145550177', p_source: 'personal', p_key: 'before_named_date_001',
       p_now: '2100-01-01T00:00:00Z',
     }))).toMatchObject({ ok: false, paused: false, reason: 'the seller asked us to wait until the scheduled date' })
+    expect(await as(db, THALIA, () => rpc(db, 'begin_human_call', {
+      p_lead_id: LEAD, p_phone: '4145550177', p_source: 'app', p_key: 'before_named_date_app_002',
+      p_now: '2100-01-01T00:00:00Z',
+    }))).toMatchObject({ ok: false, paused: false, reason: 'the seller asked us to wait until the scheduled date' })
     expect(await one(db, `select human_takeover_at is null clean from public.leads where id = '${LEAD}'`)).toEqual({ clean: true })
     await db.exec(`update public.leads set named_date = now() - interval '1 second', next_stop_at = now() - interval '1 second' where id = '${LEAD}'`)
 

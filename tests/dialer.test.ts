@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { callLabel, callerDigits, fmtDuration, inboundLabel, pickInbound } from '../src/lib/dialer'
-import { humanCallAuthorized, humanCallProviderParams, outboundCallWaits } from '../src/lib/callAttempt'
+import { humanCallAuthorized, humanCallProviderParams, outboundCallWaits, personalCallControlHidden } from '../src/lib/callAttempt'
 import type { PhoneMatch } from '../src/lib/queries'
 
 const match = (x: Partial<PhoneMatch>): PhoneMatch => ({
@@ -25,6 +25,8 @@ describe('dialer helpers', () => {
     expect(outboundCallWaits(due, Date.parse('2099-11-05T15:59:59Z'))).toBe(true)
     expect(outboundCallWaits(due, Date.parse(due))).toBe(false)
     expect(outboundCallWaits(null, Date.parse(due))).toBe(false)
+    expect(personalCallControlHidden(false, null, due, Date.parse('2099-11-05T15:59:59Z'))).toBe(true)
+    expect(personalCallControlHidden(false, 'active-attempt', due, Date.parse('2099-11-05T15:59:59Z'))).toBe(false)
   })
   it('names the call after the person and the property', () => {
     expect(callLabel('Laurie', '3424 N Main St')).toBe('Laurie - 3424 N Main St')

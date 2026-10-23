@@ -2,7 +2,7 @@
 // up, and never shown for a number the card flags (bad, do-not-contact, STOP, DNC list).
 import { Button } from '@/components/ui/button'
 import { callLabel, useDialer } from '@/lib/dialer'
-import { callAttemptKey, humanCallAuthorized, outboundCallWaits } from '@/lib/callAttempt'
+import { callAttemptKey, humanCallAuthorized, outboundCallWaits, personalCallControlHidden } from '@/lib/callAttempt'
 import { api } from '@/lib/queries'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -43,7 +43,9 @@ export function PersonalCallButton(props: {
   const qc = useQueryClient()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
-  if (props.blocked || outboundCallWaits(props.notBefore)) return null
+  // A new outbound start waits for the seller's date. An already-active attempt must
+  // keep its recovery control visible so the caller can resume automation safely.
+  if (personalCallControlHidden(props.blocked, props.activeKey, props.notBefore)) return null
   const refresh = async () => {
     await Promise.all([
       qc.invalidateQueries({ queryKey: ['lead', props.leadId] }),
