@@ -8,7 +8,7 @@ Status: local candidate only. Nothing in this manifest authorizes deployment, mi
 
 | Component | Intended upstream base | Local review branch | Frozen code commit |
 | --- | --- | --- | --- |
-| outreach-crm | `origin/wpie-live` = `a708f20db4594336de3cc7dbd212f7024eb86950` | `codex/release-candidate-20261023` | `71a97f33395491bce64afa41f44a031899431f75` |
+| outreach-crm | `origin/wpie-live` = `a708f20db4594336de3cc7dbd212f7024eb86950` | `codex/release-candidate-20261023` | `5a949da334e46f7509628fc50a9da79b90024b40` |
 | pm-phone | `origin/main` = `cabb8ba2bb32a48e231a6d4250b4bc89459a0879` | `codex/phone-release-candidate-20261023` | `41e3ee48f89c2f55416cbab87b4f5b4558dc0f00` |
 | WPIE compatibility | `origin/main` | detached, read-only fixture | `62309d4b33fe69161cc1095a8c45f50833061240` |
 
@@ -77,7 +77,7 @@ python -m pytest -q -p no:cacheprovider tests/test_single_family_plan.py
 
 ## Current local evidence
 
-- outreach-crm: 334/334 tests, 43/43 focused RC tests, forced TypeScript build, Vite production build, mock-preview build, ESLint, and diff check passed.
+- outreach-crm: 335/335 tests, 44/44 focused RC tests, forced TypeScript build, Vite production build, mock-preview build, ESLint, and diff check passed.
 - pm-phone: 115/115 tests, 17/17 focused voice-client tests, typecheck, Next production build, and diff check passed.
 - WPIE at refreshed `62309d4`: 26/26 compatibility tests and 4/4 single-family classification tests passed.
 - The repaired synthetic preview compiles completely. The local browser-control helper crashed twice before opening a tab, so no UI click evidence was produced.

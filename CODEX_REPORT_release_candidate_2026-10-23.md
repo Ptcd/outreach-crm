@@ -10,7 +10,7 @@ This shift produced a cohesive local release candidate from the already reviewed
 
 Frozen code commits:
 
-- outreach-crm `codex/release-candidate-20261023`: `71a97f33395491bce64afa41f44a031899431f75`, based directly on `origin/wpie-live` `a708f20db4594336de3cc7dbd212f7024eb86950`. Its logical commits are `f3ba5e8` (RC journey/lint gate) and `71a97f3` (exact-date call hold and preview repair).
+- outreach-crm `codex/release-candidate-20261023`: `5a949da334e46f7509628fc50a9da79b90024b40`, based directly on `origin/wpie-live` `a708f20db4594336de3cc7dbd212f7024eb86950`. Its logical commits are `f3ba5e8` (RC journey/lint gate), `71a97f3` (exact-date call hold and preview repair), and `5a949da` (app/personal boundary matrix and paused-call recovery).
 - pm-phone `codex/phone-release-candidate-20261023`: `41e3ee48f89c2f55416cbab87b4f5b4558dc0f00`, based directly on `origin/main` `cabb8ba2bb32a48e231a6d4250b4bc89459a0879`.
 - WPIE compatibility was rerun in a detached read-only worktree at refreshed `origin/main` `62309d4b33fe69161cc1095a8c45f50833061240`.
 
@@ -50,7 +50,7 @@ The route now explicitly requires an account SID equal to the configured parent 
 
 Independent review found that the previous journey could open a human call before the seller's future Not-now date. Additive migration `0042_exact_date_call_gate.sql` replaces only `begin_human_call` and rejects both app and personal outbound authorization while a `not_now_dated` card's recipient-local due instant is still future. It compares against database `now()` so an authenticated caller cannot bypass the hold by supplying a future `p_now`. Incoming seller calls remain answerable.
 
-Lead, Calls, and Inbox views hide outbound controls until the due instant, while the RPC remains authoritative. Tests prove rejection immediately before the due instant, no takeover mutation, acceptance on/after it, and continued valid retry behavior.
+Lead, Calls, and Inbox views hide new outbound controls until the due instant, while keeping the recovery control visible for an already-paused attempt. The RPC remains authoritative. Tests prove future-date rejection for both app and personal sources even with a forged future `p_now`, no takeover mutation, acceptance after the fixture advances due, continued valid retry behavior, and successful resume after a paused card is rescheduled into a future hold.
 
 ### Clean repository gates
 
@@ -83,8 +83,8 @@ All data was synthetic/PGlite or mocked HTTP. No provider request or external me
 
 ### outreach-crm
 
-- `npm run test:release-candidate`: 43 passed in 8 files.
-- `npm test -- --run`: 334 passed in 43 files.
+- `npm run test:release-candidate`: 44 passed in 8 files.
+- `npm test -- --run`: 335 passed in 43 files.
 - `npx tsc -b --force`: passed.
 - `npm run build`: passed; only the existing Vite large-chunk advisory appeared.
 - `npm run lint`: passed.
@@ -98,6 +98,7 @@ All data was synthetic/PGlite or mocked HTTP. No provider request or external me
 - `npm test`: 115 passed in 9 files.
 - `npm run typecheck`: passed.
 - `npm run build`: passed.
+- One final sandboxed rerun could not create `.next/server/app/api/twilio/voice`; the unchanged elevated local rerun passed. This was a filesystem-sandbox failure, not a compile failure.
 - `git diff --check`: passed.
 
 ### WPIE
