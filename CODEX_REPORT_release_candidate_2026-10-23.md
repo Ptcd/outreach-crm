@@ -10,7 +10,7 @@ This shift produced a cohesive local release candidate from the already reviewed
 
 Frozen code commits:
 
-- outreach-crm `codex/release-candidate-20261023`: `f3ba5e8324883a71cda95b08f5752b64b2c3c9ba`, based directly on `origin/wpie-live` `a708f20db4594336de3cc7dbd212f7024eb86950`.
+- outreach-crm `codex/release-candidate-20261023`: `71a97f33395491bce64afa41f44a031899431f75`, based directly on `origin/wpie-live` `a708f20db4594336de3cc7dbd212f7024eb86950`. Its logical commits are `f3ba5e8` (RC journey/lint gate) and `71a97f3` (exact-date call hold and preview repair).
 - pm-phone `codex/phone-release-candidate-20261023`: `41e3ee48f89c2f55416cbab87b4f5b4558dc0f00`, based directly on `origin/main` `cabb8ba2bb32a48e231a6d4250b4bc89459a0879`.
 - WPIE compatibility was rerun in a detached read-only worktree at refreshed `origin/main` `62309d4b33fe69161cc1095a8c45f50833061240`.
 
@@ -29,7 +29,7 @@ The exact migration/deploy/rollback sequence and copyable commands are in `RELEA
 - Adil logs interest; Thalia records motivation, timing, signer, condition, and asking price;
 - the repeat-safe handoff creates one Colin visit task and Colin books the visit;
 - the appointment packet preserves recorded actor provenance and visibly leaves unanswered facts unknown; and
-- STOP before a provider claim and STOP after a claim both fail closed, remove open work, and refuse a new personal-phone authorization.
+- STOP before a provider claim denies it; STOP after an already allowed claim invalidates replay and new authorization, removes open work, and refuses a new personal-phone authorization. An already returned provider verdict cannot be revoked, which is why the real STOP/claim race remains a staging gate.
 
 The focused gate also includes the existing Thalia, Adil, Colin, handoff, exact-date, takeover, provider-gate, incoming-call, and call-queue suites. It is exposed as `npm run test:release-candidate`.
 
@@ -37,7 +37,7 @@ The focused gate also includes the existing Thalia, Adil, Colin, handoff, exact-
 
 The new test calls the real Next route `POST /api/twilio/voice/client` in `NODE_ENV=production` using synthetic requests and locally generated Twilio signatures. It proves:
 
-- a correctly signed request carries `To`, seller line, lead ID, takeover key, and CallSid into the WPIE provider-claim contract and emits `<Dial>` only after an allowed verdict;
+- a correctly signed request carries the normalized destination, lead ID, takeover key, and CallSid into the WPIE provider-claim contract and emits `<Dial>` only after an allowed verdict; the requested line is checked locally against the approved seller caller-ID pool;
 - a tampered signature is rejected with HTTP 403 before WPIE is called;
 - a foreign account SID and a non-Voice-SDK/PSTN `From` are rejected with HTTP 403;
 - an empty seller caller-ID pool produces refusal TwiML and never falls back to the PM number;
@@ -46,6 +46,12 @@ The new test calls the real Next route `POST /api/twilio/voice/client` in `NODE_
 
 The route now explicitly requires an account SID equal to the configured parent or seller account and a bounded `client:` source identity in addition to the existing production signature check. `npm run test:voice-client` runs this route suite with the lower-level dial contract.
 
+### Exact-date outbound-call gate
+
+Independent review found that the previous journey could open a human call before the seller's future Not-now date. Additive migration `0042_exact_date_call_gate.sql` replaces only `begin_human_call` and rejects both app and personal outbound authorization while a `not_now_dated` card's recipient-local due instant is still future. It compares against database `now()` so an authenticated caller cannot bypass the hold by supplying a future `p_now`. Incoming seller calls remain answerable.
+
+Lead, Calls, and Inbox views hide outbound controls until the due instant, while the RPC remains authoritative. Tests prove rejection immediately before the due instant, no takeover mutation, acceptance on/after it, and continued valid retry behavior.
+
 ### Clean repository gates
 
 The 11 pre-existing outreach lint errors were small mixed-export/unused-test-fixture problems. Targeted explanations and fixture cleanup make the full repository lint pass without moving runtime logic or changing the conveyor.
@@ -53,7 +59,7 @@ The 11 pre-existing outreach lint errors were small mixed-export/unused-test-fix
 ## Conveyor and safety invariants preserved
 
 - `belt_event` and `belt_enter` remain the only conveyor. No second scheduler, task stream, or follow-up engine was added.
-- Migration order remains `0039` zero-active-pause preflight, `0040` shared-phone people, then additive `0041` provider claim gate.
+- Migration order is `0039` zero-active-pause preflight, `0040` shared-phone people, additive `0041` provider claim gate, then additive function replacement `0042` for the exact-date call hold.
 - Exact-date Not-now work never runs before the named date, is reassigned to Colin, and rescheduling leaves one current task rather than parallel old/new work.
 - Missing-date and conversation-recovery paths remain visible; terminal, STOP, DNC, suppressed, and bad-number records do not re-enter outreach.
 - Personal-phone and app calls both require an active paused authorization. A refusal means no dialing. Valid active retries remain idempotent; resume, outcome, reassignment, wrong destination, or STOP invalidates old authority.
@@ -78,10 +84,11 @@ All data was synthetic/PGlite or mocked HTTP. No provider request or external me
 ### outreach-crm
 
 - `npm run test:release-candidate`: 43 passed in 8 files.
-- `npm test -- --run`: 333 passed in 43 files.
+- `npm test -- --run`: 334 passed in 43 files.
 - `npx tsc -b --force`: passed.
 - `npm run build`: passed; only the existing Vite large-chunk advisory appeared.
 - `npm run lint`: passed.
+- `npm run check:preview:mock`: passed after adding the conveyor/Today mocks missing from the preview harness; only the existing Vite large-chunk advisory appeared.
 - `git diff --check`: passed.
 - The known jsdom canvas warning still prints during the signing-page test; that test passes.
 
@@ -101,7 +108,7 @@ All data was synthetic/PGlite or mocked HTTP. No provider request or external me
 ### Not completed and why
 
 - Real separate-session PostgreSQL contention: not run. This host has no `psql`, PostgreSQL server, Docker, or Podman. PGlite uses one local handle and is not represented as proof of server concurrency. Run the exact races in staging before enablement.
-- Local synthetic browser clicks: not run. The browser-control runtime crashed twice before creating a tab; no click had an uncertain outcome. Component/UI flows remain in the passing test suites, but interactive rendering is still a staging smoke item.
+- Local synthetic browser clicks: not run. The browser-control runtime crashed twice before creating a tab; no click had an uncertain outcome. The repaired synthetic preview now compiles, and component/UI flows remain in the passing test suites, but interactive clicking is still a staging smoke item.
 - Live state and provider delivery: not checked by design. Production credentials and calls were outside authorization.
 
 ## Claude review and rollout instructions
