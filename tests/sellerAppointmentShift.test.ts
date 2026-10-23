@@ -226,18 +226,24 @@ describe('recovery queue', () => {
 })
 
 describe('simulated Thalia → Adil → Colin shift', () => {
-  it('carries one card from an exact follow-up through weekend takeover to one Colin-owned visit', async () => {
+  it('waits for the exact follow-up before takeover, then creates one Colin-owned visit', async () => {
     await as(THALIA, () => db.query(`select public.log_call($1, '4145550177', 'not_now', 'call after the move',
-      '2026-11-05T18:00:00Z'::timestamptz)`, [LEAD]))
+      '2099-11-05T18:00:00Z'::timestamptz)`, [LEAD]))
     expect(await one<{ belt: string; named: string }>(`
       select belt, to_char(named_date at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') named from public.leads where id = $1`, [LEAD]))
-      .toEqual({ belt: 'not_now_dated', named: '2026-11-05T16:00:00Z' })
+      .toEqual({ belt: 'not_now_dated', named: '2099-11-05T16:00:00Z' })
+
+    const early = await as(ADIL, async () => (await one<{ r: Record<string, unknown> }>(
+      `select public.begin_human_call($1, '4145550177', 'personal', 'adil_scheduled_001', '2100-01-01T00:00:00Z') r`, [LEAD])).r)
+    expect(early).toMatchObject({ ok: false, paused: false, reason: 'the seller asked us to wait until the scheduled date' })
+    expect(await one<{ paused: boolean }>(`select human_takeover_at is not null paused from public.leads where id = $1`, [LEAD])).toEqual({ paused: false })
+    await db.query(`update public.leads set named_date = now() - interval '1 second', next_stop_at = now() - interval '1 second' where id = $1`, [LEAD])
 
     const started = await as(ADIL, async () => (await one<{ r: Record<string, unknown> }>(
-      `select public.begin_human_call($1, '4145550177', 'personal', 'adil_weekend_001', '2026-10-25T16:00:00Z') r`, [LEAD])).r)
+      `select public.begin_human_call($1, '4145550177', 'personal', 'adil_scheduled_001', '2026-11-05T16:00:00Z') r`, [LEAD])).r)
     expect(started).toMatchObject({ ok: true, paused: true })
     const retry = await as(ADIL, async () => (await one<{ r: Record<string, unknown> }>(
-      `select public.begin_human_call($1, '4145550177', 'personal', 'adil_weekend_001', '2026-10-25T16:00:00Z') r`, [LEAD])).r)
+      `select public.begin_human_call($1, '4145550177', 'personal', 'adil_scheduled_001', '2026-11-05T16:00:01Z') r`, [LEAD])).r)
     expect(retry).toMatchObject({ ok: true, duplicate: true, paused: true })
     expect(await one<{ by: string }>(`select human_takeover_by by from public.leads where id = $1`, [LEAD])).toEqual({ by: 'Adil' })
     await as(ADIL, () => db.query(`select public.log_call($1, '4145550177', 'interested', 'ready to schedule', null)`, [LEAD]))

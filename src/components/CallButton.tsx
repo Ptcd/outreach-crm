@@ -2,7 +2,7 @@
 // up, and never shown for a number the card flags (bad, do-not-contact, STOP, DNC list).
 import { Button } from '@/components/ui/button'
 import { callLabel, useDialer } from '@/lib/dialer'
-import { callAttemptKey, humanCallAuthorized } from '@/lib/callAttempt'
+import { callAttemptKey, humanCallAuthorized, outboundCallWaits } from '@/lib/callAttempt'
 import { api } from '@/lib/queries'
 import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -14,12 +14,13 @@ export function CallButton(props: {
   leadId: string | null
   contactId?: string | null
   blocked?: boolean
+  notBefore?: string | null
   size?: 'sm' | 'default'
   className?: string
 }) {
   const { active, start, supported } = useDialer()
   const to = (props.to ?? '').trim()
-  if (!to || props.blocked) return null
+  if (!to || props.blocked || outboundCallWaits(props.notBefore)) return null
   const busy = !!active && (active.status === 'connecting' || active.status === 'ringing' || active.status === 'in_call')
   const title = !supported ? 'This browser cannot place calls; open the app in Chrome or Safari.' : undefined
   return (
@@ -35,13 +36,14 @@ export function PersonalCallButton(props: {
   to: string
   leadId: string
   blocked?: boolean
+  notBefore?: string | null
   activeKey?: string | null
   size?: 'sm' | 'default'
 }) {
   const qc = useQueryClient()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
-  if (props.blocked) return null
+  if (props.blocked || outboundCallWaits(props.notBefore)) return null
   const refresh = async () => {
     await Promise.all([
       qc.invalidateQueries({ queryKey: ['lead', props.leadId] }),

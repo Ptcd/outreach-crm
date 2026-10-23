@@ -37,6 +37,7 @@ const lead = (id: string, name: string, address: string, stage: string) => ({ id
   municipality: 'Milwaukee', property_address: address, property_zip: '53202', wpie_property_id: 11, parcel_id: 'P-11', property_type: 'duplex',
   units: 2, reasons_to_sell: ['tired landlord', 'deep tax delinquency'], score: 412.5, mailed_on: '2026-10-20', mail_channel: 'postcard',
   stage, stage_changed_at: ago(60), next_action_at: null, next_action: null, assigned_to: 'colin', dead_reason: null, notes: null,
+  belt: null, named_date: null,
   last_inbound_at: ago(6), created_at: ago(9000), updated_at: ago(60) })
 const LEADS = [lead('L1', 'DALE NOVAK', '2847 N Burleigh St', 'reply_received'), lead('L2', 'RITA SCHMIDT', 'W220 N1765 Pewaukee Rd', 'reply_received'),
   lead('L3', 'ACME HOLDINGS LLC', '200 S Oak Ave', 'opener_sent'), lead('L4', 'BOB SMITH', '300 W Elm St', 'dnc')]
@@ -79,8 +80,24 @@ export const useRepliesWaiting = () => ok({ drafts_waiting: WAITING.length, rout
 export const useCampaignControl = () => ok(CONTROL)
 export const usePlannedOpeners = () => ok(PLANNED)
 export const useDueTasks = () => ok([{ id: 'T1', lead_id: 'L1', due_at: ago(30), kind: 'call', owner: 'colin', done_at: null, note: 'after 5', created_at: '', lead: LEADS[0] }])
+export const useMyStops = () => ok([{ id: 'TS1', lead_id: 'L1', due_at: ago(15), kind: 'call', owner: 'thalia', done_at: null,
+  note: 'Ask whether the tenant has named a move-out day.', created_at: ago(600), source: 'belt', title: 'Call: tenant timing', phone10: '4145550177',
+  lead: { ...LEADS[0], belt: 'yes_unbooked', belt_step: 1, next_stop_say: 'Ask whether the tenant has named a move-out day.', elderly_or_ill: false, grief: false } }])
 export const useUnseenReplies = () => ok([{ id: 'M1', lead_id: 'L1', direction: 'in', channel: 'sms', body: "Maybe. Depends what you'd pay.", sent_at: ago(6), seen_at: null, is_opt_out: false, is_opener: false, status: 'replied', lead: LEADS[0] }])
 export const useFollowupDebt = () => ok([{ lead_id: 'L2', owner_name: 'RITA SCHMIDT', property_address: 'W220 N1765 Pewaukee Rd', stage: 'follow_up', next_action_at: ago(4000), next_action: 'call back about the roof', assigned_to: 'colin', days_late: 3 }])
+export const useSellerRecovery = () => ok([
+  { lead_id: 'L2', owner_name: 'RITA SCHMIDT', property_address: 'W220 N1765 Pewaukee Rd', stage: 'follow_up', reason: 'missing_next_stop', recovery_owner: 'thalia', human_takeover_by: null },
+  { lead_id: 'L1', owner_name: 'DALE NOVAK', property_address: '2847 N Burleigh St', stage: 'reply_received', reason: 'call_outcome_needed', recovery_owner: 'thalia', human_takeover_by: 'thalia' },
+])
+export const useBeltHealth = () => ok({
+  run: { id: 'BH1', kind: 'run', at: ago(4), ok: true, summary: 'All belts moving: 2 cards checked', checks: { counts: { yes_unbooked: 1, not_now: 1 }, fails: [] } },
+  canary: { id: 'BH2', kind: 'canary', at: ago(4), ok: true, summary: 'Synthetic canary passed', checks: {} },
+})
+export const useBeltEvents = () => ok([])
+export const useBeltMaxSteps = () => ok({ cold_texts: 3, yes_unbooked: 5, not_now: 2, visit_booked: 2 })
+export const useTouchTemplates = () => ok([
+  { key: 'not_now_named_date', label: 'Named-date reminder', wording: 'The seller-named date and street are inserted here.', auto: true, enabled: false, changed_by: null, changed_at: null },
+])
 export const usePipelineCounts = () => ok([{ stage: 'reply_received', lane: 'hold', county: 'Milwaukee', n: 2 }, { stage: 'postcard_mailed', lane: 'flip', county: 'Racine', n: 4996 }, { stage: 'dnc', lane: 'hold', county: 'Milwaukee', n: 1 }])
 export const useLeads = () => ok({ rows: LEADS, count: LEADS.length })
 const REPLY_TASKS = [{ id: 'T9', lead_id: 'L1', due_at: ago(5), kind: 'email', owner: 'adil' as const, done_at: null, note: null, created_at: ago(5), source: 'reply',

@@ -126,6 +126,11 @@ function QueueCard({ task, canOverride, onDone, onSkip }: { task: QueueTask; can
 
       <div>
         <p className="text-sm font-medium">Numbers to dial</p>
+        {lead.belt === 'not_now_dated' && lead.named_date && new Date(lead.named_date).getTime() > Date.now() && (
+          <p className="mt-1 rounded-md border border-amber-400 bg-amber-50 p-2 text-sm">
+            They asked us to wait until {fmtDateTime(lead.named_date)}. Outbound call controls return then.
+          </p>
+        )}
         {phones.length === 0 && <p className="text-sm text-muted-foreground">No phone on the card.</p>}
         <ul className="mt-1 space-y-2">
           {phones.map((c) => {
@@ -137,12 +142,13 @@ function QueueCard({ task, canOverride, onDone, onSkip }: { task: QueueTask; can
                 {c.line_type && <Badge>{c.line_type}</Badge>}
                 {c.person_name && <span className="text-muted-foreground">{c.person_name}</span>}
                 <CallButton to={c.value_normalized ?? c.value} name={lead.owner_name} address={lead.property_address} leadId={lead.id}
-                  contactId={c.id} blocked={blocked} size="sm" />
+                  contactId={c.id} blocked={blocked} size="sm" notBefore={lead.belt === 'not_now_dated' ? lead.named_date : null} />
                 {/* the same door as on the card: a call from your own phone pauses the texts too, and a call that
                     never connected is undone here without leaving the list (2026-10-22) */}
                 {(!lead.human_takeover_at || lead.human_takeover_phone === ten) && (
                   <PersonalCallButton to={c.value_normalized ?? c.value} leadId={lead.id} blocked={blocked}
-                    activeKey={lead.human_takeover_at ? lead.human_takeover_key : null} />
+                    activeKey={lead.human_takeover_at ? lead.human_takeover_key : null}
+                    notBefore={lead.belt === 'not_now_dated' ? lead.named_date : null} />
                 )}
               </li>
             )

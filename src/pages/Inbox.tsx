@@ -121,7 +121,8 @@ function InboxCard({ x, bucket }: { x: InboxLead; bucket: Bucket }) {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <CallButton to={o.phone} name={x.lead?.owner_name ?? o.owner_name} address={x.lead?.property_address ?? o.property_address}
-            leadId={leadId ?? null} blocked={stopped} />
+            leadId={leadId ?? null} blocked={stopped}
+            notBefore={x.lead?.belt === 'not_now_dated' ? x.lead.named_date : null} />
           <Badge tone={sendTone(o.send_status)}>{SEND_LABEL[o.send_status]}</Badge>
         </div>
       </div>

@@ -40,7 +40,7 @@ describe('release-candidate seller journey', () => {
 
     await as(db, THALIA, () => rpc(db, 'log_call', {
       p_lead_id: LEAD, p_phone: '4145550177', p_outcome: 'not_now', p_note: 'Call after the move',
-      p_when: '2026-11-05T18:00:00Z',
+      p_when: '2099-11-05T18:00:00Z',
     }))
     const dated = await one<{ named: string; stop: string; tasks: number }>(db, `
       select l.named_date::text named, l.next_stop_at::text stop,
@@ -51,7 +51,7 @@ describe('release-candidate seller journey', () => {
 
     await as(db, THALIA, () => rpc(db, 'log_call', {
       p_lead_id: LEAD, p_phone: '4145550177', p_outcome: 'not_now', p_note: 'Corrected: one week later',
-      p_when: '2026-11-12T18:00:00Z',
+      p_when: '2099-11-12T18:00:00Z',
     }))
     const rescheduled = await one<{ named: string; due: string; owner: string; tasks: number }>(db, `
       select l.named_date::text named, min(t.due_at)::text due, min(t.owner)::text owner, count(t.id)::int tasks
@@ -60,23 +60,29 @@ describe('release-candidate seller journey', () => {
     expect(new Date(rescheduled.due).getTime()).toBeGreaterThanOrEqual(new Date(rescheduled.named).getTime())
     expect(rescheduled.owner).toBe('colin')
     expect(rescheduled.tasks).toBe(1)
+    expect(await as(db, THALIA, () => rpc(db, 'begin_human_call', {
+      p_lead_id: LEAD, p_phone: '4145550177', p_source: 'personal', p_key: 'before_named_date_001',
+      p_now: '2100-01-01T00:00:00Z',
+    }))).toMatchObject({ ok: false, paused: false, reason: 'the seller asked us to wait until the scheduled date' })
+    expect(await one(db, `select human_takeover_at is null clean from public.leads where id = '${LEAD}'`)).toEqual({ clean: true })
+    await db.exec(`update public.leads set named_date = now() - interval '1 second', next_stop_at = now() - interval '1 second' where id = '${LEAD}'`)
 
     const manual = await as(db, THALIA, () => rpc<{ ok: boolean; paused: boolean; duplicate: boolean }>(db, 'begin_human_call', {
       p_lead_id: LEAD, p_phone: '4145550177', p_source: 'personal', p_key: 'manual_journey_001',
-      p_now: '2026-10-23T16:00:00Z',
+      p_now: '2026-11-12T16:00:00Z',
     }))
     expect(manual).toMatchObject({ ok: true, paused: true, duplicate: false })
     expect(await as(db, THALIA, () => rpc(db, 'begin_human_call', {
       p_lead_id: LEAD, p_phone: '4145550177', p_source: 'personal', p_key: 'manual_journey_001',
-      p_now: '2026-10-23T16:00:01Z',
+      p_now: '2026-11-12T16:00:01Z',
     }))).toMatchObject({ ok: true, paused: true, duplicate: true })
     expect(await as(db, THALIA, () => rpc(db, 'resume_human_call', {
-      p_lead_id: LEAD, p_key: 'manual_journey_001', p_now: '2026-10-23T16:01:00Z',
+      p_lead_id: LEAD, p_key: 'manual_journey_001', p_now: '2026-11-12T16:01:00Z',
     }))).toMatchObject({ ok: true, paused: false })
 
     expect(await as(db, ADIL, () => rpc(db, 'begin_human_call', {
       p_lead_id: LEAD, p_phone: '4145550177', p_source: 'app', p_key: 'app_journey_002',
-      p_now: '2026-10-24T16:00:00Z',
+      p_now: '2026-11-13T16:00:00Z',
     }))).toMatchObject({ ok: true, paused: true, duplicate: false })
     expect(await serviceRpc(db, 'claim_human_call_provider', {
       p_lead_id: LEAD, p_phone10: '4145550177', p_key: 'app_journey_002', p_provider_call_sid: SID1,
@@ -97,10 +103,10 @@ describe('release-candidate seller journey', () => {
 
     const note = 'Moving near family; sole signer; roof is old; asking 185000'
     expect(await as(db, THALIA, () => rpc(db, 'handoff_to_colin', {
-      p_lead_id: LEAD, p_note: note, p_now: '2026-10-24T17:00:00Z',
+      p_lead_id: LEAD, p_note: note, p_now: '2026-11-13T17:00:00Z',
     }))).toMatchObject({ ok: true, duplicate: false })
     expect(await as(db, THALIA, () => rpc(db, 'handoff_to_colin', {
-      p_lead_id: LEAD, p_note: note, p_now: '2026-10-24T17:01:00Z',
+      p_lead_id: LEAD, p_note: note, p_now: '2026-11-13T17:01:00Z',
     }))).toMatchObject({ ok: true, duplicate: true })
 
     await as(db, COLIN, () => rpc(db, 'call_answer', {

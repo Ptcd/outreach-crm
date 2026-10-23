@@ -13,6 +13,8 @@ export interface InboxLead {
     next_action: string | null
     assigned_to: string | null
     dead_reason: string | null
+    belt: string | null
+    named_date: string | null
   } | null
   messages: Message[]
   thread: ReplyThread | null

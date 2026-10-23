@@ -360,7 +360,7 @@ export function useInbox(fromDay: string, toDay: string, enabled = true) {
     queryFn: async (): Promise<InboxLead[]> => {
       const openers = check(
         await supabase.from('planned_openers')
-          .select('*, lead:leads(id, owner_name, property_address, stage, next_action_at, next_action, assigned_to, dead_reason)')
+          .select('*, lead:leads(id, owner_name, property_address, stage, next_action_at, next_action, assigned_to, dead_reason, belt, named_date)')
           .gte('plan_date', fromDay).lte('plan_date', toDay)
           .order('scheduled_at', { ascending: false, nullsFirst: false })
           .limit(500),

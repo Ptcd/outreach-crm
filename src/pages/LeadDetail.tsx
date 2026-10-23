@@ -273,9 +273,14 @@ function Contacts({ contacts, leadId, lead }: { contacts: Contact[]; leadId: str
     ({ id, patch }: { id: string; patch: Partial<Pick<Contact, 'status' | 'dnc_app'>> }) => api.updateContact(id, patch),
     [['lead', leadId]],
   )
+  const notBefore = lead?.belt === 'not_now_dated' ? lead.named_date : null
+  const waitingForNamedDate = !!notBefore && new Date(notBefore).getTime() > Date.now()
   return (
     <Section title={`Phones and emails (${contacts.length})`}>
       <p className="mb-2 text-xs text-muted-foreground">Red flags mean do not call or text that number.</p>
+      {waitingForNamedDate && <p className="mb-2 rounded-md border border-amber-400 bg-amber-50 p-2 text-sm">
+        They asked us to wait until {fmtDateTime(notBefore)}. Outbound call controls return then; incoming calls can still be answered.
+      </p>}
       {contacts.length === 0 && <Empty>No phones or emails on file.</Empty>}
       <ul className="divide-y">
         {contacts.map((c) => (
@@ -296,10 +301,10 @@ function Contacts({ contacts, leadId, lead }: { contacts: Contact[]; leadId: str
               {c.kind === 'phone' && (
                 <>
                   <CallButton to={c.value} name={c.person_name || lead?.owner_name} address={lead?.property_address}
-                    leadId={leadId} contactId={c.id} blocked={contactFlags(c).some((f) => f.tone === 'bad')} />
+                    leadId={leadId} contactId={c.id} blocked={contactFlags(c).some((f) => f.tone === 'bad')} notBefore={notBefore} />
                   {(!lead?.human_takeover_at || lead.human_takeover_phone === (c.value_normalized ?? c.value).replace(/\D/g, '').slice(-10)) && (
                     <PersonalCallButton to={c.value} leadId={leadId} blocked={contactFlags(c).some((f) => f.tone === 'bad')}
-                      activeKey={lead?.human_takeover_at ? lead.human_takeover_key : null} />
+                      activeKey={lead?.human_takeover_at ? lead.human_takeover_key : null} notBefore={notBefore} />
                   )}
                 </>
               )}
