@@ -3,7 +3,7 @@
 // fake Twilio and a fake drafter. Whether a reply MAY go is decided in Postgres
 // (reply_claim_send, migration 0004); what the reply agent says is decided by replyBrain.decide and,
 // for a real conversation, by the drafter (Claude) whose text only Colin can approve.
-import { PITCH_ASKED, endsInterest, firstNameOf, isHotReply } from './hotLeads.ts'
+import { AI_NOT_NOW, PITCH_ASKED, endsInterest, firstNameOf, isHotReply } from './hotLeads.ts'
 import { reactionKind, reactionMeaning } from './replyGuard.ts'
 import { decide, rulesVersion, scoreRedteam, type RedteamRow, type ReplyContext } from './replyBrain.ts'
 import { classifyFailure, isOptOut, type Rpc, type SenderEnv, type TwilioPort } from './sending.ts'
@@ -169,6 +169,15 @@ export async function runReplyAgent(opts: {
         body = null     // no draft: Colin writes this one himself
       }
     }
+    // Claude reads the whole thread; a word rule reads one line. When Claude says they would sell later or not at
+    // all, a rule's yes does not put the card on the call-now list: a later is a not now (a check-in every 90 days),
+    // a no is not interest. A price question or a call request stays warm whatever Claude says (3325 Linden,
+    // 2026-10-23: "Yes, still mine ... not ready to think about selling, but I'll keep you in mind" fired two hot
+    // alerts and a call-now card while Claude's own read said "later").
+    const aiInterest = typeof facts?.interest === 'string' ? facts.interest.trim().toLowerCase() : ''
+    if (!d.removal && AI_NOT_NOW.has(aiInterest) && ['interested', 'statement', 'think_it_over'].includes(d.intent)) {
+      d = { ...d, intent: aiInterest === 'later' ? 'not_now' : 'not_interested', note: `${d.note} | Claude read: ${aiInterest}` }
+    }
     s.decided[d.kind] += 1
     const r = await opts.rpc('reply_record_decision', { p_sid: t.sid, p_intent: d.intent, p_kind: d.kind, p_removal: d.removal,
       p_outcome: d.outcome, p_body: body, p_draft_source: source, p_note: d.note, p_rules_version: version,
@@ -186,7 +195,7 @@ export async function runReplyAgent(opts: {
         p_now: now().toISOString() })
     }
     const afterPitch = PITCH_ASKED.test(ctx.lastAgentText ?? '')
-    if ((held && !d.removal) || isHotReply({ intent: d.intent, text: ctx.inbound, removal: d.removal, afterPitch })) {
+    if ((held && !d.removal) || isHotReply({ intent: d.intent, text: ctx.inbound, removal: d.removal, afterPitch, aiInterest })) {
       const h = await opts.rpc('hot_record', { p_sid: t.sid, p_lead_id: t.lead_id, p_phone10: t.from10,
         p_first_name: firstNameOf(t.owner_name), p_address: t.property_address, p_body: ctx.inbound,
         p_is_test: t.is_test === true, p_now: now().toISOString() })

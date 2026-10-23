@@ -87,6 +87,15 @@ describe('which replies are hot', () => {
     }
   })
 
+  it("a yes then a soft later is not hot, and Claude's later or no outranks a one-line yes (3325 Linden, 2026-10-23)", () => {
+    const linden = "Yes, the house is still mine and at this point, I'm not ready to think about selling, but I'll keep you in mind. Have a great day."
+    expect(isHotReply({ intent: 'interested', text: linden, removal: false, afterPitch: true })).toBe(false)
+    expect(isHotReply({ intent: 'interested', text: 'yes', removal: false, afterPitch: true, aiInterest: 'later' })).toBe(false)
+    expect(isHotReply({ intent: 'statement', text: "I'd sell if the timing works", removal: false, aiInterest: 'no' })).toBe(false)
+    expect(isHotReply({ intent: 'interested', text: 'yes', removal: false, afterPitch: true, aiInterest: 'yes' })).toBe(true)
+    expect(isHotReply({ intent: 'price_first', text: 'not for a year, but what would you pay?', removal: false, aiInterest: 'later' })).toBe(true)
+  })
+
   it('writes the alert for Colin: who, what they said, the number, the lead link', () => {
     const a: HotAlert = { id: 'x', n: 1, lead_id: LEAD, phone10: '4144776435', first_name: 'John', address: '2825 S LOGAN AV, Milwaukee',
       body: 'Yes still mine', is_test: false }

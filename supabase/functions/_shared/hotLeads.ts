@@ -23,15 +23,22 @@ const COLD_INTENTS = new Set(['opt_out', 'hostile', 'wrong_number', 'sold', 'not
 const PRICE_INTENTS = new Set(['price_first', 'number_only', 'worth', 'terms', 'wants_call'])
 const INTEREST_WORDS = new RegExp(B.INTEREST_WORDS_RE.source, B.INTEREST_WORDS_RE.flags)
 const AFFIRM = new RegExp(B.AFFIRM_RE.source, B.AFFIRM_RE.flags)
-// "...I'm not looking to sell", "no intention of selling": selling words that say no.
-const NOT_SELLING = /\bnot\s+(?:\w+\s+){0,3}sell|\bno\s+(?:interest|intention|plans?)\b|\bnot\s+interested\b/i
+// "...I'm not looking to sell", "no intention of selling", "not ready to think about selling, but I'll keep
+// you in mind" (3325 Linden, 2026-10-23): selling words that say no, or not now.
+const NOT_SELLING = /\bnot\s+(?:\w+\s+){0,5}sell|\bno\s+(?:interest|intention|plans?)\b|\bnot\s+interested\b|\bnot\s+(?:quite\s+|really\s+|yet\s+)?ready\b|\bkeep\s+you\s+in\s+mind\b/i
 /** Our last text was the pitch question. */
 export const PITCH_ASKED = /would you ever consider selling/i
 
-export function isHotReply(x: { intent: string; text: string; removal: boolean; afterPitch?: boolean }): boolean {
+/** Claude's read of the whole thread (the drafter's facts.interest): 'later' or 'no' is never hot, whatever a word
+ * rule matched in one line, unless they asked a price or for a call (3325 Linden, 2026-10-23: Claude said "later" while a "Yes" made the card hot). */
+export const AI_NOT_NOW = new Set(['later', 'no'])
+
+export function isHotReply(x: { intent: string; text: string; removal: boolean; afterPitch?: boolean; aiInterest?: string | null }): boolean {
   const text = x.text ?? ''
   if (x.removal || COLD_INTENTS.has(x.intent) || NOT_SELLING.test(text)) return false
   if (PRICE_INTENTS.has(x.intent)) return true
+  // A price question or a call request stays hot; anything softer is not when Claude read later or no.
+  if (AI_NOT_NOW.has(x.aiInterest ?? '')) return false
   if (INTEREST_WORDS.test(text)) return true
   return !!x.afterPitch && (x.intent === 'interested' || AFFIRM.test(text))
 }

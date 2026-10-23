@@ -318,6 +318,31 @@ describe('hot replies', () => {
       `select inbound_sid, first_name, address, body from public.hot_alerts`)).rows
     expect(h).toEqual([{ inbound_sid: 'SMh1', first_name: null, address: '2847 N Burleigh St', body: 'Yes, what would you pay?' }])
   })
+
+  it("Claude's 'later' beats a one-line yes: no hot alert, and the card goes to not now, not the call-now list", async () => {
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMl', '+14145550177', "Yes it's still mine, we'll see. Have a great day")]
+    const s = await runReplyAgent({ rpc, env: DRY, twilio: tw, control: await control(), redteamRows: ROWS, now: () => NOON,
+      drafter: async () => ({ message: 'Got it, thanks for letting me know.', facts: { interest: 'later', still_owns: 'true' } }) })
+    expect(s.hot).toBe(0)
+    expect((await db.query(`select 1 from public.hot_alerts`)).rows).toHaveLength(0)
+    const d = (await db.query<{ intent: string; note: string }>(`select intent, note from public.reply_drafts where inbound_sid = 'SMl'`)).rows[0]
+    expect(d.intent).toBe('not_now')
+    expect(d.note).toMatch(/Claude read: later/)
+    const ev = (await db.query<{ to_belt: string | null }>(
+      `select to_belt from public.belt_events where event = 'inbound_text' and payload->>'said' like 'Yes it''s still mine%' order by at desc limit 1`)).rows
+    if (ev.length) expect(ev[0].to_belt).not.toBe('yes_unbooked')
+  })
+
+  it("Claude's 'later' never cools a price question: still hot", async () => {
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMp2', '+14145550177', 'Not for a year, but what would you pay?')]
+    const s = await runReplyAgent({ rpc, env: DRY, twilio: tw, control: await control(), redteamRows: ROWS, now: () => NOON,
+      drafter: async () => ({ message: 'Fair enough.', facts: { interest: 'later' } }) })
+    const d = (await db.query<{ intent: string }>(`select intent from public.reply_drafts where inbound_sid = 'SMp2'`)).rows[0]
+    expect(d.intent).toBe('price_first')
+    expect(s.hot).toBe(1)                                     // a price ask is still worth a call today
+  })
 })
 
 describe('the routine switch', () => {
