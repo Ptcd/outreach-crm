@@ -41,9 +41,12 @@ export function NotifyPanel() {
           <b>Put WPIE on your home screen:</b>{' '}
           {installable
             ? <Button size="sm" className="ml-1" onClick={() => void promptInstall()}>Install the app</Button>
-            : <>in Chrome tap the <b>⋮</b> menu, then <b>Add to Home screen</b> (or <b>Install app</b>).</>}
+            : <>on a phone, in Chrome tap the <b>three-dot menu</b>, then <b>Add to Home screen</b> (or <b>Install app</b>).</>}
         </p>
       )}
+      <p className="mb-2 text-xs text-muted-foreground">
+        On a computer, Chrome can show pings while the browser is running; installing the app is only needed for phone notifications when the browser is closed.
+      </p>
       <div className="flex flex-wrap items-center gap-2">
         {state === 'on' && <span>Notifications are on: a ping for every hot lead{member.role === 'owner' ? ' and when a reply needs you' : ''}.</span>}
         {state === 'off' && <Button size="sm" disabled={busy} onClick={() => void run(enablePush)}>Turn on notifications</Button>}

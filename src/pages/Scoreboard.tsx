@@ -47,6 +47,19 @@ export default function Scoreboard() {
       {q.data && weeks.length === 0 && <Empty>No activity yet. Numbers appear once openers go out.</Empty>}
       {week && (
         <Section title={`Week of ${fmtDate(week.week_start)}`}>
+          <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Caller scorecard">
+            {([
+              ['Reached', week.connects],
+              ['Confirmed owners', week.contacts],
+              ['Would sell', week.leads],
+              ['Booked calls', week.handoffs],
+            ] as const).map(([label, value]) => (
+              <div key={label} className="rounded-lg border bg-card p-3 text-center">
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="text-2xl font-semibold">{value}</p>
+              </div>
+            ))}
+          </div>
           {/* phones: one card per number */}
           <ul className="space-y-2 sm:hidden">
             {ROWS.map((r) => (

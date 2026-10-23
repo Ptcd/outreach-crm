@@ -14,13 +14,14 @@ export default function Pipeline() {
   const [params, setParams] = useSearchParams()
   const filter: LeadFilter = {
     stage: (params.get('stage') as LeadFilter['stage']) || 'working',
+    belt: params.get('belt') || 'all',
     lane: (params.get('lane') as LeadFilter['lane']) || 'all',
     county: params.get('county') || 'all',
     search: params.get('q') || '',
     page: Number(params.get('page') || 0),
   }
   const [search, setSearch] = useState(filter.search)
-  const set = (patch: Partial<Record<'stage' | 'lane' | 'county' | 'q' | 'page', string>>) => {
+  const set = (patch: Partial<Record<'stage' | 'belt' | 'lane' | 'county' | 'q' | 'page', string>>) => {
     const next = new URLSearchParams(params)
     for (const [k, v] of Object.entries(patch)) {
       if (!v || v === 'all' || (k === 'page' && v === '0')) next.delete(k)

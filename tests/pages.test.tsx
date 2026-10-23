@@ -118,6 +118,14 @@ describe('pages render', () => {
     at('/today', '/today', <Today />)
     expect(screen.getByText('Who is this?')).toBeTruthy()
     expect(screen.getByText('after 5', { exact: false })).toBeTruthy()
+    const required = [
+      screen.getByRole('heading', { name: /Tasks from replies/ }),
+      screen.getByRole('heading', { name: /New replies/ }),
+      screen.getByRole('heading', { name: 'Follow-ups due' }),
+      screen.getByRole('heading', { name: /Follow-up debt/ }),
+    ]
+    expect(required.every((heading, i) => i === 0 || Boolean(required[i - 1].compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true)
+    expect((screen.getByLabelText('Whose follow-ups') as HTMLSelectElement).value).toBe('colin')
   })
 
   it('Pipeline shows stage counts and the lead', () => {
@@ -235,6 +243,8 @@ describe('pages render', () => {
     at('/scoreboard', '/scoreboard', <Scoreboard />)
     expect(screen.getAllByText('92.0%').length).toBeGreaterThan(0)
     expect(screen.getByText('Walks per contract')).toBeTruthy()
+    const caller = within(screen.getByLabelText('Caller scorecard'))
+    for (const label of ['Reached', 'Confirmed owners', 'Would sell', 'Booked calls']) expect(caller.getByText(label)).toBeTruthy()
   })
 })
 
