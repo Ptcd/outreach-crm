@@ -112,6 +112,10 @@ All data was synthetic/PGlite or mocked HTTP. No provider request or external me
 - Local synthetic browser clicks: not run. The browser-control runtime crashed twice before creating a tab; no click had an uncertain outcome. The repaired synthetic preview now compiles, and component/UI flows remain in the passing test suites, but interactive clicking is still a staging smoke item.
 - Live state and provider delivery: not checked by design. Production credentials and calls were outside authorization.
 
+The smallest remaining environment actions are bounded: provide an existing disposable PostgreSQL 15+ test database to a runner that can open two genuinely independent sessions, then run only the documented migration fixtures and claim/STOP/lock races; and restart the browser-control runtime, open the existing synthetic preview on loopback, and execute the documented click checklist without a real login. If no disposable PostgreSQL runtime already exists, installation or startup needs separate approval. No service installation, database startup, credential change, or browser-security change was attempted in this shift.
+
+The useful release-candidate work reached those environment gates early; this records completion against the eight-hour allocation, not eight hours of elapsed execution.
+
 ## Claude review and rollout instructions
 
 1. Review both frozen code commits and `RELEASE_CANDIDATE_2026-10-23.md`; do not cherry-pick older milestones separately because they are already ancestors of the bases.
