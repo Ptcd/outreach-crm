@@ -22,6 +22,10 @@ export interface TwilioConfig {
   messagingServiceSid: string
   campaignNumber: string        // E.164 whose inbound texts are pulled before each run, or 'pool': every reply number
   statusCallbackUrl?: string    // set only when the auth token is available to verify callbacks
+  // CAMPAIGN_OPENER_FROM: first texts go out only from these pool numbers. A number just added to
+  // the pool waits days for carrier registration (30024 until then) and must stay in the pool for
+  // it, so without this list Twilio would pick it for real sellers. Empty = Twilio picks from the pool.
+  openerFrom: string[]
 }
 
 export interface SendResult { ok: true; sid: string; status: string; from?: string | null }
@@ -31,8 +35,9 @@ export interface InboundText { sid: string; from: string; to: string; body: stri
 export interface OutboundText { sid: string; to: string; from?: string | null; body: string; status: string; errorCode: string | null; dateCreated: string }
 
 export interface TwilioPort {
-  /** `from`: send from this exact number (a reply goes out from the number they texted). */
-  send(to: string, body: string, from?: string | null): Promise<SendResult | SendFailure>
+  /** `from`: send from this exact number (a reply goes out from the number they texted).
+   *  `statusCallback`: ask for delivery callbacks even with a `from` (a pinned first text). */
+  send(to: string, body: string, from?: string | null, opts?: { statusCallback?: boolean }): Promise<SendResult | SendFailure>
   /** Inbound texts to `to` (default: the campaign number) since `since`. */
   inboundSince(since: Date, to?: string): Promise<InboundText[]>
   /** Texts we sent to `to` since `since` (Twilio's own record; used to reconcile a lost result). */
@@ -53,6 +58,7 @@ export function senderEnv(get: (name: string) => string | undefined, functionsBa
   const authToken = (get('TWILIO_AUTH_TOKEN') ?? '').trim()
   const messagingServiceSid = (get('CAMPAIGN_MESSAGING_SERVICE_SID') ?? '').trim()
   const campaignNumber = (get('CAMPAIGN_FROM_NUMBER') ?? '').trim()
+  const openerFrom = (get('CAMPAIGN_OPENER_FROM') ?? '').split(',').map((x) => x.trim()).filter((x) => /^\+1\d{10}$/.test(x))
   const user = keySid && keySecret ? keySid : accountSid
   const password = keySid && keySecret ? keySecret : authToken
   const missing = [
@@ -64,7 +70,7 @@ export function senderEnv(get: (name: string) => string | undefined, functionsBa
   const twilio = missing.length
     ? null
     : {
-        accountSid, user, password, messagingServiceSid, campaignNumber,
+        accountSid, user, password, messagingServiceSid, campaignNumber, openerFrom,
         statusCallbackUrl: authToken ? `${functionsBaseUrl.replace(/\/$/, '')}/opener-status` : undefined,
       }
   if ((get('TWILIO_LIVE_SENDING') ?? '').trim() !== '1') return { live: false, why: 'TWILIO_LIVE_SENDING is not 1', twilio }
@@ -77,10 +83,10 @@ export function twilioPort(cfg: TwilioConfig, fetchFn: typeof fetch): TwilioPort
   const base = `https://api.twilio.com/2010-04-01/Accounts/${cfg.accountSid}`
   const auth = 'Basic ' + btoa(`${cfg.user}:${cfg.password}`)
   return {
-    async send(to, body, from) {
+    async send(to, body, from, opts) {
       const form = new URLSearchParams({ To: to, Body: body, MessagingServiceSid: cfg.messagingServiceSid })
       if (from) form.set('From', from)     // must be a number in the same Messaging Service
-      if (cfg.statusCallbackUrl && !from) form.set('StatusCallback', cfg.statusCallbackUrl)
+      if (cfg.statusCallbackUrl && (!from || opts?.statusCallback)) form.set('StatusCallback', cfg.statusCallbackUrl)
       let res: Response
       try {
         res = await fetchFn(`${base}/Messages.json`, {
@@ -253,7 +259,10 @@ export async function runSendOpeners(opts: {
 
     let res: SendResult | SendFailure
     try {
-      res = await opts.twilio.send(j.opener.phone, j.opener.body)
+      const from = openerFromFor(opts.env.twilio?.openerFrom ?? [], j.opener.phone)
+      res = from
+        ? await opts.twilio.send(j.opener.phone, j.opener.body, from, { statusCallback: true })
+        : await opts.twilio.send(j.opener.phone, j.opener.body)
     } catch (e) {
       res = { ok: false, httpStatus: null, code: null, message: String(e).slice(0, 300) }
     }
@@ -275,6 +284,14 @@ export async function runSendOpeners(opts: {
   }
   if (!s.stopped) s.stopped = 'max_claims'
   return s
+}
+
+/** The pool number a first text goes out from: the same one for the same phone, spread across the list. */
+export function openerFromFor(list: string[], phone: string): string | null {
+  if (!list.length) return null
+  let h = 0
+  for (const ch of phone.replace(/\D/g, '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return list[h % list.length]
 }
 
 // -------------------------------------------------------- Twilio callback signature

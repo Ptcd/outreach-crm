@@ -10,7 +10,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { SUPABASE_STUB } from './supabaseStub'
 import parity from './replyParity.generated.json'
 import {
-  classifyFailure, isOptOut, runSendOpeners, senderEnv, twilioSignature, validTwilioSignature,
+  classifyFailure, isOptOut, openerFromFor, runSendOpeners, senderEnv, twilioPort, twilioSignature, validTwilioSignature,
   type InboundText, type OutboundText, type Rpc, type SendFailure, type SendResult, type TwilioPort,
 } from '../supabase/functions/_shared/sending'
 
@@ -38,12 +38,12 @@ const LIVE = senderEnv((n) => ({
 } as Record<string, string>)[n], 'https://x.supabase.co/functions/v1')
 
 class FakeTwilio implements TwilioPort {
-  sends: { to: string; body: string }[] = []
+  sends: { to: string; body: string; from?: string | null; statusCallback?: boolean }[] = []
   inbound: InboundText[] = []
   answers: (SendResult | SendFailure | Error)[] = []
   inboundFails = false
-  async send(to: string, body: string) {
-    this.sends.push({ to, body })
+  async send(to: string, body: string, from?: string | null, opts?: { statusCallback?: boolean }) {
+    this.sends.push(from ? { to, body, from, statusCallback: opts?.statusCallback } : { to, body })
     const a = this.answers.shift() ?? { ok: true as const, sid: `SM${this.sends.length}`, status: 'accepted' }
     if (a instanceof Error) throw a
     return a
@@ -116,6 +116,28 @@ describe('runSendOpeners', () => {
     // No pool numbers known: STOPs cannot be read, so a live run sends nothing.
     const none = await runSendOpeners({ rpc, env: POOL, twilio: new FakeTwilio(), now: () => NOW, inboundNumbers: [] })
     expect(none).toMatchObject({ stopped: 'inbound_check_failed', sent: 0 })
+  })
+
+  it('CAMPAIGN_OPENER_FROM: first texts go out only from the listed numbers, with delivery callbacks', async () => {
+    const PINNED = senderEnv((n) => ({ TWILIO_LIVE_SENDING: '1', TWILIO_ACCOUNT_SID: 'ACtest', TWILIO_AUTH_TOKEN: 'tok',
+      CAMPAIGN_MESSAGING_SERVICE_SID: 'MGtest', CAMPAIGN_FROM_NUMBER: 'pool',
+      CAMPAIGN_OPENER_FROM: ' +12629996513, +12624180202 ,not-a-number' } as Record<string, string>)[n], 'https://x')
+    expect(PINNED.twilio?.openerFrom).toEqual(['+12629996513', '+12624180202'])
+    const phones = [await approvedOpener(), await approvedOpener(), await approvedOpener(), await approvedOpener()]
+    const tw = new FakeTwilio()
+    const s = await runSendOpeners({ rpc, env: PINNED, twilio: tw, now: () => NOW, inboundNumbers: ['+12629996513', '+12624180202'] })
+    expect(s.sent).toBe(4)
+    for (const x of tw.sends) {
+      expect(['+12629996513', '+12624180202']).toContain(x.from)
+      expect(x.statusCallback).toBe(true)
+      expect(x.from).toBe(openerFromFor(['+12629996513', '+12624180202'], x.to))   // same phone, same number
+    }
+    expect(tw.sends.map((x) => x.to).sort()).toEqual(phones.map((p) => `+1${p}`).sort())
+    // Not set: Twilio still picks from the pool (no From).
+    const POOL = senderEnv((n) => ({ TWILIO_LIVE_SENDING: '1', TWILIO_ACCOUNT_SID: 'ACtest', TWILIO_AUTH_TOKEN: 'tok',
+      CAMPAIGN_MESSAGING_SERVICE_SID: 'MGtest', CAMPAIGN_FROM_NUMBER: 'pool' } as Record<string, string>)[n], 'https://x')
+    expect(POOL.twilio?.openerFrom).toEqual([])
+    expect(openerFromFor([], '+14145551234')).toBeNull()
   })
 
   it('reconciles a lost result: Twilio has the text -> recorded sent with its delivery, never re-sent', async () => {
@@ -255,6 +277,27 @@ describe('sender env', () => {
     expect(classifyFailure({ ok: false, httpStatus: 429, code: '20429', message: '' })).toBe('failed')
     expect(classifyFailure({ ok: false, httpStatus: 500, code: null, message: '' })).toBe('uncertain')
     expect(classifyFailure({ ok: false, httpStatus: null, code: null, message: '' })).toBe('uncertain')
+  })
+})
+
+describe('Twilio port', () => {
+  it('a pinned first text carries From and still asks for delivery callbacks; a reply with From does not', async () => {
+    const env = senderEnv((n) => ({ TWILIO_ACCOUNT_SID: 'ACtest', TWILIO_AUTH_TOKEN: 'tok', CAMPAIGN_MESSAGING_SERVICE_SID: 'MGtest',
+      CAMPAIGN_FROM_NUMBER: 'pool' } as Record<string, string>)[n], 'https://x.supabase.co/functions/v1')
+    const forms: URLSearchParams[] = []
+    const fake = (async (_url: string, init: RequestInit) => {
+      forms.push(new URLSearchParams(String(init.body)))
+      return new Response(JSON.stringify({ sid: 'SM1', status: 'accepted' }), { status: 201 })
+    }) as unknown as typeof fetch
+    const port = twilioPort(env.twilio!, fake)
+    await port.send('+14145551234', 'hi', '+12629996513', { statusCallback: true })
+    await port.send('+14145551234', 'hi', '+12629996513')
+    await port.send('+14145551234', 'hi')
+    expect(forms.map((f) => [f.get('From'), f.get('StatusCallback')])).toEqual([
+      ['+12629996513', 'https://x.supabase.co/functions/v1/opener-status'],
+      ['+12629996513', null],
+      [null, 'https://x.supabase.co/functions/v1/opener-status'],
+    ])
   })
 })
 
