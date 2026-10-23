@@ -1,6 +1,7 @@
 # WPIE integration and browser-call safety — handoff for Claude
 
-Date: 2026-10-23 UTC  
+Date: 2026-10-23 UTC
+
 Status: implemented and verified locally; not pushed, merged, deployed, or applied to any live database
 
 ## Exact repositories and commits
@@ -22,7 +23,8 @@ Status: implemented and verified locally; not pushed, merged, deployed, or appli
 - Worktree: `C:\Users\onkau\Documents\Codex\2026-10-22\task-5\pm-phone-integration-safety`
 - Branch: `codex/wpie-call-safety-next`
 - Refreshed base: `origin/main` at `d07d6375f5335cd9acbcc2690c016b3c4ce50eae`
-- Safety implementation and frozen HEAD: `eeaf68d7199a261d23cddf948e6cf573244086d6`
+- Safety implementation: `eeaf68d7199a261d23cddf948e6cf573244086d6`
+- Seller caller-ID fail-closed hardening and frozen HEAD: `cabb8ba2bb32a48e231a6d4250b4bc89459a0879`
 
 The frozen statewide worktree/branch at `07aa1872` was not touched. No existing published history was rewritten.
 
@@ -61,7 +63,7 @@ The claims table has RLS enabled and no browser policy. Both the table and RPC a
 
 ### Backend fail-closed behavior
 
-pm-phone now calls `claim_human_call_provider`, not the earlier phone-only RPC. It refuses the call when any binding parameter or required configuration value is absent or malformed, when the RPC times out after five seconds, when HTTP/JSON/verdict handling fails, or when WPIE denies the claim. The refusal TwiML contains no database reason or key. Existing Twilio signature validation and seller caller-ID selection are unchanged.
+pm-phone now calls `claim_human_call_provider`, not the earlier phone-only RPC. It refuses the call when any binding parameter or required configuration value is absent or malformed, when the RPC times out after five seconds, when HTTP/JSON/verdict handling fails, or when WPIE denies the claim. It also refuses before claiming authorization when no approved seller caller-ID pool is configured; it never falls back to the PM line for a seller call. The refusal TwiML contains no database reason or key. Existing Twilio signature validation and valid seller caller-ID selection are unchanged.
 
 ### Test stability only
 
@@ -80,19 +82,24 @@ One existing reply-agent regression used database `now()` even though the assert
 
 ## Migration order, rollout, and rollback
 
-Required staging/production order after independent review:
+Required staging/production order after independent review and a separate authorization to deploy:
 
-1. Confirm the database is already through `0040_shift_people.sql` and run the existing `0039` active-pause preflight if upgrading from an older release.
-2. Apply `0041_human_call_provider_gate.sql`. It is additive: one empty claim table and one service-only RPC; it performs no lead/task/draft/belt backfill and does not clear active pauses.
-3. Deploy the outreach client so new browser calls include `leadId` and `takeoverKey`. The old pm-phone backend ignores those extra parameters and retains its phone-only fail-closed check during this brief compatibility window.
-4. Confirm pm-phone has the existing `WPIE_SUPABASE_URL` and service-role `WPIE_SUPABASE_KEY` configuration without printing either value.
-5. Deploy pm-phone commit `eeaf68d`. Deploying this backend before steps 2–3 intentionally fails closed and would refuse browser calls; it does not create unsafe dialing.
+1. Disable browser calling for the entire rollout. Do not treat a mixed old/new client-server window as acceptable availability.
+2. Confirm the database is already through `0040_shift_people.sql`. If upgrading from older migrations, run the existing `0039` zero-active-pause preflight and resolve every uncertain pause before proceeding.
+3. Apply `0041_human_call_provider_gate.sql`. It is additive: one empty claim table and one service-only RPC; it performs no lead/task/draft/belt backfill and does not clear active pauses.
+4. Verify pm-phone has the existing `WPIE_SUPABASE_URL` and service-role `WPIE_SUPABASE_KEY` configuration without printing either value, and verify the approved seller caller-ID pool is nonempty. The PM number is not a valid seller fallback.
+5. Deploy pm-phone through `cabb8ba` first. Old outreach clients omit the new binding parameters, so the new backend fails them closed while browser calling remains disabled.
+6. Deploy the outreach client through `493edbd`, which sends `leadId` and `takeoverKey`.
+7. In a production-mode staging process (`NODE_ENV=production`), verify a correctly signed request carries the custom parameters and succeeds only for the synthetic authorization; verify a tampered signature receives HTTP 403 and a tampered takeover key returns refusal TwiML with no `<Dial>`.
+8. Against staging Postgres, run the same-attempt claim from two independent database sessions and verify one stored claim plus an idempotent same-`CallSid` result. PGlite's single handle is not proof of production lock behavior.
+9. Complete the remaining controlled smoke checks below. Browser calling may be enabled only through a separate, explicitly authorized change after all checks pass.
 
 Rollback:
 
-1. Revert pm-phone to `d07d637` first; it restores the previous service-side phone block check.
-2. Revert the outreach client parameter change if needed.
-3. The `0041` table and RPC may remain inert. If removal is necessary, first ensure no browser calls are active and the backend no longer calls the RPC, then drop the function and table. No conveyor state needs reconstruction because `0041` never changes it.
+1. Disable browser calling and keep it disabled through the rollback.
+2. Revert the outreach client first so no new client depends on the provider-claim contract.
+3. Revert pm-phone to `d07d637` only after the client rollback is complete. This restores the previous service-side phone block check but is an intentional security downgrade, not a safe mixed-version operating state.
+4. The `0041` table and RPC may remain inert. If removal is necessary, first ensure no browser calls are active and the backend no longer calls the RPC, then drop the function and table. No conveyor state needs reconstruction because `0041` never changes it.
 
 ## Verification evidence
 
@@ -111,7 +118,7 @@ All tests used synthetic/PGlite data or mocked HTTP/Twilio behavior. No credenti
 
 ### pm-phone
 
-- `npm test` — **109 passed**, 8 files.
+- `npm test` - **110 passed**, 8 files.
 - `npm run typecheck` — **passed**.
 - `npm run build` — **passed**. The first sandboxed post-change run could not create `.next/server/app/api`; the identical elevated local rerun passed without source changes.
 - `git diff --check` — **passed**.
@@ -123,20 +130,23 @@ All tests used synthetic/PGlite data or mocked HTTP/Twilio behavior. No credenti
 
 ## Controlled smoke checklist (synthetic/test number only)
 
-1. In staging, verify migrations through `0041` and confirm the claim table is empty.
+1. With browser calling disabled, verify staging migrations through `0041` and confirm the claim table is empty.
 2. Use a synthetic lead and owned test number. Start one browser call and verify one `human_call_started` event, one provider claim, and no belt text claim.
 3. Replay the same signed Twilio webhook with the same `CallSid`; verify the claim is returned as a duplicate and no second row appears.
 4. Try the same key with another `CallSid`; verify refusal and no `<Dial>`.
 5. Authorize, then separately test STOP, a new suppression row, reassignment, explicit resume, and logged outcome before the provider webhook; every case must refuse.
 6. Try a clean number from another lead and a clean number not on any card; both must refuse.
 7. Temporarily point staging at an unavailable WPIE endpoint; verify the five-second fail-closed TwiML and restore configuration.
-8. Confirm the displayed caller ID remains one of the owned seller lines and a forged caller-ID parameter is ignored.
-9. Run one dry WPIE sync/conveyor cycle and confirm no missed stops, duplicate tasks, or claim-related worker errors.
+8. Confirm the displayed caller ID remains one of the owned seller lines, a forged caller-ID parameter is ignored, and an empty seller pool refuses without using the PM line.
+9. In a production-mode staging process, verify a correct Twilio signature and custom parameters, then verify a tampered signature gets HTTP 403 and a tampered takeover key produces no `<Dial>`.
+10. Use two independent staging Postgres sessions to race the same claim and verify one row and the expected retry verdicts.
+11. Run one dry WPIE sync/conveyor cycle and confirm no missed stops, duplicate tasks, or claim-related worker errors.
 
 ## Remaining decisions and gates
 
-- No live provider call was made. Signature behavior and Twilio custom-parameter delivery are covered by source review and mocked tests, but must receive the controlled staging smoke above before browser calling is enabled.
-- The shared-login selector in migration `0040` changes list/settings ownership on that phone, but the current voice token and `begin_human_call` actor still derive from the authenticated shared `team_members` row (Colin). This batch did not alter that deliberate `0040` design. If per-person call attribution or per-person incoming ringing is required, it needs a separate reviewed identity contract rather than trusting local storage at the provider boundary.
+- No live provider call was made. Signature behavior and Twilio custom-parameter delivery are covered by source review and mocked tests, but must receive the controlled production-mode staging smoke above before browser calling is enabled.
+- PGlite serialized the local duplicate-claim test through one database handle. A two-session staging Postgres race is still required to validate production lock/unique-conflict behavior.
+- The shared-login selector in migration `0040` changes list/settings ownership on that phone, but it is display state, not a security identity. The current voice token and `begin_human_call` actor derive from the authenticated shared `team_members` row (Colin), so the shared Colin account authorizes the team rather than proving which individual human is holding the phone. This batch did not alter that deliberate `0040` design. Per-person authorization, attribution, or incoming ringing requires a separate reviewed identity contract rather than trusting local storage at the provider boundary.
 - Dependency installation reported existing npm audit findings in both repositories. No automatic audit fix was run because it could change locked dependencies outside this safety batch.
 
 ## No-live-action statement
