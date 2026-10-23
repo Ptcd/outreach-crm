@@ -82,4 +82,3 @@ python -m pytest -q -p no:cacheprovider tests/test_single_family_plan.py
 - WPIE at refreshed `62309d4`: 26/26 compatibility tests and 4/4 single-family classification tests passed.
 - The repaired synthetic preview compiles completely. The local browser-control helper crashed twice before opening a tab, so no UI click evidence was produced.
 - Genuine multi-session PostgreSQL testing was not available: this host has no `psql`, PostgreSQL server, Docker, or Podman runtime.
-
