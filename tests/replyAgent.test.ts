@@ -547,3 +547,17 @@ describe('a sent removal line always blocks the phone (2026-10-24)', () => {
     expect((await db.query<{ stage: string }>(`select stage::text from public.leads where wpie_owner_id = 77`)).rows[0].stage).toBe('dnc')
   })
 })
+
+describe('no automatic nudge on top of an unanswered question (Colin 2026-10-24)', () => {
+  it('a due nudge slides a day while their text waits for Colin', async () => {
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMq1', '+14145550177', 'Why would you even contact us and ask that')]
+    await run(tw)
+    const lead = (await db.query<{ id: string }>(`select id from public.leads where wpie_owner_id = 77`)).rows[0]
+    await db.query(`update public.leads set belt = 'replied_quiet', belt_step = 1, next_stop_who = 'auto_text', next_stop_at = $2 where id = $1`,
+      [lead.id, new Date(NOON.getTime() + 25 * 3600_000).toISOString()])
+    const r = (await db.query<{ r: { outcome: string; reason?: string } }>(`select public.belt_claim_text($1, true, true, $2) r`,
+      [lead.id, new Date(NOON.getTime() + 26 * 3600_000).toISOString()])).rows[0].r
+    expect(r).toMatchObject({ outcome: 'slid', reason: 'their text is waiting for Colin' })
+  })
+})
