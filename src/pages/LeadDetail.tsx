@@ -19,6 +19,7 @@ import { AppointmentPacket } from '@/components/AppointmentPacket'
 import { api, useDeals, useLead, useWrite } from '@/lib/queries'
 import { useDialer } from '@/lib/dialer'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
+import { firstNameOf, timelineOf } from '@/lib/inbox'
 import { DEAL_STATUS_LABEL, MILESTONES, PEOPLE, SELLER_FACTS, STAGES, STAGE_LABEL, TASK_KINDS, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
 import { useColinHere } from '@/components/OnPhonePicker'
@@ -82,6 +83,8 @@ export default function LeadDetail() {
           )}
         </div>
       )}
+      <History leadId={lead.id} ownerName={lead.owner_name} messages={messages} inbound={q.data.inbound}
+        stageEvents={q.data.stageEvents} tasks={tasks} />
       <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}
         phone={params.get('phone')} startOpen={params.get('call') === '1'} canOverride={isOwner} />
       {(lead.belt === 'visit_booked' || lead.stage === 'walkthrough_booked') && (
@@ -97,7 +100,6 @@ export default function LeadDetail() {
         </ul>
         <EmailAction leadId={lead.id} to={email} ownerName={lead.owner_name} address={lead.property_address} />
       </Section>
-      <History leadId={lead.id} messages={messages} />
       <Section title="Book the visit?">
         <p className="mb-2 text-sm text-muted-foreground">The card decides from the call&apos;s answers: a reason with a date behind it, every signer lined up, a number they&apos;d hear under or one resting on a need, who lives there and what&apos;s wrong, no hard stop.</p>
         <VerdictBox v={verdict} />
@@ -387,57 +389,70 @@ function Milestones({ leadId, done }: { leadId: string; done: { id: number; kind
   )
 }
 
-function History({ leadId, messages }: { leadId: string; messages: import('@/lib/types').Message[] }) {
+// Everything with this owner, newest first (Adil 2026-10-24): texts both ways, calls, emails, notes, stage changes
+// and finished tasks, by name. A notification or the Inbox name opens the card at #history.
+function History({ leadId, ownerName, messages, inbound, stageEvents, tasks }: {
+  leadId: string
+  ownerName: string
+  messages: import('@/lib/types').Message[]
+  inbound: import('@/lib/types').TwilioInbound[]
+  stageEvents: { id: number; from_stage: string | null; to_stage: string; at: string; source: string }[]
+  tasks: import('@/lib/types').Task[]
+}) {
   const [kind, setKind] = useState<'note' | 'call'>('note')
   const [body, setBody] = useState('')
+  const [all, setAll] = useState(false)
   const add = useWrite(
     () => api.addMessage({ lead_id: leadId, channel: kind, direction: 'out', body: body.trim() }),
     [['lead', leadId]],
   )
+  const items = timelineOf({ ownerName, messages, inbound, stageEvents, tasks,
+    stageLabel: (s) => STAGE_LABEL[s as LeadStage] ?? s.replace(/_/g, ' ') })
+  const contacts = items.filter((i) => i.kind !== 'stage' && i.kind !== 'task').length
+  const shown = all ? items : items.slice(0, 8)
+  const first = firstNameOf(ownerName)
+  useEffect(() => {
+    if (window.location.hash === '#history') document.getElementById('history')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
   return (
-    <Section title={`Texts, calls and notes (${messages.length})`}>
-      <div className="mb-3 space-y-2">
-        <div className="flex gap-2">
-          <Select value={kind} onChange={(e) => setKind(e.target.value as 'note' | 'call')} className="w-40">
-            <option value="note">Note</option>
-            <option value="call">Call log</option>
-          </Select>
-        </div>
-        <Textarea
-          placeholder={kind === 'call' ? 'What happened on the call' : 'Note'}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-        />
-        <Button
-          size="sm"
-          disabled={!body.trim() || add.isPending}
-          onClick={() => add.mutate(undefined, { onSuccess: () => setBody('') })}
-        >
-          Add
-        </Button>
-        <p className="text-xs text-muted-foreground">Texts are sent from WPIE, not from here.</p>
-        <ErrorNote error={add.error} />
-      </div>
-      {messages.length === 0 && <Empty>Nothing yet.</Empty>}
-      <ul className="space-y-2">
-        {messages.map((m) => (
-          <li
-            key={m.id}
-            className={`rounded-md p-2 text-sm ${m.direction === 'in' ? 'bg-blue-50' : m.channel === 'sms' ? 'bg-muted' : 'border'}`}
-          >
-            <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span>
-                {m.channel === 'sms' ? (m.direction === 'in' ? 'Text from owner' : m.is_opener ? 'Opener text' : 'Text') : m.channel === 'call' ? 'Call' : m.channel === 'email' ? 'Email sent' : 'Note'}
-              </span>
-              <span>{fmtDateTime(m.sent_at)}</span>
-              {m.status && m.channel === 'sms' && <Badge>{m.status.replace(/_/g, ' ')}</Badge>}
-              {m.is_opt_out && <Badge tone="bad">STOP</Badge>}
-            </div>
-            <p className="whitespace-pre-wrap">{m.body}</p>
-          </li>
-        ))}
-      </ul>
-    </Section>
+    <div id="history" className="scroll-mt-16">
+      <Section title={`Everything with ${first || ownerName} (${contacts})`}>
+        {items.length === 0 && <Empty>Nothing yet.</Empty>}
+        <ul className="space-y-2">
+          {shown.map((m) => (
+            <li key={m.key}
+              className={cn('rounded-md p-2 text-sm', m.who === 'them' ? 'bg-blue-50' : m.who === 'us' ? 'bg-muted' : 'border border-dashed')}>
+              <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">{m.title}</span>
+                <span>{fmtDateTime(m.at)}</span>
+                {m.badges.map((b) => <Badge key={b} tone={b === 'STOP' ? 'bad' : undefined}>{b}</Badge>)}
+              </div>
+              {m.body && <p className="whitespace-pre-wrap">{m.body}</p>}
+            </li>
+          ))}
+        </ul>
+        {items.length > 8 && (
+          <Button variant="outline" size="sm" className="mt-2" onClick={() => setAll((v) => !v)}>
+            {all ? 'Show the latest only' : `Show all ${items.length}`}
+          </Button>
+        )}
+        <details className="mt-3">
+          <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium">Add a note or a call log</summary>
+          <div className="mt-2 space-y-2">
+            <Select value={kind} onChange={(e) => setKind(e.target.value as 'note' | 'call')} className="w-40">
+              <option value="note">Note</option>
+              <option value="call">Call log</option>
+            </Select>
+            <Textarea placeholder={kind === 'call' ? 'What happened on the call' : 'Note'} value={body} onChange={(e) => setBody(e.target.value)} />
+            <Button size="sm" disabled={!body.trim() || add.isPending} onClick={() => add.mutate(undefined, { onSuccess: () => setBody('') })}>
+              Add
+            </Button>
+            <p className="text-xs text-muted-foreground">Texts are sent from WPIE, not from here.</p>
+            <ErrorNote error={add.error} />
+          </div>
+        </details>
+      </Section>
+    </div>
   )
 }
 

@@ -138,15 +138,17 @@ export function ReviewDeck({ drafts, startId }: { drafts: WaitingDraft[]; startI
       {d ? (
         <article id={`draft-${d.id}`} className="rounded-xl border bg-card p-4 shadow-sm">
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <h3 className="text-lg font-semibold">{displayName(d)}</h3>
+            <h3 className="text-lg font-semibold">
+              {d.lead_id ? <Link to={`/lead/${d.lead_id}#history`} className="underline underline-offset-4">{displayName(d)}</Link> : displayName(d)}
+            </h3>
             {d.is_test && <Badge tone="bad">TEST</Badge>}
           </div>
           <p className="text-sm text-muted-foreground">
             {d.property_address ? `${d.property_address} · ` : ''}{fmtPhone(d.phone10)}
           </p>
           {d.lead_id ? (
-            <Link to={`/lead/${d.lead_id}`} className="mt-1 inline-flex min-h-11 items-center text-sm font-medium text-primary underline">
-              Open the full card (facts, gate, tasks)
+            <Link to={`/lead/${d.lead_id}#history`} className="mt-1 inline-flex min-h-11 items-center text-sm font-medium text-primary underline">
+              Everything with them (texts, calls, notes)
             </Link>
           ) : !d.is_test && (
             <div className="mt-1">

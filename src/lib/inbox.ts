@@ -194,3 +194,81 @@ export const DRAFT_LABEL: Record<DraftStatus, string> = {
 
 /** Statuses where Colin can still approve (with edits) or skip. */
 export const DRAFT_OPEN: DraftStatus[] = ['awaiting_approval', 'would_send', 'no_reply', 'dry_sent']
+
+/** When the owner last texted us (ISO), or null. */
+export function lastReplyAt(x: InboxLead): string | null {
+  const ats = [...x.messages.filter((m) => m.direction === 'in').map((m) => m.sent_at), ...x.inbound.map((t) => t.received_at)]
+  return ats.length ? ats.sort().slice(-1)[0] : null
+}
+
+/** Inbox order (Adil 2026-10-24: "I am not able to find the replies at the top"): replies waiting for
+ *  an answer first, then every other owner who replied, newest reply first, then the rest by when we texted. */
+export function inboxOrder(a: InboxLead, b: InboxLead): number {
+  const need = (x: InboxLead) => Number(bucketOf(x) === 'needs_me')
+  if (need(a) !== need(b)) return need(b) - need(a)
+  const ra = lastReplyAt(a), rb = lastReplyAt(b)
+  if (!!ra !== !!rb) return ra ? -1 : 1
+  if (ra && rb && ra !== rb) return rb.localeCompare(ra)
+  return (b.opener.sent_at ?? b.opener.scheduled_at ?? '').localeCompare(a.opener.sent_at ?? a.opener.scheduled_at ?? '')
+}
+
+/** The first name a person would use ("PATRICIA C GARRITY TRUSTEE" -> "Patricia"); '' for a company. */
+export function firstNameOf(owner: string | null | undefined): string {
+  const s = (owner ?? '').trim()
+  if (!s || /\b(LLC|INC|CORP|COMPANY|HOLDINGS|PROPERTIES|INVESTMENTS?|GROUP|PARTNERS|REALTY|MANAGEMENT|BANK|CHURCH)\b/i.test(s)) return ''
+  const comma = s.match(/^([A-Za-z'-]{2,}),\s*([A-Za-z'-]{2,})/)
+  const w = comma ? comma[2] : s.split(/[\s,&]+/).find((x) => x.length > 1 && !/^(THE|MR|MRS|MS|DR)$/i.test(x)) ?? ''
+  return w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : ''
+}
+
+export interface TimelineItem {
+  key: string
+  at: string
+  who: 'us' | 'them' | 'team'
+  kind: 'text' | 'call' | 'note' | 'email' | 'stage' | 'task'
+  title: string
+  body: string
+  badges: string[]
+}
+
+/** Every contact with one owner, newest first (Adil 2026-10-24: "when I click on the name of the prospect, it
+ *  should show me the whole history of every type of communication"): texts both ways, calls, emails, notes,
+ *  texts Twilio has that WPIE has not recorded yet, stage changes and finished tasks. Names, not numbers. */
+export function timelineOf(x: {
+  ownerName: string | null | undefined
+  messages: Message[]
+  inbound?: TwilioInbound[]
+  stageEvents?: { id: number | string; from_stage: string | null; to_stage: string; at: string; source: string }[]
+  tasks?: { id: string; kind: string; owner: string; done_at: string | null; note: string | null; title?: string | null }[]
+  stageLabel?: (s: string) => string
+}): TimelineItem[] {
+  const name = firstNameOf(x.ownerName) || 'the owner'
+  const items: TimelineItem[] = []
+  for (const m of x.messages) {
+    const them = m.direction === 'in'
+    const badges = [m.status && m.channel === 'sms' ? m.status.replace(/_/g, ' ') : '', m.is_opt_out ? 'STOP' : ''].filter(Boolean)
+    const title = m.channel === 'sms'
+      ? (them ? `Text from ${name}` : m.is_opener ? `First text to ${name}` : `Text to ${name}`)
+      : m.channel === 'call' ? (them ? `Call from ${name}` : `Call with ${name}`)
+      : m.channel === 'email' ? (them ? `Email from ${name}` : `Email to ${name}`) : 'Note'
+    items.push({ key: `m-${m.id}`, at: m.sent_at, who: m.channel === 'note' ? 'team' : them ? 'them' : 'us',
+      kind: m.channel === 'sms' ? 'text' : m.channel, title, body: m.body ?? '', badges })
+  }
+  for (const t of x.inbound ?? []) {
+    const dup = x.messages.some((m) => m.direction === 'in' && (m.body ?? '').trim() === (t.body ?? '').trim()
+      && Math.abs(new Date(m.sent_at).getTime() - new Date(t.received_at).getTime()) < 10 * 60_000)
+    if (!dup) items.push({ key: `t-${t.sid}`, at: t.received_at, who: 'them', kind: 'text', title: `Text from ${name}`,
+      body: t.body ?? '', badges: t.is_opt_out ? ['STOP'] : [] })
+  }
+  for (const e of x.stageEvents ?? []) {
+    const label = x.stageLabel ?? ((s: string) => s.replace(/_/g, ' '))
+    items.push({ key: `s-${e.id}`, at: e.at, who: 'team', kind: 'stage', title: `Moved to ${label(e.to_stage)}`,
+      body: e.from_stage ? `from ${label(e.from_stage)}` : '', badges: [] })
+  }
+  for (const t of x.tasks ?? []) {
+    if (!t.done_at) continue
+    items.push({ key: `k-${t.id}`, at: t.done_at, who: 'team', kind: 'task', title: `Done: ${t.title || t.kind.replace(/_/g, ' ')}`,
+      body: t.note ?? '', badges: [t.owner] })
+  }
+  return items.sort((a, b) => b.at.localeCompare(a.at))
+}

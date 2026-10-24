@@ -294,6 +294,8 @@ export interface ReplyDraft {
   decided_by: string | null
   decided_at: string | null
   is_test: boolean
+  /** the card's name and address, when the query joins them (the Inbox's "other" texts) */
+  leads?: { owner_name: string | null; property_address: string | null } | null
 }
 
 /** The reply agent's view of one conversation, pushed by the WPIE sync. */

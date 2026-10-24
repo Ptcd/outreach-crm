@@ -51,3 +51,39 @@ describe('nextBusinessMorning', () => {
     expect(nextBusinessMorning(new Date('2026-10-21T18:00:00Z'))).toBe('2026-10-22T10:00')
   })
 })
+
+describe('Adil 2026-10-24: replies on top, names not numbers, the whole history', () => {
+  const base = (id: string, sent: string, inbound: { at: string; body: string }[] = []) => ({
+    opener: { id, lead_id: id, sent_at: sent, scheduled_at: sent, send_status: 'delivered' } as never,
+    lead: null, thread: null, drafts: [],
+    messages: inbound.map((m, i) => ({ id: `${id}-${i}`, lead_id: id, direction: 'in', channel: 'sms', body: m.body, sent_at: m.at,
+      from_number: null, to_number: null, status: null, is_opener: false, is_opt_out: false, seen_at: null })) as never,
+    inbound: [],
+  })
+  it('puts owners who replied first, newest reply on top', async () => {
+    const { inboxOrder } = await import('../src/lib/inbox')
+    const rows = [
+      base('quiet-new', '2026-10-24T15:00:00Z'),
+      base('old-reply', '2026-10-21T15:00:00Z', [{ at: '2026-10-22T10:00:00Z', body: 'not now' }]),
+      base('new-reply', '2026-10-20T15:00:00Z', [{ at: '2026-10-24T09:00:00Z', body: 'yes' }]),
+    ]
+    expect([...rows].sort(inboxOrder).map((r) => r.opener.id)).toEqual(['new-reply', 'old-reply', 'quiet-new'])
+  })
+  it('names the person in the history and merges every kind of contact', async () => {
+    const { firstNameOf, timelineOf } = await import('../src/lib/inbox')
+    expect(firstNameOf('PATRICIA C GARRITY TRUSTEE')).toBe('Patricia')
+    expect(firstNameOf('MANZ, GILBERT J JR')).toBe('Gilbert')
+    expect(firstNameOf('ACME HOLDINGS LLC')).toBe('')
+    const items = timelineOf({
+      ownerName: 'MARK J KRUPSKI & PATRICIA',
+      messages: [
+        { id: '1', lead_id: 'L', direction: 'out', channel: 'sms', body: 'Hey Mark', sent_at: '2026-10-23T15:00:00Z', from_number: null, to_number: null, status: 'delivered', is_opener: true, is_opt_out: false, seen_at: null },
+        { id: '2', lead_id: 'L', direction: 'out', channel: 'call', body: 'left a message', sent_at: '2026-10-24T15:00:00Z', from_number: null, to_number: null, status: null, is_opener: false, is_opt_out: false, seen_at: null },
+      ],
+      inbound: [{ sid: 'SM1', from10: '4145550000', body: 'Mark passed', is_opt_out: false, lead_id: 'L', received_at: '2026-10-23T23:26:00Z' }],
+      stageEvents: [{ id: 9, from_stage: 'reply_received', to_stage: 'dead', at: '2026-10-24T16:00:00Z', source: 'app' }],
+    })
+    expect(items.map((i) => i.title)).toEqual(['Moved to dead', 'Call with Mark', 'Text from Mark', 'First text to Mark'])
+    expect(items.some((i) => /\d{3}/.test(i.title))).toBe(false)
+  })
+})

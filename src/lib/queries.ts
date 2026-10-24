@@ -205,7 +205,7 @@ export function useLead(id: string) {
   return useQuery({
     queryKey: ['lead', id],
     queryFn: async () => {
-      const [lead, contacts, messages, tasks, gates, milestones, facts] = await Promise.all([
+      const [lead, contacts, messages, tasks, gates, milestones, facts, stageEvents, inbound] = await Promise.all([
         supabase.from('leads').select('*').eq('id', id).single(),
         supabase.from('contacts').select('*').eq('lead_id', id).order('kind').order('line_type'),
         supabase.from('messages').select('*').eq('lead_id', id).order('sent_at', { ascending: false }),
@@ -213,6 +213,9 @@ export function useLead(id: string) {
         supabase.from('gate_scores').select('*').eq('lead_id', id).order('at', { ascending: false }),
         supabase.from('lead_milestones').select('*').eq('lead_id', id),
         supabase.from('reply_drafts').select('facts, inbound_at').eq('lead_id', id).not('facts', 'is', null).order('inbound_at'),
+        // the card's full history (Adil 2026-10-24): stage changes and texts Twilio has that WPIE has not recorded yet
+        supabase.from('lead_stage_events').select('id, from_stage, to_stage, at, source').eq('lead_id', id).order('at', { ascending: false }).limit(100),
+        supabase.from('twilio_inbound').select('*').eq('lead_id', id).order('received_at', { ascending: false }).limit(100),
       ])
       return {
         lead: check(lead) as Lead,
@@ -221,6 +224,8 @@ export function useLead(id: string) {
         tasks: check(tasks) as Task[],
         gates: check(gates) as GateScore[],
         milestones: check(milestones) as Milestone[],
+        stageEvents: (stageEvents.data ?? []) as { id: number; from_stage: string | null; to_stage: string; at: string; source: string }[],
+        inbound: (inbound.data ?? []) as TwilioInbound[],
         // What the seller has told us so far (the drafting model's facts, newest value wins)
         facts: Object.assign({}, ...((facts.data ?? []) as { facts: Record<string, unknown> }[]).map((f) => f.facts ?? {})) as Record<string, unknown>,
       }
@@ -431,7 +436,8 @@ export function useOtherDrafts(knownLeadIds: string[]) {
     refetchInterval: 60_000,
     queryFn: async () => {
       const rows = check(
-        await supabase.from('reply_drafts').select('*').neq('status', 'superseded').order('inbound_at', { ascending: false }).limit(200),
+        await supabase.from('reply_drafts').select('*, leads(owner_name, property_address)').neq('status', 'superseded')
+          .order('inbound_at', { ascending: false }).limit(200),
       ) as ReplyDraft[]
       const known = new Set(knownLeadIds)
       return rows.filter((d) => !d.lead_id || !known.has(d.lead_id))

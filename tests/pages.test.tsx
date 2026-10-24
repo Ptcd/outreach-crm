@@ -228,6 +228,9 @@ describe('pages render', () => {
 
   it('Inbox shows each text with its thread, the reply AI and one-tap actions', () => {
     at('/inbox', '/inbox', <Inbox />)
+    // opens on the owners who replied (Adil 2026-10-24); "All" shows everyone texted
+    expect(screen.getByRole('tab', { name: /^Replies/ }).getAttribute('aria-selected')).toBe('true')
+    fireEvent.click(screen.getByRole('tab', { name: /^All/ }))
     expect(screen.getAllByText('ANN LEE').length).toBeGreaterThan(0)
     expect(screen.getByText('Needs you')).toBeTruthy()
     const deck = within(screen.getByRole('region', { name: 'Replies waiting for you' }))

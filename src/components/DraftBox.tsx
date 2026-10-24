@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge, ErrorNote, Textarea } from '@/components/ui/form'
 import { api, useWrite } from '@/lib/queries'
@@ -40,7 +41,16 @@ export function DraftBox({ d, showFrom = false }: { d: ReplyDraft; showFrom?: bo
         {d.intent && <span className="text-xs text-muted-foreground">Read as: {intentText(d.intent)}</span>}
       </div>
       {showFrom && (
-        <p className="mt-1 text-xs text-muted-foreground">From {fmtPhone(d.phone10)} to {fmtPhone(d.our_number)} - {fmtDateTime(d.inbound_at)}</p>
+        // the person's name first, the number after (Adil 2026-10-24: "it shows me the number, whereas it should show me the name")
+        <p className="mt-1 text-sm">
+          {d.lead_id && d.leads?.owner_name ? (
+            <Link to={`/lead/${d.lead_id}#history`} className="font-semibold underline underline-offset-4">{d.leads.owner_name}</Link>
+          ) : <span className="font-semibold">{fmtPhone(d.phone10)}</span>}
+          {d.leads?.property_address ? <span className="text-muted-foreground"> - {d.leads.property_address}</span> : null}
+          <span className="block text-xs text-muted-foreground">
+            {d.leads?.owner_name ? `${fmtPhone(d.phone10)} - ` : ''}{fmtDateTime(d.inbound_at)}
+          </span>
+        </p>
       )}
       {showFrom && d.inbound_body && <p className="mt-1 whitespace-pre-wrap rounded bg-muted p-2">{d.inbound_body}</p>}
       {d.status === 'sent' && d.sent_body && <p className="mt-1 whitespace-pre-wrap">Sent: {d.sent_body}</p>}

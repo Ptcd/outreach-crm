@@ -12,8 +12,8 @@ import { NotifyPanel } from '@/components/NotifyPanel'
 import { PhoneLookup } from '@/components/PhoneLookup'
 import { fmtDateTime, localInputToIso, todayLocal } from '@/lib/format'
 import {
-  BUCKETS, type Bucket, type InboxLead, SEND_LABEL, WORDING, bucketOf, intentText, nextBusinessMorning, optedOut,
-  reasonText, sendTone, threadOf,
+  BUCKETS, type Bucket, type InboxLead, SEND_LABEL, WORDING, bucketOf, inboxOrder, intentText, lastReplyAt, nextBusinessMorning,
+  optedOut, reasonText, sendTone, threadOf,
 } from '@/lib/inbox'
 import { STAGE_LABEL } from '@/lib/wpie'
 import { cn } from '@/lib/utils'
@@ -29,9 +29,11 @@ export default function Inbox() {
   const waiting = useWaitingDrafts()
   const q = useInbox(from, to, waiting.isFetched)
   const [startId] = useState(() => (window.location.hash.startsWith('#draft-') ? window.location.hash.slice(7) : null))
-  const [chip, setChip] = useState<Bucket | 'all'>('all')
-  const rows = useMemo(() => (q.data ?? []).map((x) => ({ x, bucket: bucketOf(x) }))
-    .sort((a, b) => Number(b.bucket === 'needs_me') - Number(a.bucket === 'needs_me')), [q.data])
+  // Replies first (Adil 2026-10-24: "I am not able to find the replies at the top"): the Inbox opens on owners who
+  // texted back, newest reply on top; "All" still shows everyone texted.
+  const [chip, setChip] = useState<Bucket | 'all' | 'replied'>('replied')
+  const rows = useMemo(() => [...(q.data ?? [])].sort(inboxOrder).map((x) => ({ x, bucket: bucketOf(x), replied: !!lastReplyAt(x) })),
+    [q.data])
   const leadIds = useMemo(() => (q.data ?? []).map((x) => x.opener.lead_id).filter((x): x is string => Boolean(x)), [q.data])
   const other = useOtherDrafts(leadIds)
   // A notification opens /inbox#draft-<id>: show that card once the data is in.
@@ -41,7 +43,8 @@ export default function Inbox() {
     document.getElementById(h.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [q.data, other.data])
   const counts = rows.reduce((c, r) => ({ ...c, [r.bucket]: (c[r.bucket] ?? 0) + 1 }), {} as Record<Bucket, number>)
-  const shown = rows.filter((r) => chip === 'all' || r.bucket === chip)
+  const shown = rows.filter((r) => chip === 'all' || (chip === 'replied' ? r.replied : r.bucket === chip))
+  const repliedCount = rows.filter((r) => r.replied).length
 
   return (
     <div className="space-y-4">
@@ -53,13 +56,8 @@ export default function Inbox() {
       {waiting.data && waiting.data.length === 0 && (
         <p className="rounded-xl border bg-card p-4 text-base">Nothing needs you right now.</p>
       )}
-      <NotifyPanel />
-      <p className="text-sm text-muted-foreground">
-        Every seller text from the last 30 days and the coming week. Routine ones (removals, wrong numbers, not interested)
-        are answered automatically; anything real waits here for your Approve.
-      </p>
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter">
-        {[{ id: 'all' as const, label: 'All' }, ...BUCKETS].map((b) => (
+      <div className="sticky top-0 z-10 -mx-1 flex gap-2 overflow-x-auto bg-background/95 px-1 py-2 backdrop-blur" role="tablist" aria-label="Filter">
+        {[{ id: 'replied' as const, label: 'Replies' }, { id: 'all' as const, label: 'All' }, ...BUCKETS].map((b) => (
           <button
             key={b.id}
             role="tab"
@@ -70,7 +68,7 @@ export default function Inbox() {
               chip === b.id ? 'border-primary bg-primary text-primary-foreground' : 'bg-background',
             )}
           >
-            {b.label} {b.id === 'all' ? rows.length : (counts[b.id] ?? 0)}
+            {b.label} {b.id === 'all' ? rows.length : b.id === 'replied' ? repliedCount : (counts[b.id as Bucket] ?? 0)}
           </button>
         ))}
       </div>
@@ -82,7 +80,7 @@ export default function Inbox() {
           <InboxCard key={x.opener.id} x={x} bucket={bucket} />
         ))}
       </div>
-      {(other.data ?? []).length > 0 && (chip === 'all' || chip === 'needs_me') && (
+      {(other.data ?? []).length > 0 && (chip === 'all' || chip === 'needs_me' || chip === 'replied') && (
         <section className="space-y-2">
           <h2 className="pt-2 font-semibold">Texts from numbers not on these plans</h2>
           {/* a skipped text is done: it does not hang around here (Colin 2026-10-23) */}
@@ -92,6 +90,11 @@ export default function Inbox() {
         </section>
       )}
       <ErrorNote error={other.error} />
+      <p className="text-sm text-muted-foreground">
+        Every seller text from the last 30 days and the coming week. Routine ones (removals, wrong numbers, not interested)
+        are answered automatically; anything real waits here for your Approve.
+      </p>
+      <NotifyPanel />
     </div>
   )
 }
@@ -113,7 +116,7 @@ function InboxCard({ x, bucket }: { x: InboxLead; bucket: Bucket }) {
         <div className="min-w-0">
           <h2 className="truncate font-semibold">
             {leadId ? (
-              <Link to={`/lead/${leadId}`} className="underline decoration-muted-foreground/40 underline-offset-4">
+              <Link to={`/lead/${leadId}#history`} className="underline decoration-muted-foreground/40 underline-offset-4">
                 {x.lead?.owner_name ?? o.owner_name ?? `Owner ${o.wpie_owner_id}`}
               </Link>
             ) : (x.lead?.owner_name ?? o.owner_name ?? `Owner ${o.wpie_owner_id}`)}
