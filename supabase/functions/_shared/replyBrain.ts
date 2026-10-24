@@ -31,6 +31,10 @@ const NAMES_A_NUMBER = /\$|\d/
 /** One question for a real (non-price) condition: what would have to happen, and when (phone script nr1). */
 export const NURTURE_LINE = "That's fine, and I'd rather you take your time than feel pushed. What would need to happen for selling to make sense, and roughly when?"
 const NOT_ANYMORE = re(B.NOT_ANYMORE_RE)
+/** the opener's question: "Do you still own ...", "Is ... still yours / your place", "Are you still with the owners of ..." */
+const OWNERSHIP_Q = /\b(?:still\s+own|still\s+yours|still\s+the\s+owner|still\s+your\s+(?:place|house|home)|still\s+with\s+the\s+owners|right\s+person\s+to\s+ask|still\s+in\s+the\s+family)\b/i
+/** a plain no to it: "No", "No, I don't", "nope not anymore", "I don't" */
+const DONT_OWN = /^(?=.*[a-z])\W*(?:(?:no|nope|nah)\b[\s,.!-]*)?(?:i\s+(?:don'?t|do\s+not)(?:\s+own\s+it)?|not\s+anymore|no\s+longer|not\s+mine)?\W*$/i
 const AFFIRM = re(B.AFFIRM_RE)
 const INTEREST_WORDS = re(B.INTEREST_WORDS_RE)
 const NEGATABLE = new Set(B.NEGATABLE)
@@ -149,6 +153,15 @@ function decideBase(ctx: ReplyContext): Decision {
   }
 
   // 3. The routine English cases (wpie.reply.brain.ScriptedGenerator, same lines).
+  // A plain "No, I don't" to the opener's "do you still own ...?" is not a conversation: they don't own it, so it
+  // closes like a wrong number (Colin 2026-10-24: "needs you messages are piling up even though they should be
+  // going to dead").
+  if (first && OWNERSHIP_Q.test(ctx.lastAgentText ?? '') && DONT_OWN.test(text)) {
+    // closes as a no, not as a wrong number: the number reached the owner of record, who no longer owns it, so WPIE
+    // must not re-plan another of their phones
+    return { ...routine('sold', B.WRONG_NUMBER_LINE, 'not_interested', 'does not own it - answered the ownership question with a no'),
+      facts: { still_owns: 'false' } }
+  }
   if (intent === 'wrong_number') return routine(intent, B.WRONG_NUMBER_LINE, 'wrong_number', 'wrong number')
   if (intent === 'sold') {
     if (!first && NOT_ANYMORE.test(text)) return toColin(intent, '"not anymore" answering a question')

@@ -11,7 +11,7 @@ import { guardDraft } from './replyGuard.ts'
 import { workNeeded } from './needsWork.ts'
 
 /** Selling or price words in a text that arrives after the thread was closed: a person may call back. */
-const LATE_INTEREST = /\b(sell|selling|sale|buy|buying|offer|price|pay|interested|changed (?:my|our) mind)\b/i
+const LATE_INTEREST = /\b(sell|selling|sale|buy|buying|offer|price|pay|interested|changed (?:my|our) mind|another (?:house|property|place|one)|other (?:house|property|place))\b/i
 
 export interface DraftInput {
   inbound: string

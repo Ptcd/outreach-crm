@@ -48,3 +48,18 @@ describe('routing', () => {
     expect(decide({ ...base, inbound: 'who is this?' }).reply).toMatch(/on N Burleigh St/)
   })
 })
+
+describe('Colin 2026-10-24: "needs you" fills with replies that should be dead', () => {
+  const opener = 'Hi, Colin Merrill here. Do you still own 1825 Kelly St? No worries if not, just reply STOP.'
+  const ctx = { inbound: '', priorInbound: [] as string[], lastAgentText: opener, propertyAddress: '1825 Kelly St', ownerName: 'PAT', ourTurns: 0 }
+  it('a plain "No, I don\'t" to "do you still own it?" closes as a no, by itself', () => {
+    for (const t of ["No, I don't", 'No', 'nope', 'Not anymore', 'I don\'t']) {
+      expect(decide({ ...ctx, inbound: t })).toMatchObject({ kind: 'routine', outcome: 'not_interested' })
+    }
+  })
+  it('still asks the exit question on a plain no, and leaves anything longer to Colin', () => {
+    expect(decide({ ...ctx, inbound: 'No thanks', lastAgentText: 'Thanks for getting back to me. Would you ever consider selling?' }))
+      .toMatchObject({ kind: 'routine', outcome: 'open' })
+    expect(decide({ ...ctx, inbound: 'No I sold it last year to my nephew' }).outcome).not.toBe('dnc')
+  })
+})

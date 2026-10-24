@@ -522,3 +522,28 @@ describe('after the thread is closed', () => {
     expect((await db.query<{ n: number }>(`select count(*)::int as n from public.reply_drafts where status = 'awaiting_approval'`)).rows[0].n).toBe(0)
   })
 })
+
+describe('a no closes the card (Colin 2026-10-24)', () => {
+  it('the exit question sends the card to dead, so no "replied, went quiet" nudge is ever drafted', async () => {
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMno1', '+14145550177', 'Not interested in selling')]
+    await run(tw)
+    const d = await drafts()
+    expect(d.find((x) => x.intent === 'not_interested')).toMatchObject({ kind: 'routine' })
+    expect((await db.query<{ belt: string | null }>(`select belt from public.leads where wpie_owner_id = 77`)).rows[0].belt).toBe('dead')
+    expect(d.filter((x) => x.kind === 'belt')).toHaveLength(0)
+  })
+})
+
+describe('a sent removal line always blocks the phone (2026-10-24)', () => {
+  it('a removal line approved by hand on a draft blocks the phone and closes the card red', async () => {
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMrm1', '+14145550177', 'Its my parents home. Leave it alone.')]
+    await run(tw)
+    const d = (await drafts()).find((x) => x.phone10 === '4145550177')!
+    await db.query(`update public.reply_drafts set status = 'sent', sent_body = $2, sent_at = now() where id = $1`,
+      [d.id, "Done - you won't hear from me again. Sorry to have bothered you."])
+    expect((await db.query(`select reason from public.suppressed_phones where phone10 = '4145550177'`)).rows).toEqual([{ reason: 'removal_reply' }])
+    expect((await db.query<{ stage: string }>(`select stage::text from public.leads where wpie_owner_id = 77`)).rows[0].stage).toBe('dnc')
+  })
+})
