@@ -561,3 +561,16 @@ describe('no automatic nudge on top of an unanswered question (Colin 2026-10-24)
     expect(r).toMatchObject({ outcome: 'slid', reason: 'their text is waiting for Colin' })
   })
 })
+
+describe('only a real removal line blocks (2026-10-24)', () => {
+  it('a conditional "if not, you won\'t hear from me again" does not block the phone or close the card', async () => {
+    const tw = new FakeTwilio()
+    tw.inbound = [text('SMp1', '+14145550177', "No, sorry I don't live there")]
+    await run(tw)
+    const d = (await drafts()).find((x) => x.phone10 === '4145550177')!
+    await db.query(`update public.reply_drafts set status = 'sent', sent_body = $2, sent_at = now() where id = $1`,
+      [d.id, "Thanks, Patty. Do you know who owns it now? If not, no worries at all, and you won't hear from me again."])
+    expect((await db.query(`select 1 from public.suppressed_phones where phone10 = '4145550177'`)).rows).toHaveLength(0)
+    expect((await db.query<{ stage: string }>(`select stage::text from public.leads where wpie_owner_id = 77`)).rows[0].stage).not.toBe('dnc')
+  })
+})
