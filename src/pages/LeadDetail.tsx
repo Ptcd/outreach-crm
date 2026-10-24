@@ -16,6 +16,7 @@ import { VerdictBadge, VerdictBox } from '@/components/BookingVerdict'
 import { BeltStrip } from '@/components/BeltStrip'
 import { CallButton, PersonalCallButton } from '@/components/CallButton'
 import { AppointmentPacket } from '@/components/AppointmentPacket'
+import { CallPanel } from '@/components/CallPanel'
 import { api, useDeals, useLead, useWrite } from '@/lib/queries'
 import { useDialer } from '@/lib/dialer'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
@@ -67,7 +68,6 @@ export default function LeadDetail() {
         </div>
       )}
       <HotBanner leadId={lead.id} />
-      <BeltStrip lead={lead} />
       {lead.human_takeover_at && (
         <div className="rounded-md border-2 border-amber-400 bg-amber-50 p-3 text-sm">
           {liveHere ? (
@@ -83,10 +83,15 @@ export default function LeadDetail() {
           )}
         </div>
       )}
+      <CallPanel lead={lead} contacts={contacts} inbound={q.data.inbound} replyFacts={facts} />
+      {/* the script sits right under the Call button, open on a hot card (someone just said they'd sell) */}
+      <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}
+        phone={params.get('phone')} canOverride={isOwner}
+        startOpen={params.get('call') === '1' || liveHere || lead.belt === 'yes_unbooked' || lead.belt === 'call_booked'} />
       <History leadId={lead.id} ownerName={lead.owner_name} messages={messages} inbound={q.data.inbound}
         stageEvents={q.data.stageEvents} tasks={tasks} />
-      <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}
-        phone={params.get('phone')} startOpen={params.get('call') === '1'} canOverride={isOwner} />
+      {/* the follow-up belt (what happens next on its own) sits under the history: callers start at the Call panel */}
+      <BeltStrip lead={lead} />
       {(lead.belt === 'visit_booked' || lead.stage === 'walkthrough_booked') && (
         <AppointmentPacket lead={lead} callFacts={callFacts} replyFacts={facts} latestGate={gates[0] ?? null} />
       )}

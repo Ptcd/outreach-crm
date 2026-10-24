@@ -40,6 +40,7 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
 }) {
   const qc = useQueryClient()
   const [open, setOpen] = useState(startOpen)
+  useEffect(() => { if (startOpen) setOpen(true) }, [startOpen])   // the panel's "open the script" tap
   const [facts, setFacts] = useState<CallFacts>(() => (lead.call_facts ?? {}) as CallFacts)
   const [err, setErr] = useState<string | null>(null)
   useEffect(() => setFacts((lead.call_facts ?? {}) as CallFacts), [lead.call_facts])

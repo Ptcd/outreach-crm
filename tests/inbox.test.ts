@@ -87,3 +87,16 @@ describe('Adil 2026-10-24: replies on top, names not numbers, the whole history'
     expect(items.some((i) => /\d{3}/.test(i.title))).toBe(false)
   })
 })
+
+describe('the call panel (Colin 2026-10-24: "Where is the place to call")', () => {
+  it('calls the number they texted from, and ticks the pillars from the call script and their texts', async () => {
+    const { bestPhone, pillarsDone } = await import('../src/components/CallPanel')
+    const c = (id: string, v: string, line = 'landline') => ({ id, kind: 'phone', value: v, value_normalized: v, line_type: line, status: 'ok',
+      suppressed: false, dnc_app: false, person_name: null }) as never
+    const contacts = [c('a', '8472498108', 'mobile'), c('b', '2626390214')]
+    expect((bestPhone(contacts, [{ sid: 'S', from10: '2626390214', body: 'We are looking to get it ready to sell', is_opt_out: false, lead_id: 'L', received_at: '2026-10-24T21:19:55Z' }]) as { id: string }).id).toBe('b')
+    expect((bestPhone(contacts, []) as { id: string }).id).toBe('a')
+    const done = pillarsDone({ motivation: { value: { text: 'tired of it' }, at: 'x' } } as never, { timeline: 'by spring' })
+    expect(done).toMatchObject({ motivation: true, timeline: true, condition: false, price: false })
+  })
+})
