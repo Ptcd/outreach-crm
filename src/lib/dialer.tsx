@@ -19,7 +19,7 @@ import { supabase } from './supabaseClient'
 import { fmtPhone } from './format'
 import { useAuth } from '@/providers/AuthProvider'
 import type { PhoneMatch } from './queries'
-import { callAttemptKey, humanCallAuthorized, humanCallProviderParams } from './callAttempt'
+import { callAttemptKey, callerLineFor, humanCallAuthorized, humanCallProviderParams } from './callAttempt'
 
 // The seller line the call shows (the pool's main texting number). Any number in the seller pool works;
 // pm-phone refuses one that is not ours.
@@ -208,7 +208,10 @@ export function DialerProvider({ children }: { children: ReactNode }) {
       const allowed = gate.data as { ok?: boolean; paused?: boolean; reason?: string } | null
       if (gate.error || !humanCallAuthorized(allowed)) throw new Error(gate.error?.message ?? allowed?.reason ?? 'Call authorization is not active')
       void contactId
-      const call = await dev.connect({ params: humanCallProviderParams(to, CALLER_ID, leadId, takeoverKey) })
+      const thread = await supabase.from('messages').select('direction, channel, from_number, to_number, sent_at')
+        .eq('lead_id', leadId).eq('channel', 'sms').order('sent_at', { ascending: false }).limit(50)
+      const line = callerLineFor(to, (thread.data ?? []) as Parameters<typeof callerLineFor>[1], CALLER_ID)
+      const call = await dev.connect({ params: humanCallProviderParams(to, line, leadId, takeoverKey) })
       callRef.current = call
       call.on('ringing', () => setActive((a) => (a ? { ...a, status: 'ringing' } : a)))
       call.on('accept', () => {

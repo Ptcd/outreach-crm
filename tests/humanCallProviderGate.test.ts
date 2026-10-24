@@ -121,3 +121,19 @@ describe('provider-side human-call authorization', () => {
     await expect(as(THALIA, () => db.query(`select * from public.human_call_provider_claims`))).rejects.toThrow(/permission denied/i)
   })
 })
+
+import { callerLineFor } from '@/lib/callAttempt'
+describe('callerLineFor (call from the number that texted them)', () => {
+  const rows = [
+    { direction: 'out', channel: 'sms', from_number: '+12624180202', to_number: '+17158965632', sent_at: '2026-10-24T23:45:03Z' },
+    { direction: 'in', channel: 'sms', from_number: '+17158965632', to_number: '+12624180202', sent_at: '2026-10-24T23:46:59Z' },
+    { direction: 'out', channel: 'sms', from_number: '+12623812196', to_number: '+14145550100', sent_at: '2026-10-25T01:00:00Z' },
+  ]
+  it('uses our side of the latest text with that phone', () => {
+    expect(callerLineFor('(715) 896-5632', rows, '+12629996513')).toBe('+12624180202')
+  })
+  it('falls back to the latest number we texted the card from, then the default', () => {
+    expect(callerLineFor('2625550199', rows, '+12629996513')).toBe('+12623812196')
+    expect(callerLineFor('2625550199', [], '+12629996513')).toBe('+12629996513')
+  })
+})
