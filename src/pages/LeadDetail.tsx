@@ -83,7 +83,7 @@ export default function LeadDetail() {
           )}
         </div>
       )}
-      <CallPanel lead={lead} contacts={contacts} inbound={q.data.inbound} replyFacts={facts} />
+      <CallPanel lead={lead} contacts={contacts} inbound={q.data.inbound} replyFacts={facts} messages={messages} />
       {/* the script sits right under the Call button, open on a hot card (someone just said they'd sell) */}
       <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}
         phone={params.get('phone')} canOverride={isOwner}

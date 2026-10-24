@@ -100,3 +100,14 @@ describe('the call panel (Colin 2026-10-24: "Where is the place to call")', () =
     expect(done).toMatchObject({ motivation: true, timeline: true, condition: false, price: false })
   })
 })
+
+describe('the call panel names the person we texted', () => {
+  it('uses the greeting of our first text, not the trust name', async () => {
+    const { greetedName } = await import('../src/components/CallPanel')
+    const m = (body: string, at: string) => ({ id: at, lead_id: 'L', direction: 'out', channel: 'sms', body, sent_at: at,
+      from_number: null, to_number: null, status: null, is_opener: true, is_opt_out: false, seen_at: null }) as never
+    expect(greetedName([m('Hi Laurie, Colin Merrill here in Mequon. Are you still with the owners of 3424 N Main St?', '2026-10-22')],
+      'R Darrell Sutton Revocable Trust')).toBe('Laurie')
+    expect(greetedName([], 'PATRICIA C GARRITY TRUSTEE')).toBe('Patricia')
+  })
+})

@@ -5,7 +5,16 @@ import { answerOf, type CallFacts } from '@/lib/callGate'
 import { firstNameOf } from '@/lib/inbox'
 import { fmtPhone } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import type { Contact, Lead, TwilioInbound } from '@/lib/types'
+import type { Contact, Lead, Message, TwilioInbound } from '@/lib/types'
+
+/** The name our first text greeted ("Hi Laurie, Colin Merrill here ..."), else the owner's first name. A trust's
+ *  texts go to a person (Laurie), not to the name on title ("R Darrell Sutton Revocable Trust"). */
+export function greetedName(messages: Message[] | undefined, ownerName: string): string {
+  const first = [...(messages ?? [])].filter((m) => m.direction === 'out' && m.channel === 'sms')
+    .sort((a, b) => a.sent_at.localeCompare(b.sent_at))[0]
+  const m = (first?.body ?? '').match(/^(?:Hi|Hey|Hello)\s+([A-Z][a-z]+)\b|^([A-Z][a-z]+),/)
+  return (m && (m[1] || m[2])) || firstNameOf(ownerName)
+}
 
 /** The four pillars (Rick: motivation, condition, timeline, price) plus who signs and the booking, in call order.
  *  `call` is the call script's answer id; `reply` is what their texts already told us. */
@@ -37,14 +46,14 @@ export function bestPhone(contacts: Contact[], inbound: TwilioInbound[]): Contac
 // The top of a card (Colin 2026-10-24: "Where is the place to call", "figuring out how to do the pillars on a call is
 // hard"): one big Call for the number they texted from, the pillars as a checklist that fills in as the call script is
 // answered, and one tap to the script.
-export function CallPanel({ lead, contacts, inbound, replyFacts }: {
-  lead: Lead; contacts: Contact[]; inbound: TwilioInbound[]; replyFacts: Record<string, unknown>
+export function CallPanel({ lead, contacts, inbound, replyFacts, messages }: {
+  lead: Lead; contacts: Contact[]; inbound: TwilioInbound[]; replyFacts: Record<string, unknown>; messages?: Message[]
 }) {
   const nav = useNavigate()
   if (lead.stage === 'dnc') return null
   const phone = bestPhone(contacts, inbound)
   const done = pillarsDone((lead.call_facts ?? {}) as CallFacts, replyFacts)
-  const first = firstNameOf(lead.owner_name)
+  const first = greetedName(messages, lead.owner_name)
   const texted = !!phone && (inbound ?? []).some((t) => (phone.value_normalized ?? phone.value).replace(/\D/g, '').slice(-10) === t.from10)
   const openScript = () => {
     nav({ search: '?call=1', hash: '#call-script' })
