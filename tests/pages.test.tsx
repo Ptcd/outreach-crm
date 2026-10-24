@@ -145,6 +145,10 @@ describe('pages render', () => {
 
   it('Lead detail shows facts, DNC flags, history, gate and the deal box', () => {
     at('/lead/L1', '/lead/:id', <LeadDetail />)
+    // the Call panel at the top (Colin 2026-10-24: "Where is the place to call")
+    const panel = within(screen.getByLabelText('The pillars').closest('section')!)
+    expect(panel.getByText(/No usable phone|^Call /)).toBeTruthy()      // this fixture's only phone texted STOP
+    expect(panel.getByText(/open the script/)).toBeTruthy()
     expect(screen.getByText('tired landlord')).toBeTruthy()
     expect(screen.getByText('Texted STOP')).toBeTruthy()
     expect(screen.getByText('Hi Jane')).toBeTruthy()
