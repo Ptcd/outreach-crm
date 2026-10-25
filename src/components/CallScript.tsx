@@ -93,9 +93,6 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
       <div className="rounded-md bg-muted p-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pick up with</p>
         <p className="mt-1 text-lg font-semibold">&ldquo;{pickupLine(caller)}&rdquo;</p>
-        {caller !== 'colin' && (
-          <p className="text-sm font-medium">You are calling for Colin: he is the buyer. Where the script says &ldquo;I buy houses&rdquo;, say &ldquo;Colin buys houses&rdquo;.</p>
-        )}
         <p className="text-sm text-muted-foreground">{PHONE_SCRIPT.voice}</p>
       </div>
       <details className="rounded-md border p-3">
@@ -406,9 +403,10 @@ function ScriptLines({ lines }: { lines: { id: string; say: string; note?: strin
   )
 }
 
-/** The first words on a call (Colin 2026-10-24: Adil and Thalia call for him, by their own names). */
+/** The first words on a call. Rick's lead manager is "an assistant checking what's going on with the property"; the
+ *  buyer (Colin) talks to the ones who want to sell (Colin 2026-10-25: "What would Rick do"). */
 // eslint-disable-next-line react-refresh/only-export-components
 export function pickupLine(caller: string): string {
   if (caller === 'colin') return PHONE_SCRIPT.pickup
-  return `Hi, this is ${caller.charAt(0).toUpperCase()}${caller.slice(1)}, I work with Colin Merrill.`
+  return `Hi, this is ${caller.charAt(0).toUpperCase()}${caller.slice(1)}, Colin Merrill's assistant. I'm just checking in about the place.`
 }
