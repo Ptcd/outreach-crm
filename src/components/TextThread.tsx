@@ -30,14 +30,14 @@ export function TextThread({ leadId, phone, messages, inbound, closed }: {
   }), [['lead', leadId], ['inbox'], ['reply_drafts']])
 
   return (
-    <section id="texts" className="scroll-mt-16 rounded-lg border bg-card">
-      <h2 className="border-b px-3 py-2 text-sm font-semibold">Texts{phone ? ` with ${fmtPhone(phone.value)}` : ''}</h2>
+    <section id="texts" className="scroll-mt-16 overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[var(--shadow-soft)]">
+      <h2 className="border-b border-border/70 bg-muted/40 px-4 py-2.5 text-sm font-semibold">Texts{phone ? ` with ${fmtPhone(phone.value)}` : ''}</h2>
       <div ref={box} className="max-h-[60vh] space-y-2 overflow-y-auto p-3" aria-label="Text messages, newest at the bottom">
         {items.length === 0 && <p className="text-sm text-muted-foreground">No texts yet.</p>}
         {items.map((t) => (
           <div key={t.key} className={cn('flex flex-col', t.mine ? 'items-end' : 'items-start')}>
             <p className={cn('max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm',
-              t.mine ? 'rounded-br-sm bg-blue-600 text-white' : 'rounded-bl-sm bg-muted text-foreground')}>{t.body || '(empty)'}</p>
+              t.mine ? 'rounded-br-md bg-gradient-to-b from-[hsl(245_80%_62%)] to-primary text-white shadow-sm' : 'rounded-bl-md bg-muted text-foreground')}>{t.body || '(empty)'}</p>
             <span className="mt-0.5 px-1 text-[11px] text-muted-foreground">
               {fmtDateTime(t.at)}{!t.mine && phone && t.phone10 !== phone.value.replace(/\D/g, '').slice(-10) ? ` - from ${fmtPhone(t.phone10)}` : ''}
             </span>

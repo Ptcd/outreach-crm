@@ -42,9 +42,9 @@ export default function Today() {
       <OnPhonePrompt />
       <StatTiles tiles={[
         { label: 'New replies', value: replies.data?.length, icon: MessageCircle, tone: 'indigo', to: '/inbox' },
-        { label: 'Calls and stops due', value: stops.data?.length, icon: PhoneCall, tone: 'emerald', to: '/calls' },
+        { label: 'Calls due', value: stops.data?.length, icon: PhoneCall, tone: 'emerald', to: '/calls' },
         { label: 'Tasks due', value: tasks.data?.length, icon: ClipboardList, tone: 'amber' },
-        { label: 'Asked for by sellers', value: replyTasks.data?.length, icon: Sparkles, tone: 'rose' },
+        { label: 'Seller asks', value: replyTasks.data?.length, icon: Sparkles, tone: 'rose' },
       ]} />
       <BeltHealthStrip />
       <Section title={`Tasks from replies${replyTasks.data ? ` (${replyTasks.data.length})` : ''}`}>

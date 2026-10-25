@@ -60,7 +60,7 @@ export function CallPanel({ lead, contacts, inbound, replyFacts, messages }: {
     setTimeout(() => document.getElementById('call-script')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }
   return (
-    <section className="sticky top-0 z-20 -mx-1 space-y-2 rounded-lg border-2 border-emerald-500 bg-card p-3 shadow-sm">
+    <section className="sticky top-16 z-20 space-y-2.5 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-card to-card p-4 shadow-[var(--shadow-lift)]">
       {phone ? (
         <div className="flex flex-wrap items-center gap-2">
           <div className="min-w-0 flex-1">
@@ -77,7 +77,7 @@ export function CallPanel({ lead, contacts, inbound, replyFacts, messages }: {
       <div className="flex flex-wrap gap-1.5" aria-label="The pillars">
         {PILLARS.map((p) => (
           <span key={p.id} className={cn('inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium',
-            done[p.id] ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'text-muted-foreground')}>
+            done[p.id] ? 'border-emerald-300 bg-emerald-100 text-emerald-800' : 'border-border bg-card text-muted-foreground')}>
             {done[p.id] ? '✓' : '○'} {p.label}
           </span>
         ))}
