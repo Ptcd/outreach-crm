@@ -140,6 +140,7 @@ export interface Message {
   is_opt_out: boolean
   sent_at: string
   seen_at: string | null
+  provider_sid?: string | null
 }
 
 export interface Task {
@@ -282,7 +283,7 @@ export interface ReplyDraft {
   inbound_body: string | null
   inbound_at: string
   intent: string | null
-  kind: 'removal' | 'routine' | 'candidate' | 'after_close' | 'belt'
+  kind: 'removal' | 'routine' | 'candidate' | 'after_close' | 'belt' | 'team'
   outcome: string | null
   note: string | null
   body: string | null

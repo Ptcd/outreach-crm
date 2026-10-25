@@ -151,7 +151,9 @@ describe('pages render', () => {
     expect(panel.getByText(/open the script/)).toBeTruthy()
     expect(screen.getByText('tired landlord')).toBeTruthy()
     expect(screen.getByText('Texted STOP')).toBeTruthy()
-    expect(screen.getByText('Hi Jane')).toBeTruthy()
+    // once in the phone-style text log at the top, once in the history
+    expect(screen.getAllByText('Hi Jane').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByLabelText('Text messages, newest at the bottom')).toBeTruthy()
     expect(screen.getAllByRole('radiogroup')).toHaveLength(6)
     expect(screen.getByText('Deal (Colin only)')).toBeTruthy()
     expect(screen.getByText(/never suggests an offer/)).toBeTruthy()

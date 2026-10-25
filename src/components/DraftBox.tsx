@@ -14,6 +14,7 @@ const KIND_LABEL: Record<ReplyDraft['kind'], string> = {
   candidate: 'Real reply - needs you',
   after_close: 'After close - needs you',
   belt: 'Follow-up - needs you',
+  team: 'Typed on the card',
 }
 
 // One text from a seller and the drafted answer. Approve sends Colin's final wording (he can edit);

@@ -305,6 +305,13 @@ export const api = {
     const d = r.data as { outcome: string; reason?: string }
     return { error: d.outcome === 'refused' ? { message: d.reason ?? 'not sent' } : null, data: d }
   },
+  // A text typed on the card (Adil 2026-10-24), from the number that texted them, through the approve gate
+  sendCardText: async (leadId: string, phone: string, text: string) => {
+    const r = await supabase.functions.invoke('reply-send', { body: { action: 'send_card_text', lead_id: leadId, phone, text } })
+    if (r.error) return { error: { message: r.error.message } }
+    const d = r.data as { outcome: string; reason?: string }
+    return { error: d.outcome === 'refused' ? { message: d.reason ?? 'not sent' } : null, data: d }
+  },
   setRoutine: (on: boolean) => supabase.rpc('set_routine_replies', { p_on: on }),
   // A tap-sent email (never AI-sent), from the Gmail sender, logged on the lead
   sendEmail: async (x: { lead_id: string | null; task_id: string | null; to: string; subject: string; body: string }) => {

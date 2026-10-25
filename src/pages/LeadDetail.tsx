@@ -16,7 +16,8 @@ import { VerdictBadge, VerdictBox } from '@/components/BookingVerdict'
 import { BeltStrip } from '@/components/BeltStrip'
 import { CallButton, PersonalCallButton } from '@/components/CallButton'
 import { AppointmentPacket } from '@/components/AppointmentPacket'
-import { CallPanel } from '@/components/CallPanel'
+import { CallPanel, bestPhone } from '@/components/CallPanel'
+import { TextThread } from '@/components/TextThread'
 import { api, useDeals, useLead, useWrite } from '@/lib/queries'
 import { useDialer } from '@/lib/dialer'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
@@ -84,6 +85,8 @@ export default function LeadDetail() {
         </div>
       )}
       <CallPanel lead={lead} contacts={contacts} inbound={q.data.inbound} replyFacts={facts} messages={messages} />
+      <TextThread leadId={lead.id} phone={bestPhone(contacts, q.data.inbound)} messages={messages} inbound={q.data.inbound}
+        closed={lead.stage === 'dnc'} />
       {/* the script sits right under the Call button, open on a hot card (someone just said they'd sell) */}
       <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}
         phone={params.get('phone')} canOverride={isOwner}
