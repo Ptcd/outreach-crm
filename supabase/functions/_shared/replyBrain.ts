@@ -72,8 +72,14 @@ export function isCarrierKeyword(text: string): boolean {
 }
 
 /** 'W220 N1765 Pewaukee Rd' style street for "on <street>" (brain._street). */
+// One card can hold two addresses ("1600 GREEN TREE DR ; 1602 GREEN TREE DR"): the first one, and an all-caps
+// county spelling in title case (2026-10-24: a seller got "myself on GREEN TREE DR ; 1602 GREEN TREE DR").
 function street(address: string | null | undefined): string {
-  const parts = (address ?? '').trim().split(/\s+/).filter(Boolean)
+  let first = (address ?? '').split(';')[0].trim()
+  if (first && first === first.toUpperCase()) {
+    first = first.toLowerCase().replace(/\b([a-z])/g, (c) => c.toUpperCase()).replace(/\b(\d+)(St|Nd|Rd|Th)\b/g, (_, n, x) => n + x.toLowerCase())
+  }
+  const parts = first.split(/\s+/).filter(Boolean)
   if (parts.length && /^\d+$/.test(parts[0])) parts.shift()
   return parts.join(' ')
 }

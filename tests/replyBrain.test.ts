@@ -63,3 +63,12 @@ describe('Colin 2026-10-24: "needs you" fills with replies that should be dead',
     expect(decide({ ...ctx, inbound: 'No I sold it last year to my nephew' }).outcome).not.toBe('dnc')
   })
 })
+
+describe('who-is-this names one street, in plain case (2026-10-24)', () => {
+  it('a two-address card says the first street', () => {
+    const d = decide({ inbound: 'Yes why are you asking?', priorInbound: [], lastAgentText: "Hello, this is Colin Merrill. Is 1600 Green Tree Dr still yours? Reply STOP if you'd rather not hear from me.",
+      propertyAddress: '1600 GREEN TREE DR ; 1602 GREEN TREE DR', ourTurns: 0 })
+    expect(d.reply).toContain('myself on Green Tree Dr.')
+    expect(d.reply).not.toContain(';')
+  })
+})
