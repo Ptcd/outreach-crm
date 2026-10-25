@@ -47,7 +47,7 @@ export default function Approvals() {
 
   return (
     <div className="space-y-4 pb-36 sm:pb-0">
-      <h1 className="text-xl font-semibold">Texts to approve</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Texts to approve</h1>
       <SendingPanel canDecide={isOwner} />
       <TouchSwitches canDecide={isOwner} />
       <div className="flex flex-wrap items-center gap-3">

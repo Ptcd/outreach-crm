@@ -86,7 +86,7 @@ function Signing({ view, token, onSigned }: { view: View; token: string; onSigne
     const waiting = view.others.filter((o) => !o.signed).map((o) => o.name)
     return (
       <section className="space-y-3 rounded-lg border bg-card p-4">
-        <h1 className="text-xl font-semibold">Signed. Thank you.</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Signed. Thank you.</h1>
         {finalUrl ? (
           <>
             <p>Everyone has signed. Here is your copy of the signed offer{view.include_recr ? ' and condition report' : ''}:</p>
@@ -116,7 +116,7 @@ function Signing({ view, token, onSigned }: { view: View; token: string; onSigne
   return (
     <>
       <section className="space-y-2 rounded-lg border bg-card p-4">
-        <h1 className="text-xl font-semibold">{t.street}, {t.muniName}</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t.street}, {t.muniName}</h1>
         <p>{view.buyer_name} offers to buy this property on these main terms:</p>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
           <dt className="text-muted-foreground">Price</dt><dd className="font-semibold">{usd(t.price)}</dd>

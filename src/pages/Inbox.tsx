@@ -48,7 +48,7 @@ export default function Inbox() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Inbox</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Inbox</h1>
       <PhoneLookup />
       {waiting.isLoading && <Empty>Loading replies that need you...</Empty>}
       <ErrorNote error={waiting.error} />

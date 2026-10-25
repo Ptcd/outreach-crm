@@ -47,7 +47,7 @@ export default function CallQueue() {
   return (
     <div className="space-y-4">
       <div className="flex items-baseline justify-between">
-        <h1 className="text-xl font-semibold">Calls</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Calls</h1>
         <p className="text-sm text-muted-foreground" data-testid="queue-count">
           {total === 0 ? 'nothing to call' : `${Math.min(done.length + 1, total)} of ${total}${skipped.length ? `, ${skipped.length} skipped for now` : ''}`}
         </p>

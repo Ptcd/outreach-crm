@@ -52,7 +52,7 @@ export default function LeadDetail() {
         <Link to="/pipeline" className="inline-flex min-h-11 items-center text-sm underline">
           Back to pipeline
         </Link>
-        <h1 className={cn('mt-1 text-xl font-semibold', lead.stage === 'dnc' && 'text-red-700')}>{lead.owner_name}</h1>
+        <h1 className={cn('mt-1 text-2xl font-bold tracking-tight', lead.stage === 'dnc' && 'text-red-700')}>{lead.owner_name}</h1>
         <div className="mt-1 flex flex-wrap gap-2">
           <Badge tone={lead.stage === 'dnc' ? 'bad' : undefined}>{STAGE_LABEL[lead.stage]}</Badge>
           {verdict.verdict !== 'open' && <VerdictBadge v={verdict} />}

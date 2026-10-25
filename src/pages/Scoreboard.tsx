@@ -28,7 +28,7 @@ export default function Scoreboard() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Scoreboard</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Scoreboard</h1>
       <div className="grid grid-cols-2 gap-2 sm:w-96">
         <Select value={lane} onChange={(e) => setLane(e.target.value)} aria-label="Lane">
           <option value="all">Both lanes</option>

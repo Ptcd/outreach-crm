@@ -57,7 +57,7 @@ export default function Settings() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Settings</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
       <OnPhonePrompt />
       <Section title={`Your alerts${who ? ` (${personLabel(who)})` : ''}`}>
         <p className="mb-3 text-sm text-muted-foreground">

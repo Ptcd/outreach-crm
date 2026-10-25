@@ -66,7 +66,7 @@ export default function Pipeline() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Pipeline</h1>
+      <h1 className="text-2xl font-bold tracking-tight">Pipeline</h1>
       <PhoneLookup />
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

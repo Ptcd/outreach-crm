@@ -11,6 +11,8 @@ import { STAGE_LABEL, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
 import { ownerFilterFor, useOnPhone, workerFor, type TaskOwner } from '@/lib/onPhone'
 import { OnPhonePrompt } from '@/components/OnPhonePicker'
+import { StatTiles } from '@/components/StatTiles'
+import { ClipboardList, MessageCircle, PhoneCall, Sparkles } from 'lucide-react'
 
 export default function Today() {
   const { member, user } = useAuth()
@@ -33,8 +35,17 @@ export default function Today() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Today</h1>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Today</h1>
+        <p className="text-sm text-muted-foreground">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+      </div>
       <OnPhonePrompt />
+      <StatTiles tiles={[
+        { label: 'New replies', value: replies.data?.length, icon: MessageCircle, tone: 'indigo', to: '/inbox' },
+        { label: 'Calls and stops due', value: stops.data?.length, icon: PhoneCall, tone: 'emerald', to: '/calls' },
+        { label: 'Tasks due', value: tasks.data?.length, icon: ClipboardList, tone: 'amber' },
+        { label: 'Asked for by sellers', value: replyTasks.data?.length, icon: Sparkles, tone: 'rose' },
+      ]} />
       <BeltHealthStrip />
       <Section title={`Tasks from replies${replyTasks.data ? ` (${replyTasks.data.length})` : ''}`}>
         <p className="mb-2 text-sm text-muted-foreground">Things a seller asked for that a text can&apos;t do. Adil by default.</p>

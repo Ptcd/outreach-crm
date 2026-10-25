@@ -10,13 +10,13 @@ import { useDialer } from '@/lib/dialer'
 import { cn } from '@/lib/utils'
 import { OnPhoneSwitch } from '@/components/OnPhonePicker'
 
-const NAV = [
+const NAV: { to: string; label: string; short?: string; icon: typeof CalendarCheck }[] = [
   { to: '/today', label: 'Today', icon: CalendarCheck },
   { to: '/calls', label: 'Calls', icon: PhoneCall },
   { to: '/inbox', label: 'Inbox', icon: Inbox },
   { to: '/pipeline', label: 'Pipeline', icon: ListChecks },
-  { to: '/approvals', label: 'Approve', icon: MessageSquareText },
-  { to: '/scoreboard', label: 'Scoreboard', icon: BarChart3 },
+  { to: '/approvals', label: 'Approve', short: 'Approve', icon: MessageSquareText },
+  { to: '/scoreboard', label: 'Scoreboard', short: 'Score', icon: BarChart3 },
 ]
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -96,7 +96,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 <span className="absolute -top-1 right-1 rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-sm">{waiting}</span>
               )}
             </span>
-            {n.label}
+            <span className="max-w-full truncate px-0.5">{n.short ?? n.label}</span>
             </>)}
           </NavLink>
         ))}

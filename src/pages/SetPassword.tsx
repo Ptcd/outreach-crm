@@ -26,7 +26,7 @@ export default function SetPassword() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
       <form onSubmit={submit} className="w-full max-w-sm space-y-3 rounded-lg border bg-card p-6 shadow-sm">
-        <h1 className="text-xl font-semibold">Set the app password</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Set the app password</h1>
         <p className="text-sm text-muted-foreground">
           Everyone who uses WPIE signs in with this one password. At least {MIN_PASSWORD} characters.
         </p>
