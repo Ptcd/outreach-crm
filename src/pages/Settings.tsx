@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input'
 import { ErrorNote, Section } from '@/components/ui/form'
 import { NotifyPanel } from '@/components/NotifyPanel'
 import { personAlerts, setPersonAlerts } from '@/lib/apiExtra'
-import { OnPhonePrompt } from '@/components/OnPhonePicker'
+import { OnPhonePrompt, useColinHere } from '@/components/OnPhonePicker'
+import { AgentKeys } from '@/components/AgentKeys'
 import { useOnPhone, workerFor } from '@/lib/onPhone'
 import { personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
@@ -17,6 +18,7 @@ export default function Settings() {
   const { member } = useAuth()
   const [picked] = useOnPhone()
   const who = workerFor(member, picked)
+  const colinHere = useColinHere()
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [loaded, setLoaded] = useState(false)
@@ -87,6 +89,11 @@ export default function Settings() {
       <Section title="Notifications on this phone">
         <NotifyPanel />
       </Section>
+      {colinHere && (
+        <Section title="Agent keys (Muse)">
+          <AgentKeys />
+        </Section>
+      )}
     </div>
   )
 }

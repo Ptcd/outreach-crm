@@ -1,0 +1,203 @@
+// The agent door (Colin 2026-10-25: "design it agent first"): the MCP tools two Muse agents (or any MCP client)
+// use. The intake agent loads prospects; the sender agent writes and queues texts and watches the results. The
+// agent applies the prospect rules itself. What this door refuses is only what may never go out: an opted-out or
+// do-not-contact phone, a closed card, a text with a price, cash, a business name or no STOP line. Everything
+// queued still passes the database's send check (switch, pause, no Sundays, window, daily cap, already texted).
+// Transport: MCP over streamable HTTP, stateless JSON responses (supabase/functions/agent-mcp).
+import { findPriceOrOffer } from './replyGuard.ts'
+
+export type Role = 'intake' | 'sender'
+export interface Agent { id: string; name: string; role: Role }
+
+/** Everything the tools touch, so the routing and the checks are testable without a database. */
+export interface DoorDb {
+  addProspect(p: Record<string, unknown>, agent: string): Promise<Record<string, unknown>>
+  findProspects(f: { address?: string; phone?: string; name?: string; lead_id?: string; only_agent?: boolean; limit: number }): Promise<unknown[]>
+  prospectCounts(): Promise<Record<string, unknown>>
+  status(): Promise<Record<string, unknown>>
+  readyToText(f: { limit: number; followups: boolean; all_sources: boolean }): Promise<unknown[]>
+  queueText(t: { lead_id: string; phone: string; body: string; step: number; send_after: string | null }, agent: string): Promise<Record<string, unknown>>
+  queue(date: string | null): Promise<unknown[]>
+  withdraw(id: string, agent: string, reason: string): Promise<boolean>
+  pause(reason: string, agent: string): Promise<Record<string, unknown>>
+  resume(agent: string): Promise<Record<string, unknown>>
+  results(hours: number): Promise<Record<string, unknown>>
+}
+
+export const SERVER_NAME = 'wpie'
+export const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05']
+
+export const TEXTING_RULES = [
+  'You write texts as Colin Merrill himself, first person ("I"). He is one local person who buys houses; never name a business, company, team or "investors".',
+  'Never mention a price, a number of dollars, an offer, "cash" or "as-is" (carriers flag it). No $ anywhere.',
+  'Every text ends with a way out that contains the word STOP, for example "Reply STOP if you\'d rather not hear from me."',
+  'A first text only asks a simple question about the property (is it still yours / are you the right person to ask about <address>). No pitch until they answer.',
+  'Keep it under 160 characters when you can (320 is the hard limit). No links, no emojis, no ALL CAPS.',
+  'Never pressure an older or grieving owner. STOP is final: an opted-out phone can never be texted again.',
+  'Follow-ups (steps 2-5) go only to people who never answered, at least 3 days apart; the sequence the team uses is days 1, 3, 10, 17, 24.',
+  'Texts go out 10 AM to 7 PM in the recipient\'s time zone, never on Sunday, and share one daily limit with the laptop\'s own texts. Queue them and the server sends them in that window.',
+  'When someone replies, stop: the reply agent and the team answer replies. You never text a person who has texted back.',
+].join('\n')
+
+const S = (description: string, extra: Record<string, unknown> = {}) => ({ type: 'string', description, ...extra })
+const PHONE = { anyOf: [S('10-digit US number'), { type: 'object', properties: {
+  number: S('the phone number'), type: S('mobile, landline or voip if known'), name: S('whose phone this is'),
+  confidence: { type: 'number', description: '0-1 from the source, if it gives one' }, note: S('anything else') }, required: ['number'] }] }
+const REASON = { type: 'object', properties: {
+  kind: S('short type: tax_delinquent, foreclosure, probate, vacant, code_violation, divorce, eviction, tired_landlord, other'),
+  label: S('how the team should read it on the card, e.g. "Behind on taxes 2 years"'),
+  detail: S('the specifics: which years, case number, what the notice says'),
+  date: S('YYYY-MM-DD the record is from'), amount: { type: 'number', description: 'dollars owed, if any' },
+  source: S('where it came from: county treasurer list, court record, ...') }, required: ['kind'] }
+
+export const TOOLS: { role: Role; name: string; description: string; inputSchema: Record<string, unknown> }[] = [
+  { role: 'intake', name: 'add_prospects',
+    description: 'Load prospects: property address, owner name(s), phone numbers and why they are motivated. You have already applied the prospect rules; every one is accepted unless the address or owner is missing. The same address and owner merges into the existing card (new phones and reasons are added). Up to 200 per call. Returns one result per prospect: created / updated / rejected, the card id, and phones that were skipped and why.',
+    inputSchema: { type: 'object', properties: { prospects: { type: 'array', maxItems: 200, items: { type: 'object', properties: {
+      owner_name: S('the owner (or the person to ask for)'), owner_type: S('individual, trust, llc, estate'),
+      address: S('property street address'), city: S('city / village / town'), zip: S('ZIP'), county: S('county'),
+      mailing_street: S('owner mailing street'), mailing_city: S('owner mailing city'), mailing_state: S('owner mailing state (sets the texting time zone)'),
+      mailing_zip: S('owner mailing ZIP'), property_type: S('house, duplex, ...'), units: { type: 'integer' },
+      phones: { type: 'array', items: PHONE }, reasons: { type: 'array', items: REASON },
+      source: S('where this prospect came from (defaults to muse)'), notes: S('anything the team should know') },
+      required: ['owner_name', 'address'] } } }, required: ['prospects'] } },
+  { role: 'intake', name: 'find_prospects',
+    description: 'Look up cards by address, phone, owner name or card id: stage, phones, reasons, and whether they were texted or replied.',
+    inputSchema: { type: 'object', properties: { address: S('part of the street address'), phone: S('a phone number'),
+      name: S('part of the owner name'), lead_id: S('a card id'), only_agent: { type: 'boolean', description: 'only cards an agent loaded' },
+      limit: { type: 'integer', maximum: 100 } } } },
+  { role: 'intake', name: 'prospect_counts', description: 'How many agent-loaded cards there are, by stage and by source.',
+    inputSchema: { type: 'object', properties: {} } },
+  { role: 'sender', name: 'texting_rules', description: 'The rules every text must follow, and the current sending switches. Read this before writing texts.',
+    inputSchema: { type: 'object', properties: {} } },
+  { role: 'sender', name: 'sending_status', description: 'Is sending on or paused, the window, the daily limit and how much of it is used today, and today\'s texts by status.',
+    inputSchema: { type: 'object', properties: {} } },
+  { role: 'sender', name: 'ready_to_text',
+    description: 'Cards waiting for a text: new cards with a usable mobile phone and nothing queued, and (followups=true) people who got a text, never answered, and are due for the next step. Includes the owner, address, phone, reasons and what was sent before.',
+    inputSchema: { type: 'object', properties: { limit: { type: 'integer', maximum: 300 }, followups: { type: 'boolean' },
+      all_sources: { type: 'boolean', description: 'include cards the laptop loaded (default: only agent-loaded cards)' } } } },
+  { role: 'sender', name: 'queue_texts',
+    description: 'Queue texts you wrote. Each: card id, phone (one on that card), the exact text, step (1 = first text, 2-5 = follow-ups) and optionally the earliest time to send. The server sends each one inside the recipient\'s window, under the daily limit. Refused texts come back with the reason. Up to 100 per call.',
+    inputSchema: { type: 'object', properties: { texts: { type: 'array', maxItems: 100, items: { type: 'object', properties: {
+      lead_id: S('card id'), phone: S('phone on that card'), body: S('the exact text'), step: { type: 'integer', minimum: 1, maximum: 5 },
+      send_after: S('ISO time, optional') }, required: ['lead_id', 'phone', 'body'] } } }, required: ['texts'] } },
+  { role: 'sender', name: 'todays_queue', description: 'Every text planned for a day (default today), from you and from the laptop, with its status.',
+    inputSchema: { type: 'object', properties: { date: S('YYYY-MM-DD') } } },
+  { role: 'sender', name: 'withdraw_texts', description: 'Pull texts that have not gone yet.',
+    inputSchema: { type: 'object', properties: { text_ids: { type: 'array', items: { type: 'string' } }, reason: S('why') }, required: ['text_ids'] } },
+  { role: 'sender', name: 'pause_sending', description: 'Stop all texting now (yours and the laptop\'s) until resumed. Use it when something looks wrong: many failures, a carrier error, a wording problem.',
+    inputSchema: { type: 'object', properties: { reason: S('why') }, required: ['reason'] } },
+  { role: 'sender', name: 'resume_sending', description: 'Resume texting after YOUR pause. A pause Colin or the team made can only be lifted in the app.',
+    inputSchema: { type: 'object', properties: {} } },
+  { role: 'sender', name: 'text_results', description: 'What happened to recent texts: delivered, failed (with carrier codes), replies and STOPs, over the last N hours (default 24).',
+    inputSchema: { type: 'object', properties: { hours: { type: 'integer', maximum: 168 } } } },
+]
+
+/** The wording check before a text is queued (the database checks STOP, $, length and the business name again). */
+export function textProblem(body: string): string | null {
+  const b = (body ?? '').trim()
+  if (!b) return 'empty text'
+  if (!/\bSTOP\b/.test(b)) return 'needs a STOP line (e.g. "Reply STOP if you\'d rather not hear from me.")'
+  if (b.length > 320) return 'over 320 characters'
+  if (b.includes('$')) return 'no $ or prices'
+  if (findPriceOrOffer(b).length) return 'mentions a price or an offer'
+  if (/\bcash\b/i.test(b)) return 'no "cash" in a text'
+  if (/\bas[\s-]?is\b/i.test(b)) return '"as-is" is flagged by carriers'
+  if (/https?:\/\/|www\./i.test(b)) return 'no links'
+  if (/\b(llc|inc|company|investors?|our team)\b/i.test(b)) return 'sounds like a business: write as Colin, one person'
+  return null
+}
+
+type Json = Record<string, unknown>
+const ok = (id: unknown, result: unknown) => ({ jsonrpc: '2.0', id, result })
+const fail = (id: unknown, code: number, message: string) => ({ jsonrpc: '2.0', id, error: { code, message } })
+const textResult = (v: unknown, isError = false) => ({ content: [{ type: 'text', text: JSON.stringify(v, null, 1) }], isError })
+const int = (v: unknown, d: number, max: number) => Math.max(1, Math.min(max, Number.isFinite(Number(v)) && v !== null && v !== undefined ? Math.floor(Number(v)) : d))
+
+export async function callTool(name: string, args: Json, agent: Agent, db: DoorDb): Promise<{ value: unknown; isError?: boolean }> {
+  const tool = TOOLS.find((t) => t.name === name)
+  if (!tool) return { value: { error: `no tool ${name}` }, isError: true }
+  if (tool.role !== agent.role) return { value: { error: `the ${agent.role} key cannot use ${name}` }, isError: true }
+  switch (name) {
+    case 'add_prospects': {
+      const list = Array.isArray(args.prospects) ? (args.prospects as Json[]).slice(0, 200) : []
+      if (!list.length) return { value: { error: 'prospects is an empty list' }, isError: true }
+      const results = []
+      for (const p of list) results.push(await db.addProspect(p, agent.name))
+      const count = (s: string) => results.filter((r) => r.status === s).length
+      return { value: { created: count('created'), updated: count('updated'), rejected: count('rejected'), results } }
+    }
+    case 'find_prospects':
+      return { value: await db.findProspects({ address: args.address as string, phone: args.phone as string, name: args.name as string,
+        lead_id: args.lead_id as string, only_agent: !!args.only_agent, limit: int(args.limit, 20, 100) }) }
+    case 'prospect_counts': return { value: await db.prospectCounts() }
+    case 'texting_rules': return { value: { rules: TEXTING_RULES, status: await db.status() } }
+    case 'sending_status': return { value: await db.status() }
+    case 'ready_to_text':
+      return { value: await db.readyToText({ limit: int(args.limit, 50, 300), followups: !!args.followups, all_sources: !!args.all_sources }) }
+    case 'queue_texts': {
+      const list = Array.isArray(args.texts) ? (args.texts as Json[]).slice(0, 100) : []
+      if (!list.length) return { value: { error: 'texts is an empty list' }, isError: true }
+      const results = []
+      for (const t of list) {
+        const body = String(t.body ?? '').replace(/\s+/g, ' ').trim()
+        const why = textProblem(body)
+        if (why) { results.push({ lead_id: t.lead_id, status: 'refused', reason: why }); continue }
+        const r = await db.queueText({ lead_id: String(t.lead_id ?? ''), phone: String(t.phone ?? ''), body,
+          step: int(t.step, 1, 5), send_after: t.send_after ? String(t.send_after) : null }, agent.name)
+        results.push({ lead_id: t.lead_id, ...r })
+      }
+      return { value: { queued: results.filter((r) => r.status === 'queued').length, refused: results.filter((r) => r.status !== 'queued').length, results } }
+    }
+    case 'todays_queue': return { value: await db.queue(typeof args.date === 'string' ? args.date : null) }
+    case 'withdraw_texts': {
+      const ids = Array.isArray(args.text_ids) ? (args.text_ids as unknown[]).map(String).slice(0, 300) : []
+      const done: string[] = []
+      for (const id of ids) if (await db.withdraw(id, agent.name, String(args.reason ?? 'withdrawn by the sender agent'))) done.push(id)
+      return { value: { withdrawn: done.length, not_withdrawn: ids.filter((i) => !done.includes(i)) } }
+    }
+    case 'pause_sending': return { value: await db.pause(String(args.reason ?? '').trim() || 'paused by the sender agent', agent.name) }
+    case 'resume_sending': return { value: await db.resume(agent.name) }
+    case 'text_results': return { value: await db.results(int(args.hours, 24, 168)) }
+  }
+  return { value: { error: `no tool ${name}` }, isError: true }
+}
+
+/** One JSON-RPC message; null for a notification (no reply). */
+export async function handleMessage(msg: Json, agent: Agent, db: DoorDb): Promise<Json | null> {
+  const id = msg.id
+  const method = String(msg.method ?? '')
+  if (id === undefined || id === null) return null                     // notifications/initialized and friends
+  if (method === 'initialize') {
+    const asked = String((msg.params as Json | undefined)?.protocolVersion ?? '')
+    return ok(id, {
+      protocolVersion: PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
+      capabilities: { tools: {} },
+      serverInfo: { name: SERVER_NAME, version: '1.0.0' },
+      instructions: agent.role === 'intake'
+        ? 'You load seller prospects into the WPIE app with add_prospects. You check the prospect rules before loading; the app accepts what you send.'
+        : 'You run the WPIE texting: read texting_rules first, then ready_to_text, write texts, queue_texts, and watch text_results. Pause if something looks wrong.',
+    })
+  }
+  if (method === 'ping') return ok(id, {})
+  if (method === 'tools/list') {
+    return ok(id, { tools: TOOLS.filter((t) => t.role === agent.role).map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) })
+  }
+  if (method === 'tools/call') {
+    const p = (msg.params ?? {}) as Json
+    try {
+      const r = await callTool(String(p.name ?? ''), (p.arguments ?? {}) as Json, agent, db)
+      return ok(id, textResult(r.value, !!r.isError))
+    } catch (e) {
+      return ok(id, textResult({ error: e instanceof Error ? e.message : String(e) }, true))
+    }
+  }
+  return fail(id, -32601, `method not found: ${method}`)
+}
+
+/** The key from the request: Authorization: Bearer <key>, or x-api-key. */
+export function keyFrom(headers: Headers): string | null {
+  const a = headers.get('authorization') ?? ''
+  const m = a.match(/^Bearer\s+(\S+)$/i)
+  return m ? m[1] : (headers.get('x-api-key') || null)
+}

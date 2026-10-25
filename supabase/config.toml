@@ -30,3 +30,6 @@ verify_jwt = false
 # The conveyor (pg_cron every 15 minutes; checks the shared secret itself like send-openers).
 [functions.conveyor]
 verify_jwt = false
+
+[functions.agent-mcp]
+verify_jwt = false
