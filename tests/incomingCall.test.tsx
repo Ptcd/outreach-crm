@@ -16,7 +16,7 @@ vi.mock('@/lib/supabaseClient', () => ({ supabase: {}, supabaseConfigured: true 
 vi.mock('@/providers/AuthProvider', () => ({ useAuth: () => ({ member: { display_name: 'Colin' }, signOut: vi.fn() }) }))
 vi.mock('@/lib/queries', () => ({
   useRepliesWaiting: () => ({ data: { drafts_waiting: 0, tasks_open: 0 } }),
-  api: { newCaller: vi.fn(async () => ({ data: { ok: true, lead_id: 'NEW1' }, error: null })) },
+  api: { newCaller: vi.fn(async () => ({ data: { ok: true, lead_id: 'NEW1' }, error: null })), logCall: vi.fn(async () => ({ error: null })) },
 }))
 vi.mock('@/lib/dialer', async (orig) => ({ ...(await orig<typeof import('../src/lib/dialer')>()), useDialer: () => dialer }))
 
@@ -87,12 +87,25 @@ describe('a call coming in', () => {
     r.unmount()
     dialer.active = { ...dialer.active, status: 'ended' }
     mount(<CallBar />)
-    expect(screen.getByRole('link', { name: 'Log the call' }).getAttribute('href')).toBe('/lead/L1#call')
+    expect(screen.getByRole('link', { name: 'Log the call' }).getAttribute('href')).toBe('/lead/L1?call=1#call-script')
     cleanup()
     dialer.active = { status: 'ringing', to: '+14145550101', label: 'JANE ROE - 100 N MAIN ST', leadId: 'L1', startedAt: null, muted: false,
       error: null, answered: false, inbound: false, line: null }
     mount(<CallBar />)
     expect(screen.getByRole('status').textContent).toContain('Ringing... from (414) 555-0101')
     expect(screen.queryByRole('button', { name: 'New caller' })).toBeNull()
+  })
+
+  it('a finished outbound call asks how it went: No answer logs in one tap, We talked opens the script', async () => {
+    const { api } = await import('@/lib/queries')
+    dialer.active = { status: 'ended', to: '+17158965632', label: 'DONALD - 109 W 3RD ST', leadId: 'L2', startedAt: null, muted: false,
+      error: null, answered: true, inbound: false, line: null }
+    mount(<CallBar />)
+    expect(screen.getByText('How did it go?')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'We talked: log it' }).getAttribute('href')).toBe('/lead/L2?call=1#call-script')
+    screen.getByRole('button', { name: "Couldn't hear" }).click()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(api.logCall).toHaveBeenCalledWith('L2', '7158965632', 'no_answer', expect.stringContaining("couldn't hear"))
+    expect(dialer.dismiss).toHaveBeenCalled()
   })
 })

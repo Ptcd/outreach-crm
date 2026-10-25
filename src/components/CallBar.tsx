@@ -37,6 +37,19 @@ export function CallBar() {
     nav(`/lead/${out.lead_id}?call=1&phone=${digits}`)
   }
 
+  // A finished call asks for its outcome right here (Colin 2026-10-24: a call that ends with nothing logged leaves the
+  // card stuck on "call started"). The quick ones log in one tap; a real conversation opens the card's script to log.
+  const quickLog = async (outcome: 'no_answer', note: string) => {
+    if (!active.leadId) return
+    setBusy(true)
+    setMsg(null)
+    const r = await api.logCall(active.leadId, digits || null, outcome, note)
+    setBusy(false)
+    if (r.error) { setMsg(r.error.message); return }
+    dismiss()
+  }
+  const askOutcome = !live && !!active.leadId && !active.inbound
+
   const where = active.inbound
     ? `calling in from ${fmtPhone(active.to) || 'a withheld number'}${active.line ? ` on ${fmtPhone(active.line)}` : ''}`
     : `from ${fmtPhone(active.to)}`
@@ -64,10 +77,17 @@ export function CallBar() {
           <Button size="sm" variant="destructive" onClick={hangUp}>Hang up</Button>
         ) : (
           <>
-            {active.leadId && active.answered && (
-              <Button size="sm" asChild><Link to={`/lead/${active.leadId}#call`} onClick={dismiss}>Log the call</Link></Button>
-            )}
-            <Button size="sm" variant="outline" onClick={dismiss}>Close</Button>
+            {askOutcome ? (
+              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                <span className="w-full text-right text-xs font-medium sm:w-auto">How did it go?</span>
+                <Button size="sm" disabled={busy} onClick={() => void quickLog('no_answer', 'No answer (logged from the call bar)')}>No answer</Button>
+                <Button size="sm" disabled={busy} onClick={() => void quickLog('no_answer', "Connected but we couldn't hear each other (logged from the call bar)")}>Couldn't hear</Button>
+                <Button size="sm" asChild><Link to={`/lead/${active.leadId}?call=1#call-script`} onClick={dismiss}>We talked: log it</Link></Button>
+              </div>
+            ) : active.leadId && active.answered ? (
+              <Button size="sm" asChild><Link to={`/lead/${active.leadId}?call=1#call-script`} onClick={dismiss}>Log the call</Link></Button>
+            ) : null}
+            <Button size="sm" variant="outline" onClick={dismiss}>{askOutcome ? 'Later' : 'Close'}</Button>
           </>
         )}
       </div>

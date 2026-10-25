@@ -12,6 +12,8 @@ import { bookingVerdict, type BookingVerdict } from '@/lib/bookingVerdict'
 import { VerdictBox } from '@/components/BookingVerdict'
 import { DECISION_LABEL, GATE_ITEMS, HARD_STOPS, SELLER_FACTS, STAGE_LABEL } from '@/lib/wpie'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/providers/AuthProvider'
+import { useOnPhone, workerFor } from '@/lib/onPhone'
 import type { Contact, GateScore, Lead, Message } from '@/lib/types'
 
 const LABELS: Record<string, string> = Object.fromEntries(
@@ -38,6 +40,9 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
   phone: string | null; startOpen: boolean; canOverride?: boolean
   onLogged?: (outcome: string) => void     // the call queue: a logged call finishes the task and brings the next card
 }) {
+  const { member } = useAuth()
+  const [picked] = useOnPhone()
+  const caller = workerFor(member, picked) ?? 'colin'
   const qc = useQueryClient()
   const [open, setOpen] = useState(startOpen)
   useEffect(() => { if (startOpen) setOpen(true) }, [startOpen])   // the panel's "open the script" tap
@@ -87,8 +92,11 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
 
       <div className="rounded-md bg-muted p-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pick up with</p>
-        <p className="mt-1 text-lg font-semibold">&ldquo;{PHONE_SCRIPT.pickup}&rdquo;</p>
-        <p className="text-sm text-muted-foreground">(Adil: &ldquo;This is Adil, I work with Colin.&rdquo;) {PHONE_SCRIPT.voice}</p>
+        <p className="mt-1 text-lg font-semibold">&ldquo;{pickupLine(caller)}&rdquo;</p>
+        {caller !== 'colin' && (
+          <p className="text-sm font-medium">You are calling for Colin: he is the buyer. Where the script says &ldquo;I buy houses&rdquo;, say &ldquo;Colin buys houses&rdquo;.</p>
+        )}
+        <p className="text-sm text-muted-foreground">{PHONE_SCRIPT.voice}</p>
       </div>
       <details className="rounded-md border p-3">
         <summary className="cursor-pointer font-semibold">Before you pick up</summary>
@@ -396,4 +404,11 @@ function ScriptLines({ lines }: { lines: { id: string; say: string; note?: strin
       ))}
     </ol>
   )
+}
+
+/** The first words on a call (Colin 2026-10-24: Adil and Thalia call for him, by their own names). */
+// eslint-disable-next-line react-refresh/only-export-components
+export function pickupLine(caller: string): string {
+  if (caller === 'colin') return PHONE_SCRIPT.pickup
+  return `Hi, this is ${caller.charAt(0).toUpperCase()}${caller.slice(1)}, I work with Colin Merrill.`
 }
