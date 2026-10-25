@@ -82,7 +82,7 @@ export function CallPanel({ lead, contacts, inbound, replyFacts, messages }: {
           </span>
         ))}
       </div>
-      <Button variant="outline" className="h-11 w-full" onClick={openScript}>On the call: open the script (what to ask, tap the answers)</Button>
+      <Button variant="outline" className="h-auto min-h-11 w-full whitespace-normal py-2" onClick={openScript}>Open the call script</Button>
     </section>
   )
 }
