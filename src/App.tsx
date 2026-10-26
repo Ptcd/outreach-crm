@@ -15,6 +15,7 @@ import Scoreboard from '@/pages/Scoreboard'
 import SignContract from '@/pages/SignContract'
 import CallQueue from '@/pages/CallQueue'
 import Settings from '@/pages/Settings'
+import Privacy from '@/pages/Privacy'
 
 function Centered({ children }: { children: React.ReactNode }) {
   return <div className="flex min-h-dvh items-center justify-center p-6 text-center text-base">{children}</div>
@@ -40,6 +41,8 @@ export default function App() {
   if (location.pathname.startsWith('/sign/')) {
     return <Routes><Route path="/sign/:token" element={<SignContract />} /></Routes>
   }
+  // The privacy page Google's consent screen links to: public.
+  if (location.pathname === '/privacy') return <Privacy />
   if (loading) return <Centered>Loading...</Centered>
   if (!user) return <Login />
   if (recovering) return <SetPassword />
