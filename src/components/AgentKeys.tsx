@@ -13,7 +13,7 @@ const BASE = ((import.meta.env.NEXT_PUBLIC_SUPABASE_URL ?? import.meta.env.VITE_
   || 'https://jyfetargyaaxcqmxdgft.supabase.co'
 export const AGENT_DOOR_URL = `${BASE.replace(/\/+$/, '')}/functions/v1/agent-mcp`
 
-type Key = { id: string; name: string; role: 'intake' | 'sender'; key_hint: string; created_at: string; last_used_at: string | null; revoked_at: string | null }
+type Key = { id: string; name: string; role: 'intake' | 'sender' | 'records'; key_hint: string; created_at: string; last_used_at: string | null; revoked_at: string | null }
 
 export function AgentKeys() {
   const qc = useQueryClient()
@@ -23,13 +23,13 @@ export function AgentKeys() {
     return (r.data ?? []) as Key[]
   } })
   const [name, setName] = useState('')
-  const [role, setRole] = useState<'intake' | 'sender'>('intake')
+  const [role, setRole] = useState<'intake' | 'sender' | 'records'>('intake')
   const [fresh, setFresh] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [err, setErr] = useState<Error | null>(null)
   const make = async () => {
     setErr(null); setFresh(null); setCopied(false)
-    const r = await supabase.rpc('create_agent_key', { p_name: name.trim() || (role === 'intake' ? 'Muse intake' : 'Muse sender'), p_role: role })
+    const r = await supabase.rpc('create_agent_key', { p_name: name.trim() || (role === 'intake' ? 'Muse intake' : role === 'sender' ? 'Muse sender' : 'Muse records'), p_role: role })
     if (r.error) { setErr(new Error(r.error.message)); return }
     setFresh(r.data as string)
     setName('')
@@ -54,9 +54,10 @@ export function AgentKeys() {
       </div>
       <div className="grid gap-2 sm:grid-cols-[1fr_10rem_auto]">
         <Input className="h-11" placeholder="Name, e.g. Muse intake" value={name} onChange={(e) => setName(e.target.value)} aria-label="Key name" />
-        <Select className="h-11" value={role} onChange={(e) => setRole(e.target.value as 'intake' | 'sender')} aria-label="What the key may do">
+        <Select className="h-11" value={role} onChange={(e) => setRole(e.target.value as 'intake' | 'sender' | 'records')} aria-label="What the key may do">
           <option value="intake">Intake: load prospects</option>
           <option value="sender">Sender: run the texts</option>
+          <option value="records">Records: records requests</option>
         </Select>
         <Button className="h-11" onClick={() => void make()}>Make a key</Button>
       </div>

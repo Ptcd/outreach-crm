@@ -21,6 +21,7 @@ Each agent sends its own key as `Authorization: Bearer <key>` (or `x-api-key: <k
 | **intake** | `add_prospects`, `find_prospects`, `prospect_counts` |
 | **sender** | `texting_rules`, `sending_status`, `ready_to_text`, `queue_texts`, `test_results`, `replies_waiting`, `send_reply`, `todays_queue`, `withdraw_texts`, `pause_sending`, `resume_sending`, `text_results` |
 | **both** | `due_today`, `mark_card`, `link_cards` |
+| **records** | `records_overview`, `records_list`, `records_templates`, `records_replies`, `records_save_draft`, `records_propose_batch`, `records_mark` |
 
 ## Intake: `add_prospects`
 
@@ -113,3 +114,13 @@ A text queued outside the window goes at the start of the next allowed window.
 - `contract_waiting`: a contract sent and not signed, with who still has to sign.
 
 `days_late` says how overdue it is. The card carries `check_back_at`, `named_date`, `named_event`, `notes`, the conversation and `contracts`, so the agent sees why it was waiting before it acts.
+
+## Records requests (records key)
+
+The public-records letters to municipal clerks and county Registers of Deeds run through the app (migration 0072).
+
+1. The agent reads `records_overview`, `records_replies` (clerks' answers, copied in from the records mailbox by the laptop) and `records_list` (due: never sent, the 90-day re-request reached, or no answer in 14 days).
+2. It marks what came back (`records_mark`).
+3. It writes letters from `records_templates` (`records_save_draft`) and proposes them in batches of up to 40 (`records_propose_batch`).
+
+**Nothing sends until Colin approves the batch** on the Approve page. The laptop (`tools/records_bridge.py`, in the live cycle every 10 minutes) then sends only the approved letters from the records mailbox, 30 to 60 seconds apart, and writes back the Message-ID. A refusal stops the pass.

@@ -10,6 +10,7 @@ import { SEND_LABEL, WORDING, reasonText, sendTone } from '@/lib/inbox'
 import { useAuth } from '@/providers/AuthProvider'
 import { useColinHere } from '@/components/OnPhonePicker'
 import { TouchSwitches } from '@/components/TouchSwitches'
+import { RecordsBatches } from '@/components/RecordsBatches'
 import type { CampaignControl, OpenerDecision, PlannedOpener } from '@/lib/types'
 
 const DECISION_LABEL: Record<OpenerDecision, string> = { pending: 'Waiting', approved: 'Approved', skipped: 'Skipped' }
@@ -50,6 +51,7 @@ export default function Approvals() {
       <h1 className="text-2xl font-bold tracking-tight">Texts to approve</h1>
       <SendingPanel canDecide={isOwner} />
       <TouchSwitches canDecide={isOwner} />
+      {isOwner && <RecordsBatches />}
       <div className="flex flex-wrap items-center gap-3">
         <label className="text-sm font-medium">
           Day <Input type="date" value={day} onChange={(e) => { setDay(e.target.value); setTicked(new Set()) }} className="mt-1 w-48" />

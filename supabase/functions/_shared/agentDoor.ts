@@ -6,7 +6,7 @@
 // Transport: MCP over streamable HTTP, stateless JSON responses (supabase/functions/agent-mcp).
 import { findPriceOrOffer } from './replyGuard.ts'
 
-export type Role = 'intake' | 'sender'
+export type Role = 'intake' | 'sender' | 'records'
 type ToolRole = Role | 'any'
 export interface Agent { id: string; name: string; role: Role }
 
@@ -21,6 +21,7 @@ export interface DoorDb {
   testResults(days: number, step: number): Promise<Record<string, unknown>>
   repliesWaiting(days: number): Promise<unknown[]>
   dueToday(): Promise<Record<string, unknown>>
+  records(fn: string, args: Record<string, unknown>): Promise<unknown>
   markCard(m: { lead_id: string; mark: string; reason: string | null; date: string | null; phone: string | null }, agent: string): Promise<Record<string, unknown>>
   linkCards(l: { lead_id: string; other_id: string; kind: string; note: string | null }, agent: string): Promise<Record<string, unknown>>
   sendReply(t: { lead_id: string; phone: string; body: string }, agent: string): Promise<Record<string, unknown>>
@@ -103,6 +104,22 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
     description: 'Answer someone who texted us, on the same thread (same number). Sent now, unless it is quiet hours, when it goes in the morning. Refused if they opted out, if they texted again since you read the thread (read it again), or if it breaks the wording rules. A STOP line is not needed in a reply.',
     inputSchema: { type: 'object', properties: { lead_id: S('card id'), phone: S('their phone (the one that texted us)'), body: S('your reply') },
       required: ['lead_id', 'phone', 'body'] } },
+  { role: 'records', name: 'records_overview', description: 'The records-request cycle at a glance: requests by kind and status, how many are due, unhandled replies, drafts waiting, batches waiting for Colin, approved batches not sent yet.',
+    inputSchema: { type: 'object', properties: {} } },
+  { role: 'records', name: 'records_list', description: 'Records requests (municipal clerks and county Registers of Deeds). filter: due (default: never sent, re-request date reached, or no answer in 14 days, with why_due), all, or a status. Each has where it goes, its status and dates, records_through, notes, its drafts and replies.',
+    inputSchema: { type: 'object', properties: { filter: S('due | all | draft | sent | acknowledged | replied | received | no_records | needs_payment | denied | bounced | skip'), limit: { type: 'integer', maximum: 500 } } } },
+  { role: 'records', name: 'records_templates', description: 'The two request letters word for word (municipal and Register of Deeds) and how to fill them. Write every first request and re-request from these.',
+    inputSchema: { type: 'object', properties: {} } },
+  { role: 'records', name: 'records_replies', description: 'Replies from clerks and Registers of Deeds that came into the records mailbox, oldest first, with the body, attachments (saved on the laptop under data/records/received/) and the request they match. unhandled=true (default) shows only the ones not yet handled.',
+    inputSchema: { type: 'object', properties: { unhandled: { type: 'boolean' }, limit: { type: 'integer', maximum: 200 } } } },
+  { role: 'records', name: 'records_save_draft', description: 'Write a letter for a request: purpose request (first ask), re_request (the 90-day repeat), follow_up (no answer yet), or reply (answering a clerk: a fee question, a narrower scope, a corrected address). It replaces the open draft for that request. Nothing sends: drafts go into a batch for Colin.',
+    inputSchema: { type: 'object', properties: { request_id: S('the request'), purpose: S('request | re_request | follow_up | reply'), to: S('email address'), cc: S('optional'),
+      subject: S('subject line'), body: S('the letter'), in_reply_to: S('the Message-ID being answered, for follow_up and reply') }, required: ['request_id', 'to', 'subject', 'body'] } },
+  { role: 'records', name: 'records_propose_batch', description: 'Put drafts up for Colin to approve, up to 40 letters per batch (the mailbox has a daily cap). He approves or rejects in the app; only then does the laptop send them.',
+    inputSchema: { type: 'object', properties: { draft_ids: { type: 'array', items: { type: 'string' }, maxItems: 40 }, note: S('one line for Colin: what this batch is and why now') }, required: ['draft_ids'] } },
+  { role: 'records', name: 'records_mark', description: 'Update a request after reading a reply or a bounce: status (acknowledged, replied, received, no_records, needs_payment, denied, bounced, skip, draft), a note, received_date, records_through (the last date the records cover: the next re-request starts the day after), next_due (received and no_records default to 90 days), a corrected to_email, and reply_id to mark that reply handled.',
+    inputSchema: { type: 'object', properties: { request_id: S('the request'), status: S('new status'), note: S('what happened'), received_date: S('YYYY-MM-DD'),
+      records_through: S('date the records cover through'), next_due: S('YYYY-MM-DD'), to_email: S('corrected address'), reply_id: S('the reply this handles') }, required: ['request_id'] } },
   { role: 'any', name: 'due_today',
     description: 'Every card whose time has come, oldest first, each with the whole card and why it was waiting: check_back (a dated not-now, a hold, an estate or family wait whose date arrived), booked_call / booked_visit (today), call_due / text_due (a stop the team or you owes), contract_waiting (a contract sent and not signed, with who still has to sign). days_late says how overdue. Also `stuck`: the safety net, cards that would otherwise be lost: no_next_step (a warm card with no date), reply_unanswered (2+ hours), unlogged_call, text_stale (planned, never went), unknown_caller (a text from a phone no card has), dormant_replied (put to sleep after they replied). Read both lists every morning and act on each one: a text, a mark_card, or tell Colin. Nothing on either list may stay there two days running.',
     inputSchema: { type: 'object', properties: {} } },
@@ -201,6 +218,19 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       return { value: { queued: results.filter((r) => r.status === 'queued').length, refused: results.filter((r) => r.status !== 'queued').length, results } }
     }
     case 'due_today': return { value: await db.dueToday() }
+    case 'records_overview': return { value: await db.records('records_overview', {}) }
+    case 'records_templates': return { value: await db.records('records_templates', {}) }
+    case 'records_list': return { value: await db.records('records_list', { p_filter: args.filter ? String(args.filter) : 'due', p_limit: int(args.limit, 100, 500) }) }
+    case 'records_replies': return { value: await db.records('records_replies_list', { p_unhandled: args.unhandled !== false, p_limit: int(args.limit, 50, 200) }) }
+    case 'records_save_draft': return { value: await db.records('records_save_draft', { p_request_id: String(args.request_id ?? ''), p_purpose: String(args.purpose ?? 'request'),
+      p_to: String(args.to ?? ''), p_cc: args.cc ? String(args.cc) : null, p_subject: String(args.subject ?? ''), p_body: String(args.body ?? ''),
+      p_in_reply_to: args.in_reply_to ? String(args.in_reply_to) : null, p_agent: agent.name }) }
+    case 'records_propose_batch': return { value: await db.records('records_propose_batch', { p_draft_ids: Array.isArray(args.draft_ids) ? (args.draft_ids as unknown[]).map(String) : [],
+      p_note: args.note ? String(args.note) : null, p_agent: agent.name }) }
+    case 'records_mark': return { value: await db.records('records_mark', { p_request_id: String(args.request_id ?? ''), p_status: args.status ? String(args.status) : null,
+      p_note: args.note ? String(args.note) : null, p_received_date: args.received_date ? String(args.received_date) : null,
+      p_records_through: args.records_through ? String(args.records_through) : null, p_next_due: args.next_due ? String(args.next_due) : null,
+      p_to_email: args.to_email ? String(args.to_email) : null, p_reply_id: args.reply_id ? String(args.reply_id) : null, p_agent: agent.name }) }
     case 'mark_card':
       return { value: await db.markCard({ lead_id: String(args.lead_id ?? ''), mark: String(args.mark ?? ''), reason: args.reason ? String(args.reason) : null,
         date: args.date ? String(args.date) : null, phone: args.phone ? String(args.phone) : null }, agent.name) }
@@ -240,7 +270,9 @@ export async function handleMessage(msg: Json, agent: Agent, db: DoorDb): Promis
       protocolVersion: PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
       capabilities: { tools: {} },
       serverInfo: { name: SERVER_NAME, version: '1.0.0' },
-      instructions: agent.role === 'intake'
+      instructions: agent.role === 'records'
+        ? 'You run the public-records-request cycle: read records_overview, records_replies and records_list(due); mark what came back; draft letters from records_templates; propose batches. Colin approves every batch before anything sends.'
+        : agent.role === 'intake'
         ? 'You load seller prospects into the WPIE app with add_prospects. You check the prospect rules before loading; the app accepts what you send.'
         : 'You run the WPIE texting: read texting_rules first, then ready_to_text, write texts, queue_texts, and watch text_results. Pause if something looks wrong.',
     })
