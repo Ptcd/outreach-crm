@@ -20,7 +20,7 @@ export interface DoorDb {
   queueText(t: { lead_id: string; phone: string; body: string; step: number; send_after: string | null; variant: string | null; template: string | null }, agent: string): Promise<Record<string, unknown>>
   testResults(days: number, step: number): Promise<Record<string, unknown>>
   repliesWaiting(days: number): Promise<unknown[]>
-  dueToday(): Promise<unknown[]>
+  dueToday(): Promise<Record<string, unknown>>
   markCard(m: { lead_id: string; mark: string; reason: string | null; date: string | null; phone: string | null }, agent: string): Promise<Record<string, unknown>>
   linkCards(l: { lead_id: string; other_id: string; kind: string; note: string | null }, agent: string): Promise<Record<string, unknown>>
   sendReply(t: { lead_id: string; phone: string; body: string }, agent: string): Promise<Record<string, unknown>>
@@ -104,7 +104,7 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
     inputSchema: { type: 'object', properties: { lead_id: S('card id'), phone: S('their phone (the one that texted us)'), body: S('your reply') },
       required: ['lead_id', 'phone', 'body'] } },
   { role: 'any', name: 'due_today',
-    description: 'Every card whose time has come, oldest first, each with the whole card and why it was waiting: check_back (a dated not-now, a hold, an estate or family wait whose date arrived), booked_call / booked_visit (today), call_due / text_due (a stop the team or you owes), contract_waiting (a contract sent and not signed, with who still has to sign). days_late says how overdue. Read this every morning and act on each one: a text, a mark_card, or tell Colin.',
+    description: 'Every card whose time has come, oldest first, each with the whole card and why it was waiting: check_back (a dated not-now, a hold, an estate or family wait whose date arrived), booked_call / booked_visit (today), call_due / text_due (a stop the team or you owes), contract_waiting (a contract sent and not signed, with who still has to sign). days_late says how overdue. Also `stuck`: the safety net, cards that would otherwise be lost: no_next_step (a warm card with no date), reply_unanswered (2+ hours), unlogged_call, text_stale (planned, never went), unknown_caller (a text from a phone no card has), dormant_replied (put to sleep after they replied). Read both lists every morning and act on each one: a text, a mark_card, or tell Colin. Nothing on either list may stay there two days running.',
     inputSchema: { type: 'object', properties: {} } },
   { role: 'any', name: 'mark_card',
     description: 'Mark a card the way the team does from its buttons. mark: dead (not interested), dnc (asked not to be contacted: every phone blocked for good), not_now (with date = when to check back, or reason = what has to change first), hot (wants to sell / asked for a call: Colin is pinged and the card goes to him), held (reason = the named blocker, optional date), wrong_number (phone = the number that was never them), elderly, grief, or note (reason = the note). Returns the stage and belt of the card after the mark.',

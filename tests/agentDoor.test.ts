@@ -18,7 +18,7 @@ const fakeDb = (over: Partial<DoorDb> = {}): DoorDb => ({
   addProspect: async () => ({ status: 'created', lead_id: 'L1' }), findProspects: async () => [], prospectCounts: async () => ({}),
   status: async () => ({ paused: false }), readyToText: async () => [], queueText: async () => ({ status: 'queued', text_id: 'T1' }),
   queue: async () => [], withdraw: async () => true, pause: async () => ({ paused: true }), resume: async () => ({ paused: false }),
-  results: async () => ({}), testResults: async () => ({}), repliesWaiting: async () => [], markCard: async () => ({ ok: true }), dueToday: async () => [], linkCards: async () => ({ ok: true }), sendReply: async () => ({ outcome: 'sent' }), ...over,
+  results: async () => ({}), testResults: async () => ({}), repliesWaiting: async () => [], markCard: async () => ({ ok: true }), dueToday: async () => ({ due: [], stuck: [] }), linkCards: async () => ({ ok: true }), sendReply: async () => ({ outcome: 'sent' }), ...over,
 })
 const intake = { id: 'k1', name: 'Muse intake', role: 'intake' as const }
 const sender = { id: 'k2', name: 'Muse sender', role: 'sender' as const }
@@ -249,7 +249,7 @@ describe('on the real migrations', () => {
     await r(`public.agent_mark_card($1, 'not_now', 'after the holidays', '2027-01-15T16:00:00Z', null, 'Muse sender')`, [later])
     const cid = (await one<{ id: string }>(`insert into public.contracts (lead_id, form, status, terms, buyer_name, buyer_signed_at, offer_path, offer_sha256, created_at) values ($1, 'wb11', 'sent', '{}'::jsonb, 'Colin Merrill', '2026-10-20T15:00:00Z', 'offers/test.pdf', 'abc', '2026-10-20T15:00:00Z') returning id`, [signer])).id
     await db.query(`insert into public.contract_signers (contract_id, position, name, phone, token_hash, expires_at) values ($1, 1, 'Carl Contract', '4145550403', 'h', now() + interval '30 days')`, [cid])
-    const at = async (iso: string) => (await r(`public.agent_due_today($1::timestamptz)`, [iso])) as unknown as { lead_id: string; what: string; why: string; days_late: number }[]
+    const at = async (iso: string) => ((await r(`public.agent_due_today($1::timestamptz)`, [iso])).due) as { lead_id: string; what: string; why: string; days_late: number }[]
     const oct27 = (await at('2026-10-27T15:00:00Z')).filter((x) => [guy, lady, signer, later].includes(x.lead_id))
     expect(oct27.map((x) => [x.what, x.lead_id])).toEqual([['contract_waiting', signer]])
     expect(oct27[0].why).toMatch(/contract sent Oct 20, not signed \(Carl Contract still to sign\)/)
@@ -261,6 +261,38 @@ describe('on the real migrations', () => {
     expect((await at('2026-11-26T15:00:00Z')).some((x) => x.lead_id === lady || x.lead_id === later)).toBe(false)
     const card = await r(`public.agent_card($1)`, [signer])
     expect((card.contracts as { status: string; signers: { name: string; signed_at: null }[] }[])[0]).toMatchObject({ status: 'sent', signers: [{ name: 'Carl Contract', signed_at: null }] })
+  })
+
+  it('the safety net: a card with no date, an unanswered reply, an unlogged call, a stale text, an unknown caller and a misfiled dormant card are all caught', async () => {
+    const mk = async (name: string, addr: string, phone: string) => (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`,
+      [JSON.stringify({ owner_name: name, address: addr, phones: [phone] })])).lead_id as string
+    const nodate = await mk('No Date Ned', '1 Lost St', '4145550501')
+    await db.query(`update public.leads set belt = 'yes_unbooked', stage = 'colin_call', next_stop_at = null, named_date = null, next_action_at = null where id = $1`, [nodate])
+    const quiet = await mk('Quiet Quentin', '2 Lost St', '4145550502')
+    await db.query(`insert into public.twilio_inbound (sid, from10, to_number, body, is_opt_out, lead_id, received_at) values ('SMq1', '4145550502', '+12624180202', 'Sure, what do you need?', false, $1, now() - interval '3 hours')`, [quiet])
+    const call = await mk('Unlogged Ulla', '3 Lost St', '4145550503')
+    await db.query(`update public.leads set human_takeover_at = now() - interval '5 hours', human_takeover_key = 'k-ulla' where id = $1`, [call])
+    const stale = await mk('Stale Stan', '4 Lost St', '4145550504')
+    await db.query(`insert into public.planned_openers (plan_date, wpie_owner_id, attempt, lead_id, lane, phone, body, step, send_status, window_start_utc, window_end_utc)
+      select current_date - 2, wpie_owner_id, 1, id, 'agent', '+14145550504', 'x STOP', 1, 'planned', now() - interval '50 hours', now() - interval '40 hours' from public.leads where id = $1`, [stale])
+    await db.query(`insert into public.twilio_inbound (sid, from10, to_number, body, is_opt_out, lead_id, received_at) values ('SMu1', '4145559876', '+12624180202', 'Who is this?', false, null, now() - interval '1 hour')`)
+    const dorm = await mk('Dormant Dora', '5 Lost St', '4145550505')
+    await db.query(`insert into public.twilio_inbound (sid, from10, to_number, body, is_opt_out, lead_id, received_at) values ('SMd1', '4145550505', '+12624180202', 'Why are you asking?', false, $1, now() - interval '2 days')`, [dorm])
+    await db.query(`insert into public.messages (lead_id, direction, channel, body, from_number, to_number, status, sent_at, source_key) values ($1, 'out', 'sms', 'Fair question', '+12624180202', '+14145550505', 'delivered', now() - interval '47 hours', 'test:dora')`, [dorm])
+    await db.query(`update public.leads set belt = 'dormant', belt_entered_at = now() - interval '46 hours' where id = $1`, [dorm])
+    const fine = await mk('Fine Fiona', '6 Found St', '4145550506')
+    await db.query(`update public.leads set belt = 'yes_unbooked', stage = 'colin_call', next_stop_at = now() + interval '1 day' where id = $1`, [fine])
+
+    const net = ((await r(`public.agent_due_today()`)).stuck) as { lead_id?: string; what: string; why: string }[]
+    const whats = (id: string) => net.filter((x) => x.lead_id === id).map((x) => x.what)
+    expect(whats(nodate)).toEqual(['no_next_step'])
+    expect(whats(quiet)).toEqual(['reply_unanswered'])
+    expect(whats(call)).toEqual(['unlogged_call'])
+    expect(whats(stale)).toEqual(['text_stale'])
+    expect(whats(dorm)).toEqual(['dormant_replied'])
+    expect(net.filter((x) => x.what === 'unknown_caller').map((x) => x.why)).toEqual(expect.arrayContaining([expect.stringContaining('4145559876')]))
+    expect(whats(fine)).toEqual([])
+    expect(await one(`select public.warm_stuck_count() as n`)).toMatchObject({ n: net.length })
   })
 
   it('the agent can lift only its own pause', async () => {
