@@ -227,6 +227,12 @@ describe('on the real migrations', () => {
     expect(await one(`select count(*)::int n from public.suppressed_phones where phone10 = '4145550303'`)).toEqual({ n: 1 })
     expect(await r(`public.agent_mark_card($1, 'hot', 'wants to sell by spring', null, null, 'Muse sender')`, [h])).toMatchObject({ mark: 'hot' })
     expect(await card(h)).toMatchObject({ stage: 'colin_call', belt: 'yes_unbooked' })
+    // the ping to Colin comes from the agent's mark, with its reason; the reply agent's own hot read pings nothing while the agent runs texting
+    expect(await one(`select body, phone10 from public.hot_alerts where lead_id = $1`, [h])).toEqual({ body: 'Muse: wants to sell by spring', phone10: '4145550304' })
+    await db.exec(`update public.campaign_control set agent_runs_texting = true`)
+    expect(await r(`public.hot_record('SMjunk', $1, '4145550304', 'Holly', '4 Mark St', 'Yes', false, now())`, [h])).toMatchObject({ ok: false })
+    await db.exec(`update public.campaign_control set agent_runs_texting = false`)
+    expect(await r(`public.agent_mark_card($1, 'hot', null, null, null, 'Muse sender')`, [w])).toMatchObject({ ok: false })
     expect(await r(`public.agent_mark_card($1, 'wrong_number', null, null, '4145550305', 'Muse sender')`, [w])).toMatchObject({ phone_marked_bad: '4145550305' })
     expect((await card(w)).stage).toBe('data_fix')
     expect(await r(`public.agent_mark_card($1, 'dead', 'x', null, null, 'Muse sender')`, [c])).toMatchObject({ ok: false })   // dnc stays dnc
