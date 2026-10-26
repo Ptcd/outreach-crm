@@ -3,6 +3,8 @@
 // or "x-api-key". The key's role (intake or sender) decides which tools it sees. Tools and checks: _shared/agentDoor.ts.
 import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
 import { handleMessage, keyFrom, type Agent, type DoorDb } from '../_shared/agentDoor.ts'
+import { approveReply } from '../_shared/replyAgent.ts'
+import { senderEnv, twilioPort, type Rpc } from '../_shared/sending.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -33,6 +35,22 @@ Deno.serve(async (req) => {
     readyToText: (f) => rpc('agent_ready_to_text', { p_limit: f.limit, p_followups: f.followups, p_all: f.all_sources }) as Promise<unknown[]>,
     queueText: (t, a) => rpc('agent_queue_text', { p_lead_id: t.lead_id, p_phone: t.phone, p_body: t.body, p_step: t.step,
       p_send_after: t.send_after, p_agent: a, p_variant: t.variant, p_template: t.template }) as Promise<Record<string, unknown>>,
+    repliesWaiting: (days) => rpc('agent_replies_waiting', { p_days: days }) as Promise<unknown[]>,
+    sendReply: async (t, a) => {
+      const id = await rpc('agent_start_reply', { p_lead_id: t.lead_id, p_phone: t.phone, p_agent: a }) as string
+      const rpcs: Rpc = async (fn, args) => {
+        const r = await sb.rpc(fn, args)
+        return { data: r.data, error: r.error ? { message: r.error.message } : null }
+      }
+      const env = senderEnv((n) => Deno.env.get(n), `${Deno.env.get('SUPABASE_URL') ?? ''}/functions/v1`)
+      const res = await approveReply({ rpc: rpcs, env, twilio: env.twilio ? twilioPort(env.twilio, fetch) : null, id, text: t.body,
+        actor: `Muse (${a})`, companyName: Deno.env.get('REPLY_COMPANY_NAME') ?? undefined })
+      if (res.outcome === 'refused') {
+        await sb.from('reply_drafts').update({ status: 'superseded', note: 'agent reply not sent: ' + (res.reason ?? '') })
+          .eq('id', id).eq('status', 'awaiting_approval')
+      }
+      return { reply_id: id, ...res }
+    },
     testResults: (days, step) => rpc('agent_test_results', { p_days: days, p_step: step }) as Promise<Record<string, unknown>>,
     queue: (d) => rpc('agent_queue_list', { p_date: d }) as Promise<unknown[]>,
     withdraw: (id, a, reason) => rpc('agent_withdraw_text', { p_id: id, p_agent: a, p_reason: reason }) as Promise<boolean>,

@@ -18,7 +18,7 @@ const fakeDb = (over: Partial<DoorDb> = {}): DoorDb => ({
   addProspect: async () => ({ status: 'created', lead_id: 'L1' }), findProspects: async () => [], prospectCounts: async () => ({}),
   status: async () => ({ paused: false }), readyToText: async () => [], queueText: async () => ({ status: 'queued', text_id: 'T1' }),
   queue: async () => [], withdraw: async () => true, pause: async () => ({ paused: true }), resume: async () => ({ paused: false }),
-  results: async () => ({}), testResults: async () => ({}), ...over,
+  results: async () => ({}), testResults: async () => ({}), repliesWaiting: async () => [], sendReply: async () => ({ outcome: 'sent' }), ...over,
 })
 const intake = { id: 'k1', name: 'Muse intake', role: 'intake' as const }
 const sender = { id: 'k2', name: 'Muse sender', role: 'sender' as const }
@@ -173,6 +173,41 @@ describe('on the real migrations', () => {
       values ((now() at time zone 'America/Chicago')::date + 1, 777, 1, $1, 'flip', '+14145550177', 'x STOP', 1)`, [lid])
     expect(await one(`select send_status from public.planned_openers where wpie_owner_id = 777 and plan_date > (now() at time zone 'America/Chicago')::date`))
       .toEqual({ send_status: 'planned' })
+  })
+
+  it('"do we already have them?": an address the laptop has (spelled differently) merges into that card; a phone on another card is not added', async () => {
+    const lap = (await one<{ id: string }>(`insert into public.leads (wpie_owner_id, owner_name, property_address, property_zip, stage)
+      values (888, 'SMITH JOHN', '1205 NORTH STATE STREET', '54911', 'opener_queued') returning id`)).id
+    await db.query(`insert into public.contacts (lead_id, kind, value, value_normalized) values ($1, 'phone', '9205550111', '9205550111')`, [lap])
+    const res = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'John Smith',
+      address: '1205 N State St', zip: '54911', phones: ['920-555-0112', '920-555-0111'], reasons: [{ kind: 'vacant', label: 'Vacant' }] })])
+    expect(res).toMatchObject({ status: 'already_have', lead_id: lap, phones_added: ['9205550112'], existing: { source: 'laptop', texted: false } })
+    const elsewhere = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'Jane Roe',
+      address: '9 Other Rd', phones: ['9205550112'] })])
+    expect(elsewhere.status).toBe('created')
+    expect(elsewhere.phones_skipped).toEqual([{ number: '9205550112', why: 'already on another card', lead_id: lap }])
+  })
+
+  it('with agent_runs_texting on, a reply is read and recorded but not queued or put up for the team; the agent sees it and answers it', async () => {
+    const lid = (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'Rae Plier',
+      address: '3 Reply Ct', phones: ['4145550199'] })])).lead_id as string
+    await db.query(`insert into public.messages (lead_id, direction, channel, body, from_number, to_number, status, sent_at, source_key, is_opener, provider_sid)
+      values ($1, 'out', 'sms', 'Hi Rae, Colin Merrill here. Still own 3 Reply Ct? Reply STOP', '+12623812196', '+14145550199', 'delivered', now() - interval '1 hour', 'test:o1', true, 'SMo1')`, [lid])
+    await db.query(`insert into public.twilio_inbound (sid, from10, to_number, body, is_opt_out, lead_id, received_at)
+      values ('SMr1', '4145550199', '+12623812196', 'Yes, why?', false, $1, now() - interval '5 minutes')`, [lid])
+    await db.exec(`update public.campaign_control set agent_runs_texting = true, routine_enabled = true`)
+    const dec = await r(`public.reply_record_decision('SMr1', 'who_is_this', 'routine', false, 'open', 'Fair question - this is Colin.', 'brain', 'n', 'v1')`)
+    expect(dec).toMatchObject({ ok: true, status: 'no_reply' })
+    const waiting = await r(`public.agent_replies_waiting(7)`) as unknown as { lead_id: string; reply_to: { text: string; our_number: string };
+      reply_agent_read: { intent: string; suggested_reply: string }; conversation: { who: string; text: string }[] }[]
+    const w = waiting.find((x) => x.lead_id === lid)!
+    expect(w.reply_to).toMatchObject({ text: 'Yes, why?', our_number: '+12623812196' })
+    expect(w.reply_agent_read).toMatchObject({ intent: 'who_is_this', suggested_reply: 'Fair question - this is Colin.' })
+    expect(w.conversation.map((c) => c.who)).toEqual(['us', 'them'])
+    const draft = (await one<{ id: string }>(`select public.agent_start_reply($1, '4145550199', 'Muse sender') as id`, [lid])).id
+    expect(await one(`select kind, our_number, status from public.reply_drafts where id = $1`, [draft]))
+      .toEqual({ kind: 'team', our_number: '+12623812196', status: 'awaiting_approval' })
+    await db.exec(`update public.campaign_control set agent_runs_texting = false`)
   })
 
   it('the agent can lift only its own pause', async () => {

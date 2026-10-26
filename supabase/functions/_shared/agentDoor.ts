@@ -18,6 +18,8 @@ export interface DoorDb {
   readyToText(f: { limit: number; followups: boolean; all_sources: boolean }): Promise<unknown[]>
   queueText(t: { lead_id: string; phone: string; body: string; step: number; send_after: string | null; variant: string | null; template: string | null }, agent: string): Promise<Record<string, unknown>>
   testResults(days: number, step: number): Promise<Record<string, unknown>>
+  repliesWaiting(days: number): Promise<unknown[]>
+  sendReply(t: { lead_id: string; phone: string; body: string }, agent: string): Promise<Record<string, unknown>>
   queue(date: string | null): Promise<unknown[]>
   withdraw(id: string, agent: string, reason: string): Promise<boolean>
   pause(reason: string, agent: string): Promise<Record<string, unknown>>
@@ -37,7 +39,8 @@ export const TEXTING_RULES = [
   'Never pressure an older or grieving owner. STOP is final: an opted-out phone can never be texted again.',
   'Follow-ups (steps 2-5) go only to people who never answered, at least 3 days apart; the sequence the team uses is days 1, 3, 10, 17, 24.',
   'Texts go out 10 AM to 7 PM in the recipient\'s time zone, never on Sunday, and share one daily limit with the laptop\'s own texts. Queue them and the server sends them in that window.',
-  'When someone replies, stop: the reply agent and the team answer replies. You never text a person who has texted back.',
+  'Replies: you answer them now (replies_waiting, then send_reply), on the same thread. Read the whole conversation and the card first. One reply per text from them; never a first text or follow-up (queue_texts) to someone who has texted back.',
+  'In a reply: never give, guess or react to a price; Colin prices every deal himself on a call. Your job is to learn why they would sell, the condition, the timing, who signs and their number, then book a call with Colin.',
   'When an A/B test is running, tag every text with its variant (and template) in queue_texts, assign cards to variants at random, and read test_results before changing anything.',
 ].join('\n')
 
@@ -88,6 +91,13 @@ export const TOOLS: { role: Role; name: string; description: string; inputSchema
   { role: 'sender', name: 'test_results',
     description: 'The A/B test scoreboard: per variant, texts queued, sent, delivered, failed (and carrier-filtered 30007), real conversations (a reply that is not a STOP or a wrong number), STOPs, wrong numbers, and the reply and STOP rates on delivered texts. Default: first texts, last 14 days.',
     inputSchema: { type: 'object', properties: { days: { type: 'integer', maximum: 90 }, step: { type: 'integer', minimum: 1, maximum: 5 } } } },
+  { role: 'sender', name: 'replies_waiting',
+    description: 'People who texted back and have no answer from us yet, oldest first. Each comes with the whole card: property, owner, mailing address, reasons, the full conversation both ways, calls, what we already know (motivation, timeline, condition, price, who signs), the card stage and next step, whether it is hot, and how the reply agent read their text (intent, outcome, its suggested reply). Answer each with send_reply.',
+    inputSchema: { type: 'object', properties: { days: { type: 'integer', maximum: 30 } } } },
+  { role: 'sender', name: 'send_reply',
+    description: 'Answer someone who texted us, on the same thread (same number). Sent now, unless it is quiet hours, when it goes in the morning. Refused if they opted out, if they texted again since you read the thread (read it again), or if it breaks the wording rules. A STOP line is not needed in a reply.',
+    inputSchema: { type: 'object', properties: { lead_id: S('card id'), phone: S('their phone (the one that texted us)'), body: S('your reply') },
+      required: ['lead_id', 'phone', 'body'] } },
   { role: 'sender', name: 'todays_queue', description: 'Every text planned for a day (default today), from you and from the laptop, with its status.',
     inputSchema: { type: 'object', properties: { date: S('YYYY-MM-DD') } } },
   { role: 'sender', name: 'withdraw_texts', description: 'Pull texts that have not gone yet.',
@@ -99,6 +109,19 @@ export const TOOLS: { role: Role; name: string; description: string; inputSchema
   { role: 'sender', name: 'text_results', description: 'What happened to recent texts: delivered, failed (with carrier codes), replies and STOPs, over the last N hours (default 24).',
     inputSchema: { type: 'object', properties: { hours: { type: 'integer', maximum: 168 } } } },
 ]
+
+/** The wording check for a reply (no STOP line needed in the middle of a conversation). */
+export function replyProblem(body: string): string | null {
+  const b = (body ?? '').trim()
+  if (!b) return 'empty reply'
+  if (b.length > 480) return 'over 480 characters'
+  if (b.includes('$')) return 'no $ or prices'
+  if (findPriceOrOffer(b).length) return 'mentions a price or an offer: Colin gives numbers himself, on a call'
+  if (/\bcash\b/i.test(b)) return 'no "cash" in a text'
+  if (/https?:\/\/|www\./i.test(b)) return 'no links'
+  if (/\b(llc|inc|company|investors?|our team)\b/i.test(b)) return 'sounds like a business: write as Colin, one person'
+  return null
+}
 
 /** The wording check before a text is queued (the database checks STOP, $, length and the business name again). */
 export function textProblem(body: string): string | null {
@@ -156,6 +179,13 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
         results.push({ lead_id: t.lead_id, ...r })
       }
       return { value: { queued: results.filter((r) => r.status === 'queued').length, refused: results.filter((r) => r.status !== 'queued').length, results } }
+    }
+    case 'replies_waiting': return { value: await db.repliesWaiting(int(args.days, 7, 30)) }
+    case 'send_reply': {
+      const body = String(args.body ?? '').replace(/\s+/g, ' ').trim()
+      const why = replyProblem(body)
+      if (why) return { value: { status: 'refused', reason: why }, isError: true }
+      return { value: await db.sendReply({ lead_id: String(args.lead_id ?? ''), phone: String(args.phone ?? ''), body }, agent.name) }
     }
     case 'todays_queue': return { value: await db.queue(typeof args.date === 'string' ? args.date : null) }
     case 'withdraw_texts': {

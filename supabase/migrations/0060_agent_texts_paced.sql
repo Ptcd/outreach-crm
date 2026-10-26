@@ -3,7 +3,7 @@
 create or replace function public.pace_agent_texts() returns trigger
 language plpgsql as $$
 begin
-  if new.lane = 'agent' and new.per_hour is null then new.per_hour := 35; end if;
+  if new.lane = 'agent' and new.per_hour is null then new.per_hour := 45; end if;
   return new;
 end $$;
 drop trigger if exists pace_agent_texts on public.planned_openers;
