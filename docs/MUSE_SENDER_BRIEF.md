@@ -148,6 +148,32 @@ One pillar answered and they're still responsive: keep going, one question at a 
 
 ---
 
+## 5b. Picking the next date (`mark_card not_now` / `held` with `date`)
+
+You choose the check-back date. The door keeps it inside a year, off Sundays, and gives a hold with no date 45 days. Rules, in order:
+
+| They said | Mark | Date |
+|---|---|---|
+| A date or an event ("after the holidays", "when the lease ends in March", "once my mom's estate closes") | `not_now`, reason in their words | 5 days BEFORE the event, so Colin is first in line. "After the holidays" = Jan 5. |
+| A month without a day ("maybe in March") | `not_now` | The 1st of that month. |
+| "Six months to a year" / "next year" | `not_now` | 90 days out, with the monthly line at each touch. Rick: that's follow-up, not a deal. |
+| "Not now", no reason, no date | `not_now`, reason "no reason given" | 30 days. |
+| A need but a firm retail number (after the flexibility test) | `held`, "firm at <their words>" | 30 days. Touch line: "anything changed, any flexibility on that number?" |
+| Retail, no need (the takeaway was sent) | `dead` | None. A dead card comes back only if a new event lands on it. |
+| Listed with an agent | `held`, "listed, through <date>" | The listing end date + 14 days; unknown, 60 days. |
+| Signed with another buyer | `held`, "signed with <who>, closes <date>" | Their closing date + 7 days; unknown, 45 days. |
+| Estate: "too soon" | `held`, "too soon" | 60 days, and the next text is gentle, no pillar. |
+| Estate: waiting on papers / the attorney / a personal representative | `held`, what they're waiting on | 45 days (30 if they said it's close). |
+| Waiting on a spouse, sibling or co-owner | `held`, who | 7 days: "did you get a chance to talk it over?" |
+| Thinking it over | `not_now`, "thinking it over" | 3 days. Rick: a concrete time for the decision, never pressure. |
+| Older, ill or grieving | `elderly` / `grief` first; then `held` if they gave a reason | 30 days, phone only by the team; never a pillar by text. |
+| Went quiet mid-thread (answered one or two pillars, then nothing) | nothing to mark: the card's own ladder runs (2, 7, 21 days) and `due_today` shows you each `text_due`; you write the words | the ladder's |
+| A dated card comes back and they say "not yet" again | `not_now` again | Double the last gap (30 → 60 → 90), never past a year. Third "not yet" with no new reason: `dead` "three not-yets, no change". |
+
+Every touch names the thing they said: "Anything changed with 12 Maple St since the lease ends?" Never a bare "just checking in."
+
+---
+
 ## 6. `due_today`: dates and the safety net
 
 Run it every morning and at 1 PM. It returns two lists.

@@ -301,6 +301,17 @@ describe('on the real migrations', () => {
     expect(await one(`select public.warm_stuck_count() as n`)).toMatchObject({ n: net.length })
   })
 
+  it('check-back dates: a year out is refused, a Sunday rolls to Monday, a hold with no date comes back in 45 days', async () => {
+    const mk = async (name: string, addr: string, phone: string) => (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`,
+      [JSON.stringify({ owner_name: name, address: addr, phones: [phone] })])).lead_id as string
+    const a = await mk('Far Fred', '1 Date St', '4145550601'); const b = await mk('Sunday Sue', '2 Date St', '4145550602'); const c = await mk('Held Hal', '3 Date St', '4145550603')
+    expect(await r(`public.agent_mark_card($1, 'not_now', 'maybe in two years', (now() + interval '400 days')::timestamptz, null, 'Muse sender')`, [a])).toMatchObject({ ok: false })
+    await r(`public.agent_mark_card($1, 'not_now', 'after the holidays', '2027-01-03T16:00:00Z', null, 'Muse sender')`, [b])   // a Sunday
+    expect(await one(`select to_char(next_action_at at time zone 'America/Chicago', 'Dy') as d from public.leads where id = $1`, [b])).toEqual({ d: 'Mon' })
+    await r(`public.agent_mark_card($1, 'held', 'waiting on the estate attorney', null, null, 'Muse sender')`, [c])
+    expect(await one(`select (named_date::date - current_date)::int as days from public.leads where id = $1`, [c])).toEqual({ days: 45 })
+  })
+
   it('the agent can lift only its own pause', async () => {
     expect(await r(`public.agent_pause('carrier errors', 'Muse sender')`)).toEqual({ paused: true })
     expect(await r(`public.agent_resume('Muse sender')`)).toEqual({ paused: false })
