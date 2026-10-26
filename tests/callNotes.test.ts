@@ -160,7 +160,7 @@ const asThalia = async <T = Record<string, unknown>>(sql: string, params: unknow
 }
 
 function fakeTwilio(over: Partial<Intelligence> = {}) {
-  const made: string[] = []; const deleted: string[] = []
+  const made: string[] = []; const deleted: string[] = []; const recordingsDeleted: string[] = []
   let n = 0
   const t: Intelligence = {
     async createTranscript(rec) { made.push(rec); return GT(++n) },
@@ -170,10 +170,11 @@ function fakeTwilio(over: Partial<Intelligence> = {}) {
               { media_channel: 2, sentence_index: 1, transcript: 'Yes. My mom passed and the house is empty.' }]
     },
     async deleteTranscript(sid) { deleted.push(sid) },
+    async deleteRecording(sid) { recordingsDeleted.push(sid) },
     async call() { return { from: 'client:thalia', to: '', direction: 'inbound', start_time: null } },
     ...over,
   }
-  return { t, made, deleted }
+  return { t, made, deleted, recordingsDeleted }
 }
 const NOTES: CallNotes = cleanNotes({
   talked: true, summary: 'Jane inherited it from her mom; it is empty. She and her brother would sell in January.', quote: 'We just want it gone.',
@@ -354,6 +355,22 @@ describe('call notes: the pipeline on the real migrations', () => {
     const n6 = await one<{ id: string; logged_before: string }>(`select id, logged_before from public.call_notes where call_sid = $1`, [SID(6)])
     expect(n6.logged_before).toBe('reached_no_decision')
     expect(await asThalia(`select public.call_note_confirm($1, 'hot') r`, [n6.id])).toMatchObject({ ok: false, reason: 'this call is already logged (reached no decision)' })
+  })
+
+  it('a seller who may be in an all-party-consent state is not recorded: the recording is deleted, nothing transcribed', async () => {
+    const allowed = async (phone: string, lead: string | null = null) =>
+      (await one<{ r: Record<string, unknown> }>(`select public.call_recording_allowed($1, $2::uuid) r`, [phone, lead])).r
+    expect(await allowed(PHONE, LEAD)).toEqual({ record: true })
+    expect(await allowed('3125550101')).toMatchObject({ record: false, reason: 'area code 312 is in an all-party-consent state' })
+    expect(await allowed('')).toMatchObject({ record: false })
+    await db.exec(`update public.leads set mailing_state = 'FL' where id = '${LEAD}'`)
+    expect(await allowed(PHONE)).toMatchObject({ record: false, reason: 'mailing state FL is all-party consent' })
+    const tw = fakeTwilio()
+    expect(await onRecording(recording(1), 'out', deps(tw.t))).toMatchObject({ status: 'not_allowed', delete: true, deleted: true })
+    expect(tw.recordingsDeleted).toEqual([RE(1)])
+    expect(tw.made).toHaveLength(0)
+    expect(await one(`select status, error from public.call_recordings where call_sid = $1`, [SID(1)]))
+      .toEqual({ status: 'not_allowed', error: 'mailing state FL is all-party consent' })
   })
 
   it('the tables are the team\'s: the words are not readable without a team login', async () => {

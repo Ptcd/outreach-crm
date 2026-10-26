@@ -325,6 +325,7 @@ export interface Intelligence {
   transcriptStatus(transcriptSid: string): Promise<string>
   sentences(transcriptSid: string): Promise<Sentence[]>
   deleteTranscript(transcriptSid: string): Promise<void>
+  deleteRecording(recordingSid: string): Promise<void>
   call(callSid: string): Promise<TwilioCall | null>
 }
 
@@ -375,6 +376,9 @@ export function twilioIntelligence(o: { accountSid: string; authToken: string; s
     async deleteTranscript(sid) {
       await req(`https://intelligence.twilio.com/v2/Transcripts/${sid}`, { method: 'DELETE' })
     },
+    async deleteRecording(sid) {
+      await req(`https://api.twilio.com/2010-04-01/Accounts/${o.accountSid}/Recordings/${sid}.json`, { method: 'DELETE' })
+    },
     async call(callSid) {
       const c = await req(`https://api.twilio.com/2010-04-01/Accounts/${o.accountSid}/Calls/${callSid}.json`).catch(() => null)
       return c ? { from: String(c.from ?? ''), to: String(c.to ?? ''), direction: String(c.direction ?? ''), start_time: c.start_time ?? null } : null
@@ -413,6 +417,13 @@ export async function onRecording(p: Record<string, string>, direction: Directio
     p_caller: direction === 'out' ? (call?.from ?? null) : null, p_from: call?.from ?? '', p_to: call?.to ?? '',
   })
   if (ready.ok !== true) { log(`[call-notes] recording ${callSid}: ${String(ready.reason ?? 'refused')}`); return ready }
+  if (ready.delete === true) {
+    // a seller who may be in an all-party-consent state (migration 0075): the recording must not exist
+    try { await d.twilio.deleteRecording(p.RecordingSid ?? ''); return { ...ready, deleted: true } } catch (e) {
+      log(`[call-notes] delete recording ${callSid}: ${why(e)}`)
+      return { ...ready, deleted: false }
+    }
+  }
   if (ready.transcribe !== true) return ready
   return { ...ready, ...(await transcribe(callSid, p.RecordingSid ?? '', direction, d)) }
 }

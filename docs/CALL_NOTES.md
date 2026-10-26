@@ -13,8 +13,14 @@ Every seller call through the app is recorded (after a disclosure line), transcr
      The PM line is never recorded. A missed call goes to voicemail as before (Twilio's own voicemail transcript,
      migration 0063).
    - `CALL_RECORDING`: `off` (default: calls sound exactly as before), `test` (only numbers in
-     `CALL_RECORDING_TEST_NUMBERS`), `on` (every seller call). `CALL_DISCLOSURE` overrides the line
+     `CALL_RECORDING_TEST_NUMBERS`), `on` (every seller call). `CALL_DISCLOSURE_MODE=none` (Colin 2026-10-26: no
+     recording statement, Wisconsin is one-party consent) records silently; `say` plays `CALL_DISCLOSURE` first
      (default "This call may be recorded for notes.").
+   - Consent guard (migration 0075, `call_recording_allowed`): a seller whose phone's area code is in an all-party-consent
+     state (CA, IL, FL, WA, PA, MD, MA, MT, NH, CT, MI, OR, NV, DE), or whose card (or any card with that phone) has
+     such a mailing state, is never recorded. pm-phone asks before recording (no answer: not recorded); the
+     call-notes function asks again and deletes a recording that should not exist (`not_allowed`). On 2026-10-26 it
+     skipped 6 of the 75 cards that had texted back (mostly Chicago-area and 906 numbers).
 2. **call-notes** Edge Function (`supabase/functions/call-notes`, `_shared/callNotes.ts`):
    - `?d=out|in`: Twilio's recording callback (X-Twilio-Signature, the subaccount's token). `call_recording_ready`
      finds the card (an app call by its `human_call_provider_claims` row, an inbound call by its `inbound_calls` row,
