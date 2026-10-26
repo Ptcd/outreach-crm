@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
-import { BarChart3, CalendarCheck, Home, Inbox, ListChecks, LogOut, MessageSquareText, PhoneCall, Settings as SettingsIcon } from 'lucide-react'
+import { BarChart3, CalendarCheck, Flame, Home, Inbox, ListChecks, LogOut, MessageSquareText, PhoneCall, Settings as SettingsIcon } from 'lucide-react'
 import { useAuth } from '@/providers/AuthProvider'
 import { useRepliesWaiting } from '@/lib/queries'
 import { OfflineBanner } from '@/components/OfflineBanner'
@@ -14,7 +14,8 @@ const NAV: { to: string; label: string; short?: string; icon: typeof CalendarChe
   { to: '/today', label: 'Today', icon: CalendarCheck },
   { to: '/calls', label: 'Calls', icon: PhoneCall },
   { to: '/inbox', label: 'Inbox', icon: Inbox },
-  { to: '/pipeline', label: 'Pipeline', icon: ListChecks },
+  { to: '/warm', label: 'Warm', icon: Flame },
+  { to: '/pipeline', label: 'Pipeline', short: 'Pipe', icon: ListChecks },
   { to: '/approvals', label: 'Approve', short: 'Approve', icon: MessageSquareText },
   { to: '/scoreboard', label: 'Scoreboard', short: 'Score', icon: BarChart3 },
 ]
@@ -80,7 +81,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <main className="mx-auto max-w-6xl px-4 py-5 sm:py-6">{children}</main>
       <IncomingCallBar />
       <CallBar />
-      <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-border/60 bg-background/85 px-1 backdrop-blur-xl md:hidden" aria-label="Main">
+      <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 grid grid-cols-7 border-t border-border/60 bg-background/85 px-1 backdrop-blur-xl md:hidden" aria-label="Main">
         {NAV.map((n) => (
           <NavLink
             key={n.to}
@@ -90,7 +91,7 @@ export function Layout({ children }: { children: ReactNode }) {
             }
           >
             {({ isActive }) => (<>
-            <span className={cn('relative flex h-8 w-14 items-center justify-center rounded-full transition-colors', isActive ? 'bg-accent' : 'group-hover:bg-muted')}>
+            <span className={cn('relative flex h-8 w-12 items-center justify-center rounded-full transition-colors', isActive ? 'bg-accent' : 'group-hover:bg-muted')}>
               <n.icon className="h-[22px] w-[22px]" strokeWidth={isActive ? 2.4 : 2} aria-hidden />
               {n.to === '/inbox' && waiting > 0 && (
                 <span className="absolute -top-1 right-1 rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-sm">{waiting}</span>

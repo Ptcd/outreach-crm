@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import Login from '@/pages/Login'
 import SetPassword from '@/pages/SetPassword'
 import Today from '@/pages/Today'
+import Warm from '@/pages/Warm'
 import Pipeline from '@/pages/Pipeline'
 import LeadDetail from '@/pages/LeadDetail'
 import Approvals from '@/pages/Approvals'
@@ -80,6 +81,7 @@ export default function App() {
         <Route path="/pipeline" element={<Pipeline />} />
         <Route path="/lead/:id" element={<LeadDetail />} />
         <Route path="/inbox" element={<Inbox />} />
+        <Route path="/warm" element={<Warm />} />
         <Route path="/approvals" element={<Approvals />} />
         <Route path="/scoreboard" element={<Scoreboard />} />
         <Route path="*" element={<Navigate to="/today" replace />} />
