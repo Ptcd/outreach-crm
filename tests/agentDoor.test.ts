@@ -312,6 +312,24 @@ describe('on the real migrations', () => {
     expect(await one(`select (named_date::date - current_date)::int as days from public.leads where id = $1`, [c])).toEqual({ days: 45 })
   })
 
+  it('the time-of-day test: a pm text waits for 5 PM, an am text queued after noon waits for 10 AM tomorrow; scored by slot', async () => {
+    const mk = async (name: string, addr: string, phone: string) => (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`,
+      [JSON.stringify({ owner_name: name, address: addr, phones: [phone], mailing_state: 'WI' })])).lead_id as string
+    const a = await mk('Am Amy', '1 Slot St', '4145550701'); const p = await mk('Pm Pat', '2 Slot St', '4145550702')
+    const tue1pm = '2026-10-27T18:00:00Z'                          // Tuesday 1 PM Central
+    const qa = await r(`public.agent_queue_text($1, '4145550701', $2, 1, null, 'Muse sender', $3::timestamptz, 'A', 'own_q', 'am')`, [a, OPENER, tue1pm])
+    const qp = await r(`public.agent_queue_text($1, '4145550702', $2, 1, null, 'Muse sender', $3::timestamptz, 'B', 'intent_q', 'pm')`, [p, OPENER, tue1pm])
+    expect(new Date(qa.goes_after as string).toISOString()).toBe('2026-10-28T15:00:00.000Z')     // Wed 10 AM Central
+    expect(new Date(qp.goes_after as string).toISOString()).toBe('2026-10-27T22:00:00.000Z')     // Tue 5 PM Central
+    expect(qp).toMatchObject({ slot: 'pm' })
+    expect(await r(`public.agent_queue_text($1, '4145550701', $2, 1, null, 'Muse sender', $3::timestamptz, 'A', 'own_q', 'noon')`, [a, OPENER, tue1pm]))
+      .toMatchObject({ status: 'refused' })
+    expect(await one(`select per_hour from public.planned_openers where lead_id = $1`, [p])).toEqual({ per_hour: 100 })
+    const t = await r(`public.agent_test_results(14, 1)`)
+    expect((t.slots as { slot: string }[]).map((x) => x.slot)).toEqual(expect.arrayContaining(['am', 'pm']))
+    expect((t.cells as { cell: string }[]).map((x) => x.cell)).toEqual(expect.arrayContaining(['A/am', 'B/pm']))
+  })
+
   it('the agent can lift only its own pause', async () => {
     expect(await r(`public.agent_pause('carrier errors', 'Muse sender')`)).toEqual({ paused: true })
     expect(await r(`public.agent_resume('Muse sender')`)).toEqual({ paused: false })

@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
     status: () => rpc('agent_status', {}) as Promise<Record<string, unknown>>,
     readyToText: (f) => rpc('agent_ready_to_text', { p_limit: f.limit, p_followups: f.followups, p_all: f.all_sources }) as Promise<unknown[]>,
     queueText: (t, a) => rpc('agent_queue_text', { p_lead_id: t.lead_id, p_phone: t.phone, p_body: t.body, p_step: t.step,
-      p_send_after: t.send_after, p_agent: a, p_variant: t.variant, p_template: t.template }) as Promise<Record<string, unknown>>,
+      p_send_after: t.send_after, p_agent: a, p_variant: t.variant, p_template: t.template, p_slot: t.slot }) as Promise<Record<string, unknown>>,
     records: (fn, args) => rpc(fn, args),
     dueToday: () => rpc('agent_due_today', {}) as Promise<unknown[]>,
     markCard: (m, a) => rpc('agent_mark_card', { p_lead_id: m.lead_id, p_mark: m.mark, p_reason: m.reason, p_date: m.date, p_phone: m.phone, p_agent: a }) as Promise<Record<string, unknown>>,

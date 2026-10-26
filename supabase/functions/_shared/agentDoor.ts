@@ -18,7 +18,7 @@ export interface DoorDb {
   prospectCounts(): Promise<Record<string, unknown>>
   status(): Promise<Record<string, unknown>>
   readyToText(f: { limit: number; followups: boolean; all_sources: boolean }): Promise<unknown[]>
-  queueText(t: { lead_id: string; phone: string; body: string; step: number; send_after: string | null; variant: string | null; template: string | null }, agent: string): Promise<Record<string, unknown>>
+  queueText(t: { lead_id: string; phone: string; body: string; step: number; send_after: string | null; variant: string | null; template: string | null; slot: string | null }, agent: string): Promise<Record<string, unknown>>
   testResults(days: number, step: number): Promise<Record<string, unknown>>
   repliesWaiting(days: number): Promise<unknown[]>
   dueToday(): Promise<Record<string, unknown>>
@@ -98,9 +98,10 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
       lead_id: S('card id'), phone: S('phone on that card'), body: S('the exact text'), step: { type: 'integer', minimum: 1, maximum: 5 },
       send_after: S('ISO time, optional'),
       variant: S('A/B test arm this text belongs to, e.g. "A" or "B" (always set it when a test is running)'),
-      template: S('short name of the wording, e.g. "own_q" or "intent_q"') }, required: ['lead_id', 'phone', 'body'] } } }, required: ['texts'] } },
+      template: S('short name of the wording, e.g. "own_q" or "intent_q"'),
+      slot: S('time-of-day test: am (goes from 10 AM their time) or pm (from 5 PM); leave out for follow-ups') }, required: ['lead_id', 'phone', 'body'] } } }, required: ['texts'] } },
   { role: 'sender', name: 'test_results',
-    description: 'The A/B test scoreboard: per variant, texts queued, sent, delivered, failed (and carrier-filtered 30007), real conversations (a reply that is not a STOP or a wrong number), STOPs, wrong numbers, and the reply and STOP rates on delivered texts. Default: first texts, last 14 days.',
+    description: 'The test scoreboard: per wording variant, per time slot (am / pm), and per cell (variant/slot), with hot leads too: texts queued, sent, delivered, failed (and carrier-filtered 30007), real conversations (a reply that is not a STOP or a wrong number), STOPs, wrong numbers, and the reply and STOP rates on delivered texts. Default: first texts, last 14 days.',
     inputSchema: { type: 'object', properties: { days: { type: 'integer', maximum: 90 }, step: { type: 'integer', minimum: 1, maximum: 5 } } } },
   { role: 'sender', name: 'replies_waiting',
     description: 'People who texted back and have no answer from us yet, oldest first. Each comes with the whole card: property, owner, mailing address, reasons, the full conversation both ways, calls, what we already know (motivation, timeline, condition, price, who signs), the card stage and next step, whether it is hot, and how the reply agent read their text (intent, outcome, its suggested reply). Answer each with send_reply.',
@@ -219,7 +220,7 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
         if (why) { results.push({ lead_id: t.lead_id, status: 'refused', reason: why }); continue }
         const r = await db.queueText({ lead_id: String(t.lead_id ?? ''), phone: String(t.phone ?? ''), body,
           step: int(t.step, 1, 5), send_after: t.send_after ? String(t.send_after) : null,
-          variant: t.variant ? String(t.variant) : null, template: t.template ? String(t.template) : null }, agent.name)
+          variant: t.variant ? String(t.variant) : null, template: t.template ? String(t.template) : null, slot: t.slot ? String(t.slot) : null }, agent.name)
         results.push({ lead_id: t.lead_id, ...r })
       }
       return { value: { queued: results.filter((r) => r.status === 'queued').length, refused: results.filter((r) => r.status !== 'queued').length, results } }
