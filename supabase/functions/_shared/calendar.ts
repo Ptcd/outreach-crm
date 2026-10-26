@@ -136,7 +136,7 @@ export class CalendarError extends Error {
 
 export function authUrl(clientId: string, redirectUri: string, state: string, loginHint?: string): string {
   const q = new URLSearchParams({ client_id: clientId, redirect_uri: redirectUri, response_type: 'code', scope: SCOPES.join(' '),
-    access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', state })
+    access_type: 'offline', prompt: 'select_account consent', include_granted_scopes: 'true', state })
   if (loginHint) q.set('login_hint', loginHint)
   return 'https://accounts.google.com/o/oauth2/v2/auth?' + q.toString()
 }
