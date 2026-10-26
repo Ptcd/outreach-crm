@@ -382,6 +382,7 @@ describe('on the real migrations', () => {
     const row = await one(`select calls_24h::int c, refused_24h::int f, scopes from public.list_agent_keys() where id = $1`, [id])
     await db.exec('reset role')
     expect(row).toEqual({ c: 2, f: 1, scopes: ['texting', 'records', 'marks'] })
+    await db.query(`select set_config('request.jwt.claims', '', false)`)
     // an old single-role key keeps what its role had
     const old = (await one<{ key_sha256: string }>(`insert into public.agent_keys (name, role, key_sha256, key_hint) values ('old intake', 'intake',
       encode(sha256(convert_to('wpie_intake_old', 'UTF8')), 'hex'), '_old') returning key_sha256`))
@@ -448,6 +449,64 @@ describe('on the real migrations', () => {
     await db.query(`update public.planned_openers set send_status = 'undelivered' where id = $1`, [q2.text_id])
     await db.exec(`insert into public.twilio_inbound (sid, from10, to_number, body, is_opt_out, received_at) values ('SMnp1', '4145550902', '+12624180202', 'who is this', false, '2026-10-27T21:00:00Z')`)
     expect(await r(`public.next_phone_problem($1, '4145550903')`, [lid])).toBe('they texted back from a good phone')
+    await db.exec(`update public.planned_openers set send_status = 'withdrawn' where send_status in ('planned', 'would_send')`)
+  })
+
+  it('a dead card the laptop closed only because its phones bounced reopens for the next phone; a real close stays closed', async () => {
+    const tue = '2026-10-27T20:00:00Z'
+    await db.query(`select set_config('request.jwt.claims', '', false)`)     // the laptop sync, not a person in the app
+    const card = async (name: string, nums: string[]) => {
+      const id = (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`,
+        [JSON.stringify({ owner_name: name, address: `${nums[0].slice(-3)} Closed Ct`, phones: nums, mailing_state: 'WI' })])).lead_id as string
+      await db.query(`update public.contacts set line_type = 'mobile' where lead_id = $1`, [id])
+      return id
+    }
+    // first text out and bounced, phone marked bad, then the laptop closes the card (through the sync: no person)
+    const bounce = async (id: string, num: string, status = 'undelivered', code = '30003') => {
+      const q = await r(`public.agent_queue_text($1, $2, $3, 1, null, 'Muse sender', $4::timestamptz)`, [id, num, OPENER, tue])
+      expect(q.status).toBe('queued')
+      await db.query(`update public.planned_openers set send_status = $2, error_code = $3, claim_mode = 'live', claimed_at = $4::timestamptz, sent_at = $4::timestamptz where id = $1`,
+        [q.text_id, status, code, tue])
+      if (status !== 'delivered') await db.query(`update public.contacts set status = 'bad' where lead_id = $1 and value_normalized = $2`, [id, num])
+      await db.query(`update public.leads set stage = 'closed_no_contact' where id = $1`, [id])
+      await db.query(`update public.leads set stage = 'dead', dead_reason = 'no_contact' where id = $1`, [id])
+    }
+    await db.exec(`update public.planned_openers set send_status = 'withdrawn' where send_status in ('planned', 'would_send')`)
+    const a = await card('Dee Deadphone', ['4145550951', '4145550952', '4145550953'])
+    await db.query(`update public.contacts set line_type = 'landline' where lead_id = $1 and value_normalized = '4145550953'`, [a])
+    await bounce(a, '4145550951')
+    const q = (n: string, id = a) => r(`public.agent_queue_text($1, $2, $3, 1, null, 'Muse sender', $4::timestamptz, 'A', 'own_q', 'pm')`, [id, n, OPENER, tue])
+    expect(await q('4145550953')).toMatchObject({ status: 'refused', reason: expect.stringContaining('phone not textable (landline') })
+    expect(await q('4145550951')).toMatchObject({ status: 'refused', reason: 'phone already tried on this card' })
+    expect(await r(`public.agent_queue_text($1, '4145550952', $2, 2, null, 'Muse sender', $3::timestamptz)`, [a, OPENER, tue]))
+      .toMatchObject({ status: 'refused', reason: 'card is closed (dead)' })            // only a first text reopens
+    const ok = await q('4145550952')
+    expect(ok).toMatchObject({ status: 'queued', next_phone: true, reopened: true })
+    const after = await one<Record<string, unknown>>(`select stage::text, belt, dead_reason, reopened_at is not null as reopened, reopened_reason, notes from public.leads where id = $1`, [a])
+    expect(after).toMatchObject({ stage: 'opener_queued', belt: null, dead_reason: null, reopened: true })
+    expect(after.reopened_reason).toMatch(/every first text bounced \(30003\); next phone 4145550952/)
+    expect(after.notes).toMatch(/reopened by Muse/)
+    expect(await one(`select source from public.lead_stage_events where lead_id = $1 and to_stage = 'opener_queued' order by id desc limit 1`, [a]))
+      .toEqual({ source: 'agent: delivery-failure reopen' })
+    expect(await one(`select count(*)::int n from public.belt_events where lead_id = $1 and event = 'reopened'`, [a])).toEqual({ n: 1 })
+    const claim = await r(`public.claim_next_opener(true, '2026-10-27T22:30:00Z'::timestamptz)`)
+    expect(claim).toMatchObject({ outcome: 'would_send', opener: { id: ok.text_id } })
+    // controls: a delivered text, a reply from the dead phone, a person's close, a filtered (30007) text
+    const b = await card('Del Ivered', ['4145550961', '4145550962'])
+    await bounce(b, '4145550961', 'delivered', '')
+    expect(await q('4145550962', b)).toMatchObject({ status: 'refused', reason: expect.stringContaining('was delivered') })
+    const c = await card('Rep Lied', ['4145550971', '4145550972'])
+    await bounce(c, '4145550971')
+    await db.exec(`insert into public.twilio_inbound (sid, from10, to_number, body, is_opt_out, received_at) values ('SMrl1', '4145550971', '+12624180202', 'not interested', false, '2026-10-27T21:00:00Z')`)
+    expect(await q('4145550972', c)).toMatchObject({ status: 'refused', reason: 'card has a reply' })
+    const d = await card('Hugh Mann', ['4145550981', '4145550982'])
+    await bounce(d, '4145550981')
+    await db.query(`update public.leads set dead_reason = 'not_interested' where id = $1`, [d])
+    expect(await q('4145550982', d)).toMatchObject({ status: 'refused', reason: 'card is closed (dead)' })
+    const e = await card('Phil Tered', ['4145550991', '4145550992'])
+    await bounce(e, '4145550991', 'undelivered', '30007')
+    await db.query(`update public.contacts set status = 'ok' where lead_id = $1`, [e])
+    expect(await q('4145550992', e)).toMatchObject({ status: 'refused', reason: expect.stringContaining('not a dead number') })
     await db.exec(`update public.planned_openers set send_status = 'withdrawn' where send_status in ('planned', 'would_send')`)
   })
 
