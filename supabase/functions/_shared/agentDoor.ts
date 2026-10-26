@@ -7,6 +7,7 @@
 import { findPriceOrOffer } from './replyGuard.ts'
 
 export type Role = 'intake' | 'sender'
+type ToolRole = Role | 'any'
 export interface Agent { id: string; name: string; role: Role }
 
 /** Everything the tools touch, so the routing and the checks are testable without a database. */
@@ -19,6 +20,8 @@ export interface DoorDb {
   queueText(t: { lead_id: string; phone: string; body: string; step: number; send_after: string | null; variant: string | null; template: string | null }, agent: string): Promise<Record<string, unknown>>
   testResults(days: number, step: number): Promise<Record<string, unknown>>
   repliesWaiting(days: number): Promise<unknown[]>
+  markCard(m: { lead_id: string; mark: string; reason: string | null; date: string | null; phone: string | null }, agent: string): Promise<Record<string, unknown>>
+  linkCards(l: { lead_id: string; other_id: string; kind: string; note: string | null }, agent: string): Promise<Record<string, unknown>>
   sendReply(t: { lead_id: string; phone: string; body: string }, agent: string): Promise<Record<string, unknown>>
   queue(date: string | null): Promise<unknown[]>
   withdraw(id: string, agent: string, reason: string): Promise<boolean>
@@ -55,7 +58,7 @@ const REASON = { type: 'object', properties: {
   date: S('YYYY-MM-DD the record is from'), amount: { type: 'number', description: 'dollars owed, if any' },
   source: S('where it came from: county treasurer list, court record, ...') }, required: ['kind'] }
 
-export const TOOLS: { role: Role; name: string; description: string; inputSchema: Record<string, unknown> }[] = [
+export const TOOLS: { role: ToolRole; name: string; description: string; inputSchema: Record<string, unknown> }[] = [
   { role: 'intake', name: 'add_prospects',
     description: 'Load prospects: property address, owner name(s), phone numbers and why they are motivated. You have already applied the prospect rules; every one is accepted unless the address or owner is missing. The same address and owner merges into the existing card (new phones and reasons are added). Up to 200 per call. Returns one result per prospect: created / updated / rejected, the card id, and phones that were skipped and why.',
     inputSchema: { type: 'object', properties: { prospects: { type: 'array', maxItems: 200, items: { type: 'object', properties: {
@@ -98,6 +101,18 @@ export const TOOLS: { role: Role; name: string; description: string; inputSchema
     description: 'Answer someone who texted us, on the same thread (same number). Sent now, unless it is quiet hours, when it goes in the morning. Refused if they opted out, if they texted again since you read the thread (read it again), or if it breaks the wording rules. A STOP line is not needed in a reply.',
     inputSchema: { type: 'object', properties: { lead_id: S('card id'), phone: S('their phone (the one that texted us)'), body: S('your reply') },
       required: ['lead_id', 'phone', 'body'] } },
+  { role: 'any', name: 'mark_card',
+    description: 'Mark a card the way the team does from its buttons. mark: dead (not interested), dnc (asked not to be contacted: every phone blocked for good), not_now (with date = when to check back, or reason = what has to change first), hot (wants to sell / asked for a call: Colin is pinged and the card goes to him), held (reason = the named blocker, optional date), wrong_number (phone = the number that was never them), elderly, grief, or note (reason = the note). Returns the stage and belt of the card after the mark.',
+    inputSchema: { type: 'object', properties: { lead_id: S('card id'),
+      mark: S('dead | dnc | not_now | hot | held | wrong_number | elderly | grief | note'),
+      reason: S('why, in their words where possible; the blocker for held; the condition for not_now without a date; the note for note'),
+      date: S('ISO time: the check-back date for not_now, or when a held card should be looked at again'),
+      phone: S('the phone, for wrong_number or dnc') }, required: ['lead_id', 'mark'] } },
+  { role: 'any', name: 'link_cards',
+    description: 'Link two cards: same_person (one owner, two cards), other_property (they mentioned another place), estate_contact (the person handling an estate), shared_phone, occupant (lives there, not the owner), co_owner, related. Shown on both cards.',
+    inputSchema: { type: 'object', properties: { lead_id: S('card id'), other_id: S('the other card id'),
+      kind: S('same_person | other_property | estate_contact | shared_phone | occupant | co_owner | related'), note: S('what connects them') },
+      required: ['lead_id', 'other_id', 'kind'] } },
   { role: 'sender', name: 'todays_queue', description: 'Every text planned for a day (default today), from you and from the laptop, with its status.',
     inputSchema: { type: 'object', properties: { date: S('YYYY-MM-DD') } } },
   { role: 'sender', name: 'withdraw_texts', description: 'Pull texts that have not gone yet.',
@@ -147,7 +162,7 @@ const int = (v: unknown, d: number, max: number) => Math.max(1, Math.min(max, Nu
 export async function callTool(name: string, args: Json, agent: Agent, db: DoorDb): Promise<{ value: unknown; isError?: boolean }> {
   const tool = TOOLS.find((t) => t.name === name)
   if (!tool) return { value: { error: `no tool ${name}` }, isError: true }
-  if (tool.role !== agent.role) return { value: { error: `the ${agent.role} key cannot use ${name}` }, isError: true }
+  if (tool.role !== 'any' && tool.role !== agent.role) return { value: { error: `the ${agent.role} key cannot use ${name}` }, isError: true }
   switch (name) {
     case 'add_prospects': {
       const list = Array.isArray(args.prospects) ? (args.prospects as Json[]).slice(0, 200) : []
@@ -180,6 +195,12 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       }
       return { value: { queued: results.filter((r) => r.status === 'queued').length, refused: results.filter((r) => r.status !== 'queued').length, results } }
     }
+    case 'mark_card':
+      return { value: await db.markCard({ lead_id: String(args.lead_id ?? ''), mark: String(args.mark ?? ''), reason: args.reason ? String(args.reason) : null,
+        date: args.date ? String(args.date) : null, phone: args.phone ? String(args.phone) : null }, agent.name) }
+    case 'link_cards':
+      return { value: await db.linkCards({ lead_id: String(args.lead_id ?? ''), other_id: String(args.other_id ?? ''), kind: String(args.kind ?? ''),
+        note: args.note ? String(args.note) : null }, agent.name) }
     case 'replies_waiting': return { value: await db.repliesWaiting(int(args.days, 7, 30)) }
     case 'send_reply': {
       const body = String(args.body ?? '').replace(/\s+/g, ' ').trim()
@@ -220,7 +241,7 @@ export async function handleMessage(msg: Json, agent: Agent, db: DoorDb): Promis
   }
   if (method === 'ping') return ok(id, {})
   if (method === 'tools/list') {
-    return ok(id, { tools: TOOLS.filter((t) => t.role === agent.role).map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) })
+    return ok(id, { tools: TOOLS.filter((t) => t.role === 'any' || t.role === agent.role).map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) })
   }
   if (method === 'tools/call') {
     const p = (msg.params ?? {}) as Json

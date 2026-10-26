@@ -19,7 +19,8 @@ Each agent sends its own key as `Authorization: Bearer <key>` (or `x-api-key: <k
 | Key | Tools |
 |---|---|
 | **intake** | `add_prospects`, `find_prospects`, `prospect_counts` |
-| **sender** | `texting_rules`, `sending_status`, `ready_to_text`, `queue_texts`, `todays_queue`, `withdraw_texts`, `pause_sending`, `resume_sending`, `text_results` |
+| **sender** | `texting_rules`, `sending_status`, `ready_to_text`, `queue_texts`, `test_results`, `replies_waiting`, `send_reply`, `todays_queue`, `withdraw_texts`, `pause_sending`, `resume_sending`, `text_results` |
+| **both** | `mark_card`, `link_cards` |
 
 ## Intake: `add_prospects`
 
@@ -86,3 +87,18 @@ A text queued outside the window goes at the start of the next allowed window.
 - `supabase/functions/_shared/agentDoor.ts`: the tools and the wording check.
 - Migrations `0055_agent_door.sql` and `0056_agent_door_reads.sql`.
 - Tests: `tests/agentDoor.test.ts`.
+
+## Marking and linking cards (both keys)
+
+`mark_card` moves a card the way the team's own buttons do. `mark` is one of:
+
+- `dead`: not interested.
+- `dnc`: asked not to be contacted. Every phone on the card is blocked for good.
+- `not_now`: with `date` (when to check back) or `reason` (what has to change first).
+- `hot`: wants to sell or asked for a call. Colin is pinged and the card goes to him.
+- `held`: `reason` is the named blocker; `date` is optional.
+- `wrong_number`: `phone` is the number that was never them.
+- `elderly`, `grief`: the card is flagged and every pending text is cancelled.
+- `note`: `reason` is the note.
+
+`link_cards` connects two cards: `same_person`, `other_property`, `estate_contact`, `shared_phone`, `occupant`, `co_owner` or `related`, with a note. Links show on both cards under `links`; a phone that is also on another card shows under `phones[].also_on`.

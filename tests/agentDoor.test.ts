@@ -18,7 +18,7 @@ const fakeDb = (over: Partial<DoorDb> = {}): DoorDb => ({
   addProspect: async () => ({ status: 'created', lead_id: 'L1' }), findProspects: async () => [], prospectCounts: async () => ({}),
   status: async () => ({ paused: false }), readyToText: async () => [], queueText: async () => ({ status: 'queued', text_id: 'T1' }),
   queue: async () => [], withdraw: async () => true, pause: async () => ({ paused: true }), resume: async () => ({ paused: false }),
-  results: async () => ({}), testResults: async () => ({}), repliesWaiting: async () => [], sendReply: async () => ({ outcome: 'sent' }), ...over,
+  results: async () => ({}), testResults: async () => ({}), repliesWaiting: async () => [], markCard: async () => ({ ok: true }), linkCards: async () => ({ ok: true }), sendReply: async () => ({ outcome: 'sent' }), ...over,
 })
 const intake = { id: 'k1', name: 'Muse intake', role: 'intake' as const }
 const sender = { id: 'k2', name: 'Muse sender', role: 'sender' as const }
@@ -37,7 +37,8 @@ describe('the MCP routing', () => {
   it('each key sees only its own tools, and cannot call the other role\'s', async () => {
     const list = async (a: typeof intake | typeof sender) => ((await handleMessage({ jsonrpc: '2.0', id: 2, method: 'tools/list' }, a, fakeDb())) as
       { result: { tools: { name: string }[] } }).result.tools.map((t) => t.name)
-    expect(await list(intake)).toEqual(TOOLS.filter((t) => t.role === 'intake').map((t) => t.name))
+    expect(await list(intake)).toEqual(TOOLS.filter((t) => t.role === 'intake' || t.role === 'any').map((t) => t.name))
+    expect(await list(intake)).toContain('mark_card')
     expect(await list(sender)).toContain('queue_texts')
     expect(await list(intake)).not.toContain('queue_texts')
     expect((await call(intake, 'queue_texts', { texts: [] })).isError).toBe(true)
@@ -208,6 +209,32 @@ describe('on the real migrations', () => {
     expect(await one(`select kind, our_number, status from public.reply_drafts where id = $1`, [draft]))
       .toEqual({ kind: 'team', our_number: '+12623812196', status: 'awaiting_approval' })
     await db.exec(`update public.campaign_control set agent_runs_texting = false`)
+  })
+
+  it('mark_card moves a card the way the team buttons do; link_cards shows on both cards', async () => {
+    const mk = async (name: string, addr: string, phone: string) => (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`,
+      [JSON.stringify({ owner_name: name, address: addr, phones: [phone] })])).lead_id as string
+    const a = await mk('Mark Able', '1 Mark St', '4145550301'); const b = await mk('Mark Able', '2 Mark St', '4145550302')
+    const c = await mk('Dee Enncee', '3 Mark St', '4145550303'); const h = await mk('Hot Holly', '4 Mark St', '4145550304')
+    const w = await mk('Wrong Wu', '5 Mark St', '4145550305')
+    const card = async (id: string) => one<{ stage: string; belt: string | null; named_event: string | null }>(`select stage::text, belt, named_event from public.leads where id = $1`, [id])
+    expect(await r(`public.agent_mark_card($1, 'not_now', 'after the tenant moves out', null, null, 'Muse sender')`, [a])).toMatchObject({ mark: 'not_now' })
+    expect(await card(a)).toMatchObject({ stage: 'follow_up', belt: 'not_now_condition', named_event: 'after the tenant moves out' })
+    expect(await r(`public.agent_mark_card($1, 'not_now', null, '2026-12-01T16:00:00Z', null, 'Muse sender')`, [b])).toMatchObject({ mark: 'not_now' })
+    expect((await card(b)).belt).toBe('not_now_dated')
+    expect(await r(`public.agent_mark_card($1, 'dnc', 'said never text me', null, '4145550303', 'Muse sender')`, [c])).toMatchObject({ mark: 'dnc' })
+    expect((await card(c)).stage).toBe('dnc')
+    expect(await one(`select count(*)::int n from public.suppressed_phones where phone10 = '4145550303'`)).toEqual({ n: 1 })
+    expect(await r(`public.agent_mark_card($1, 'hot', 'wants to sell by spring', null, null, 'Muse sender')`, [h])).toMatchObject({ mark: 'hot' })
+    expect(await card(h)).toMatchObject({ stage: 'colin_call', belt: 'yes_unbooked' })
+    expect(await r(`public.agent_mark_card($1, 'wrong_number', null, null, '4145550305', 'Muse sender')`, [w])).toMatchObject({ phone_marked_bad: '4145550305' })
+    expect((await card(w)).stage).toBe('data_fix')
+    expect(await r(`public.agent_mark_card($1, 'dead', 'x', null, null, 'Muse sender')`, [c])).toMatchObject({ ok: false })   // dnc stays dnc
+    expect(await r(`public.agent_mark_card($1, 'bogus', null, null, null, 'Muse sender')`, [a])).toMatchObject({ ok: false })
+    expect(await r(`public.agent_link_cards($1, $2, 'same_person', 'both deeds to Mark Able', 'Muse intake')`, [a, b])).toEqual({ ok: true })
+    const links = (await r(`public.agent_card($1)`, [b])).links as { lead_id: string; kind: string; note: string }[]
+    expect(links).toEqual([{ lead_id: a, owner_name: 'Mark Able', address: '1 Mark St', stage: 'follow_up', kind: 'same_person', note: 'both deeds to Mark Able' }])
+    expect(await r(`public.agent_link_cards($1, $2, 'cousin', null, 'x')`, [a, b])).toMatchObject({ ok: false })
   })
 
   it('the agent can lift only its own pause', async () => {
