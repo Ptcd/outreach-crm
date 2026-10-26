@@ -18,7 +18,7 @@ const fakeDb = (over: Partial<DoorDb> = {}): DoorDb => ({
   addProspect: async () => ({ status: 'created', lead_id: 'L1' }), findProspects: async () => [], prospectCounts: async () => ({}),
   status: async () => ({ paused: false }), readyToText: async () => [], queueText: async () => ({ status: 'queued', text_id: 'T1' }),
   queue: async () => [], withdraw: async () => true, pause: async () => ({ paused: true }), resume: async () => ({ paused: false }),
-  results: async () => ({}), testResults: async () => ({}), repliesWaiting: async () => [], markCard: async () => ({ ok: true }), linkCards: async () => ({ ok: true }), sendReply: async () => ({ outcome: 'sent' }), ...over,
+  results: async () => ({}), testResults: async () => ({}), repliesWaiting: async () => [], markCard: async () => ({ ok: true }), dueToday: async () => [], linkCards: async () => ({ ok: true }), sendReply: async () => ({ outcome: 'sent' }), ...over,
 })
 const intake = { id: 'k1', name: 'Muse intake', role: 'intake' as const }
 const sender = { id: 'k2', name: 'Muse sender', role: 'sender' as const }
@@ -235,6 +235,32 @@ describe('on the real migrations', () => {
     const links = (await r(`public.agent_card($1)`, [b])).links as { lead_id: string; kind: string; note: string }[]
     expect(links).toEqual([{ lead_id: a, owner_name: 'Mark Able', address: '1 Mark St', stage: 'follow_up', kind: 'same_person', note: 'both deeds to Mark Able' }])
     expect(await r(`public.agent_link_cards($1, $2, 'cousin', null, 'x')`, [a, b])).toMatchObject({ ok: false })
+  })
+
+  it('due_today: the 30-day guy, the 6-month lady and the unsigned contract show up when their day comes, with why; not before', async () => {
+    const mk = async (name: string, addr: string, phone: string) => (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`,
+      [JSON.stringify({ owner_name: name, address: addr, phones: [phone] })])).lead_id as string
+    const guy = await mk('Thirty Day Guy', '30 Day St', '4145550401')
+    const lady = await mk('Six Month Lady', '6 Month Rd', '4145550402')
+    const signer = await mk('Contract Carl', '7 Sign Ln', '4145550403')
+    const later = await mk('Not Yet Nate', '8 Soon Ave', '4145550404')
+    await r(`public.agent_mark_card($1, 'not_now', 'renovating first, said call back in a month', '2026-11-25T16:00:00Z', null, 'Muse sender')`, [guy])
+    await r(`public.agent_mark_card($1, 'held', 'waiting on probate letters, lawyer said about six months', '2027-04-26T16:00:00Z', null, 'Muse sender')`, [lady])
+    await r(`public.agent_mark_card($1, 'not_now', 'after the holidays', '2027-01-15T16:00:00Z', null, 'Muse sender')`, [later])
+    const cid = (await one<{ id: string }>(`insert into public.contracts (lead_id, form, status, terms, buyer_name, buyer_signed_at, offer_path, offer_sha256, created_at) values ($1, 'wb11', 'sent', '{}'::jsonb, 'Colin Merrill', '2026-10-20T15:00:00Z', 'offers/test.pdf', 'abc', '2026-10-20T15:00:00Z') returning id`, [signer])).id
+    await db.query(`insert into public.contract_signers (contract_id, position, name, phone, token_hash, expires_at) values ($1, 1, 'Carl Contract', '4145550403', 'h', now() + interval '30 days')`, [cid])
+    const at = async (iso: string) => (await r(`public.agent_due_today($1::timestamptz)`, [iso])) as unknown as { lead_id: string; what: string; why: string; days_late: number }[]
+    const oct27 = (await at('2026-10-27T15:00:00Z')).filter((x) => [guy, lady, signer, later].includes(x.lead_id))
+    expect(oct27.map((x) => [x.what, x.lead_id])).toEqual([['contract_waiting', signer]])
+    expect(oct27[0].why).toMatch(/contract sent Oct 20, not signed \(Carl Contract still to sign\)/)
+    const nov26 = (await at('2026-11-26T15:00:00Z')).filter((x) => x.lead_id === guy)
+    expect(nov26).toHaveLength(1)
+    expect(nov26[0]).toMatchObject({ what: 'check_back', why: 'renovating first, said call back in a month' })
+    const may = (await at('2027-05-01T15:00:00Z')).filter((x) => [lady, later].includes(x.lead_id)).map((x) => [x.lead_id, x.what])
+    expect(may).toEqual(expect.arrayContaining([[lady, 'check_back'], [later, 'check_back']]))
+    expect((await at('2026-11-26T15:00:00Z')).some((x) => x.lead_id === lady || x.lead_id === later)).toBe(false)
+    const card = await r(`public.agent_card($1)`, [signer])
+    expect((card.contracts as { status: string; signers: { name: string; signed_at: null }[] }[])[0]).toMatchObject({ status: 'sent', signers: [{ name: 'Carl Contract', signed_at: null }] })
   })
 
   it('the agent can lift only its own pause', async () => {

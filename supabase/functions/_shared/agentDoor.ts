@@ -20,6 +20,7 @@ export interface DoorDb {
   queueText(t: { lead_id: string; phone: string; body: string; step: number; send_after: string | null; variant: string | null; template: string | null }, agent: string): Promise<Record<string, unknown>>
   testResults(days: number, step: number): Promise<Record<string, unknown>>
   repliesWaiting(days: number): Promise<unknown[]>
+  dueToday(): Promise<unknown[]>
   markCard(m: { lead_id: string; mark: string; reason: string | null; date: string | null; phone: string | null }, agent: string): Promise<Record<string, unknown>>
   linkCards(l: { lead_id: string; other_id: string; kind: string; note: string | null }, agent: string): Promise<Record<string, unknown>>
   sendReply(t: { lead_id: string; phone: string; body: string }, agent: string): Promise<Record<string, unknown>>
@@ -44,6 +45,7 @@ export const TEXTING_RULES = [
   'Texts go out 10 AM to 7 PM in the recipient\'s time zone, never on Sunday, and share one daily limit with the laptop\'s own texts. Queue them and the server sends them in that window.',
   'Replies: you answer them now (replies_waiting, then send_reply), on the same thread. Read the whole conversation and the card first. One reply per text from them; never a first text or follow-up (queue_texts) to someone who has texted back.',
   'In a reply: never give, guess or react to a price; Colin prices every deal himself on a call. Your job is to learn why they would sell, the condition, the timing, who signs and their number, then book a call with Colin.',
+  'Every morning, read due_today: dated check-backs, holds whose date arrived, booked calls and visits, and contracts out for signature. The card says why it was waiting (named_event, notes, the conversation). Act on each one and mark the card.',
   'When an A/B test is running, tag every text with its variant (and template) in queue_texts, assign cards to variants at random, and read test_results before changing anything.',
 ].join('\n')
 
@@ -101,6 +103,9 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
     description: 'Answer someone who texted us, on the same thread (same number). Sent now, unless it is quiet hours, when it goes in the morning. Refused if they opted out, if they texted again since you read the thread (read it again), or if it breaks the wording rules. A STOP line is not needed in a reply.',
     inputSchema: { type: 'object', properties: { lead_id: S('card id'), phone: S('their phone (the one that texted us)'), body: S('your reply') },
       required: ['lead_id', 'phone', 'body'] } },
+  { role: 'any', name: 'due_today',
+    description: 'Every card whose time has come, oldest first, each with the whole card and why it was waiting: check_back (a dated not-now, a hold, an estate or family wait whose date arrived), booked_call / booked_visit (today), call_due / text_due (a stop the team or you owes), contract_waiting (a contract sent and not signed, with who still has to sign). days_late says how overdue. Read this every morning and act on each one: a text, a mark_card, or tell Colin.',
+    inputSchema: { type: 'object', properties: {} } },
   { role: 'any', name: 'mark_card',
     description: 'Mark a card the way the team does from its buttons. mark: dead (not interested), dnc (asked not to be contacted: every phone blocked for good), not_now (with date = when to check back, or reason = what has to change first), hot (wants to sell / asked for a call: Colin is pinged and the card goes to him), held (reason = the named blocker, optional date), wrong_number (phone = the number that was never them), elderly, grief, or note (reason = the note). Returns the stage and belt of the card after the mark.',
     inputSchema: { type: 'object', properties: { lead_id: S('card id'),
@@ -195,6 +200,7 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       }
       return { value: { queued: results.filter((r) => r.status === 'queued').length, refused: results.filter((r) => r.status !== 'queued').length, results } }
     }
+    case 'due_today': return { value: await db.dueToday() }
     case 'mark_card':
       return { value: await db.markCard({ lead_id: String(args.lead_id ?? ''), mark: String(args.mark ?? ''), reason: args.reason ? String(args.reason) : null,
         date: args.date ? String(args.date) : null, phone: args.phone ? String(args.phone) : null }, agent.name) }

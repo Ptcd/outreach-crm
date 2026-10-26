@@ -20,7 +20,7 @@ Each agent sends its own key as `Authorization: Bearer <key>` (or `x-api-key: <k
 |---|---|
 | **intake** | `add_prospects`, `find_prospects`, `prospect_counts` |
 | **sender** | `texting_rules`, `sending_status`, `ready_to_text`, `queue_texts`, `test_results`, `replies_waiting`, `send_reply`, `todays_queue`, `withdraw_texts`, `pause_sending`, `resume_sending`, `text_results` |
-| **both** | `mark_card`, `link_cards` |
+| **both** | `due_today`, `mark_card`, `link_cards` |
 
 ## Intake: `add_prospects`
 
@@ -102,3 +102,14 @@ A text queued outside the window goes at the start of the next allowed window.
 - `note`: `reason` is the note.
 
 `link_cards` connects two cards: `same_person`, `other_property`, `estate_contact`, `shared_phone`, `occupant`, `co_owner` or `related`, with a note. Links show on both cards under `links`; a phone that is also on another card shows under `phones[].also_on`.
+
+## What is due (both keys)
+
+`due_today` lists every card whose time has come, oldest first, each with the whole card and `why` it was waiting:
+
+- `check_back`: a dated not-now, a hold, or an estate, family or elderly wait whose date arrived.
+- `booked_call` / `booked_visit`: today.
+- `call_due` / `text_due`: a stop the team or the agent owes.
+- `contract_waiting`: a contract sent and not signed, with who still has to sign.
+
+`days_late` says how overdue it is. The card carries `check_back_at`, `named_date`, `named_event`, `notes`, the conversation and `contracts`, so the agent sees why it was waiting before it acts.
