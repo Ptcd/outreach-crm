@@ -10,7 +10,7 @@ import { Badge, Empty, ErrorNote, Section } from '@/components/ui/form'
 import { StatTiles } from '@/components/StatTiles'
 import { PILLARS, pillarsDone } from '@/components/CallPanel'
 import { BELT_LABEL, type Belt } from '@/lib/belts'
-import { fmtDateTime } from '@/lib/format'
+import { fmtDateTime, fullAddress } from '@/lib/format'
 import { GROUPS, groupRows, dayKey, nextLine, type Group, type WarmRow } from '@/lib/warm'
 import type { CallFacts } from '@/lib/callGate'
 import { cn } from '@/lib/utils'
@@ -102,7 +102,7 @@ function WarmItem({ r }: { r: WarmRow }) {
             <Badge tone={r.grp === 'decide' ? 'bad' : r.grp === 'hot' ? 'warn' : r.grp === 'booked' ? 'info' : 'muted'}>{BELT_LABEL[r.belt as Belt] ?? r.belt}</Badge>
             {(r.elderly_or_ill || r.grief) && <Badge tone="warn">Go gently</Badge>}
           </span>
-          <span className="block truncate text-sm text-muted-foreground">{[r.property_address, r.municipality].filter(Boolean).join(', ')}</span>
+          <span className="block truncate text-sm text-muted-foreground">{fullAddress(r)}</span>
           {r.why && <span className="block text-sm font-medium text-rose-700">{r.why}</span>}
           {r.last_in_body && (
             <span className="block truncate text-sm italic text-foreground/80">&ldquo;{r.last_in_body}&rdquo;

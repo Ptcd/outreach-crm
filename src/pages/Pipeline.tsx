@@ -6,7 +6,7 @@ import { Badge, Empty, ErrorNote, Select } from '@/components/ui/form'
 import { PAGE_SIZE, useLeads, usePipelineCounts, type LeadFilter } from '@/lib/queries'
 import { PhoneLookup } from '@/components/PhoneLookup'
 import { STAGES, STAGE_LABEL, WORKING_STAGES } from '@/lib/wpie'
-import { fmtDateTime } from '@/lib/format'
+import { fmtDateTime, fullAddress } from '@/lib/format'
 import type { LeadStage } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -117,7 +117,7 @@ export default function Pipeline() {
                 {l.lane && <Badge tone="info">{l.lane === 'hold' ? 'Hold' : 'Flip'}</Badge>}
               </div>
               <div className="text-sm text-muted-foreground">
-                {l.property_address}
+                {fullAddress(l)}
                 {l.municipality ? `, ${l.municipality}` : ''} {l.county ? `(${l.county})` : ''}
               </div>
               {l.next_action_at && (

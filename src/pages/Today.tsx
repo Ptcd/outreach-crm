@@ -6,7 +6,7 @@ import { api, useDueTasks, useFollowupDebt, useMyStops, useReplyTasks, useSeller
 import { ReplyTaskCard } from '@/components/ReplyTaskCard'
 import { BeltHealthStrip } from '@/components/BeltHealthStrip'
 import { StopCard } from '@/components/StopCard'
-import { endOfTodayIso, fmtDateTime } from '@/lib/format'
+import { endOfTodayIso, fmtDateTime, fullAddress } from '@/lib/format'
 import { STAGE_LABEL, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
 import { ownerFilterFor, useOnPhone, workerFor, type TaskOwner } from '@/lib/onPhone'
@@ -68,7 +68,7 @@ export default function Today() {
                 <Link to={`/lead/${m.lead_id}`} className="inline-flex min-h-11 items-center font-medium underline">
                   {m.lead?.owner_name ?? 'Lead'}
                 </Link>
-                <span className="text-sm text-muted-foreground"> - {m.lead?.property_address}</span>
+                <span className="text-sm text-muted-foreground"> - {fullAddress(m.lead)}</span>
                 <p className="mt-1 whitespace-pre-wrap text-sm">{m.body}</p>
                 <p className="text-xs text-muted-foreground">
                   {fmtDateTime(m.sent_at)} {m.is_opt_out && <Badge tone="bad">STOP</Badge>}
@@ -109,7 +109,7 @@ export default function Today() {
                   </div>
                   {t.lead && (
                     <Link to={`/lead/${t.lead.id}`} className="inline-flex min-h-11 items-center text-sm underline">
-                      {t.lead.owner_name} - {t.lead.property_address}
+                      {t.lead.owner_name} - {fullAddress(t.lead)}
                     </Link>
                   )}
                   <p className="text-xs text-muted-foreground">

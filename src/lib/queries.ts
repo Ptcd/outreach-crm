@@ -20,14 +20,14 @@ export function useDueTasks(untilIso: string, owner: Person | 'all' | 'callers')
     queryFn: async () => {
       let q = supabase
         .from('tasks')
-        .select('*, lead:leads(id, owner_name, property_address, stage)')
+        .select('*, lead:leads(id, owner_name, property_address, municipality, property_zip, stage)')
         .is('done_at', null)
         .lte('due_at', untilIso)
         .order('due_at')
         .limit(200)
       if (owner === 'callers') q = q.in('owner', ['thalia', 'adil'])
       else if (owner !== 'all') q = q.eq('owner', owner)
-      return check(await q) as (Task & { lead: Pick<Lead, 'id' | 'owner_name' | 'property_address' | 'stage'> | null })[]
+      return check(await q) as (Task & { lead: Pick<Lead, 'id' | 'owner_name' | 'property_address' | 'municipality' | 'property_zip' | 'stage'> | null })[]
     },
   })
 }
@@ -39,17 +39,17 @@ export function useUnseenReplies() {
       check(
         await supabase
           .from('messages')
-          .select('*, lead:leads(id, owner_name, property_address, stage)')
+          .select('*, lead:leads(id, owner_name, property_address, municipality, property_zip, stage)')
           .eq('direction', 'in')
           .is('seen_at', null)
           .order('sent_at', { ascending: false })
           .limit(100),
-      ) as (Message & { lead: Pick<Lead, 'id' | 'owner_name' | 'property_address' | 'stage'> | null })[],
+      ) as (Message & { lead: Pick<Lead, 'id' | 'owner_name' | 'property_address' | 'municipality' | 'property_zip' | 'stage'> | null })[],
   })
 }
 
 // ------------------------------------------------------------------ the conveyor (migrations 0029-0032)
-export type StopTask = Task & { lead: Pick<Lead, 'id' | 'owner_name' | 'property_address' | 'stage' | 'belt' | 'belt_step' | 'next_stop_say' | 'elderly_or_ill' | 'grief'> | null }
+export type StopTask = Task & { lead: Pick<Lead, 'id' | 'owner_name' | 'property_address' | 'municipality' | 'property_zip' | 'stage' | 'belt' | 'belt_step' | 'next_stop_say' | 'elderly_or_ill' | 'grief'> | null }
 
 /** The signed-in person's stops: belt and call-list tasks due by the end of today, overdue first. */
 export function useMyStops(untilIso: string, owner: Person | 'all' | 'callers') {
@@ -58,7 +58,7 @@ export function useMyStops(untilIso: string, owner: Person | 'all' | 'callers') 
     refetchInterval: 60_000,
     queryFn: async () => {
       let q = supabase.from('tasks')
-        .select('*, lead:leads(id, owner_name, property_address, stage, belt, belt_step, next_stop_say, elderly_or_ill, grief)')
+        .select('*, lead:leads(id, owner_name, property_address, municipality, property_zip, stage, belt, belt_step, next_stop_say, elderly_or_ill, grief)')
         .in('source', ['belt', 'call_list', 'after_stop']).is('done_at', null).lte('due_at', untilIso).order('due_at').limit(200)
       if (owner === 'callers') q = q.in('owner', ['thalia', 'adil'])
       else if (owner !== 'all') q = q.eq('owner', owner)
@@ -184,7 +184,7 @@ export function useLeads(f: LeadFilter, workingStages: LeadStage[]) {
     queryFn: async () => {
       let q = supabase
         .from('leads')
-        .select('id, owner_name, property_address, municipality, county, lane, stage, next_action_at, next_action, assigned_to, reasons_to_sell, last_inbound_at, belt, belt_step, next_stop_at, next_stop_who', { count: 'exact' })
+        .select('id, owner_name, property_address, property_zip, municipality, county, lane, stage, next_action_at, next_action, assigned_to, reasons_to_sell, last_inbound_at, belt, belt_step, next_stop_at, next_stop_who', { count: 'exact' })
       if (f.stage === 'working') q = q.in('stage', workingStages)
       else if (f.stage !== 'all') q = q.eq('stage', f.stage)
       if (f.belt && f.belt !== 'all') q = q.eq('belt', f.belt)
@@ -373,7 +373,7 @@ export function useInbox(fromDay: string, toDay: string, enabled = true) {
     queryFn: async (): Promise<InboxLead[]> => {
       const openers = check(
         await supabase.from('planned_openers')
-          .select('*, lead:leads(id, owner_name, property_address, stage, next_action_at, next_action, assigned_to, dead_reason, belt, named_date)')
+          .select('*, lead:leads(id, owner_name, property_address, municipality, property_zip, stage, next_action_at, next_action, assigned_to, dead_reason, belt, named_date)')
           .gte('plan_date', fromDay).lte('plan_date', toDay)
           .order('scheduled_at', { ascending: false, nullsFirst: false })
           .limit(500),
@@ -443,7 +443,7 @@ export function useOtherDrafts(knownLeadIds: string[]) {
     refetchInterval: 60_000,
     queryFn: async () => {
       const rows = check(
-        await supabase.from('reply_drafts').select('*, leads(owner_name, property_address)').neq('status', 'superseded')
+        await supabase.from('reply_drafts').select('*, leads(owner_name, property_address, municipality, property_zip)').neq('status', 'superseded')
           .order('inbound_at', { ascending: false }).limit(200),
       ) as ReplyDraft[]
       const known = new Set(knownLeadIds)
@@ -467,6 +467,8 @@ export function useRepliesWaiting() {
 export interface WaitingDraft extends ReplyDraft {
   owner_name: string | null
   property_address: string | null
+  municipality?: string | null
+  property_zip?: string | null
   thread: { key: string; who: 'us' | 'them'; body: string; at: string }[]
 }
 
@@ -477,9 +479,9 @@ export function useWaitingDrafts() {
     refetchInterval: 30_000,
     queryFn: async (): Promise<WaitingDraft[]> => {
       const drafts = (check(
-        await supabase.from('reply_drafts').select('*, lead:leads(owner_name, property_address, stage, belt)')
+        await supabase.from('reply_drafts').select('*, lead:leads(owner_name, property_address, municipality, property_zip, stage, belt)')
           .eq('status', 'awaiting_approval').order('inbound_at').limit(50),
-      ) as (ReplyDraft & { lead: { owner_name: string | null; property_address: string | null; stage?: string | null; belt?: string | null } | null })[])
+      ) as (ReplyDraft & { lead: { owner_name: string | null; property_address: string | null; municipality?: string | null; property_zip?: string | null; stage?: string | null; belt?: string | null } | null })[])
         // a lead marked do not contact waits for nobody (Approve refuses it too; migration 0044)
         .filter((d) => d.lead?.stage !== 'dnc' && d.lead?.belt !== 'dnc')
       if (!drafts.length) return []
@@ -508,7 +510,8 @@ export function useWaitingDrafts() {
           .filter((l, i, all) => !all.slice(0, i).some((p) => p.who === l.who && p.body.trim() === l.body.trim()
             && Math.abs(new Date(p.at).getTime() - new Date(l.at).getTime()) < 3_600_000))
         const { lead, ...rest } = d
-        return { ...rest, owner_name: lead?.owner_name ?? null, property_address: lead?.property_address ?? null, thread: lines }
+        return { ...rest, owner_name: lead?.owner_name ?? null, property_address: lead?.property_address ?? null, municipality: lead?.municipality ?? null,
+          property_zip: lead?.property_zip ?? null, thread: lines }
       })
     },
   })
@@ -520,9 +523,9 @@ export function useReplyTasks() {
     queryKey: ['tasks', 'reply'],
     refetchInterval: 60_000,
     queryFn: async () =>
-      check(await supabase.from('tasks').select('*, lead:leads(id, owner_name, property_address)')
+      check(await supabase.from('tasks').select('*, lead:leads(id, owner_name, property_address, municipality, property_zip)')
         .eq('source', 'reply').is('done_at', null).order('created_at').limit(100)) as
-        (Task & { lead: { id: string; owner_name: string; property_address: string | null } | null })[],
+        (Task & { lead: { id: string; owner_name: string; property_address: string | null; municipality?: string | null; property_zip?: string | null } | null })[],
   })
 }
 

@@ -8,7 +8,7 @@ import { fmtDateTime, fmtPhone } from '@/lib/format'
 import { PEOPLE, REPLY_TASK_LABEL, personLabel } from '@/lib/wpie'
 import type { Person, Task } from '@/lib/types'
 
-export type ReplyTask = Task & { lead?: { id: string; owner_name: string; property_address: string | null } | null }
+export type ReplyTask = Task & { lead?: { id: string; owner_name: string; property_address: string | null; municipality?: string | null; property_zip?: string | null } | null }
 
 // A task the reply agent opened because the seller asked for something no text can do.
 // The seller's exact words are quoted; Adil (or Colin) does it and taps Done.

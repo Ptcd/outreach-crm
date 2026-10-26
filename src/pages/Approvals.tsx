@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Badge, Empty, ErrorNote, Section } from '@/components/ui/form'
 import { ConfirmButton } from '@/components/ui/confirm'
 import { api, useCampaignControl, usePlannedOpeners, useWrite } from '@/lib/queries'
-import { fmtDateTime, fmtPhone, todayLocal } from '@/lib/format'
+import { fmtDateTime, fmtPhone, todayLocal, fullAddress } from '@/lib/format'
 import { SEND_LABEL, WORDING, reasonText, sendTone } from '@/lib/inbox'
 import { useAuth } from '@/providers/AuthProvider'
 import { useColinHere } from '@/components/OnPhonePicker'
@@ -257,7 +257,7 @@ function OpenerCard({
       }
     >
       <div className="mb-2 text-sm text-muted-foreground">
-        {r.property_address} - to {fmtPhone(r.phone)} {r.scheduled_at ? `- planned ${fmtDateTime(r.scheduled_at)}` : ''}
+        {fullAddress(r)} - to {fmtPhone(r.phone)} {r.scheduled_at ? `- planned ${fmtDateTime(r.scheduled_at)}` : ''}
         {r.sent_at ? ` - sent ${fmtDateTime(r.sent_at)}` : ''}
       </div>
       <div className="mb-2 flex flex-wrap gap-2">

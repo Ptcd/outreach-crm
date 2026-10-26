@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge, Textarea } from '@/components/ui/form'
 import { api, type WaitingDraft } from '@/lib/queries'
-import { fmtDateTime, fmtPhone } from '@/lib/format'
+import { fmtDateTime, fmtPhone, fullAddress } from '@/lib/format'
 import { intentText } from '@/lib/inbox'
 import { cn } from '@/lib/utils'
 
@@ -144,7 +144,7 @@ export function ReviewDeck({ drafts, startId }: { drafts: WaitingDraft[]; startI
             {d.is_test && <Badge tone="bad">TEST</Badge>}
           </div>
           <p className="text-sm text-muted-foreground">
-            {d.property_address ? `${d.property_address} · ` : ''}{fmtPhone(d.phone10)}
+            {d.property_address ? `${fullAddress(d)} · ` : ''}{fmtPhone(d.phone10)}
           </p>
           {d.lead_id ? (
             <Link to={`/lead/${d.lead_id}#history`} className="mt-1 inline-flex min-h-11 items-center text-sm font-medium text-primary underline">

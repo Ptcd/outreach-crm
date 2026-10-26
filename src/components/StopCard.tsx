@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Badge, ErrorNote, Select, Textarea } from '@/components/ui/form'
 import { ConfirmButton } from '@/components/ui/confirm'
 import { api, useWrite, type StopTask } from '@/lib/queries'
-import { fmtDateTime, localInputToIso } from '@/lib/format'
+import { fmtDateTime, localInputToIso, fullAddress } from '@/lib/format'
 import { BELT_LABEL, STOP_OUTCOMES, type Belt } from '@/lib/belts'
 import { personLabel } from '@/lib/wpie'
 import { cn } from '@/lib/utils'
@@ -46,7 +46,7 @@ export function StopCard({ t, now }: { t: StopTask; now: number }) {
       </div>
       {t.lead && (
         <Link to={`/lead/${t.lead.id}${t.phone10 ? `?call=1&phone=${t.phone10}` : ''}`} className="inline-flex min-h-11 items-center text-sm underline">
-          {t.lead.owner_name}{t.lead.property_address ? ` - ${t.lead.property_address}` : ''}
+          {t.lead.owner_name}{t.lead.property_address ? ` - ${fullAddress(t.lead)}` : ''}
         </Link>
       )}
       {belt && <p className="text-xs text-muted-foreground">{belt}{late ? ` - was due ${fmtDateTime(t.due_at)}` : ''}</p>}

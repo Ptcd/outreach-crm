@@ -20,7 +20,7 @@ import { CallPanel, bestPhone } from '@/components/CallPanel'
 import { TextThread } from '@/components/TextThread'
 import { api, useDeals, useLead, useWrite } from '@/lib/queries'
 import { useDialer } from '@/lib/dialer'
-import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
+import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso, fullAddress } from '@/lib/format'
 import { firstNameOf, timelineOf } from '@/lib/inbox'
 import { DEAL_STATUS_LABEL, MILESTONES, PEOPLE, SELLER_FACTS, STAGES, STAGE_LABEL, TASK_KINDS, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
@@ -53,6 +53,7 @@ export default function LeadDetail() {
           Back to pipeline
         </Link>
         <h1 className={cn('mt-1 text-2xl font-bold tracking-tight', lead.stage === 'dnc' && 'text-red-700')}>{lead.owner_name}</h1>
+        {fullAddress(lead) && <p className="mt-0.5 text-base font-medium text-muted-foreground">{fullAddress(lead)}</p>}
         <div className="mt-1 flex flex-wrap gap-2">
           <Badge tone={lead.stage === 'dnc' ? 'bad' : undefined}>{STAGE_LABEL[lead.stage]}</Badge>
           {verdict.verdict !== 'open' && <VerdictBadge v={verdict} />}
@@ -224,8 +225,7 @@ function Facts({ lead }: { lead: Lead }) {
         </Row>
         <Row label="Mailing address">{mailing}</Row>
         <Row label="Property">
-          {lead.property_address}
-          {lead.municipality ? `, ${lead.municipality}` : ''} {lead.property_zip}
+          {fullAddress(lead)}
         </Row>
         <Row label="County">{lead.county}</Row>
         <Row label="Type">

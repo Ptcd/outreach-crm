@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge, ErrorNote, Textarea } from '@/components/ui/form'
 import { api, useWrite } from '@/lib/queries'
-import { fmtDateTime, fmtPhone } from '@/lib/format'
+import { fmtDateTime, fmtPhone, fullAddress } from '@/lib/format'
 import { DRAFT_LABEL, DRAFT_OPEN, intentText } from '@/lib/inbox'
 import { useAuth } from '@/providers/AuthProvider'
 import type { ReplyDraft } from '@/lib/types'
@@ -47,7 +47,7 @@ export function DraftBox({ d, showFrom = false }: { d: ReplyDraft; showFrom?: bo
           {d.lead_id && d.leads?.owner_name ? (
             <Link to={`/lead/${d.lead_id}#history`} className="font-semibold underline underline-offset-4">{d.leads.owner_name}</Link>
           ) : <span className="font-semibold">{fmtPhone(d.phone10)}</span>}
-          {d.leads?.property_address ? <span className="text-muted-foreground"> - {d.leads.property_address}</span> : null}
+          {d.leads?.property_address ? <span className="text-muted-foreground"> - {fullAddress(d.leads)}</span> : null}
           <span className="block text-xs text-muted-foreground">
             {d.leads?.owner_name ? `${fmtPhone(d.phone10)} - ` : ''}{fmtDateTime(d.inbound_at)}
           </span>

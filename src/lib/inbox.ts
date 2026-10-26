@@ -8,6 +8,8 @@ export interface InboxLead {
     id: string
     owner_name: string
     property_address: string | null
+    municipality?: string | null
+    property_zip?: string | null
     stage: LeadStage
     next_action_at: string | null
     next_action: string | null

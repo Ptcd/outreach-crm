@@ -70,3 +70,29 @@ export function isoToLocalInput(iso: string | null | undefined): string {
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? ''
   return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`
 }
+
+/** "CITY OF RACINE" -> "Racine"; "TOWN OF ARBOR VITAE" -> "Arbor Vitae"; "Milwaukee" stays. */
+export function cityOf(municipality: string | null | undefined): string {
+  const m = (municipality ?? '').replace(/^\s*(CITY|VILLAGE|TOWN)\s+OF\s+/i, '').replace(/\s*\(.*?\)\s*/g, ' ').trim()
+  if (!m) return ''
+  return m === m.toUpperCase() ? m.toLowerCase().replace(/\b([a-z])/g, (c) => c.toUpperCase()) : m
+}
+
+function streetOf(address: string | null | undefined): string {
+  const a = (address ?? '').split(';')[0].trim()
+  if (!a || a !== a.toUpperCase()) return a
+  return a.toLowerCase().replace(/\b([a-z])/g, (c) => c.toUpperCase()).replace(/\b(\d+)(St|Nd|Rd|Th)\b/g, (_, n: string, x: string) => n + x.toLowerCase())
+    .replace(/\b([NSEW])\b/g, (c) => c.toUpperCase()).replace(/\b(Po)\b/g, 'PO')
+}
+
+/** The whole address a person reads on a card: "1205 N State St, Appleton, WI 54911" (Colin 2026-10-26: "why do the
+ *  cards only show the damn street and address and not the city and state"). */
+export function fullAddress(x: { property_address?: string | null; municipality?: string | null; property_zip?: string | null } | null | undefined): string {
+  if (!x) return ''
+  const street = streetOf(x.property_address)
+  const city = cityOf(x.municipality)
+  const zip = (x.property_zip ?? '').slice(0, 5)
+  const tail = ['WI', zip].filter(Boolean).join(' ')
+  if (!street && !city) return ''
+  return [street, city, tail].filter(Boolean).join(', ')
+}

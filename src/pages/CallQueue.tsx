@@ -11,14 +11,14 @@ import { CallButton, PersonalCallButton } from '@/components/CallButton'
 import { CallScript } from '@/components/CallScript'
 import { useDueTasks, useLead, useWrite } from '@/lib/queries'
 import { handoffToColin } from '@/lib/apiExtra'
-import { endOfTodayIso, fmtDateTime, fmtPhone } from '@/lib/format'
+import { endOfTodayIso, fmtDateTime, fmtPhone, fullAddress } from '@/lib/format'
 import { STAGE_LABEL } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
 import { ownerFilterFor, useOnPhone, workerFor } from '@/lib/onPhone'
 import { OnPhonePrompt, useColinHere } from '@/components/OnPhonePicker'
 import type { Task } from '@/lib/types'
 
-type QueueTask = Task & { lead: { id: string; owner_name: string; property_address: string | null; stage: string } | null }
+type QueueTask = Task & { lead: { id: string; owner_name: string; property_address: string | null; municipality?: string | null; property_zip?: string | null; stage: string } | null }
 
 export default function CallQueue() {
   const { member } = useAuth()
@@ -99,7 +99,7 @@ function QueueCard({ task, canOverride, onDone, onSkip }: { task: QueueTask; can
     <section className="space-y-3 rounded-lg border-2 border-primary/40 bg-card p-3" data-testid="queue-card">
       <div>
         <h2 className="text-lg font-semibold">{lead.owner_name}</h2>
-        <p className="text-sm">{lead.property_address}{lead.municipality ? `, ${lead.municipality}` : ''}</p>
+        <p className="text-sm">{fullAddress(lead)}</p>
         <div className="mt-1 flex flex-wrap gap-2">
           <Badge>{STAGE_LABEL[lead.stage]}</Badge>
           {lead.lane && <Badge tone="info">{lead.lane === 'hold' ? 'Hold lane' : 'Flip lane'}</Badge>}

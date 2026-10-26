@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/form'
 import { api, usePhoneLookup } from '@/lib/queries'
-import { fmtPhone } from '@/lib/format'
+import { fmtPhone, fullAddress } from '@/lib/format'
 import { STAGE_LABEL } from '@/lib/wpie'
 
 // "Who's calling?": type the last 4 digits (or more) of the caller's number, tap the owner, the lead
@@ -51,7 +51,7 @@ export function PhoneLookup() {
                     {r.blocked && r.stage !== 'dnc' && <Badge tone="bad">Do not contact</Badge>}
                   </span>
                   <span className="block text-sm text-muted-foreground">
-                    {[r.property_address, r.municipality].filter(Boolean).join(', ') || 'No property on file'} - {fmtPhone(r.phone)}
+                    {fullAddress(r) || 'No property on file'} - {fmtPhone(r.phone)}
                     {r.person_name && r.person_name.toUpperCase() !== r.owner_name.toUpperCase() ? ` (${r.person_name})` : ''}
                   </span>
                 </Link>

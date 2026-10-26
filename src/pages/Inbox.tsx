@@ -10,7 +10,7 @@ import { DraftBox } from '@/components/DraftBox'
 import { CallButton } from '@/components/CallButton'
 import { NotifyPanel } from '@/components/NotifyPanel'
 import { PhoneLookup } from '@/components/PhoneLookup'
-import { fmtDateTime, localInputToIso, todayLocal } from '@/lib/format'
+import { fmtDateTime, localInputToIso, todayLocal, fullAddress } from '@/lib/format'
 import {
   BUCKETS, type Bucket, type InboxLead, SEND_LABEL, WORDING, bucketOf, inboxOrder, intentText, lastReplyAt, nextBusinessMorning,
   optedOut, reasonText, sendTone, threadOf,
@@ -121,7 +121,7 @@ function InboxCard({ x, bucket }: { x: InboxLead; bucket: Bucket }) {
               </Link>
             ) : (x.lead?.owner_name ?? o.owner_name ?? `Owner ${o.wpie_owner_id}`)}
           </h2>
-          <p className="truncate text-sm text-muted-foreground">{x.lead?.property_address ?? o.property_address}</p>
+          <p className="truncate text-sm text-muted-foreground">{fullAddress(x.lead ?? o)}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <CallButton to={o.phone} name={x.lead?.owner_name ?? o.owner_name} address={x.lead?.property_address ?? o.property_address}
