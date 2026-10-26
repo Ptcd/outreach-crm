@@ -130,13 +130,12 @@ describe('the team gets it too', () => {
     expect(memberTexts).toEqual([{ to: '+14145550123', text: texts[0] }])          // Thalia's, normalized; Colin's row is skipped
     expect(pushes).toEqual([{ endpoint: SUB.endpoint, title: 'Hot lead: John, 2825 S Logan Av',
       url: `https://deals.example.com/lead/${LEAD}?call=1&phone=4144776435`, tag: expect.stringMatching(/^hot-/) }])
-    expect(await run(T('15:26'))).toMatchObject({ second_alerts: 1, member_texts: 1, pushes_ok: 1 })
-    expect(memberTexts[1].text).toMatch(/^STILL NOT CALLED/)
-    expect(pushes[1].title).toBe('Still not called (15 min): John, 2825 S Logan Av')
+    // no 15-minute repeat (Colin 2026-10-26: one ping per hot lead)
+    expect(await run(T('15:26'))).toMatchObject({ second_alerts: 0, member_texts: 0, pushes_ok: 0 })
     const s = await run(new Date('2026-10-23T00:05:00Z'))                          // 7:05 PM Central
     expect(s).toMatchObject({ digest: 1, member_texts: 1, pushes_ok: 1 })
-    expect(memberTexts[2].text).toMatch(/^7 PM: 1 hot lead not called yet/)
-    expect(pushes[2]).toMatchObject({ title: '7 PM: 1 hot lead not called', url: 'https://deals.example.com/inbox', tag: 'hot-digest' })
+    expect(memberTexts[1].text).toMatch(/^7 PM: 1 hot lead not called yet/)
+    expect(pushes[1]).toMatchObject({ title: '7 PM: 1 hot lead not called', url: 'https://deals.example.com/inbox', tag: 'hot-digest' })
     expect((await db.query<{ ok: string }>('select last_ok_at::text as ok from public.push_subscriptions')).rows[0].ok).toBeTruthy()
   })
 
@@ -165,16 +164,15 @@ describe('the team gets it too', () => {
 })
 
 describe('alert timing', () => {
-  it('texts once right away, once more at 15 minutes if not called, never a third time', async () => {
+  it('texts once right away and never again (the 15-minute repeat is gone, Colin 2026-10-26)', async () => {
     await record('SM1', T('15:10'))
     await record('SM1', T('15:10'))                                  // the same inbound twice: one alert
     expect(await run(T('15:10'))).toMatchObject({ alerts: 1, second_alerts: 0 })
     expect(texts[0]).toMatch(/^HOT: John, 2825 S Logan Av said: "yes still mine"/)
     expect(await run(T('15:20'))).toMatchObject({ alerts: 0, second_alerts: 0 })
-    expect(await run(T('15:26'))).toMatchObject({ second_alerts: 1 })
-    expect(texts[1]).toMatch(/^STILL NOT CALLED/)
+    expect(await run(T('15:26'))).toMatchObject({ second_alerts: 0 })
     await run(T('16:30'))
-    expect(texts).toHaveLength(2)
+    expect(texts).toHaveLength(1)
     expect((await db.query<{ hot_at: string }>(`select hot_at::text from public.leads`)).rows[0].hot_at).toBeTruthy()
   })
 
