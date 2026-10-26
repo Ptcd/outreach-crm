@@ -5,6 +5,7 @@
 // queued still passes the database's send check (switch, pause, no Sundays, window, daily cap, already texted).
 // Transport: MCP over streamable HTTP, stateless JSON responses (supabase/functions/agent-mcp).
 import { findPriceOrOffer } from './replyGuard.ts'
+import { CALENDAR_TOOLS, callCalendarTool, isCalendarTool, type CalendarDoor } from './calendar.ts'
 
 export type Role = 'intake' | 'sender' | 'records'
 type ToolRole = Role | 'any'
@@ -30,6 +31,8 @@ export interface DoorDb {
   pause(reason: string, agent: string): Promise<Record<string, unknown>>
   resume(agent: string): Promise<Record<string, unknown>>
   results(hours: number): Promise<Record<string, unknown>>
+  /** Colin's Google Calendar (open_slots, book_slot, cancel_booking); absent where it is not wired. */
+  calendar?: CalendarDoor
 }
 
 export const SERVER_NAME = 'wpie'
@@ -46,6 +49,7 @@ export const TEXTING_RULES = [
   'Texts go out 10 AM to 7 PM in the recipient\'s time zone, never on Sunday, and share one daily limit with the laptop\'s own texts. Queue them and the server sends them in that window.',
   'Replies: you answer them now (replies_waiting, then send_reply), on the same thread. Read the whole conversation and the card first. One reply per text from them; never a first text or follow-up (queue_texts) to someone who has texted back.',
   'In a reply: never give, guess or react to a price; Colin prices every deal himself on a call. Your job is to learn why they would sell, the condition, the timing, who signs and their number, then book a call with Colin.',
+  "Booking: open_slots gives Colin's real open times (his calendar and his hours). Offer two or three, book_slot the one they pick with the 4 pillars, and confirm the time in your reply. Never promise a time you did not book.",
   'Every morning, read due_today: dated check-backs, holds whose date arrived, booked calls and visits, and contracts out for signature. The card says why it was waiting (named_event, notes, the conversation). Act on each one and mark the card.',
   'When an A/B test is running, tag every text with its variant (and template) in queue_texts, assign cards to variants at random, and read test_results before changing anything.',
 ].join('\n')
@@ -146,6 +150,7 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
   { role: 'sender', name: 'text_results', description: 'What happened to recent texts: delivered, failed (with carrier codes), replies and STOPs, over the last N hours (default 24).',
     inputSchema: { type: 'object', properties: { hours: { type: 'integer', maximum: 168 } } } },
 ]
+TOOLS.push(...CALENDAR_TOOLS)
 
 /** The wording check for a reply (no STOP line needed in the middle of a conversation). */
 export function replyProblem(body: string): string | null {
@@ -185,6 +190,7 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
   const tool = TOOLS.find((t) => t.name === name)
   if (!tool) return { value: { error: `no tool ${name}` }, isError: true }
   if (tool.role !== 'any' && tool.role !== agent.role) return { value: { error: `the ${agent.role} key cannot use ${name}` }, isError: true }
+  if (isCalendarTool(name)) return callCalendarTool(name, args, agent.name, db.calendar)
   switch (name) {
     case 'add_prospects': {
       const list = Array.isArray(args.prospects) ? (args.prospects as Json[]).slice(0, 200) : []

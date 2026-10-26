@@ -10,6 +10,7 @@ import { NotifyPanel } from '@/components/NotifyPanel'
 import { personAlerts, setPersonAlerts } from '@/lib/apiExtra'
 import { OnPhonePrompt, useColinHere } from '@/components/OnPhonePicker'
 import { AgentKeys } from '@/components/AgentKeys'
+import { CalendarPanel } from '@/components/CalendarPanel'
 import { useOnPhone, workerFor } from '@/lib/onPhone'
 import { personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
@@ -89,6 +90,11 @@ export default function Settings() {
       <Section title="Notifications on this phone">
         <NotifyPanel />
       </Section>
+      {colinHere && (
+        <Section title="Calendar (seller calls and visits)">
+          <CalendarPanel />
+        </Section>
+      )}
       {colinHere && (
         <Section title="Agent keys (Muse)">
           <AgentKeys />

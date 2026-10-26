@@ -5,6 +5,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
 import { handleMessage, keyFrom, type Agent, type DoorDb } from '../_shared/agentDoor.ts'
 import { approveReply } from '../_shared/replyAgent.ts'
 import { senderEnv, twilioPort, type Rpc } from '../_shared/sending.ts'
+import { bookSlot, cancelBooking, connect, findSlots, type Cal } from '../_shared/calendar.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -61,6 +62,17 @@ Deno.serve(async (req) => {
     pause: (reason, a) => rpc('agent_pause', { p_reason: reason, p_agent: a }) as Promise<Record<string, unknown>>,
     resume: (a) => rpc('agent_resume', { p_agent: a }) as Promise<Record<string, unknown>>,
     results: (h) => rpc('agent_results', { p_hours: h }) as Promise<Record<string, unknown>>,
+    // Colin's Google Calendar: connected only when a calendar tool is called (a token refresh per request)
+    calendar: (() => {
+      let cal: Promise<Cal> | null = null
+      const live = () => (cal ??= connect(rpc, Deno.env.get('CALENDAR_TOKEN_KEY') ?? ''))
+      const appUrl = Deno.env.get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com'
+      return {
+        slots: async (a) => findSlots(rpc, await live(), a),
+        book: async (a, who) => bookSlot(rpc, await live(), a, `Muse (${who})`, appUrl),
+        cancel: async (a, who) => cancelBooking(rpc, await live(), a, `Muse (${who})`),
+      }
+    })(),
   }
 
   let body: unknown

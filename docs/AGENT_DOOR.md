@@ -19,7 +19,7 @@ Each agent sends its own key as `Authorization: Bearer <key>` (or `x-api-key: <k
 | Key | Tools |
 |---|---|
 | **intake** | `add_prospects`, `find_prospects`, `prospect_counts` |
-| **sender** | `texting_rules`, `sending_status`, `ready_to_text`, `queue_texts`, `test_results`, `replies_waiting`, `send_reply`, `todays_queue`, `withdraw_texts`, `pause_sending`, `resume_sending`, `text_results` |
+| **sender** | `texting_rules`, `sending_status`, `ready_to_text`, `queue_texts`, `test_results`, `replies_waiting`, `send_reply`, `todays_queue`, `withdraw_texts`, `pause_sending`, `resume_sending`, `text_results`, `open_slots`, `book_slot`, `cancel_booking` |
 | **both** | `due_today`, `mark_card`, `link_cards` |
 | **records** | `records_overview`, `records_list`, `records_templates`, `records_replies`, `records_save_draft`, `records_propose_batch`, `records_mark` |
 
@@ -81,6 +81,18 @@ Read `texting_rules` first. Then:
 A text queued outside the window goes at the start of the next allowed window.
 
 **Pausing:** `pause_sending` stops all texting. The agent can lift only its own pause; a pause Colin or the team made is lifted in the app.
+
+## Booking Colin's calls (sender key)
+
+Colin's Google Calendar is behind the booking. He connects it once in **Settings > Calendar** (Google's own consent page; the refresh token is sealed on the server and never reaches the browser) and sets the hours he takes calls and visits, the slot lengths, the gap between them, the notice and how far ahead people can book.
+
+- `open_slots` `{kind: call|visit, after?, limit?}`: his next open times, Central time. Busy events on the calendars he picked, other bookings and other agents' live holds are already taken out. `suggest` is two or three spread out to offer.
+- `book_slot` `{lead_id, start, kind?, phone?, pillars: {why, condition, timeline, their_number, who_signs}, note?}`: a hold on the slot (one lock for every booking, so two agents can't take it), Google free/busy checked again, then the event (seller, phone, address, pillars, link to the card) and the card moves with `belt_event 'next_step'`, the same move as the app's booking: `call_booked` / `visit_booked`, `named_date` at the slot. A card with a booking is moved to the new time and the old event comes off. Refused, with `alternatives`, when the time was taken; refused for a closed, do-not-contact, older/ill or grieving card.
+- `cancel_booking` `{lead_id, reason?}`: the event comes off and the card goes back to `yes_unbooked` (a person calls to set a new time).
+
+Colin's own edits flow back every 10 minutes (pg_cron `wpie-calendar-sync`): an event he moves moves the card's `named_date`; an event he deletes cancels the booking and puts the card on `yes_unbooked`.
+
+Code: `supabase/functions/_shared/calendar.ts` (slots, sealing, Google, the flows, the tools), `supabase/functions/calendar` (consent, Settings actions, sync), migration `0074_calendar.sql`, tests `tests/calendar.test.ts`. Secret `CALENDAR_TOKEN_KEY` seals the tokens.
 
 ## Code
 
