@@ -7,9 +7,9 @@ Every seller call through the app is recorded (after a disclosure line), transcr
 
 1. **pm-phone** (`src/lib/recording.ts`). When `CALL_RECORDING` allows it, the `<Dial>` records both sides
    (`record-from-answer-dual`) and posts the finished recording to the `call-notes` function.
-   - App call (Call button, TwiML App "WPIE app dialer" → `/api/twilio/voice/client`): the seller hears the
-     disclosure the moment they pick up, before they are connected (`<Number url=/api/twilio/voice/disclosure>`).
-   - Call in to a seller line (`/api/twilio/voice/incoming`): the caller hears the disclosure before it rings.
+   - App call (Call button, TwiML App "WPIE app dialer" → `/api/twilio/voice/client`). In `say` mode the seller hears
+     the disclosure the moment they pick up, before they are connected (`<Number url=/api/twilio/voice/disclosure>`).
+   - Call in to a seller line (`/api/twilio/voice/incoming`). In `say` mode the caller hears it before it rings.
      The PM line is never recorded. A missed call goes to voicemail as before (Twilio's own voicemail transcript,
      migration 0063).
    - `CALL_RECORDING`: `off` (default: calls sound exactly as before), `test` (only numbers in
