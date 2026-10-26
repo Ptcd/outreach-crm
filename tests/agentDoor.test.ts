@@ -18,7 +18,7 @@ const fakeDb = (over: Partial<DoorDb> = {}): DoorDb => ({
   addProspect: async () => ({ status: 'created', lead_id: 'L1' }), findProspects: async () => [], prospectCounts: async () => ({}),
   status: async () => ({ paused: false }), readyToText: async () => [], queueText: async () => ({ status: 'queued', text_id: 'T1' }),
   queue: async () => [], withdraw: async () => true, pause: async () => ({ paused: true }), resume: async () => ({ paused: false }),
-  results: async () => ({}), ...over,
+  results: async () => ({}), testResults: async () => ({}), ...over,
 })
 const intake = { id: 'k1', name: 'Muse intake', role: 'intake' as const }
 const sender = { id: 'k2', name: 'Muse sender', role: 'sender' as const }
@@ -135,6 +135,25 @@ describe('on the real migrations', () => {
       .toMatchObject({ status: 'refused', reason: expect.stringMatching(/usable|opted out/) })
     expect(await r(`public.claim_next_opener(true, $1::timestamptz)`, [sat]))
       .toMatchObject({ outcome: 'skipped', reason: 'owner_opted_out_on_another_phone' })
+  })
+
+  it('an A/B test: each text carries its variant, and test_results scores the variants side by side', async () => {
+    const mk = async (name: string, phone: string) => (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`,
+      [JSON.stringify({ owner_name: name, address: `${phone.slice(-3)} Oak St`, phones: [phone] })])).lead_id as string
+    const a = await mk('Ann Arm', '4145550161'); const b = await mk('Bob Arm', '4145550162')
+    const mon = '2026-10-26T16:00:00Z'
+    const qa = await r(`public.agent_queue_text($1, '4145550161', $2, 1, null, 'Muse sender', $3::timestamptz, 'a', 'own_q')`, [a, OPENER, mon])
+    const qb = await r(`public.agent_queue_text($1, '4145550162', $2, 1, null, 'Muse sender', $3::timestamptz, 'B', 'intent_q')`, [b, OPENER, mon])
+    expect(qa).toMatchObject({ status: 'queued', variant: 'A' })
+    expect(qb).toMatchObject({ status: 'queued', variant: 'B' })
+    await db.query(`update public.planned_openers set send_status = 'delivered', claim_mode = 'live', sent_at = $1::timestamptz where variant in ('A', 'B')`, [mon])
+    await db.query(`insert into public.twilio_inbound (sid, from10, to_number, body, is_opt_out, received_at) values
+      ('SMa1', '4145550161', '+12624180202', 'Yes why?', false, '2026-10-26T16:05:00Z'),
+      ('SMb1', '4145550162', '+12624180202', 'STOP', true, '2026-10-26T16:06:00Z')`)
+    const t = await r(`public.agent_test_results(14, 1)`)
+    const by = Object.fromEntries((t.variants as { variant: string }[]).map((v) => [v.variant, v]))
+    expect(by.A).toMatchObject({ delivered: 1, conversations: 1, stops: 0, reply_rate: 100, templates: ['own_q'] })
+    expect(by.B).toMatchObject({ delivered: 1, conversations: 0, stops: 1, stop_rate: 100, templates: ['intent_q'] })
   })
 
   it('the agent can lift only its own pause', async () => {

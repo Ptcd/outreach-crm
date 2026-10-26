@@ -16,7 +16,8 @@ export interface DoorDb {
   prospectCounts(): Promise<Record<string, unknown>>
   status(): Promise<Record<string, unknown>>
   readyToText(f: { limit: number; followups: boolean; all_sources: boolean }): Promise<unknown[]>
-  queueText(t: { lead_id: string; phone: string; body: string; step: number; send_after: string | null }, agent: string): Promise<Record<string, unknown>>
+  queueText(t: { lead_id: string; phone: string; body: string; step: number; send_after: string | null; variant: string | null; template: string | null }, agent: string): Promise<Record<string, unknown>>
+  testResults(days: number, step: number): Promise<Record<string, unknown>>
   queue(date: string | null): Promise<unknown[]>
   withdraw(id: string, agent: string, reason: string): Promise<boolean>
   pause(reason: string, agent: string): Promise<Record<string, unknown>>
@@ -37,6 +38,7 @@ export const TEXTING_RULES = [
   'Follow-ups (steps 2-5) go only to people who never answered, at least 3 days apart; the sequence the team uses is days 1, 3, 10, 17, 24.',
   'Texts go out 10 AM to 7 PM in the recipient\'s time zone, never on Sunday, and share one daily limit with the laptop\'s own texts. Queue them and the server sends them in that window.',
   'When someone replies, stop: the reply agent and the team answer replies. You never text a person who has texted back.',
+  'When an A/B test is running, tag every text with its variant (and template) in queue_texts, assign cards to variants at random, and read test_results before changing anything.',
 ].join('\n')
 
 const S = (description: string, extra: Record<string, unknown> = {}) => ({ type: 'string', description, ...extra })
@@ -80,7 +82,12 @@ export const TOOLS: { role: Role; name: string; description: string; inputSchema
     description: 'Queue texts you wrote. Each: card id, phone (one on that card), the exact text, step (1 = first text, 2-5 = follow-ups) and optionally the earliest time to send. The server sends each one inside the recipient\'s window, under the daily limit. Refused texts come back with the reason. Up to 100 per call.',
     inputSchema: { type: 'object', properties: { texts: { type: 'array', maxItems: 100, items: { type: 'object', properties: {
       lead_id: S('card id'), phone: S('phone on that card'), body: S('the exact text'), step: { type: 'integer', minimum: 1, maximum: 5 },
-      send_after: S('ISO time, optional') }, required: ['lead_id', 'phone', 'body'] } } }, required: ['texts'] } },
+      send_after: S('ISO time, optional'),
+      variant: S('A/B test arm this text belongs to, e.g. "A" or "B" (always set it when a test is running)'),
+      template: S('short name of the wording, e.g. "own_q" or "intent_q"') }, required: ['lead_id', 'phone', 'body'] } } }, required: ['texts'] } },
+  { role: 'sender', name: 'test_results',
+    description: 'The A/B test scoreboard: per variant, texts queued, sent, delivered, failed (and carrier-filtered 30007), real conversations (a reply that is not a STOP or a wrong number), STOPs, wrong numbers, and the reply and STOP rates on delivered texts. Default: first texts, last 14 days.',
+    inputSchema: { type: 'object', properties: { days: { type: 'integer', maximum: 90 }, step: { type: 'integer', minimum: 1, maximum: 5 } } } },
   { role: 'sender', name: 'todays_queue', description: 'Every text planned for a day (default today), from you and from the laptop, with its status.',
     inputSchema: { type: 'object', properties: { date: S('YYYY-MM-DD') } } },
   { role: 'sender', name: 'withdraw_texts', description: 'Pull texts that have not gone yet.',
@@ -144,7 +151,8 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
         const why = textProblem(body)
         if (why) { results.push({ lead_id: t.lead_id, status: 'refused', reason: why }); continue }
         const r = await db.queueText({ lead_id: String(t.lead_id ?? ''), phone: String(t.phone ?? ''), body,
-          step: int(t.step, 1, 5), send_after: t.send_after ? String(t.send_after) : null }, agent.name)
+          step: int(t.step, 1, 5), send_after: t.send_after ? String(t.send_after) : null,
+          variant: t.variant ? String(t.variant) : null, template: t.template ? String(t.template) : null }, agent.name)
         results.push({ lead_id: t.lead_id, ...r })
       }
       return { value: { queued: results.filter((r) => r.status === 'queued').length, refused: results.filter((r) => r.status !== 'queued').length, results } }
@@ -159,6 +167,7 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
     case 'pause_sending': return { value: await db.pause(String(args.reason ?? '').trim() || 'paused by the sender agent', agent.name) }
     case 'resume_sending': return { value: await db.resume(agent.name) }
     case 'text_results': return { value: await db.results(int(args.hours, 24, 168)) }
+    case 'test_results': return { value: await db.testResults(int(args.days, 14, 90), int(args.step, 1, 5)) }
   }
   return { value: { error: `no tool ${name}` }, isError: true }
 }
