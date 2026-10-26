@@ -118,6 +118,24 @@ describe('runSendOpeners', () => {
     expect(none).toMatchObject({ stopped: 'inbound_check_failed', sent: 0 })
   })
 
+  it('a phone texted before keeps its number when the pool grows; a new phone is spread over the whole pool', async () => {
+    const FIVE = ['+12629996513', '+12624180202', '+12623812196', '+12624767158', '+12626675223']
+    const env = senderEnv((n) => ({ TWILIO_LIVE_SENDING: '1', TWILIO_ACCOUNT_SID: 'ACtest', TWILIO_AUTH_TOKEN: 'tok',
+      CAMPAIGN_MESSAGING_SERVICE_SID: 'MGtest', CAMPAIGN_FROM_NUMBER: 'pool', CAMPAIGN_OPENER_FROM: FIVE.join(',') } as Record<string, string>)[n], 'https://x')
+    const known = await approvedOpener()
+    // its thread is on a number the five-number hash would not pick
+    const other = FIVE.find((f) => f !== openerFromFor(FIVE, `+1${known}`))!
+    await db.query(`insert into public.messages (lead_id, direction, channel, body, from_number, to_number, status, sent_at, source_key)
+      select lead_id, 'out', 'sms', 'earlier text', $1, phone, 'delivered', '2026-10-20T15:00:00Z', 'test:earlier' from public.planned_openers where phone = $2`,
+      [other, `+1${known}`])
+    const fresh = await approvedOpener()
+    const tw = new FakeTwilio()
+    await runSendOpeners({ rpc, env, twilio: tw, now: () => NOW, inboundNumbers: FIVE })
+    const from = Object.fromEntries(tw.sends.map((x) => [x.to, x.from]))
+    expect(from[`+1${known}`]).toBe(other)
+    expect(from[`+1${fresh}`]).toBe(openerFromFor(FIVE, `+1${fresh}`))
+  })
+
   it('CAMPAIGN_OPENER_FROM: first texts go out only from the listed numbers, with delivery callbacks', async () => {
     const PINNED = senderEnv((n) => ({ TWILIO_LIVE_SENDING: '1', TWILIO_ACCOUNT_SID: 'ACtest', TWILIO_AUTH_TOKEN: 'tok',
       CAMPAIGN_MESSAGING_SERVICE_SID: 'MGtest', CAMPAIGN_FROM_NUMBER: 'pool',

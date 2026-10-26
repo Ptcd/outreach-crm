@@ -262,7 +262,11 @@ export async function runSendOpeners(opts: {
 
     let res: SendResult | SendFailure
     try {
-      const from = openerFromFor(opts.env.twilio?.openerFrom ?? [], j.opener.phone)
+      // the number their thread is already on, when it is still in the pool; a new phone is spread across the pool
+      const pool = opts.env.twilio?.openerFrom ?? []
+      const prev = await opts.rpc('sender_for_phone', { p_phone: j.opener.phone })
+      const known = typeof prev.data === 'string' && pool.includes(prev.data) ? prev.data : null
+      const from = known ?? openerFromFor(pool, j.opener.phone)
       res = from
         ? await opts.twilio.send(j.opener.phone, j.opener.body, from, { statusCallback: true })
         : await opts.twilio.send(j.opener.phone, j.opener.body)
