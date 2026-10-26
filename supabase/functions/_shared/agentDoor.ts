@@ -75,7 +75,7 @@ export const TOOLS: { role: Role; name: string; description: string; inputSchema
   { role: 'sender', name: 'sending_status', description: 'Is sending on or paused, the window, the daily limit and how much of it is used today, and today\'s texts by status.',
     inputSchema: { type: 'object', properties: {} } },
   { role: 'sender', name: 'ready_to_text',
-    description: 'Cards waiting for a text: new cards with a usable mobile phone and nothing queued, and (followups=true) people who got a text, never answered, and are due for the next step. Includes the owner, address, phone, reasons and what was sent before.',
+    description: 'Cards waiting for a text: your own new cards, and the cards the laptop picked for a first text and handed to you (they passed the prospect rules; laptop_text is the wording the laptop would have sent, for reference). Each has a usable mobile phone and nothing queued. With followups=true, also your cards that got a text, never answered, and are due for the next step. Includes owner_type (individual, trust, llc, estate), address, phones, reasons and what was sent before.',
     inputSchema: { type: 'object', properties: { limit: { type: 'integer', maximum: 300 }, followups: { type: 'boolean' },
       all_sources: { type: 'boolean', description: 'include cards the laptop loaded (default: only agent-loaded cards)' } } } },
   { role: 'sender', name: 'queue_texts',

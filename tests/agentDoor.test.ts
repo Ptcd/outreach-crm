@@ -156,6 +156,25 @@ describe('on the real migrations', () => {
     expect(by.B).toMatchObject({ delivered: 1, conversations: 0, stops: 1, stop_rate: 100, templates: ['intent_q'] })
   })
 
+  it('with the switch on, a first text the laptop plans is handed to the agent, which sees the card and the laptop wording', async () => {
+    const lid = (await one<{ id: string }>(`insert into public.leads (wpie_owner_id, owner_name, owner_type, property_address, stage)
+      values (777, 'Lap Topcard', 'individual', '7 Elm St', 'opener_queued') returning id`)).id
+    await db.query(`insert into public.contacts (lead_id, kind, value, value_normalized, line_type) values ($1, 'phone', '4145550177', '4145550177', 'mobile')`, [lid])
+    await db.exec(`update public.campaign_control set agent_writes_openers = true`)
+    await db.query(`insert into public.planned_openers (plan_date, wpie_owner_id, attempt, lead_id, lane, phone, body, step)
+      values ((now() at time zone 'America/Chicago')::date, 777, 1, $1, 'flip', '+14145550177', $2, 1)`, [lid, 'Hi Lap, laptop wording. Reply STOP'])
+    expect(await one(`select send_status, send_reason from public.planned_openers where wpie_owner_id = 777`))
+      .toEqual({ send_status: 'withdrawn', send_reason: 'handed to the sender agent' })
+    const ready = await r(`public.agent_ready_to_text(50, false, false)`)
+    const c = (ready.new_cards as { lead_id: string; laptop_text: string; owner_type: string }[]).find((x) => x.lead_id === lid)
+    expect(c).toMatchObject({ laptop_text: 'Hi Lap, laptop wording. Reply STOP', owner_type: 'individual' })
+    await db.exec(`update public.campaign_control set agent_writes_openers = false`)
+    await db.query(`insert into public.planned_openers (plan_date, wpie_owner_id, attempt, lead_id, lane, phone, body, step)
+      values ((now() at time zone 'America/Chicago')::date + 1, 777, 1, $1, 'flip', '+14145550177', 'x STOP', 1)`, [lid])
+    expect(await one(`select send_status from public.planned_openers where wpie_owner_id = 777 and plan_date > (now() at time zone 'America/Chicago')::date`))
+      .toEqual({ send_status: 'planned' })
+  })
+
   it('the agent can lift only its own pause', async () => {
     expect(await r(`public.agent_pause('carrier errors', 'Muse sender')`)).toEqual({ paused: true })
     expect(await r(`public.agent_resume('Muse sender')`)).toEqual({ paused: false })
