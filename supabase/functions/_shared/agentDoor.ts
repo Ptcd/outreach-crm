@@ -50,6 +50,7 @@ export const TEXTING_RULES = [
   'Replies: you answer them now (replies_waiting, then send_reply), on the same thread. Read the whole conversation and the card first. One reply per text from them; never a first text or follow-up (queue_texts) to someone who has texted back.',
   'In a reply: never give, guess or react to a price; Colin prices every deal himself on a call. Your job is to learn why they would sell, the condition, the timing, who signs and their number, then book a call with Colin.',
   "Booking: open_slots gives Colin's real open times (his calendar and his hours). Offer two or three, book_slot the one they pick with the 4 pillars, and confirm the time in your reply. Never promise a time you did not book.",
+  "Phone calls: the card's call_notes say what was said on each recorded call (summary, the 4 pillars and who signs, outcome, next step, the mark the caller confirmed). Read them before you text: never ask again what they already told us on the phone, and follow the next step they agreed to.",
   'Every morning, read due_today: dated check-backs, holds whose date arrived, booked calls and visits, and contracts out for signature. The card says why it was waiting (named_event, notes, the conversation). Act on each one and mark the card.',
   'When an A/B test is running, tag every text with its variant (and template) in queue_texts, assign cards to variants at random, and read test_results before changing anything.',
 ].join('\n')

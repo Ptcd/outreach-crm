@@ -34,6 +34,11 @@ verify_jwt = false
 [functions.agent-mcp]
 verify_jwt = false
 
+# Twilio's recording callback (X-Twilio-Signature), Voice Intelligence's webhook (ids only: everything is re-read from
+# Twilio) and the 5-minute sweep (shared secret). Migration 0073.
+[functions.call-notes]
+verify_jwt = false
+
 # Colin's Google Calendar: Google's OAuth callback (the state is the credential), the 10-minute sync (shared secret)
 # and the app's Settings actions (the function checks the owner role itself). Migration 0074.
 [functions.calendar]

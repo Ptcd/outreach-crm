@@ -233,6 +233,40 @@ export function useLead(id: string) {
   })
 }
 
+// ------------------------------------------------------------ Call notes (migration 0073)
+export interface CallNote {
+  id: string; call_sid: string; lead_id: string; direction: 'out' | 'in'; caller: string | null; started_at: string | null
+  duration_s: number | null; summary: string; quote: string | null
+  pillars: { motivation?: string; condition?: string; timeline?: string; price?: string; signers?: string }
+  outcome: string | null; next_step: string | null; next_step_at: string | null; next_step_kind: string | null
+  suggested_mark: string | null; suggested_until: string | null; suggested_reason: string | null
+  facts_written: string[]; logged_before: string | null; confirmed_at: string | null; confirmed_by: string | null
+  confirmed_mark: string | null; created_at: string
+}
+
+/** The card's call notes, newest first, and whether a recorded call is still being turned into notes. */
+export function useCallNotes(leadId: string) {
+  return useQuery({
+    queryKey: ['call_notes', leadId],
+    refetchInterval: (q) => ((q.state.data as { pending?: number } | undefined)?.pending ? 20_000 : false),
+    queryFn: async () => {
+      const [notes, pending] = await Promise.all([
+        supabase.from('call_notes').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(10),
+        supabase.from('call_recordings').select('call_sid', { count: 'exact', head: true }).eq('lead_id', leadId)
+          .in('status', ['recorded', 'transcribing', 'summarizing']).gte('created_at', new Date(Date.now() - 6 * 3600_000).toISOString()),
+      ])
+      return { notes: check(notes) as CallNote[], pending: pending.count ?? 0 }
+    },
+  })
+}
+
+/** The words of one call (team only; read on demand, never cached with the card). */
+export async function callTranscript(callSid: string): Promise<string> {
+  const r = await supabase.from('call_transcripts').select('words').eq('call_sid', callSid).maybeSingle()
+  if (r.error) throw new Error(r.error.message)
+  return (r.data?.words as string | undefined) ?? ''
+}
+
 export function useDeals(leadId: string, enabled: boolean) {
   return useQuery({
     queryKey: ['deals', leadId],
@@ -329,6 +363,9 @@ export const api = {
   newCaller: (phone: string, name?: string) => supabase.rpc('new_caller', { p_phone: phone, p_name: name ?? null }),
   cardFromText: (draftId: string) => supabase.rpc('card_from_text', { p_draft: draftId }),
   callAnswer: (leadId: string, key: string, value: unknown) => supabase.rpc('call_answer', { p_lead_id: leadId, p_key: key, p_value: value }),
+  // Call notes (migration 0073): the caller's one tap on the suggested mark logs the call through log_call.
+  confirmCallNote: (noteId: string, mark: string, until: string | null, reason: string | null) =>
+    supabase.rpc('call_note_confirm', { p_note_id: noteId, p_mark: mark, p_until: until, p_reason: reason }),
   logCall: (leadId: string, phone: string | null, outcome: string, note: string | null, until: string | null = null) =>
     supabase.rpc('log_call', { p_lead_id: leadId, p_phone: phone, p_outcome: outcome, p_note: note, p_when: until }),
   // Send contract (Colin): preview / send / new_link / void / pdf / seal. Errors come back as { ok: false, reason }.

@@ -17,6 +17,7 @@ import { BeltStrip } from '@/components/BeltStrip'
 import { CallButton, PersonalCallButton } from '@/components/CallButton'
 import { AppointmentPacket } from '@/components/AppointmentPacket'
 import { CallPanel, bestPhone } from '@/components/CallPanel'
+import { CallNotes } from '@/components/CallNotes'
 import { TextThread } from '@/components/TextThread'
 import { api, useDeals, useLead, useWrite } from '@/lib/queries'
 import { useDialer } from '@/lib/dialer'
@@ -86,6 +87,7 @@ export default function LeadDetail() {
         </div>
       )}
       <CallPanel lead={lead} contacts={contacts} inbound={q.data.inbound} replyFacts={facts} messages={messages} />
+      <CallNotes leadId={lead.id} messages={messages} />
       <TextThread leadId={lead.id} phone={bestPhone(contacts, q.data.inbound)} messages={messages} inbound={q.data.inbound}
         closed={lead.stage === 'dnc'} />
       {/* the script sits right under the Call button, open on a hot card (someone just said they'd sell) */}
