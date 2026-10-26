@@ -21,7 +21,7 @@ export const BELTS = Object.keys(BELT_LABEL) as Belt[]
 export const RESTING_BELTS: Belt[] = ['too_high_or_listed', 'dead', 'dnc']
 
 export const WHO_LABEL: Record<StopWho, string> = {
-  auto_text: 'a text goes on its own', draft_text: 'a draft for Colin\'s tap', thalia_call: 'Thalia calls', colin_call: 'Colin calls', colin_visit: 'Colin visits',
+  auto_text: 'a text goes on its own', draft_text: 'a draft for Colin\'s tap', thalia_call: 'Thalia or Adil calls', colin_call: 'Colin calls', colin_visit: 'Colin visits',
 }
 
 /** The one line under the card's header: belt, stop, who and when, and what to say. */

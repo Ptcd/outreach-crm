@@ -16,7 +16,7 @@ const NAV: { to: string; label: string; short?: string; icon: typeof CalendarChe
   { to: '/inbox', label: 'Inbox', icon: Inbox },
   { to: '/warm', label: 'Warm', icon: Flame },
   { to: '/pipeline', label: 'Pipeline', short: 'Pipe', icon: ListChecks },
-  { to: '/approvals', label: 'Approve', short: 'Approve', icon: MessageSquareText },
+  { to: '/approvals', label: 'Approve', short: 'Texts', icon: MessageSquareText },
   { to: '/scoreboard', label: 'Scoreboard', short: 'Score', icon: BarChart3 },
 ]
 

@@ -37,10 +37,10 @@ export default function Warm() {
         <p className="text-sm text-muted-foreground">Everyone past the first texts, in the order to work them.</p>
       </div>
       <StatTiles tiles={[
-        { label: 'Needs a decision', value: q.data ? g.decide.length : null, icon: AlertTriangle, tone: 'rose' },
-        { label: 'Hot: call today', value: q.data ? g.hot.length : null, icon: Flame, tone: 'amber' },
+        { label: 'Decide', value: q.data ? g.decide.length : null, icon: AlertTriangle, tone: 'rose' },
+        { label: 'Hot', value: q.data ? g.hot.length : null, icon: Flame, tone: 'amber' },
         { label: 'Booked', value: q.data ? g.booked.length : null, icon: CalendarClock, tone: 'indigo' },
-        { label: 'Talking and nurture', value: q.data ? g.talking.length + g.callback.length + g.nurture.length : null, icon: Sprout, tone: 'emerald' },
+        { label: 'Nurture', value: q.data ? g.talking.length + g.callback.length + g.nurture.length : null, icon: Sprout, tone: 'emerald' },
       ]} />
       <ErrorNote error={q.error} />
       {GROUPS.map((grp) => {
