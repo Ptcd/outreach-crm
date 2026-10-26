@@ -415,6 +415,42 @@ describe('on the real migrations', () => {
     expect(v.find((x) => x.version === 'B v1')?.ran_to).toBeTruthy()
   })
 
+  it('the next phone: when the first text bounces, a first text may go to the next phone on the card, and its follow-ups follow it', async () => {
+    const lid = (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`,
+      [JSON.stringify({ owner_name: 'Tom Nextphone', address: '9 Retry Rd', phones: ['4145550901', '4145550902', '4145550903'], mailing_state: 'WI' })])).lead_id as string
+    const tue = '2026-10-27T20:00:00Z'                                   // Tuesday 3 PM Central
+    await db.exec(`update public.planned_openers set send_status = 'withdrawn' where send_status in ('planned', 'would_send')`)
+    const q1 = await r(`public.agent_queue_text($1, '4145550901', $2, 1, null, 'Muse sender', $3::timestamptz, 'A', 'own_q')`, [lid, OPENER, tue])
+    expect(q1).toMatchObject({ status: 'queued', next_phone: false })
+    // it went out; no delivery result yet: the next phone waits
+    await db.query(`update public.planned_openers set send_status = 'sent', claim_mode = 'live', claimed_at = $2::timestamptz, sent_at = $2::timestamptz where id = $1`, [q1.text_id, tue])
+    await db.query(`update public.leads set stage = 'opener_sent' where id = $1`, [lid])
+    expect(await r(`public.agent_queue_text($1, '4145550902', $2, 1, null, 'Muse sender', $3::timestamptz, 'A', 'own_q')`, [lid, OPENER, tue]))
+      .toMatchObject({ status: 'refused', reason: expect.stringContaining('may have arrived') })
+    // the carrier says undelivered and the bounce marks the phone bad: the next phone may have a first text
+    await db.query(`update public.planned_openers set send_status = 'undelivered', error_code = '30003' where id = $1`, [q1.text_id])
+    await db.query(`update public.contacts set status = 'bad' where lead_id = $1 and value_normalized = '4145550901'`, [lid])
+    const q2 = await r(`public.agent_queue_text($1, '4145550902', $2, 1, null, 'Muse sender', $3::timestamptz, 'A', 'own_q')`, [lid, OPENER, tue])
+    expect(q2).toMatchObject({ status: 'queued', next_phone: true })
+    expect(await one(`select attempt, step from public.planned_openers where id = $1`, [q2.text_id])).toEqual({ attempt: 2, step: 1 })
+    expect(await r(`public.agent_queue_text($1, '4145550901', $2, 1, null, 'Muse sender', $3::timestamptz)`, [lid, OPENER, tue])).toMatchObject({ status: 'refused' })
+    // the send check lets it through (it would have said owner_already_texted)
+    const claim = await r(`public.claim_next_opener(true, $1::timestamptz)`, [tue])
+    expect(claim).toMatchObject({ outcome: 'would_send', opener: { id: q2.text_id } })
+    // it is delivered: no third phone, and the follow-up belongs to the phone that got it
+    await db.query(`update public.planned_openers set send_status = 'delivered', claim_mode = 'live', sent_at = $2::timestamptz where id = $1`, [q2.text_id, tue])
+    expect(await r(`public.agent_queue_text($1, '4145550903', $2, 1, null, 'Muse sender', $3::timestamptz)`, [lid, OPENER, tue]))
+      .toMatchObject({ status: 'refused', reason: expect.stringContaining('may have arrived') })
+    const f2 = await r(`public.agent_queue_text($1, '4145550902', $2, 2, '2026-10-30T15:00:00Z', 'Muse sender', $3::timestamptz)`, [lid, OPENER, tue])
+    expect(f2.status).toBe('queued')
+    expect(await one(`select attempt, step from public.planned_openers where id = $1`, [f2.text_id])).toEqual({ attempt: 22, step: 2 })
+    // a reply from the good phone ends the next-phone path for good
+    await db.query(`update public.planned_openers set send_status = 'undelivered' where id = $1`, [q2.text_id])
+    await db.exec(`insert into public.twilio_inbound (sid, from10, to_number, body, is_opt_out, received_at) values ('SMnp1', '4145550902', '+12624180202', 'who is this', false, '2026-10-27T21:00:00Z')`)
+    expect(await r(`public.next_phone_problem($1, '4145550903')`, [lid])).toBe('they texted back from a good phone')
+    await db.exec(`update public.planned_openers set send_status = 'withdrawn' where send_status in ('planned', 'would_send')`)
+  })
+
   it('the agent can lift only its own pause', async () => {
     expect(await r(`public.agent_pause('carrier errors', 'Muse sender')`)).toEqual({ paused: true })
     expect(await r(`public.agent_resume('Muse sender')`)).toEqual({ paused: false })
