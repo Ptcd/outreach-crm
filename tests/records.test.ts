@@ -35,7 +35,7 @@ describe('records requests', () => {
     expect(await db.query(`select public.records_upsert_request($1::jsonb) as id`, [JSON.stringify({ kind: 'rod', name: 'Test', to_email: 'x@y.z' })]))
       .toMatchObject({ rows: [{ id: null }] })                           // an existing row is never overwritten
     const due = (await r(`public.records_list('due', 50)`)) as unknown as { name: string; why_due: string }[]
-    expect(due.map((x) => [x.name, x.why_due])).toEqual([['City of Testville', 'never sent'], ['Test', 'no answer in 14 days: follow up']])
+    expect(due.map((x) => [x.name, x.why_due])).toEqual([['City of Testville', 'never sent'], ['Test', 'no answer since Sep 01: follow-up #1']])
     expect((await r(`public.records_templates()`)).municipal).toMatch(/Wis\. Stat\. 19\.31/)
     const letter = 'To the Records Custodian, City of Testville: under Wis. Stat. 19.31 I request code enforcement records; fees over $25, please send an estimate.'
     const d1 = await r(`public.records_save_draft($1, 'request', 'clerk@testville.gov', null, 'Public records request (City of Testville)', $2, null, 'Muse records')`, [a, letter])
@@ -65,6 +65,40 @@ describe('records requests', () => {
     expect(await r(`public.records_mark($1, 'received', 'xlsx export', '2026-10-27', 'October 26, 2026', null, null, $2, 'Muse records')`, [a, reps[0].reply_id]))
       .toMatchObject({ ok: true, request: { status: 'received', next_due: '2027-01-25' } })
     expect((await r(`public.records_replies_list(true, 10)`)) as unknown as unknown[]).toEqual([])
+  })
+
+  it('four more offices, categories and a cadence per request, a follow-up every 14 days without end', async () => {
+    const t = await r(`public.records_templates()`)
+    for (const k of ['municipal', 'rod', 'treasurer', 'clerk_of_court', 'sheriff', 'police']) {
+      expect(t[k]).toMatch(/Wis\. Stat\. 19\.31/)
+      expect(t[k]).not.toMatch(/\b(cash|investors?|buy|buying)\b/i)
+    }
+    expect(t.categories).toEqual(expect.arrayContaining(['lis_pendens', 'federal_tax_liens', 'water_shutoffs', 'arrest_logs', 'sheriff_sales']))
+    const made = await r(`public.records_set_request($1::jsonb, 'Muse')`, [JSON.stringify({ kind: 'treasurer', name: 'Test County Treasurer', county: 'Test',
+      to_email: 'treasurer@co.test.wi.us', categories: ['tax_delinquency', 'certificates_of_sale'], cadence_days: 30 })])
+    expect(made).toMatchObject({ ok: true, created: true })
+    expect(await r(`public.records_set_request($1::jsonb, 'Muse')`, [JSON.stringify({ kind: 'treasurer', name: 'Test County Treasurer' })]))
+      .toMatchObject({ ok: false, reason: expect.stringContaining('already') })
+    expect(await r(`public.records_set_request($1::jsonb, 'Muse')`, [JSON.stringify({ kind: 'notary', name: 'X' })])).toMatchObject({ ok: false })
+    expect(await r(`public.records_set_request($1::jsonb, 'Muse')`, [JSON.stringify({ request_id: made.request_id, categories: ['tax_delinquency'], note: 'narrowed' })]))
+      .toMatchObject({ ok: true, updated: true })
+    const id = made.request_id as string
+    const why = async () => ((await r(`public.records_list('all', 500)`)) as unknown as { request_id: string; why_due: string | null; follow_up_count: number; categories: string[]; cadence_days: number }[])
+      .find((x) => x.request_id === id)!
+    expect(await why()).toMatchObject({ why_due: 'never sent', categories: ['tax_delinquency'], cadence_days: 30 })
+    // asked 15 days ago and followed up 6 times already: still due, as follow-up #7
+    await db.query(`update public.records_requests set status = 'sent', sent_date = current_date - 120, last_asked = current_date - 15, follow_up_count = 6 where id = $1`, [id])
+    expect((await why()).why_due).toMatch(/follow-up #7$/)
+    await db.query(`update public.records_requests set last_asked = current_date - 3 where id = $1`, [id])
+    expect((await why()).why_due).toBeNull()
+    // no records: the next ask comes after the request's own cadence, and the count starts over
+    expect(await r(`public.records_mark($1, 'no_records', 'none this month', '2026-09-01', null, null, null, null, 'Muse')`, [id]))
+      .toMatchObject({ ok: true, request: { status: 'no_records', next_due: '2026-10-01', follow_up_count: 0 } })
+    expect((await why()).why_due).toBe('re-request: the cadence came round')
+    // a fee quote goes to Colin
+    await db.query(`update public.records_requests set status = 'needs_payment' where id = $1`, [id])
+    expect(((await r(`public.records_list('for_colin', 50)`)) as unknown as { request_id: string }[]).map((x) => x.request_id)).toContain(id)
+    expect(await r(`public.records_overview()`)).toMatchObject({ for_colin: 1 })
   })
 
   it('the records key role exists', async () => {

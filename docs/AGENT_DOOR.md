@@ -14,14 +14,27 @@ Each agent sends its own key as `Authorization: Bearer <key>` (or `x-api-key: <k
 - Only its hash is stored.
 - **Turn off** stops that agent at once.
 
-## Roles
+## Scopes: one key (migration 0078)
 
-| Key | Tools |
+One key does everything Colin switches on for it. Each scope is a switch on the key in **Settings > Agent keys**. Turn one off and the door refuses that part at once, and drops it from `tools/list`. Every `tools/call` is logged in `agent_calls`: key, tool, scope, ok or refused, the error, and how long it took. The key list shows calls and refusals for the last 24 hours.
+
+| Scope | Tools |
 |---|---|
-| **intake** | `add_prospects`, `find_prospects`, `prospect_counts` |
-| **sender** | `texting_rules`, `sending_status`, `ready_to_text`, `queue_texts`, `test_results`, `replies_waiting`, `send_reply`, `todays_queue`, `withdraw_texts`, `pause_sending`, `resume_sending`, `text_results`, `open_slots`, `book_slot`, `cancel_booking` |
-| **both** | `due_today`, `mark_card`, `link_cards` |
-| **records** | `records_overview`, `records_list`, `records_templates`, `records_replies`, `records_save_draft`, `records_propose_batch`, `records_mark` |
+| **prospects** | `add_prospects`, `find_prospects`, `prospect_counts` |
+| **texting** | `texting_rules`, `sending_status`, `ready_to_text`, `queue_texts`, `test_results`, `text_templates`, `set_text_template`, `replies_waiting`, `send_reply`, `todays_queue`, `withdraw_texts`, `pause_sending`, `resume_sending`, `text_results` |
+| **calendar** | `open_slots`, `book_slot`, `cancel_booking` |
+| **records** | `records_overview`, `records_list`, `records_set_request`, `records_templates`, `records_replies`, `records_save_draft`, `records_propose_batch`, `records_mark` |
+| **marks** | `due_today`, `mark_card`, `link_cards` |
+
+The older single-role keys still work, with exactly what their role had: intake = prospects + marks, sender = texting + calendar + marks, records = records. Colin turns them off once the one key is live.
+
+No guardrail moved with the scopes. The wording check, the daily cap and window, slot and variant assignment, and Colin's approval of every records batch all stay where they were.
+
+## Versioned first-text wording (texting scope)
+
+Each variant (A = `own_q`, B = `intent_q`, C = spare) has a template with versions in `text_templates`. `text_templates` shows the current wording of each, and every earlier version with the dates it ran. `set_text_template` closes the current version and opens the next, but only when Colin has called the change. It needs a note, a STOP line, and no $, cash, as-is or offer.
+
+Every agent first text is stamped with its variant's version when it is queued (`planned_openers.template_version`). `test_results` adds `versions`: the same scores per variant version, with `ran_from` and `ran_to`. The assignment does not change: the variant still comes from the last character of the card id. No history is lost.
 
 ## Intake: `add_prospects`
 
@@ -131,7 +144,10 @@ Code: `supabase/functions/_shared/calendar.ts` (slots, sealing, Google, the flow
 
 The public-records letters to municipal clerks and county Registers of Deeds run through the app (migration 0072).
 
-1. The agent reads `records_overview`, `records_replies` (clerks' answers, copied in from the records mailbox by the laptop) and `records_list` (due: never sent, the 90-day re-request reached, or no answer in 14 days).
+Six kinds of office: municipal clerks, Registers of Deeds, county treasurers, clerks of circuit court, sheriffs, and police records custodians (0078). Each request has its own `categories` (from `records_templates.categories`) and `cadence_days` (default 90). `records_set_request` adds an office or changes one.
+
+1. The agent reads `records_overview`, `records_replies` (clerks' answers, copied in from the records mailbox by the laptop) and `records_list`. A request is due when it was never sent, or when an answer (received or no records) is `cadence_days` old. It is also due when there has been no answer for 14 days since `last_asked`: a polite follow-up every 14 days, without end, counted in `follow_up_count`.
+   Fee quotes (`needs_payment`) and denials go to Colin. `records_list('for_colin')` lists them, and they show on his Approve page. The agent never agrees to a fee.
 2. It marks what came back (`records_mark`).
 3. It writes letters from `records_templates` (`records_save_draft`) and proposes them in batches of up to 40 (`records_propose_batch`).
 

@@ -1,8 +1,9 @@
 // agent-mcp: the agent door. An MCP server (streamable HTTP, stateless JSON) for Muse or any MCP client.
 // Each agent has its own key, made by Colin in the app (Settings > Agent keys), sent as "Authorization: Bearer <key>"
-// or "x-api-key". The key's role (intake or sender) decides which tools it sees. Tools and checks: _shared/agentDoor.ts.
+// or "x-api-key". The key's scopes (prospects, texting, calendar, records, marks) decide which tools it sees; every call
+// is logged in agent_calls with its scope. Tools and checks: _shared/agentDoor.ts.
 import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
-import { handleMessage, keyFrom, type Agent, type DoorDb } from '../_shared/agentDoor.ts'
+import { handleMessage, keyFrom, SCOPES, type Agent, type DoorDb, type Scope } from '../_shared/agentDoor.ts'
 import { approveReply } from '../_shared/replyAgent.ts'
 import { senderEnv, twilioPort, type Rpc } from '../_shared/sending.ts'
 import { bookSlot, cancelBooking, connect, findSlots, type Cal } from '../_shared/calendar.ts'
@@ -19,9 +20,10 @@ Deno.serve(async (req) => {
   const sb = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', { auth: { persistSession: false } })
   const key = keyFrom(req.headers)
   const check = key ? await sb.rpc('agent_key_check', { p_key: key }) : null
-  const k = check?.data as { ok?: boolean; id?: string; name?: string; role?: string } | null
+  const k = check?.data as { ok?: boolean; id?: string; name?: string; role?: string; scopes?: string[] } | null
   if (!k?.ok) return Response.json({ jsonrpc: '2.0', id: null, error: { code: -32001, message: 'missing or turned-off agent key' } }, { status: 401, headers: CORS })
-  const agent: Agent = { id: k.id!, name: k.name!, role: k.role === 'sender' ? 'sender' : k.role === 'records' ? 'records' : 'intake' }
+  const role = k.role === 'sender' || k.role === 'records' || k.role === 'agent' ? k.role : 'intake'
+  const agent: Agent = { id: k.id!, name: k.name!, role, scopes: (k.scopes ?? []).filter((x): x is Scope => (SCOPES as string[]).includes(x)) }
 
   const rpc = async (fn: string, args: Record<string, unknown>) => {
     const r = await sb.rpc(fn, args)
@@ -57,6 +59,9 @@ Deno.serve(async (req) => {
       return { reply_id: id, ...res }
     },
     testResults: (days, step) => rpc('agent_test_results', { p_days: days, p_step: step }) as Promise<Record<string, unknown>>,
+    textTemplates: () => rpc('agent_text_templates', {}) as Promise<Record<string, unknown>>,
+    setTextTemplate: (t, a) => rpc('agent_set_text_template', { p_variant: t.variant, p_name: t.name, p_wording: t.wording, p_note: t.note, p_agent: a }) as Promise<Record<string, unknown>>,
+    logCall: async (c) => { await sb.rpc('agent_log_call', { p_key_id: agent.id, p_tool: c.tool, p_scope: c.scope, p_ok: c.ok, p_error: c.error, p_ms: c.ms }) },
     queue: (d) => rpc('agent_queue_list', { p_date: d }) as Promise<unknown[]>,
     withdraw: (id, a, reason) => rpc('agent_withdraw_text', { p_id: id, p_agent: a, p_reason: reason }) as Promise<boolean>,
     pause: (reason, a) => rpc('agent_pause', { p_reason: reason, p_agent: a }) as Promise<Record<string, unknown>>,

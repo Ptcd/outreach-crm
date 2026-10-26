@@ -7,9 +7,27 @@
 import { findPriceOrOffer } from './replyGuard.ts'
 import { CALENDAR_TOOLS, callCalendarTool, isCalendarTool, type CalendarDoor } from './calendar.ts'
 
-export type Role = 'intake' | 'sender' | 'records'
-type ToolRole = Role | 'any'
-export interface Agent { id: string; name: string; role: Role }
+export type Role = 'intake' | 'sender' | 'records' | 'agent'
+type ToolRole = Exclude<Role, 'agent'> | 'any'
+/** What a key may do (Muse 2026-10-26): one key, five switches Colin flips in Settings > Agent keys. */
+export type Scope = 'prospects' | 'texting' | 'calendar' | 'records' | 'marks'
+export const SCOPES: Scope[] = ['prospects', 'texting', 'calendar', 'records', 'marks']
+export interface Agent { id: string; name: string; role: Role; scopes?: Scope[] }
+
+/** The old single-role keys keep exactly what their role had; a key with its own scopes has those. */
+export function scopesOf(agent: Agent): Scope[] {
+  if (agent.scopes) return agent.scopes
+  if (agent.role === 'intake') return ['prospects', 'marks']
+  if (agent.role === 'sender') return ['texting', 'calendar', 'marks']
+  if (agent.role === 'records') return ['records']
+  return [...SCOPES]
+}
+
+/** The scope a tool belongs to: calendar tools to calendar, cards (due_today, mark_card, link_cards) to marks. */
+export function scopeOf(tool: { name: string; role: string }): Scope {
+  if (isCalendarTool(tool.name)) return 'calendar'
+  return tool.role === 'intake' ? 'prospects' : tool.role === 'sender' ? 'texting' : tool.role === 'records' ? 'records' : 'marks'
+}
 
 /** Everything the tools touch, so the routing and the checks are testable without a database. */
 export interface DoorDb {
@@ -20,6 +38,10 @@ export interface DoorDb {
   readyToText(f: { limit: number; followups: boolean; all_sources: boolean }): Promise<unknown[]>
   queueText(t: { lead_id: string; phone: string; body: string; step: number; send_after: string | null; variant: string | null; template: string | null; slot: string | null }, agent: string): Promise<Record<string, unknown>>
   testResults(days: number, step: number): Promise<Record<string, unknown>>
+  textTemplates(): Promise<Record<string, unknown>>
+  setTextTemplate(t: { variant: string; name: string | null; wording: string; note: string }, agent: string): Promise<Record<string, unknown>>
+  /** Every tools/call, with its scope: ok or refused, the error, how long it took. */
+  logCall?(c: { tool: string; scope: Scope | null; ok: boolean; error: string | null; ms: number }): Promise<void>
   repliesWaiting(days: number): Promise<unknown[]>
   dueToday(): Promise<Record<string, unknown>>
   records(fn: string, args: Record<string, unknown>): Promise<unknown>
@@ -103,6 +125,11 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
   { role: 'sender', name: 'test_results',
     description: 'The test scoreboard: per wording variant, per time slot (am / pm), and per cell (variant/slot), with hot leads too: texts queued, sent, delivered, failed (and carrier-filtered 30007), real conversations (a reply that is not a STOP or a wrong number), STOPs, wrong numbers, and the reply and STOP rates on delivered texts. Default: first texts, last 14 days.',
     inputSchema: { type: 'object', properties: { days: { type: 'integer', maximum: 90 }, step: { type: 'integer', minimum: 1, maximum: 5 } } } },
+  { role: 'sender', name: 'text_templates', description: 'The first-text wording for each variant (A own_q, B intent_q, C spare), its version and since when, and every earlier version with the dates it ran. Each first text you queue is stamped with its variant\'s current version; test_results reports by version too.',
+    inputSchema: { type: 'object', properties: {} } },
+  { role: 'sender', name: 'set_text_template', description: 'Change a variant\'s first-text wording: closes the current version and starts the next one now. Only when Colin has said to change it, and say so in the note. The assignment (which cards get A or B) does not change and no history is lost. The wording must keep a STOP line and no $, cash, as-is or offer.',
+    inputSchema: { type: 'object', properties: { variant: S('A | B | C'), name: S('short name, e.g. own_q'), wording: S('the wording, as the brief gives it (person and trust/LLC/estate lines)'),
+      note: S('why it changed, and that Colin called it') }, required: ['variant', 'wording', 'note'] } },
   { role: 'sender', name: 'replies_waiting',
     description: 'People who texted back and have no answer from us yet, oldest first. Each comes with the whole card: property, owner, mailing address, reasons, the full conversation both ways, calls, what we already know (motivation, timeline, condition, price, who signs), the card stage and next step, whether it is hot, and how the reply agent read their text (intent, outcome, its suggested reply). Answer each with send_reply.',
     inputSchema: { type: 'object', properties: { days: { type: 'integer', maximum: 30 } } } },
@@ -112,18 +139,22 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
       required: ['lead_id', 'phone', 'body'] } },
   { role: 'records', name: 'records_overview', description: 'The records-request cycle at a glance: requests by kind and status, how many are due, unhandled replies, drafts waiting, batches waiting for Colin, approved batches not sent yet.',
     inputSchema: { type: 'object', properties: {} } },
-  { role: 'records', name: 'records_list', description: 'Records requests (municipal clerks and county Registers of Deeds). filter: due (default: never sent, re-request date reached, or no answer in 14 days, with why_due), all, or a status. Each has where it goes, its status and dates, records_through, notes, its drafts and replies.',
-    inputSchema: { type: 'object', properties: { filter: S('due | all | draft | sent | acknowledged | replied | received | no_records | needs_payment | denied | bounced | skip'), limit: { type: 'integer', maximum: 500 } } } },
-  { role: 'records', name: 'records_templates', description: 'The two request letters word for word (municipal and Register of Deeds) and how to fill them. Write every first request and re-request from these.',
+  { role: 'records', name: 'records_list', description: 'Records requests (municipal clerks, Registers of Deeds, county treasurers, clerks of court, sheriffs, police records custodians). filter: due (default: never sent, its cadence came round after an answer, or no answer in 14 days: a follow-up every 14 days without end, with why_due), for_colin (fee quotes and denials: Colin decides those, never agree to a fee), all, a status, or a kind. Each has where it goes, its categories, cadence_days, status, sent_date, last_asked, follow_up_count, records_through, next_due, notes, its drafts and replies.',
+    inputSchema: { type: 'object', properties: { filter: S('due | for_colin | all | a status (draft, sent, acknowledged, replied, received, no_records, needs_payment, denied, bounced, skip) | a kind (municipal, rod, treasurer, clerk_of_court, sheriff, police)'), limit: { type: 'integer', maximum: 500 } } } },
+  { role: 'records', name: 'records_set_request', description: 'Add an office to the records list, or change one (pass its request_id): kind (municipal, rod, treasurer, clerk_of_court, sheriff, police), name, county, to_email, alt_email, form_url, categories (from records_templates.categories), cadence_days (14-400, default 90: how long after an answer the next ask comes), and a note. Nothing sends: you still draft and Colin approves the batch.',
+    inputSchema: { type: 'object', properties: { request_id: S('to change an existing request'), kind: S('municipal | rod | treasurer | clerk_of_court | sheriff | police'), name: S('the office, e.g. "Waukesha County Treasurer"'),
+      county: S('county'), to_email: S('records email'), alt_email: S('second address'), form_url: S('online request form, if it has one'),
+      categories: { type: 'array', items: { type: 'string' } }, cadence_days: { type: 'integer', minimum: 14, maximum: 400 }, note: S('why') } } },
+  { role: 'records', name: 'records_templates', description: 'The request letters word for word (municipal, Register of Deeds, county treasurer, clerk of court, sheriff, police) and how to fill them, the category list, and the cadence rule. Write every first request and re-request from these. They ask for records only: never buying, cash or investors.',
     inputSchema: { type: 'object', properties: {} } },
   { role: 'records', name: 'records_replies', description: 'Replies from clerks and Registers of Deeds that came into the records mailbox, oldest first, with the body, attachments (saved on the laptop under data/records/received/) and the request they match. unhandled=true (default) shows only the ones not yet handled.',
     inputSchema: { type: 'object', properties: { unhandled: { type: 'boolean' }, limit: { type: 'integer', maximum: 200 } } } },
-  { role: 'records', name: 'records_save_draft', description: 'Write a letter for a request: purpose request (first ask), re_request (the 90-day repeat), follow_up (no answer yet), or reply (answering a clerk: a fee question, a narrower scope, a corrected address). It replaces the open draft for that request. Nothing sends: drafts go into a batch for Colin.',
+  { role: 'records', name: 'records_save_draft', description: 'Write a letter for a request: purpose request (first ask), re_request (the repeat once its cadence comes round), follow_up (no answer yet), or reply (answering a clerk: a fee question, a narrower scope, a corrected address). It replaces the open draft for that request. Nothing sends: drafts go into a batch for Colin.',
     inputSchema: { type: 'object', properties: { request_id: S('the request'), purpose: S('request | re_request | follow_up | reply'), to: S('email address'), cc: S('optional'),
       subject: S('subject line'), body: S('the letter'), in_reply_to: S('the Message-ID being answered, for follow_up and reply') }, required: ['request_id', 'to', 'subject', 'body'] } },
   { role: 'records', name: 'records_propose_batch', description: 'Put drafts up for Colin to approve, up to 40 letters per batch (the mailbox has a daily cap). He approves or rejects in the app; only then does the laptop send them.',
     inputSchema: { type: 'object', properties: { draft_ids: { type: 'array', items: { type: 'string' }, maxItems: 40 }, note: S('one line for Colin: what this batch is and why now') }, required: ['draft_ids'] } },
-  { role: 'records', name: 'records_mark', description: 'Update a request after reading a reply or a bounce: status (acknowledged, replied, received, no_records, needs_payment, denied, bounced, skip, draft), a note, received_date, records_through (the last date the records cover: the next re-request starts the day after), next_due (received and no_records default to 90 days), a corrected to_email, and reply_id to mark that reply handled.',
+  { role: 'records', name: 'records_mark', description: 'Update a request after reading a reply or a bounce: status (acknowledged, replied, received, no_records, needs_payment, denied, bounced, skip, draft), a note, received_date, records_through (the last date the records cover: the next re-request starts the day after), next_due (received and no_records default to the cadence_days of the request), a corrected to_email, and reply_id to mark that reply handled.',
     inputSchema: { type: 'object', properties: { request_id: S('the request'), status: S('new status'), note: S('what happened'), received_date: S('YYYY-MM-DD'),
       records_through: S('date the records cover through'), next_due: S('YYYY-MM-DD'), to_email: S('corrected address'), reply_id: S('the reply this handles') }, required: ['request_id'] } },
   { role: 'any', name: 'due_today',
@@ -191,7 +222,8 @@ const int = (v: unknown, d: number, max: number) => Math.max(1, Math.min(max, Nu
 export async function callTool(name: string, args: Json, agent: Agent, db: DoorDb): Promise<{ value: unknown; isError?: boolean }> {
   const tool = TOOLS.find((t) => t.name === name)
   if (!tool) return { value: { error: `no tool ${name}` }, isError: true }
-  if (tool.role !== 'any' && tool.role !== agent.role) return { value: { error: `the ${agent.role} key cannot use ${name}` }, isError: true }
+  const scope = scopeOf(tool)
+  if (!scopesOf(agent).includes(scope)) return { value: { error: `this key has no ${scope} scope, so it cannot use ${name} (Colin switches scopes in Settings > Agent keys)` }, isError: true }
   if (isCalendarTool(name)) return callCalendarTool(name, args, agent.name, db.calendar)
   switch (name) {
     case 'add_prospects': {
@@ -263,6 +295,19 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
     case 'resume_sending': return { value: await db.resume(agent.name) }
     case 'text_results': return { value: await db.results(int(args.hours, 24, 168)) }
     case 'test_results': return { value: await db.testResults(int(args.days, 14, 90), int(args.step, 1, 5)) }
+    case 'text_templates': return { value: await db.textTemplates() }
+    case 'set_text_template': {
+      const r = await db.setTextTemplate({ variant: String(args.variant ?? '').toUpperCase(), name: args.name ? String(args.name) : null,
+        wording: String(args.wording ?? '').trim(), note: String(args.note ?? '').trim() }, agent.name)
+      return { value: r, isError: r.ok === false }
+    }
+    case 'records_set_request': {
+      const { request_id, kind, name: office, county, to_email, alt_email, form_url, categories, cadence_days, note } = args
+      const p: Json = { request_id, kind, name: office, county, to_email, alt_email, form_url, cadence_days, note }
+      if (Array.isArray(categories)) p.categories = (categories as unknown[]).map(String)
+      for (const k of Object.keys(p)) if (p[k] === undefined || p[k] === null) delete p[k]
+      return { value: await db.records('records_set_request', { p, p_agent: agent.name }) }
+    }
   }
   return { value: { error: `no tool ${name}` }, isError: true }
 }
@@ -278,7 +323,9 @@ export async function handleMessage(msg: Json, agent: Agent, db: DoorDb): Promis
       protocolVersion: PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
       capabilities: { tools: {} },
       serverInfo: { name: SERVER_NAME, version: '1.0.0' },
-      instructions: agent.role === 'records'
+      instructions: agent.role === 'agent'
+        ? `One key for WPIE, with these scopes switched on: ${scopesOf(agent).join(', ')}. Every call is logged. Texting: read texting_rules first. Records: Colin approves every batch before anything sends. Cards: read due_today every morning.`
+        : agent.role === 'records'
         ? 'You run the public-records-request cycle: read records_overview, records_replies and records_list(due); mark what came back; draft letters from records_templates; propose batches. Colin approves every batch before anything sends.'
         : agent.role === 'intake'
         ? 'You load seller prospects into the WPIE app with add_prospects. You check the prospect rules before loading; the app accepts what you send.'
@@ -287,15 +334,27 @@ export async function handleMessage(msg: Json, agent: Agent, db: DoorDb): Promis
   }
   if (method === 'ping') return ok(id, {})
   if (method === 'tools/list') {
-    return ok(id, { tools: TOOLS.filter((t) => t.role === 'any' || t.role === agent.role).map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) })
+    const allowed = scopesOf(agent)
+    return ok(id, { tools: TOOLS.filter((t) => allowed.includes(scopeOf(t))).map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) })
   }
   if (method === 'tools/call') {
     const p = (msg.params ?? {}) as Json
+    const tool = String(p.name ?? '')
+    const known = TOOLS.find((t) => t.name === tool)
+    const started = Date.now()
+    const log = async (okay: boolean, value: unknown) => {
+      if (!db.logCall) return
+      const err = okay ? null : String((value as Json | null)?.error ?? (value as Json | null)?.reason ?? 'refused')
+      try { await db.logCall({ tool, scope: known ? scopeOf(known) : null, ok: okay, error: err, ms: Date.now() - started }) } catch { /* the log never blocks a call */ }
+    }
     try {
-      const r = await callTool(String(p.name ?? ''), (p.arguments ?? {}) as Json, agent, db)
+      const r = await callTool(tool, (p.arguments ?? {}) as Json, agent, db)
+      await log(!r.isError, r.value)
       return ok(id, textResult(r.value, !!r.isError))
     } catch (e) {
-      return ok(id, textResult({ error: e instanceof Error ? e.message : String(e) }, true))
+      const value = { error: e instanceof Error ? e.message : String(e) }
+      await log(false, value)
+      return ok(id, textResult(value, true))
     }
   }
   return fail(id, -32601, `method not found: ${method}`)

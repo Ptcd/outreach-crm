@@ -21,14 +21,43 @@ export function RecordsBatches() {
   return (
     <Section title={`Records requests to approve${q.data ? ` (${q.data.length})` : ''}`}>
       <p className="mb-3 text-sm text-muted-foreground">
-        Letters the records agent wrote to clerks and Registers of Deeds. Nothing goes until you approve the batch. Untick a letter to leave it out.
+        Letters the records agent wrote to clerks, Registers of Deeds, treasurers, clerks of court, sheriffs and police records offices. Nothing goes until you approve the batch. Untick a letter to leave it out.
       </p>
       <ErrorNote error={q.error} />
       {q.data?.length === 0 && <Empty>No batches waiting.</Empty>}
       <div className="space-y-4">
         {q.data?.map((b) => <BatchCard key={b.batch_id} b={b} onDone={() => void qc.invalidateQueries({ queryKey: ['records_batches'] })} />)}
       </div>
+      <ForColin />
     </Section>
+  )
+}
+
+type Held = { id: string; name: string; kind: string; status: string; to_email: string | null; notes: string | null; updated_at: string }
+
+/** Fee quotes and denials: the agent never agrees to a fee or argues a denial; these wait for Colin. */
+function ForColin() {
+  const q = useQuery({ queryKey: ['records_for_colin'], refetchInterval: 300_000, queryFn: async () => {
+    const r = await supabase.from('records_requests').select('id, name, kind, status, to_email, notes, updated_at')
+      .in('status', ['needs_payment', 'denied']).order('updated_at', { ascending: false })
+    if (r.error) throw new Error(r.error.message)
+    return (r.data ?? []) as Held[]
+  } })
+  if (!q.data?.length) return null
+  return (
+    <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50/60 p-3 dark:bg-amber-950/20">
+      <p className="text-sm font-semibold">Fee quotes and denials for you ({q.data.length})</p>
+      <p className="text-xs text-muted-foreground">The agent never agrees to a fee. Tell it what to do with each one.</p>
+      <ul className="mt-2 divide-y text-sm">
+        {q.data.map((h) => (
+          <li key={h.id} className="py-2">
+            <span className="font-medium">{h.name}</span>
+            <span className="text-muted-foreground"> · {h.status === 'needs_payment' ? 'fee quoted' : 'denied'} · {h.to_email ?? ''} · {fmtDateTime(h.updated_at)}</span>
+            {h.notes && <span className="block truncate text-muted-foreground">{h.notes.split(' | ').slice(-1)[0]}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 

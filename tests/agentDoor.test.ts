@@ -6,7 +6,7 @@ import path from 'node:path'
 import { PGlite } from '@electric-sql/pglite'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { SUPABASE_STUB } from './supabaseStub'
-import { TOOLS, handleMessage, keyFrom, textProblem, type DoorDb } from '../supabase/functions/_shared/agentDoor'
+import { TOOLS, handleMessage, keyFrom, textProblem, type Agent, type DoorDb } from '../supabase/functions/_shared/agentDoor'
 
 const MIGRATIONS_DIR = path.resolve(__dirname, '../supabase/migrations')
 const MIGRATION = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort()
@@ -18,11 +18,12 @@ const fakeDb = (over: Partial<DoorDb> = {}): DoorDb => ({
   addProspect: async () => ({ status: 'created', lead_id: 'L1' }), findProspects: async () => [], prospectCounts: async () => ({}),
   status: async () => ({ paused: false }), readyToText: async () => [], queueText: async () => ({ status: 'queued', text_id: 'T1' }),
   queue: async () => [], withdraw: async () => true, pause: async () => ({ paused: true }), resume: async () => ({ paused: false }),
-  results: async () => ({}), testResults: async () => ({}), repliesWaiting: async () => [], markCard: async () => ({ ok: true }), dueToday: async () => ({ due: [], stuck: [] }), records: async () => ({}), linkCards: async () => ({ ok: true }), sendReply: async () => ({ outcome: 'sent' }), ...over,
+  results: async () => ({}), testResults: async () => ({}), repliesWaiting: async () => [], markCard: async () => ({ ok: true }), dueToday: async () => ({ due: [], stuck: [] }), records: async () => ({}), linkCards: async () => ({ ok: true }), sendReply: async () => ({ outcome: 'sent' }),
+  textTemplates: async () => ({}), setTextTemplate: async () => ({ ok: true }), ...over,
 })
 const intake = { id: 'k1', name: 'Muse intake', role: 'intake' as const }
 const sender = { id: 'k2', name: 'Muse sender', role: 'sender' as const }
-const call = async (agent: typeof intake | typeof sender, name: string, args: unknown, db = fakeDb()) => {
+const call = async (agent: Agent, name: string, args: unknown, db = fakeDb()) => {
   const r = await handleMessage({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name, arguments: args } }, agent, db)
   const res = (r as { result: { content: { text: string }[]; isError: boolean } }).result
   return { isError: res.isError, value: JSON.parse(res.content[0].text) }
@@ -43,6 +44,32 @@ describe('the MCP routing', () => {
     expect(await list(intake)).not.toContain('queue_texts')
     expect((await call(intake, 'queue_texts', { texts: [] })).isError).toBe(true)
     expect((await call(sender, 'add_prospects', { prospects: [] })).isError).toBe(true)
+  })
+  it('one key with scopes: it sees and calls only what its scopes allow, and every call is logged with its scope', async () => {
+    const muse: Agent = { id: 'k9', name: 'Muse', role: 'agent', scopes: ['texting', 'records'] }
+    const names = ((await handleMessage({ jsonrpc: '2.0', id: 3, method: 'tools/list' }, muse, fakeDb())) as
+      { result: { tools: { name: string }[] } }).result.tools.map((t) => t.name)
+    expect(names).toEqual(expect.arrayContaining(['queue_texts', 'records_list', 'records_set_request', 'text_templates', 'set_text_template']))
+    for (const n of ['add_prospects', 'mark_card', 'due_today', 'open_slots']) expect(names).not.toContain(n)
+    const log: { tool: string; scope: string | null; ok: boolean; error: string | null }[] = []
+    const db = fakeDb({ logCall: async (c) => { log.push(c) } })
+    const refused = await call(muse, 'add_prospects', { prospects: [{ owner_name: 'x' }] }, db)
+    expect(refused).toMatchObject({ isError: true, value: { error: expect.stringContaining('no prospects scope') } })
+    expect((await call(muse, 'records_overview', {}, db)).isError).toBe(false)
+    expect((await call({ ...muse, scopes: [...muse.scopes!, 'calendar'] }, 'open_slots', {}, db)).isError).toBe(true)   // calendar not wired here
+    expect(log.map((c) => [c.tool, c.scope, c.ok])).toEqual([['add_prospects', 'prospects', false], ['records_overview', 'records', true], ['open_slots', 'calendar', false]])
+    expect(log[0].error).toMatch(/no prospects scope/)
+    const all: Agent = { id: 'k8', name: 'Muse', role: 'agent' }        // no scopes given: all five
+    expect((await call(all, 'mark_card', { lead_id: 'L1', mark: 'hot' })).isError).toBe(false)
+  })
+  it('set_text_template and records_set_request reach the database with the agent name', async () => {
+    const muse: Agent = { id: 'k9', name: 'Muse', role: 'agent' }
+    let seen: unknown = null
+    const db = fakeDb({ setTextTemplate: async (t, a) => { seen = { ...t, a }; return { ok: true, version: 2 } }, records: async (fn, args) => ({ fn, args }) })
+    expect((await call(muse, 'set_text_template', { variant: 'b', wording: 'Hi. Reply STOP', note: 'Colin: shorter' }, db)).value).toEqual({ ok: true, version: 2 })
+    expect(seen).toMatchObject({ variant: 'B', wording: 'Hi. Reply STOP', note: 'Colin: shorter', a: 'Muse' })
+    expect((await call(muse, 'records_set_request', { kind: 'treasurer', name: 'Test County Treasurer', categories: ['tax_delinquency'], cadence_days: 30 }, db)).value)
+      .toEqual({ fn: 'records_set_request', args: { p: { kind: 'treasurer', name: 'Test County Treasurer', categories: ['tax_delinquency'], cadence_days: 30 }, p_agent: 'Muse' } })
   })
   it('the key comes from Authorization: Bearer or x-api-key', () => {
     expect(keyFrom(new Headers({ authorization: 'Bearer wpie_sender_abc' }))).toBe('wpie_sender_abc')
@@ -331,6 +358,61 @@ describe('on the real migrations', () => {
     expect((t.slots as { slot: string }[]).map((x) => x.slot)).toEqual(expect.arrayContaining(['am', 'pm']))
     expect((t.cells as { cell: string }[]).map((x) => x.cell)).toEqual(expect.arrayContaining(['A/am', 'B/pm']))
     await db.exec(`update public.campaign_control set window_start = '10:00'`)
+  })
+
+  it('one agent key: all five scopes by default, Colin switches one off, the switch holds, calls are counted', async () => {
+    await db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify(COLIN)])
+    await db.exec('set role authenticated')
+    const key = (await one<{ k: string }>(`select public.create_agent_key('Muse', 'agent') as k`)).k
+    const id = (await one<{ id: string }>(`select id from public.list_agent_keys() where name = 'Muse' and revoked_at is null`)).id
+    await db.exec('reset role')
+    expect(key).toMatch(/^wpie_agent_/)
+    expect(await r(`public.agent_key_check($1)`, [key])).toMatchObject({ ok: true, role: 'agent', scopes: ['prospects', 'texting', 'calendar', 'records', 'marks'] })
+    await db.query(`select set_config('request.jwt.claims', '', false)`)
+    await expect(db.query(`select public.set_agent_key_scopes($1, array['texting'])`, [id])).rejects.toThrow(/only Colin/)
+    await db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify(COLIN)])
+    await db.exec('set role authenticated')
+    await one(`select public.set_agent_key_scopes($1, array['texting', 'records', 'marks'])`, [id])
+    await expect(db.query(`select public.set_agent_key_scopes($1, array['everything'])`, [id])).rejects.toThrow(/scopes are/)
+    await db.exec('reset role')
+    expect(await r(`public.agent_key_check($1)`, [key])).toMatchObject({ scopes: ['texting', 'records', 'marks'] })
+    await db.query(`select public.agent_log_call($1, 'queue_texts', 'texting', true, null, 40)`, [id])
+    await db.query(`select public.agent_log_call($1, 'add_prospects', 'prospects', false, 'this key has no prospects scope', 2)`, [id])
+    await db.exec('set role authenticated')
+    const row = await one(`select calls_24h::int c, refused_24h::int f, scopes from public.list_agent_keys() where id = $1`, [id])
+    await db.exec('reset role')
+    expect(row).toEqual({ c: 2, f: 1, scopes: ['texting', 'records', 'marks'] })
+    // an old single-role key keeps what its role had
+    const old = (await one<{ key_sha256: string }>(`insert into public.agent_keys (name, role, key_sha256, key_hint) values ('old intake', 'intake',
+      encode(sha256(convert_to('wpie_intake_old', 'UTF8')), 'hex'), '_old') returning key_sha256`))
+    expect(old).toBeTruthy()
+    expect(await r(`public.agent_key_check('wpie_intake_old')`)).toMatchObject({ role: 'intake', scopes: ['prospects', 'marks'] })
+  })
+
+  it('first-text wording is versioned: a change opens v2, texts carry their version, test_results reports by version', async () => {
+    const t0 = await r(`public.agent_text_templates()`)
+    expect((t0.active as { variant: string; name: string; version: number }[]).map((x) => [x.variant, x.name, x.version])).toEqual([['A', 'own_q', 1], ['B', 'intent_q', 1]])
+    expect(await r(`public.agent_set_text_template('B', 'intent_q', 'I''m looking to buy a house around {city}. Would you sell {address}?', 'Colin: test', 'Muse')`))
+      .toMatchObject({ ok: false, reason: expect.stringContaining('STOP') })
+    expect(await r(`public.agent_set_text_template('B', 'intent_q', 'Would you take cash for {address}? Reply STOP', 'Colin: test', 'Muse')`)).toMatchObject({ ok: false })
+    expect(await r(`public.agent_set_text_template('B', 'intent_q', 'Is {address} yours? Reply STOP', '', 'Muse')`)).toMatchObject({ ok: false })
+    const before = await one<{ n: number }>(`select count(*)::int n from public.planned_openers where variant = 'B' and template_version = 1`)
+    expect(await r(`public.agent_set_text_template('B', 'intent_q_short', 'Hi {First}, Colin Merrill here. Thinking of selling {address}? Reply STOP if you''d rather not hear from me.', 'Colin 10/26: B stops 5x A', 'Muse')`))
+      .toMatchObject({ ok: true, variant: 'B', version: 2 })
+    const t1 = await r(`public.agent_text_templates()`)
+    expect((t1.active as { variant: string; version: number }[]).find((x) => x.variant === 'B')).toMatchObject({ version: 2, name: 'intent_q_short' })
+    expect((t1.history as { variant: string; version: number; to: string | null }[]).filter((x) => x.variant === 'B').map((x) => [x.version, x.to !== null]))
+      .toEqual([[1, true], [2, false]])
+    expect(await one<{ n: number }>(`select count(*)::int n from public.planned_openers where variant = 'B' and template_version = 1`)).toEqual(before)   // history kept
+    const lead = (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`,
+      [JSON.stringify({ owner_name: 'Vee Version', address: '3 Wording Way', phones: ['4145550801'], mailing_state: 'WI' })])).lead_id as string
+    const q = await r(`public.agent_queue_text($1, '4145550801', $2, 1, null, 'Muse sender', '2026-10-27T15:00:00Z'::timestamptz, 'B', 'intent_q_short')`, [lead, OPENER])
+    expect(q).toMatchObject({ status: 'queued' })
+    expect(await one(`select template_version from public.planned_openers where lead_id = $1`, [lead])).toEqual({ template_version: 2 })
+    const t = await r(`public.agent_test_results(14, 1)`)
+    const v = (t.versions as { version: string; ran_from: string | null; ran_to: string | null; name: string }[])
+    expect(v.find((x) => x.version === 'B v2')).toMatchObject({ name: 'intent_q_short', ran_to: null })
+    expect(v.find((x) => x.version === 'B v1')?.ran_to).toBeTruthy()
   })
 
   it('the agent can lift only its own pause', async () => {
