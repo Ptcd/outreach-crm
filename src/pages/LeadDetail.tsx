@@ -333,7 +333,7 @@ function Contacts({ contacts, leadId, lead }: { contacts: Contact[]; leadId: str
             <div className="text-xs text-muted-foreground">
               {[c.person_name, c.source].filter(Boolean).join(' - ')}
             </div>
-            <div className="mt-1 flex gap-2">
+            <div className="mt-1 flex flex-wrap gap-2">
               {c.kind === 'phone' && (
                 <>
                   <CallButton to={c.value} name={c.person_name || lead?.owner_name} address={lead?.property_address}
