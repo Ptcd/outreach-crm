@@ -72,7 +72,7 @@ export function DealPackage({ lead }: { lead: Lead }) {
     <div id="package" className="scroll-mt-16">
       <Section title="Package for Colin" right={p ? <Badge tone={STATUS[p.status]?.tone ?? 'muted'}>{STATUS[p.status]?.label ?? p.status}</Badge> : undefined}>
         <ErrorNote error={q.error} />
-        {open ? <OpenPackage p={p!} isOwner={isOwner} onDone={refresh} /> : <SendPackage lead={lead} last={p} onDone={refresh} />}
+        {open ? <OpenPackage p={p!} isOwner={isOwner} onDone={refresh} /> : <SendPackage lead={lead} last={p ?? null} onDone={refresh} />}
       </Section>
     </div>
   )
