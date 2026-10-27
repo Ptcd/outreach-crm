@@ -38,6 +38,17 @@ const DONT_OWN = /^(?=.*[a-z])\W*(?:(?:no|nope|nah)\b[\s,.!-]*)?(?:i\s+(?:don'?t
 const AFFIRM = re(B.AFFIRM_RE)
 const INTEREST_WORDS = re(B.INTEREST_WORDS_RE)
 const NEGATABLE = new Set(B.NEGATABLE)
+const WRONG_NUMBER_RES = INTENT_RES.filter((x) => x.name === 'wrong_number').map((x) => x.rx)
+// the extra ways someone says the owner is not on this phone, seen on removals: "this isn't Nora number",
+// "the number you found ... doesn't belong to", "there is no Nora at this number"
+const NOT_THEIR_PHONE = /\b(?:is\s?n[o']?t|aint|ain'?t)\s+(?!my\b)[a-z]+(?:'?s)?\s+(?:number|phone|cell)\b|\b(?:does\s?n[o']?t|don'?t|do\s+not)\s+belong\s+to\b|\bno\s+(?!more\b|longer\b)[a-z]+\s+(?:at|on)\s+this\s+(?:number|phone|cell)\b|\bthere\s+is\s+no\s+(?!need\b|way\b|interest\b)[a-z]+\s+(?:at|here|on)\b/i
+/** Someone who is not the owner, on the owner's phone ("Wrong number, STOP", "this isn't Nora number"). Their stop
+ *  blocks this phone only; the owner's card stays open for the owner's other numbers (Colin 2026-10-27: "System should
+ *  automatically add these ones to do not contact for that phone number, keep card open"). */
+export function saysWrongPerson(text: string): boolean {
+  const t = foldKeepCase(reactionTail(text ?? '') || (text ?? ''))
+  return NOT_THEIR_PHONE.test(t) || WRONG_NUMBER_RES.some((rx) => rx.test(t))
+}
 const CARRIER = new Set(B.CARRIER_KEYWORDS)
 
 /** wpie.reply.rules.fold: accents dropped, case and punctuation kept. */
@@ -139,6 +150,12 @@ function decideBase(ctx: ReplyContext): Decision {
   const first = ctx.priorInbound.length === 0
 
   // 1. Removal, always honoured (wpie/sms/webhooks.is_opt_out, the one opt-out list).
+  // Someone else's stop on the owner's phone: this phone is blocked for good, the card stays open (outcome
+  // wrong_number: data_fix, WPIE plans the owner's next number). Never the owner's other phones, never a closed card.
+  if ((intent === 'opt_out' || intent === 'hostile') && saysWrongPerson(text)) {
+    return { intent: 'wrong_number', kind: 'removal', removal: true, reply: isCarrierKeyword(text) ? null : spanish ? B.ES_DNC_LINE : B.DNC_LINE,
+      outcome: 'wrong_number', note: 'not the owner, asked to stop: this phone only, the card stays open' }
+  }
   if (intent === 'opt_out') {
     if (isCarrierKeyword(text)) {
       return { intent, kind: 'removal', removal: true, reply: null, outcome: 'dnc', note: 'carrier keyword; Twilio sends the confirmation' }

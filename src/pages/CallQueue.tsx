@@ -82,6 +82,30 @@ function QueueCard({ task, canOverride, onDone, onSkip }: { task: QueueTask; can
   const { lead, contacts, messages, gates } = q.data
   const facts = q.data.facts ?? {}
   const phones = orderPhones(contacts, lead.owner_name)
+  const phoneRow = (c: (typeof phones)[number]) => {
+            const blocked = c.suppressed || c.dnc_app || c.dnc_vendor || c.dnc_scrub === 'dnc' || c.status === 'bad'
+            const ten = (c.value_normalized ?? c.value).replace(/\D/g, '').slice(-10)
+            return (
+              <li key={c.id} className="flex flex-wrap items-center gap-2 text-sm">
+                <span>{fmtPhone(c.value_normalized ?? c.value)}</span>
+                {c.line_type && <Badge>{c.line_type}</Badge>}
+                {c.person_name && (c.owners
+                  ? <span className="text-muted-foreground">{c.person_name}</span>
+                  : <Badge tone="warn">Not the owner: {c.person_name}</Badge>)}
+                <CallButton to={c.value_normalized ?? c.value} name={lead.owner_name} address={lead.property_address} leadId={lead.id}
+                  contactId={c.id} blocked={blocked} size="sm" notBefore={lead.belt === 'not_now_dated' ? lead.named_date : null} />
+                {/* the same door as on the card: a call from your own phone pauses the texts too, and a call that
+                    never connected is undone here without leaving the list (2026-10-22) */}
+                {(!lead.human_takeover_at || lead.human_takeover_phone === ten) && (
+                  <PersonalCallButton to={c.value_normalized ?? c.value} leadId={lead.id} blocked={blocked}
+                    activeKey={lead.human_takeover_at ? lead.human_takeover_key : null}
+                    notBefore={lead.belt === 'not_now_dated' ? lead.named_date : null} />
+                )}
+              </li>
+            )
+  }
+  const ownPhones = phones.filter((c) => c.owners)
+  const otherPhones = phones.filter((c) => !c.owners)
   const texted = messages.filter((m) => m.channel === 'sms' && m.direction === 'in').slice(-3)
   const hand = async () => {
     setBusy(true)
@@ -133,30 +157,13 @@ function QueueCard({ task, canOverride, onDone, onSkip }: { task: QueueTask; can
           </p>
         )}
         {phones.length === 0 && <p className="text-sm text-muted-foreground">No phone on the card.</p>}
-        <ul className="mt-1 space-y-2">
-          {phones.map((c) => {
-            const blocked = c.suppressed || c.dnc_app || c.dnc_vendor || c.dnc_scrub === 'dnc' || c.status === 'bad'
-            const ten = (c.value_normalized ?? c.value).replace(/\D/g, '').slice(-10)
-            return (
-              <li key={c.id} className="flex flex-wrap items-center gap-2 text-sm">
-                <span>{fmtPhone(c.value_normalized ?? c.value)}</span>
-                {c.line_type && <Badge>{c.line_type}</Badge>}
-                {c.person_name && (c.owners
-                  ? <span className="text-muted-foreground">{c.person_name}</span>
-                  : <Badge tone="warn">Not the owner: {c.person_name}</Badge>)}
-                <CallButton to={c.value_normalized ?? c.value} name={lead.owner_name} address={lead.property_address} leadId={lead.id}
-                  contactId={c.id} blocked={blocked} size="sm" notBefore={lead.belt === 'not_now_dated' ? lead.named_date : null} />
-                {/* the same door as on the card: a call from your own phone pauses the texts too, and a call that
-                    never connected is undone here without leaving the list (2026-10-22) */}
-                {(!lead.human_takeover_at || lead.human_takeover_phone === ten) && (
-                  <PersonalCallButton to={c.value_normalized ?? c.value} leadId={lead.id} blocked={blocked}
-                    activeKey={lead.human_takeover_at ? lead.human_takeover_key : null}
-                    notBefore={lead.belt === 'not_now_dated' ? lead.named_date : null} />
-                )}
-              </li>
-            )
-          })}
-        </ul>
+        {/* other people's numbers fold away once the owner has a number of their own (a card showed 1 owner number
+            and 10 of a relative's, pushing the script off the screen) */}
+        <ul className="mt-1 space-y-2">{ownPhones.map(phoneRow)}</ul>
+        {otherPhones.length > 0 && (ownPhones.length > 0
+          ? <details className="mt-2 text-sm"><summary className="cursor-pointer text-muted-foreground">Other people&apos;s numbers ({otherPhones.length}): only if the owner&apos;s don&apos;t answer; ask for the owner</summary>
+              <ul className="mt-2 space-y-2">{otherPhones.map(phoneRow)}</ul></details>
+          : <ul className="mt-1 space-y-2">{otherPhones.map(phoneRow)}</ul>)}
         {lead.human_takeover_at && (
           <p className="mt-2 rounded-md border-2 border-amber-400 bg-amber-50 p-2 text-sm">
             A call is open on this card (started by {lead.human_takeover_by ?? 'the team'}): texts to them are paused. Log the

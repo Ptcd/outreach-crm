@@ -1443,7 +1443,8 @@
      "opt_out"
     ],
     "outcomes": [
-     "dnc"
+     "dnc",
+     "wrong_number"
     ],
     "removal": true,
     "must": null,
@@ -1471,7 +1472,8 @@
      "opt_out"
     ],
     "outcomes": [
-     "dnc"
+     "dnc",
+     "wrong_number"
     ],
     "removal": true,
     "must": null,
