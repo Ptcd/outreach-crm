@@ -6,7 +6,7 @@ import { Badge, Select, Textarea } from '@/components/ui/form'
 import { ConfirmButton } from '@/components/ui/confirm'
 import { api } from '@/lib/queries'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso, todayLocal } from '@/lib/format'
-import { CALL_OUTCOMES, NEXT_STEP, PHONE_SCRIPT, callScript, packetHot, scriptLine, type CallQuestion } from '@/lib/callScript'
+import { CALL_OUTCOMES, NEXT_STEP, PHONE_SCRIPT, callScript, clearlyHot, scriptLine, type CallQuestion } from '@/lib/callScript'
 import { answerOf, answerText, gateFromCall, stopsFromCall, type CallFacts, type CallValue } from '@/lib/callGate'
 import { bookingVerdict, type BookingVerdict } from '@/lib/bookingVerdict'
 import { VerdictBox } from '@/components/BookingVerdict'
@@ -76,7 +76,7 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
   // which call this is (the packet's three): they called us just now, they texted us, or a cold call
   const callKind: CallKind = messages.some((m) => m.channel === 'call' && m.direction === 'in' && Date.now() - new Date(m.sent_at).getTime() < 3 * 3600_000)
     ? 'inbound' : replies.length > 0 ? 'hot_text' : 'cold'
-  const hot = packetHot(facts as never)
+  const hot = clearlyHot(facts as never)
   const questions = callScript(vars)
   const answered = questions.filter((q) => answerOf(facts, q.id)).length
 
@@ -182,7 +182,8 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
         <p className="mt-1 text-xs text-muted-foreground">These fill in Colin&apos;s score on the card; the booking decision above is the card&apos;s.</p>
       </details>}
 
-      <LogCall lead={lead} contacts={contacts} phone={phone} onLogged={onLogged} />
+      <LogCall lead={lead} contacts={contacts} phone={phone} onLogged={onLogged}
+        voicemailLine={`Hi ${vars.first_name}, it's ${vars.caller}. I had a quick question about the place on ${vars.street}. Give me a call when you get a minute.`} />
     </section>
   )
 }
@@ -324,7 +325,7 @@ function Field({ label, initial, onCommit, multiline, inputMode }: {
   )
 }
 
-function LogCall({ lead, contacts, phone, onLogged }: { lead: Lead; contacts: Contact[]; phone: string | null; onLogged?: (outcome: string) => void }) {
+function LogCall({ lead, contacts, phone, onLogged, voicemailLine }: { lead: Lead; contacts: Contact[]; phone: string | null; onLogged?: (outcome: string) => void; voicemailLine?: string }) {
   const qc = useQueryClient()
   const phones = contacts.filter((c) => c.kind === 'phone').map((c) => c.value_normalized ?? c.value)
   const [from, setFrom] = useState<string>(phone ?? phones[0] ?? '')
@@ -376,6 +377,9 @@ function LogCall({ lead, contacts, phone, onLogged }: { lead: Lead; contacts: Co
         ))}
       </div>
       {chosen && <p className="text-xs text-muted-foreground">{chosen.hint}</p>}
+      {outcome === 'voicemail' && voicemailLine && (
+        <p className="rounded-md bg-muted p-2 text-sm">Under 20 seconds: &ldquo;{voicemailLine}&rdquo;</p>
+      )}
       {outcome === 'not_now' && (
         <div className="space-y-2 rounded-md bg-muted p-2">
           <label className="block text-sm font-medium">What did they give you?

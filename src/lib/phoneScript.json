@@ -346,7 +346,7 @@
       "id": "obj_stop",
       "trigger": "Stop calling / take me off",
       "say": "Done. You won't hear from us again. Sorry to have bothered you.",
-      "note": "STOP everywhere, every phone, forever."
+      "note": "Log Do not contact: every phone, forever. But if they say the owner isn't at this number, log Wrong number instead: only that number is blocked and the owner's card stays open."
     },
     {
       "id": "obj_flat_no",

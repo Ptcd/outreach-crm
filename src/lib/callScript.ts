@@ -114,6 +114,18 @@ export function packetHot(facts: Record<string, { value?: { choices?: string[] }
   const need = ch('motivation').some((x) => x !== 'just_price')
   const rough = ch('condition').some((x) => !['cosmetic', 'perfect'].includes(x)) || ch('happened').some((x) => x !== 'none')
   const date = ch('timeline').some((x) => x === 'asap' || x === 'under_30') || ch('behind').includes('sale_date')
+  const within90 = ch('timeline').some((x) => ['asap', 'under_30', 'one_to_three'].includes(x))
+  // the packet's "It's hot when": a need and a rough house; a need or a rough house inside 90 days; a sale or move date
+  return (need && rough) || ((need || rough) && within90) || date
+}
+
+/** "A clearly hot seller on call one" (the packet: a need and a rough house, or a sale or move date): book Colin's walk
+ *  on this call instead of waiting for his number. Narrower than packetHot, which only marks the package hot. */
+export function clearlyHot(facts: Record<string, { value?: { choices?: string[] } } | undefined>): boolean {
+  const ch = (k: string) => facts[k]?.value?.choices ?? []
+  const need = ch('motivation').some((x) => x !== 'just_price')
+  const rough = ch('condition').some((x) => !['cosmetic', 'perfect'].includes(x)) || ch('happened').some((x) => x !== 'none')
+  const date = ch('timeline').some((x) => x === 'asap' || x === 'under_30') || ch('behind').includes('sale_date')
   return (need && rough) || date
 }
 

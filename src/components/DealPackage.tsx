@@ -270,7 +270,7 @@ function SendPackage({ lead, last, onDone }: { lead: Lead; last: Pkg | null; onD
           <option value="">Where it came from (auto)</option>
           <option value="hot_text">Hot lead from texting</option><option value="inbound">Inbound call</option><option value="cold_list">Cold call</option><option value="other">Other</option>
         </Select>
-        <label className="flex items-center gap-2"><input type="checkbox" checked={hot} onChange={(e) => setHot(e.target.checked)} /> Hot (need + rough house, or a sale/move date)</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={hot} onChange={(e) => setHot(e.target.checked)} /> Hot (a need and a rough house; a need or a rough house inside 90 days; or a sale or move date)</label>
       </div>
       {FIELDS.map((x) => (
         <label key={x.key} className="block">
