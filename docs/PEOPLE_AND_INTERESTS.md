@@ -42,24 +42,36 @@ When it went live on 2026-10-27:
 - 270 numbers on several cards that turn out to be one person.
 - Orlich: Sam is deceased. Eva is the personal representative, at 3454 S Chase Ave, with her 5 numbers.
 
+## The door (migration 0084, 2026-10-27)
+
+- `add_prospects` takes `interests[]`: name, role, their mailing address, their phones and an optional status. The old flat `owner_name` + `phones` shape still works as one owner of record.
+  - Cards match on the property address only. Ranges count: "2825 2827 S Logan Av" is 2825 S Logan Av.
+  - A number already on another card is attached anyway, to the person it belongs to, and reported as `also_on`.
+- Every card carries `people[]`: role, status, address, phones (textable or not, shared with whom), and the person's other cards.
+- `mark_card` has person marks:
+  - `deceased`: closed on every card.
+  - `wrong_person`: this card only.
+  - `dnc` with an `interest_id` or phone: that person is do-not-contact on every card, and that number is blocked. When the person is an owner, the property closes too, as before.
+- **The Orlich rule.** A card that died only as no contact, or by the death, reopens when a live person with a phone remains. When nobody live is left, the card holds for a re-trace (`data_fix`, "no live person on this card").
+- **Texts aim at a person.**
+  - `queue_texts` takes `interest_id`; without it, the phone's person on the card. It is stamped on `planned_openers.interest_id`.
+  - Never a do-not-contact person's number.
+  - Never a deceased person's number, unless a living person shares it.
+  - The next person gets a first text only after the one texted is closed, or every first text to them bounced.
+- **The send check.** A number on several cards is no longer `phone_shared` when it is one person's. A do-not-contact person's number is refused as `person_do_not_contact`.
+- **The laptop sync** never closes a card the app reopened.
+
+Orlich, done through the door on 2026-10-27:
+- Eva's verified mobile, 414-801-5081, was attached to her.
+- Sam was marked deceased, and the card reopened to `opener_sent`.
+- A first text to Eva is allowed.
+
 ## Still to build
 
-1. **The door:**
-   - `add_prospects` takes `interests[]`. The old flat shape becomes one owner of record.
-   - Merge on the property address only, including ranges ("2825 2827 S Logan Av" = "2825 S Logan Av").
-   - `find_prospects` returns the interests.
-   - Marks for one person: dnc, deceased, wrong person.
-   - A text targets an interest, and the next-number rule stays within that interest.
-   - A shared number that is one person becomes textable. Today the send check refuses it as `phone_shared`.
-   - A person's DNC holds on every card.
-   - A dead or DNC interest never buries a live one (the Orlich rule).
-   - The last live interest closing holds the card.
-2. **The duplicates and the laptop sync:**
-   - Merge the cards that are one property: 9 addresses, 30 cards.
-   - Point the laptop's owner key at the property card, so a second owner of a house joins it.
-3. **The app card:**
-   - Each interest with its role, status, address and phones, and "also on: other card".
-   - Per-interest buttons and text threads.
-   - Due items on the interest.
+1. **The duplicates.** Merge the cards that are one property: 9 addresses, 30 cards. Point the laptop's owner key at the property card, so a second owner of a house joins it.
+2. **The app card.**
+   - Each person with their role, status, address and phones, and "also on: other card".
+   - Per-person buttons and text threads.
+   - Due items and check-backs on the person (Colin's call 1).
 
 Sending rules do not change: the window, the cap, the variant and slot tests, and every guardrail stay as they are.

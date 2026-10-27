@@ -36,7 +36,7 @@ export interface DoorDb {
   prospectCounts(): Promise<Record<string, unknown>>
   status(): Promise<Record<string, unknown>>
   readyToText(f: { limit: number; followups: boolean; all_sources: boolean }): Promise<unknown[]>
-  queueText(t: { lead_id: string; phone: string; body: string; step: number; send_after: string | null; variant: string | null; template: string | null; slot: string | null }, agent: string): Promise<Record<string, unknown>>
+  queueText(t: { lead_id: string; phone: string; body: string; step: number; send_after: string | null; variant: string | null; template: string | null; slot: string | null; interest_id: string | null }, agent: string): Promise<Record<string, unknown>>
   testResults(days: number, step: number): Promise<Record<string, unknown>>
   textTemplates(): Promise<Record<string, unknown>>
   setTextTemplate(t: { variant: string; name: string | null; wording: string; note: string }, agent: string): Promise<Record<string, unknown>>
@@ -46,6 +46,8 @@ export interface DoorDb {
   dueToday(): Promise<Record<string, unknown>>
   records(fn: string, args: Record<string, unknown>): Promise<unknown>
   markCard(m: { lead_id: string; mark: string; reason: string | null; date: string | null; phone: string | null }, agent: string): Promise<Record<string, unknown>>
+  /** A person on a card (0084): deceased and dnc follow them onto every card, wrong_person is this card only. */
+  markPerson(m: { lead_id: string; mark: string; interest_id: string | null; phone: string | null; reason: string | null }, agent: string): Promise<Record<string, unknown>>
   linkCards(l: { lead_id: string; other_id: string; kind: string; note: string | null }, agent: string): Promise<Record<string, unknown>>
   sendReply(t: { lead_id: string; phone: string; body: string }, agent: string): Promise<Record<string, unknown>>
   queue(date: string | null): Promise<unknown[]>
@@ -73,6 +75,7 @@ export const TEXTING_RULES = [
   'In a reply: never give, guess or react to a price; Colin prices every deal himself on a call. Your job is to learn why they would sell, the condition, the timing, who signs and their number, then book a call with Colin.',
   "Booking: open_slots gives Colin's real open times (his calendar and his hours). Offer two or three, book_slot the one they pick with the 4 pillars, and confirm the time in your reply. Never promise a time you did not book.",
   "Phone calls: the card's call_notes say what was said on each recorded call (summary, the 4 pillars and who signs, outcome, next step, the mark the caller confirmed). Read them before you text: never ask again what they already told us on the phone, and follow the next step they agreed to.",
+  'A card is one property; the people on it (people[] on every card) each have a role, a status, their own address and their own phones. Text a person (interest_id), on one of their numbers. Never text a person who is not active. One person on a card at a time: the next person gets a first text only after the one you texted is closed (deceased, dnc, wrong_person) or every first text to them bounced.',
   'Every morning, read due_today: dated check-backs, holds whose date arrived, booked calls and visits, and contracts out for signature. The card says why it was waiting (named_event, notes, the conversation). Act on each one and mark the card.',
   'When an A/B test is running, tag every text with its variant (and template) in queue_texts, assign cards to variants at random, and read test_results before changing anything.',
 ].join('\n')
@@ -81,6 +84,13 @@ const S = (description: string, extra: Record<string, unknown> = {}) => ({ type:
 const PHONE = { anyOf: [S('10-digit US number'), { type: 'object', properties: {
   number: S('the phone number'), type: S('mobile, landline or voip if known'), name: S('whose phone this is'),
   confidence: { type: 'number', description: '0-1 from the source, if it gives one' }, note: S('anything else') }, required: ['number'] }] }
+const INTEREST = { type: 'object', properties: {
+  name: S('the person or entity'),
+  role: S('owner_of_record | co_owner | personal_representative | special_administrator | heir | trustee | spouse | occupant | other'),
+  mailing_street: S('THEIR mailing street (may differ from the property and from everyone else on the card)'), mailing_city: S('their city'),
+  mailing_state: S('their state'), mailing_zip: S('their ZIP'), phones: { type: 'array', items: PHONE },
+  status: S('optional: deceased | do_not_contact | not_the_contact | closed'), status_reason: S('why'), notes: S('anything about this person'),
+  kind: S('optional: person | entity | household') }, required: ['name'] }
 const REASON = { type: 'object', properties: {
   kind: S('short type: tax_delinquent, foreclosure, probate, vacant, code_violation, divorce, eviction, tired_landlord, other'),
   label: S('how the team should read it on the card, e.g. "Behind on taxes 2 years"'),
@@ -90,17 +100,18 @@ const REASON = { type: 'object', properties: {
 
 export const TOOLS: { role: ToolRole; name: string; description: string; inputSchema: Record<string, unknown> }[] = [
   { role: 'intake', name: 'add_prospects',
-    description: 'Load prospects: property address, owner name(s), phone numbers and why they are motivated. You have already applied the prospect rules; every one is accepted unless the address or owner is missing. The same address and owner merges into the existing card (new phones and reasons are added). Up to 200 per call. Returns one result per prospect: created / updated / rejected, the card id, and phones that were skipped and why.',
+    description: 'Load prospects: the property, the people on it and why they are motivated. You have already applied the prospect rules; every one is accepted unless the address or a name is missing. One card per property: a prospect for an address we already have (any owner, ranges like 2825-2827 included) updates that card, adding new people, new numbers and stacking reasons. Give the people as interests[] (each with a role, THEIR address and THEIR phones); the old owner_name + phones shape still works as one owner of record. A number already on another card is attached anyway, to the person it belongs to, and comes back as also_on. Up to 200 per call. Returns one result per prospect: created / updated / already_have / rejected, the card id, each person with their interest_id and phones added, and phones skipped and why.',
     inputSchema: { type: 'object', properties: { prospects: { type: 'array', maxItems: 200, items: { type: 'object', properties: {
       owner_name: S('the owner (or the person to ask for)'), owner_type: S('individual, trust, llc, estate'),
       address: S('property street address'), city: S('city / village / town'), zip: S('ZIP'), county: S('county'),
       mailing_street: S('owner mailing street'), mailing_city: S('owner mailing city'), mailing_state: S('owner mailing state (sets the texting time zone)'),
       mailing_zip: S('owner mailing ZIP'), property_type: S('house, duplex, ...'), units: { type: 'integer' },
-      phones: { type: 'array', items: PHONE }, reasons: { type: 'array', items: REASON },
+      phones: { type: 'array', items: PHONE }, interests: { type: 'array', items: INTEREST, description: 'the people on this property, each with role, their address and their phones' },
+      reasons: { type: 'array', items: REASON },
       source: S('where this prospect came from (defaults to muse)'), notes: S('anything the team should know') },
-      required: ['owner_name', 'address'] } } }, required: ['prospects'] } },
+      required: ['address'] } } }, required: ['prospects'] } },
   { role: 'intake', name: 'find_prospects',
-    description: 'Look up cards by address, phone, owner name or card id: stage, phones, reasons, and whether they were texted or replied.',
+    description: 'Look up cards by address, phone, a name (owner or anyone on the card) or card id: stage, the people on it (role, status, their address, their phones, their other cards), reasons, and whether they were texted or replied.',
     inputSchema: { type: 'object', properties: { address: S('part of the street address'), phone: S('a phone number'),
       name: S('part of the owner name'), lead_id: S('a card id'), only_agent: { type: 'boolean', description: 'only cards an agent loaded' },
       limit: { type: 'integer', maximum: 100 } } } },
@@ -115,13 +126,14 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
     inputSchema: { type: 'object', properties: { limit: { type: 'integer', maximum: 300 }, followups: { type: 'boolean' },
       all_sources: { type: 'boolean', description: 'include cards the laptop loaded (default: only agent-loaded cards)' } } } },
   { role: 'sender', name: 'queue_texts',
-    description: 'Queue texts you wrote. Each: card id, phone (one on that card), the exact text, step (1 = first text, 2-5 = follow-ups) and optionally the earliest time to send. The server sends each one inside the recipient\'s window, under the daily limit. Refused texts come back with the reason. Up to 100 per call.',
+    description: 'Queue texts you wrote. Each: card id, the person (interest_id; without it, the phone\'s person on the card), phone (one of theirs on that card), the exact text, step (1 = first text, 2-5 = follow-ups) and optionally the earliest time to send. The server sends each one inside the recipient\'s window, under the daily limit. Refused texts come back with the reason. Up to 100 per call.',
     inputSchema: { type: 'object', properties: { texts: { type: 'array', maxItems: 100, items: { type: 'object', properties: {
       lead_id: S('card id'), phone: S('phone on that card'), body: S('the exact text'), step: { type: 'integer', minimum: 1, maximum: 5 },
       send_after: S('ISO time, optional'),
       variant: S('A/B test arm this text belongs to, e.g. "A" or "B" (always set it when a test is running)'),
       template: S('short name of the wording, e.g. "own_q" or "intent_q"'),
-      slot: S('time-of-day test: am (goes from 10 AM their time) or pm (from 5 PM); leave out for follow-ups') }, required: ['lead_id', 'phone', 'body'] } } }, required: ['texts'] } },
+      slot: S('time-of-day test: am (goes from 9 AM their time) or pm (from 5 PM); leave out for follow-ups'),
+      interest_id: S('the person on the card this text is for') }, required: ['lead_id', 'phone', 'body'] } } }, required: ['texts'] } },
   { role: 'sender', name: 'test_results',
     description: 'The test scoreboard: per wording variant, per time slot (am / pm), and per cell (variant/slot), with hot leads too: texts queued, sent, delivered, failed (and carrier-filtered 30007), real conversations (a reply that is not a STOP or a wrong number), STOPs, wrong numbers, and the reply and STOP rates on delivered texts. Default: first texts, last 14 days.',
     inputSchema: { type: 'object', properties: { days: { type: 'integer', maximum: 90 }, step: { type: 'integer', minimum: 1, maximum: 5 } } } },
@@ -161,12 +173,13 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
     description: 'Every card whose time has come, oldest first, each with the whole card and why it was waiting: check_back (a dated not-now, a hold, an estate or family wait whose date arrived), booked_call / booked_visit (today), call_due / text_due (a stop the team or you owes), contract_waiting (a contract sent and not signed, with who still has to sign). days_late says how overdue. Also `stuck`: the safety net, cards that would otherwise be lost: no_next_step (a warm card with no date), reply_unanswered (2+ hours), unlogged_call, text_stale (planned, never went), unknown_caller (a text from a phone no card has), dormant_replied (put to sleep after they replied). Read both lists every morning and act on each one: a text, a mark_card, or tell Colin. Nothing on either list may stay there two days running.',
     inputSchema: { type: 'object', properties: {} } },
   { role: 'any', name: 'mark_card',
-    description: 'Mark a card the way the team does from its buttons. mark: dead (not interested), dnc (asked not to be contacted: every phone blocked for good), not_now (with date = when to check back, or reason = what has to change first), hot (wants to sell / asked for a call: Colin is pinged and the card goes to him), held (reason = the named blocker, optional date), wrong_number (phone = the number that was never them), elderly, grief, or note (reason = the note). Returns the stage and belt of the card after the mark.',
+    description: 'Mark a card the way the team does from its buttons. Person marks close one person, not the property: deceased (with interest_id or phone: closed on every card; if the card died only as no contact or by the death and someone live remains, it reopens), wrong_person (not connected to this property: closed on this card only), and dnc with interest_id or phone (that person is do-not-contact on every card and that number is blocked; when the person is an owner, the property closes too). When nobody live is left on a card, it holds for a re-trace. Property marks: dead (not interested), dnc with no person (the whole card: every phone blocked for good), not_now (with date = when to check back, or reason = what has to change first), hot (wants to sell / asked for a call: Colin is pinged and the card goes to him), held (reason = the named blocker, optional date), wrong_number (phone = the number that was never them), elderly, grief, or note (reason = the note). Returns the stage and belt of the card after the mark.',
     inputSchema: { type: 'object', properties: { lead_id: S('card id'),
-      mark: S('dead | dnc | not_now | hot | held | wrong_number | elderly | grief | note'),
+      mark: S('deceased | wrong_person | dnc | dead | not_now | hot | held | wrong_number | elderly | grief | note'),
+      interest_id: S('the person on the card, for deceased, wrong_person and a person-level dnc'),
       reason: S('why, in their words where possible; the blocker for held; the condition for not_now without a date; the note for note'),
       date: S('ISO time: the check-back date for not_now, or when a held card should be looked at again'),
-      phone: S('the phone, for wrong_number or dnc') }, required: ['lead_id', 'mark'] } },
+      phone: S('the phone, for wrong_number, or to say which person (deceased, wrong_person, dnc)') }, required: ['lead_id', 'mark'] } },
   { role: 'any', name: 'link_cards',
     description: 'Link two cards: same_person (one owner, two cards), other_property (they mentioned another place), estate_contact (the person handling an estate), shared_phone, occupant (lives there, not the owner), co_owner, related. Shown on both cards.',
     inputSchema: { type: 'object', properties: { lead_id: S('card id'), other_id: S('the other card id'),
@@ -252,7 +265,8 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
         if (why) { results.push({ lead_id: t.lead_id, status: 'refused', reason: why }); continue }
         const r = await db.queueText({ lead_id: String(t.lead_id ?? ''), phone: String(t.phone ?? ''), body,
           step: int(t.step, 1, 5), send_after: t.send_after ? String(t.send_after) : null,
-          variant: t.variant ? String(t.variant) : null, template: t.template ? String(t.template) : null, slot: t.slot ? String(t.slot) : null }, agent.name)
+          variant: t.variant ? String(t.variant) : null, template: t.template ? String(t.template) : null, slot: t.slot ? String(t.slot) : null,
+          interest_id: t.interest_id ? String(t.interest_id) : null }, agent.name)
         results.push({ lead_id: t.lead_id, ...r })
       }
       return { value: { queued: results.filter((r) => r.status === 'queued').length, refused: results.filter((r) => r.status !== 'queued').length, results } }
@@ -271,9 +285,16 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       p_note: args.note ? String(args.note) : null, p_received_date: args.received_date ? String(args.received_date) : null,
       p_records_through: args.records_through ? String(args.records_through) : null, p_next_due: args.next_due ? String(args.next_due) : null,
       p_to_email: args.to_email ? String(args.to_email) : null, p_reply_id: args.reply_id ? String(args.reply_id) : null, p_agent: agent.name }) }
-    case 'mark_card':
+    case 'mark_card': {
+      const mark = String(args.mark ?? '')
+      if (mark === 'deceased' || mark === 'wrong_person' || (mark === 'dnc' && (args.interest_id || args.phone))) {
+        const r = await db.markPerson({ lead_id: String(args.lead_id ?? ''), mark, interest_id: args.interest_id ? String(args.interest_id) : null,
+          phone: args.phone ? String(args.phone) : null, reason: args.reason ? String(args.reason) : null }, agent.name)
+        return { value: r, isError: r.ok === false }
+      }
       return { value: await db.markCard({ lead_id: String(args.lead_id ?? ''), mark: String(args.mark ?? ''), reason: args.reason ? String(args.reason) : null,
         date: args.date ? String(args.date) : null, phone: args.phone ? String(args.phone) : null }, agent.name) }
+    }
     case 'link_cards':
       return { value: await db.linkCards({ lead_id: String(args.lead_id ?? ''), other_id: String(args.other_id ?? ''), kind: String(args.kind ?? ''),
         note: args.note ? String(args.note) : null }, agent.name) }

@@ -19,7 +19,7 @@ const fakeDb = (over: Partial<DoorDb> = {}): DoorDb => ({
   status: async () => ({ paused: false }), readyToText: async () => [], queueText: async () => ({ status: 'queued', text_id: 'T1' }),
   queue: async () => [], withdraw: async () => true, pause: async () => ({ paused: true }), resume: async () => ({ paused: false }),
   results: async () => ({}), testResults: async () => ({}), repliesWaiting: async () => [], markCard: async () => ({ ok: true }), dueToday: async () => ({ due: [], stuck: [] }), records: async () => ({}), linkCards: async () => ({ ok: true }), sendReply: async () => ({ outcome: 'sent' }),
-  textTemplates: async () => ({}), setTextTemplate: async () => ({ ok: true }), ...over,
+  textTemplates: async () => ({}), setTextTemplate: async () => ({ ok: true }), markPerson: async () => ({ ok: true }), ...over,
 })
 const intake = { id: 'k1', name: 'Muse intake', role: 'intake' as const }
 const sender = { id: 'k2', name: 'Muse sender', role: 'sender' as const }
@@ -70,6 +70,17 @@ describe('the MCP routing', () => {
     expect(seen).toMatchObject({ variant: 'B', wording: 'Hi. Reply STOP', note: 'Colin: shorter', a: 'Muse' })
     expect((await call(muse, 'records_set_request', { kind: 'treasurer', name: 'Test County Treasurer', categories: ['tax_delinquency'], cadence_days: 30 }, db)).value)
       .toEqual({ fn: 'records_set_request', args: { p: { kind: 'treasurer', name: 'Test County Treasurer', categories: ['tax_delinquency'], cadence_days: 30 }, p_agent: 'Muse' } })
+  })
+  it('person marks go to the person; a dnc with no person is the whole card, as before', async () => {
+    const seen: string[] = []
+    const db = fakeDb({ markPerson: async (m) => { seen.push(`person:${m.mark}:${m.interest_id ?? m.phone}`); return { ok: true } },
+      markCard: async (m) => { seen.push(`card:${m.mark}`); return { ok: true } } })
+    await call(sender, 'mark_card', { lead_id: 'L1', mark: 'deceased', interest_id: 'I1' }, db)
+    await call(sender, 'mark_card', { lead_id: 'L1', mark: 'dnc', phone: '4145550100' }, db)
+    await call(sender, 'mark_card', { lead_id: 'L1', mark: 'wrong_person', phone: '4145550101' }, db)
+    await call(sender, 'mark_card', { lead_id: 'L1', mark: 'dnc' }, db)
+    await call(sender, 'mark_card', { lead_id: 'L1', mark: 'dead', reason: 'retail' }, db)
+    expect(seen).toEqual(['person:deceased:I1', 'person:dnc:4145550100', 'person:wrong_person:4145550101', 'card:dnc', 'card:dead'])
   })
   it('the key comes from Authorization: Bearer or x-api-key', () => {
     expect(keyFrom(new Headers({ authorization: 'Bearer wpie_sender_abc' }))).toBe('wpie_sender_abc')
@@ -203,7 +214,7 @@ describe('on the real migrations', () => {
       .toEqual({ send_status: 'planned' })
   })
 
-  it('"do we already have them?": an address the laptop has (spelled differently) merges into that card; a phone on another card is not added', async () => {
+  it('"do we already have them?": an address the laptop has (spelled differently) merges into that card; a phone on another card is attached and reported', async () => {
     const lap = (await one<{ id: string }>(`insert into public.leads (wpie_owner_id, owner_name, property_address, property_zip, stage)
       values (888, 'SMITH JOHN', '1205 NORTH STATE STREET', '54911', 'opener_queued') returning id`)).id
     await db.query(`insert into public.contacts (lead_id, kind, value, value_normalized) values ($1, 'phone', '9205550111', '9205550111')`, [lap])
@@ -213,7 +224,9 @@ describe('on the real migrations', () => {
     const elsewhere = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'Jane Roe',
       address: '9 Other Rd', phones: ['9205550112'] })])
     expect(elsewhere.status).toBe('created')
-    expect(elsewhere.phones_skipped).toEqual([{ number: '9205550112', why: 'already on another card', lead_id: lap }])
+    // one card per property, numbers belong to people (2026-10-27): never dropped, attached and reported as also on the other card
+    expect(elsewhere).toMatchObject({ phones_added: ['9205550112'], phones_skipped: [] })
+    expect((elsewhere.interests as { phones_added: { also_on: { lead_id: string }[] }[] }[])[0].phones_added[0].also_on).toEqual([{ lead_id: lap, address: '1205 NORTH STATE STREET' }])
   })
 
   it('with agent_runs_texting on, a reply is read and recorded but not queued or put up for the team; the agent sees it and answers it', async () => {

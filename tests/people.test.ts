@@ -90,4 +90,84 @@ describe('people and interests', () => {
       { name: 'ESTATE OF ROSE TESTER', role: 'owner_of_record', kind: 'entity', phones: null },
     ])
   })
+
+  // ---------------------------------------------------------------- step 2: the door (0083)
+  const r1 = async (sql: string, params: unknown[] = []) => (await rows<{ r: Record<string, unknown> }>(`select ${sql} as r`, params))[0].r
+  const OPENER = "Hi Eva, Colin Merrill here. Are you the right person to ask about 11 Estate Av? Reply STOP if you'd rather not hear from me."
+  const tue = '2026-10-27T20:00:00Z'
+
+  it('import with interests: the owner, a personal representative at her own address, her phones; a range address is the same card', async () => {
+    const res = await r1(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ address: '11 Estate Av', city: 'Milwaukee',
+      owner_name: 'SAMUEL TESTMAN', owner_type: 'individual',
+      interests: [{ name: 'SAMUEL TESTMAN', role: 'owner_of_record', status: 'deceased', mailing_street: '11 Estate Av', mailing_zip: '53207' },
+                  { name: 'Eve Testman', role: 'personal_representative', mailing_street: '5 Chase Test Ave', mailing_city: 'Milwaukee', mailing_zip: '53207',
+                    phones: [{ number: '4145561101', type: 'mobile' }, { number: '4145561102', type: 'landline' }] }] })])
+    expect(res).toMatchObject({ status: 'created', phones_added: ['4145561101', '4145561102'] })
+    const card = res.lead_id as string
+    const ppl = (await r1(`public.card_interests($1)`, [card])) as unknown as { name: string; role: string; status: string; mailing: { street?: string }; phones: { phone: string; textable: boolean }[] | null }[]
+    expect(ppl.map((x) => [x.name, x.role, x.status])).toEqual([['Eve Testman', 'personal_representative', 'active'], ['SAMUEL TESTMAN', 'owner_of_record', 'deceased']])
+    expect(ppl[0].mailing.street).toBe('5 Chase Test Ave')
+    expect(ppl[0].phones!.map((x) => [x.phone, x.textable])).toEqual([['4145561101', true], ['4145561102', false]])
+    // 11-13 Estate Av is the same property: the second import adds an heir, no second card
+    const again = await r1(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ address: '11 13 Estate Av',
+      interests: [{ name: 'Ned Testman', role: 'heir', phones: ['4145561103'] }] })])
+    expect(again).toMatchObject({ status: 'updated', lead_id: card })
+    expect(((await r1(`public.card_interests($1)`, [card])) as unknown as unknown[]).length).toBe(3)
+  })
+
+  it('the Orlich rule: a card that died as no contact reopens when the owner is marked deceased and a live person remains', async () => {
+    const card = await add({ owner_name: 'OTTO ORLTEST', owner_type: 'individual', address: '12 Alabama Test Av',
+      phones: [{ number: '4145561201', name: 'OTTO ORLTEST' }, { number: '4145561202', name: 'Ava Orltest' }] })
+    await db.query(`update public.leads set stage = 'dead', dead_reason = 'no_contact' where id = $1`, [card])
+    const otto = (await rows<{ id: string }>(`select i.id from public.interests i where i.lead_id = $1 and i.role = 'owner_of_record'`, [card]))[0].id
+    const m = await r1(`public.agent_mark_person($1, 'deceased', $2, null, 'died 2026', 'Muse')`, [card, otto])
+    expect(m).toMatchObject({ ok: true, person: 'OTTO ORLTEST', cards: [{ lead_id: card, result: 'reopened' }] })
+    expect((await rows(`select stage::text, dead_reason from public.leads where id = $1`, [card]))[0]).toEqual({ stage: 'opener_queued', dead_reason: null })
+    // his number is never texted again, on any card; hers is
+    expect(await r1(`public.agent_queue_text($1, '4145561201', $2, 1, null, 'Muse', $3::timestamptz)`, [card, OPENER, tue]))
+      .toMatchObject({ status: 'refused', reason: expect.stringContaining('marked deceased') })
+    const q = await r1(`public.agent_queue_text($1, '4145561202', $2, 1, null, 'Muse', $3::timestamptz)`, [card, OPENER, tue])
+    expect(q).toMatchObject({ status: 'queued', person: 'Ava Orltest' })
+    expect((await rows(`select i.role from public.planned_openers p join public.interests i on i.id = p.interest_id where p.id = $1`, [q.text_id]))[0]).toEqual({ role: 'other' })
+    await db.query(`update public.planned_openers set send_status = 'withdrawn' where id = $1`, [q.text_id])
+  })
+
+  it('DNC is a person: a special administrator who says stop is closed on every card, the estate card stays open for the PR', async () => {
+    const a = await r1(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ address: '14 Admin Test St', owner_name: 'ESTATE OF ALMA TEST', owner_type: 'estate',
+      interests: [{ name: 'Carl Counsel', role: 'special_administrator', phones: ['6305561401'] }, { name: 'Pia Test', role: 'personal_representative', phones: ['4145561402'] }] })])
+    const b = await r1(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ address: '15 Other Test St', owner_name: 'ESTATE OF BO TEST', owner_type: 'estate',
+      interests: [{ name: 'Carl Counsel', role: 'special_administrator', phones: ['6305561401'] }] })])
+    const carl = (await rows<{ n: number }>(`select count(distinct person_id)::int n from public.interests i join public.people p on p.id = i.person_id where p.name = 'Carl Counsel'`))[0]
+    expect(carl).toEqual({ n: 1 })                                         // one Carl across both estates (name + shared phone)
+    const m = await r1(`public.agent_mark_person($1, 'dnc', null, '6305561401', 'DO NOT TEXT ME AGAIN', 'Muse')`, [a.lead_id])
+    expect(m).toMatchObject({ ok: true, person: 'Carl Counsel' })
+    expect((await rows(`select stage::text from public.leads where id = $1`, [a.lead_id]))[0]).toEqual({ stage: 'opener_queued' })   // Pia is live
+    expect((await rows(`select stage::text from public.leads where id = $1`, [b.lead_id]))[0]).toEqual({ stage: 'data_fix' })       // nobody live left: re-trace
+    expect(await r1(`public.agent_queue_text($1, '6305561401', $2, 1, null, 'Muse', $3::timestamptz)`, [b.lead_id, OPENER, tue])).toMatchObject({ status: 'refused' })
+  })
+
+  it('an owner who says stop still closes the property; the wrong person closes only themselves', async () => {
+    const card = await add({ owner_name: 'DORA DNCTEST', owner_type: 'individual', address: '16 Stop Test St',
+      phones: [{ number: '4145561601', name: 'DORA DNCTEST' }, { number: '4145561602', name: 'Rel Ative' }, { number: '4145561603', name: 'Wes Wrong' }] })
+    expect(await r1(`public.agent_mark_person($1, 'wrong_person', null, '4145561603', 'not related', 'Muse')`, [card])).toMatchObject({ ok: true })
+    expect((await rows(`select stage::text from public.leads where id = $1`, [card]))[0]).toEqual({ stage: 'opener_queued' })
+    expect(await r1(`public.agent_queue_text($1, '4145561603', $2, 1, null, 'Muse', $3::timestamptz)`, [card, OPENER, tue]))
+      .toMatchObject({ status: 'refused', reason: expect.stringContaining('closed') })
+    await r1(`public.agent_mark_person($1, 'dnc', null, '4145561601', 'stop texting me', 'Muse')`, [card])
+    expect((await rows(`select stage::text from public.leads where id = $1`, [card]))[0]).toEqual({ stage: 'dnc' })
+  })
+
+  it('a text names its person; a number shared by one person on two cards passes the send check', async () => {
+    const owner = { owner_name: 'TOM TWOCARDS', owner_type: 'individual', city: 'Milwaukee', mailing_street: '17 Home Test St', mailing_zip: '53204' }
+    const a = await add({ ...owner, address: '17 One Test St', phones: [{ number: '4145561701', name: 'TOM TWOCARDS', type: 'mobile' }] })
+    const b = await add({ ...owner, address: '18 Two Test St', phones: [{ number: '4145561701', name: 'TOM TWOCARDS', type: 'mobile' }] })
+    const iv = (await rows<{ id: string }>(`select id from public.interests where lead_id = $1 and role = 'owner_of_record'`, [b]))[0].id
+    expect(await r1(`public.agent_queue_text($1, '4145561701', $2, 1, null, 'Muse', $3::timestamptz, null, null, null, $4)`, [a, OPENER, tue, iv]))
+      .toMatchObject({ status: 'refused', reason: expect.stringContaining('no such person on this card') })
+    await db.exec(`update public.planned_openers set send_status = 'withdrawn' where send_status in ('planned', 'would_send')`)
+    const q = await r1(`public.agent_queue_text($1, '4145561701', $2, 1, null, 'Muse', $3::timestamptz, null, null, null, $4)`, [b, OPENER, tue, iv])
+    expect(q).toMatchObject({ status: 'queued', interest_id: iv, person: 'TOM TWOCARDS' })
+    const claim = await r1(`public.claim_next_opener(true, $1::timestamptz)`, [tue])
+    expect(claim).toMatchObject({ outcome: 'would_send', opener: { id: q.text_id } })
+  })
 })
