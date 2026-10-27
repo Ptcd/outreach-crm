@@ -61,7 +61,7 @@ const CALL_LABELS: Record<string, string> = Object.fromEntries([...callScript(),
 
 /** "the roof and the furnace you mentioned": the first two things she wrote down about the house, for the callback line */
 function mentioned(cond: Record<string, string> | null): string {
-  const names = CONDITION_ITEMS.filter((c) => cond?.[c.key] && !['fix_first', 'other'].includes(c.key)).slice(0, 2).map((c) => `the ${c.label.toLowerCase()}`)
+  const names = CONDITION_ITEMS.filter((c) => cond?.[c.key] && !['fix_first', 'other'].includes(c.key)).slice(0, 2).map((c) => `the ${c.label[0].toLowerCase()}${c.label.slice(1)}`)
   return names.length ? `With ${names.join(' and ')} you mentioned` : 'With everything you told me about the place'
 }
 
