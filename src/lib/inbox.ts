@@ -249,12 +249,17 @@ export function timelineOf(x: {
   for (const m of x.messages) {
     const them = m.direction === 'in'
     const badges = [m.status && m.channel === 'sms' ? m.status.replace(/_/g, ' ') : '', m.is_opt_out ? 'STOP' : ''].filter(Boolean)
+    const vm = m.channel === 'call' ? (m.body ?? '').match(/Voicemail: "([\s\S]*)"/) : null
     const title = m.channel === 'sms'
       ? (them ? `Text from ${name}` : m.is_opener ? `First text to ${name}` : `Text to ${name}`)
+      : vm ? `Voicemail from ${name}`
       : m.channel === 'call' ? (them ? `Call from ${name}` : `Call with ${name}`)
       : m.channel === 'email' ? (them ? `Email from ${name}` : `Email to ${name}`) : 'Note'
+    // a voicemail: their words first, then the call line under them
+    const rest = (m.body ?? '').replace(/\n?Voicemail: "[\s\S]*"/, '').trim()
+    const body = vm ? `"${vm[1]}"\n\n${rest}` : m.body ?? ''
     items.push({ key: `m-${m.id}`, at: m.sent_at, who: m.channel === 'note' ? 'team' : them ? 'them' : 'us',
-      kind: m.channel === 'sms' ? 'text' : m.channel, title, body: m.body ?? '', badges })
+      kind: m.channel === 'sms' ? 'text' : m.channel, title, body, badges: vm ? [...badges, 'voicemail'] : badges })
   }
   for (const t of x.inbound ?? []) {
     const dup = x.messages.some((m) => m.direction === 'in' && (m.body ?? '').trim() === (t.body ?? '').trim()

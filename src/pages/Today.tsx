@@ -10,6 +10,7 @@ import { endOfTodayIso, fmtDateTime, fullAddress } from '@/lib/format'
 import { STAGE_LABEL, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
 import { PackagesToday } from '@/components/DealPackage'
+import { MissedCalls } from '@/components/MissedCalls'
 import { ownerFilterFor, useOnPhone, workerFor, type TaskOwner } from '@/lib/onPhone'
 import { OnPhonePrompt } from '@/components/OnPhonePicker'
 import { StatTiles } from '@/components/StatTiles'
@@ -48,6 +49,7 @@ export default function Today() {
         { label: 'Seller asks', value: replyTasks.data?.length, icon: Sparkles, tone: 'rose' },
       ]} />
       <BeltHealthStrip />
+      <MissedCalls />
       <PackagesToday />
       <Section title={`Tasks from replies${replyTasks.data ? ` (${replyTasks.data.length})` : ''}`}>
         <p className="mb-2 text-sm text-muted-foreground">Things a seller asked for that a text can&apos;t do. Adil by default.</p>
