@@ -132,10 +132,10 @@ describe('the team gets it too', () => {
       url: `https://deals.example.com/lead/${LEAD}?call=1&phone=4144776435`, tag: expect.stringMatching(/^hot-/) }])
     // no 15-minute repeat (Colin 2026-10-26: one ping per hot lead)
     expect(await run(T('15:26'))).toMatchObject({ second_alerts: 0, member_texts: 0, pushes_ok: 0 })
+    // and no 7 PM "not called yet" list either (0081)
     const s = await run(new Date('2026-10-23T00:05:00Z'))                          // 7:05 PM Central
-    expect(s).toMatchObject({ digest: 1, member_texts: 1, pushes_ok: 1 })
-    expect(memberTexts[1].text).toMatch(/^7 PM: 1 hot lead not called yet/)
-    expect(pushes[1]).toMatchObject({ title: '7 PM: 1 hot lead not called', url: 'https://deals.example.com/inbox', tag: 'hot-digest' })
+    expect(s).toMatchObject({ member_texts: 0, pushes_ok: 0 })
+    expect(memberTexts).toHaveLength(1)
     expect((await db.query<{ ok: string }>('select last_ok_at::text as ok from public.push_subscriptions')).rows[0].ok).toBeTruthy()
   })
 
@@ -202,15 +202,13 @@ describe('alert timing', () => {
     expect(await run(T('13:01'))).toMatchObject({ alerts: 1 })       // 8:01 AM Central
   })
 
-  it('at 7 PM lists today\'s hot leads not called, once, leaving out tests and called ones', async () => {
+  it('no 7 PM "not called yet" list: the only hot text is the first one (Colin 2026-10-26, 0081)', async () => {
     await record('SM5', T('16:00'))
-    await record('SM6', T('17:00'), 'how much', null, true)          // a TEST: not listed
     await run(T('17:00'))
-    expect(await run(T('23:30'))).toMatchObject({ digest: 0 })       // 6:30 PM Central: not yet
+    const before = texts.length
     const s = await run(new Date('2026-10-23T00:05:00Z'))          // 7:05 PM Central
-    expect(s.digest).toBe(1)
-    expect(texts[texts.length - 1]).toBe('7 PM: 1 hot lead not called yet: John (2825 S Logan Av) (414) 477-6435')
-    expect((await run(new Date('2026-10-23T00:35:00Z'))).digest).toBe(0)
+    expect(s.digest ?? 0).toBe(0)
+    expect(texts.slice(before).some((t) => /not called yet/.test(t))).toBe(false)
   })
 
   it('without the pm-phone secret nothing is sent and nothing is claimed', async () => {
