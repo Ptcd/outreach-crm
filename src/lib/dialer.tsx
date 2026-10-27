@@ -102,6 +102,11 @@ export function DialerProvider({ children }: { children: ReactNode }) {
   const lookupRef = useRef<Promise<PhoneMatch[]> | null>(null)
   const answeredRef = useRef(false)
   const supported = typeof window !== 'undefined' && !!navigator.mediaDevices && typeof RTCPeerConnection !== 'undefined'
+  // the app's self-update (lib/appUpdate) never reloads during a call or while one is ringing in
+  useEffect(() => {
+    (window as Window & { __wpieOnCall?: boolean }).__wpieOnCall =
+      (!!active && ['connecting', 'ringing', 'in_call'].includes(active.status)) || !!incoming
+  }, [active, incoming])
 
   const finish = useCallback((status: CallStatus, error: string | null) => {
     callRef.current = null

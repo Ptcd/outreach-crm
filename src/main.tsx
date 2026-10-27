@@ -6,11 +6,14 @@ import QueryProvider from '@/providers/QueryProvider'
 import { DialerProvider } from '@/lib/dialer'
 import './index.css'
 import App from './App.tsx'
+import { keepAppCurrent } from '@/lib/appUpdate'
 
 // Installable app + "reply needs you" notifications (public/sw.js).
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => { void navigator.serviceWorker.register('/sw.js') })
 }
+// an installed app left open on a phone picks up a new build when it comes back to the front
+if (import.meta.env.PROD) keepAppCurrent()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
