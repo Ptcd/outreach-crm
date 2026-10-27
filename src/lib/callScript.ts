@@ -99,7 +99,7 @@ export const NEXT_STEP: Answer = { id: 'next_step', title: 'Booked', reply: ['ca
   choices: [c('walk', 'Walk-through'), c('callback', 'Call back')] }
 
 export const CALL_OUTCOMES: { id: 'interested' | 'reached_no_decision' | 'no_answer' | 'not_now' | 'not_interested' | 'wrong_number' | 'dnc'; label: string; hint: string }[] = [
-  { id: 'no_answer', label: 'No answer', hint: 'Rang out or voicemail; nothing changes on the card' },
+  { id: 'no_answer', label: 'No answer', hint: 'Rang out, no voicemail left; nothing changes on the card' },
   { id: 'interested', label: 'Interested', hint: "Stage: Colin's call (or Walk booked)" },
   { id: 'reached_no_decision', label: 'Reached, no decision', hint: "Talked, nothing settled yet; stage: Colin's call" },
   { id: 'not_now', label: 'Not now', hint: 'Use the exact date they gave, or record the event/condition they named' },
