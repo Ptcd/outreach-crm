@@ -204,7 +204,7 @@ function Close({ verdict, hot, vars, facts, replyFacts, onSave, canOverride }: {
   const lines = (keep: (id: string) => boolean) => PHONE_SCRIPT.booking.filter((l) => keep(l.id)).map((l) => scriptLine(l, vars))
   const notReady = PHONE_SCRIPT.not_ready.map((l) => scriptLine(l, vars))
   const toPackage = (
-    <Button variant="outline" className="w-full" onClick={() => document.getElementById('package')?.scrollIntoView({ behavior: 'smooth' })}>
+    <Button variant="outline" className="h-auto min-h-11 w-full whitespace-normal py-2" onClick={() => document.getElementById('package')?.scrollIntoView({ behavior: 'smooth' })}>
       Then send the package to Colin (it fills in from these answers)
     </Button>
   )
