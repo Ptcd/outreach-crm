@@ -292,8 +292,8 @@ function SendPackage({ lead, last, onDone }: { lead: Lead; last: Pkg | null; onD
       <div className="grid gap-2 sm:grid-cols-[auto_1fr] sm:items-center">
         <label className="flex items-center gap-2"><input type="checkbox" checked={walk} onChange={(e) => setWalk(e.target.checked)} /> Walk booked on this call (hot)</label>
         {!walk && (
-          <label className="flex items-center gap-2"><span className="whitespace-nowrap">Callback promised</span>
-            <Input type="datetime-local" value={cb} onChange={(e) => setCb(e.target.value)} /></label>
+          <label className="grid min-w-0 gap-1 sm:flex sm:items-center sm:gap-2"><span className="whitespace-nowrap">Callback promised</span>
+            <Input className="min-w-0" type="datetime-local" value={cb} onChange={(e) => setCb(e.target.value)} /></label>
         )}
       </div>
       <div className="flex gap-2">
