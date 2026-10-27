@@ -19,6 +19,7 @@ import { AppointmentPacket } from '@/components/AppointmentPacket'
 import { CallPanel, bestPhone } from '@/components/CallPanel'
 import { CallNotes } from '@/components/CallNotes'
 import { TextThread } from '@/components/TextThread'
+import { DealPackage } from '@/components/DealPackage'
 import { api, useDeals, useLead, useWrite } from '@/lib/queries'
 import { useDialer } from '@/lib/dialer'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso, fullAddress } from '@/lib/format'
@@ -94,6 +95,8 @@ export default function LeadDetail() {
       <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}
         phone={params.get('phone')} canOverride={isOwner}
         startOpen={params.get('call') === '1' || liveHere || lead.belt === 'yes_unbooked' || lead.belt === 'call_booked'} />
+      {/* the package to Colin, his number and the callback (migration 0085) */}
+      <DealPackage lead={lead} />
       <History leadId={lead.id} ownerName={lead.owner_name} messages={messages} inbound={q.data.inbound}
         stageEvents={q.data.stageEvents} tasks={tasks} />
       {/* the follow-up belt (what happens next on its own) sits under the history: callers start at the Call panel */}

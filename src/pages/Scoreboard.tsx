@@ -3,6 +3,7 @@ import { Empty, ErrorNote, Section, Select } from '@/components/ui/form'
 import { useScoreboard, useSignalScoreboard } from '@/lib/queries'
 import { fmtDate, pct } from '@/lib/format'
 import type { ScoreboardWeek } from '@/lib/types'
+import { DealsFunnel } from '@/components/DealPackage'
 
 // docs/ACQUISITION_SYSTEM_PLAYBOOK.md section 4. Targets are starting guesses until our own data.
 const ROWS: { n: number; label: string; def: string; target: string; value: (w: ScoreboardWeek) => string }[] = [
@@ -29,6 +30,7 @@ export default function Scoreboard() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold tracking-tight">Scoreboard</h1>
+      <DealsFunnel />
       <div className="grid grid-cols-2 gap-2 sm:w-96">
         <Select value={lane} onChange={(e) => setLane(e.target.value)} aria-label="Lane">
           <option value="all">Both lanes</option>

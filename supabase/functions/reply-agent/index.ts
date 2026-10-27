@@ -6,7 +6,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
 import { runReplyAgent } from '../_shared/replyAgent.ts'
 import { claudeDrafter } from '../_shared/drafter.ts'
-import { runNotifications } from '../_shared/notify.ts'
+import { pushAll, runNotifications, type NotifySummary } from '../_shared/notify.ts'
+import { runPackageMail } from '../_shared/packages.ts'
 import { pmPhoneSender, runHotAlerts } from '../_shared/hotLeads.ts'
 import { hotPush, notifyDeps } from '../_shared/notifyDeno.ts'
 import { senderEnv, twilioPort, type Rpc } from '../_shared/sending.ts'
@@ -49,8 +50,13 @@ Deno.serve(async (req) => {
     } } : null
     const hot = await runHotAlerts({ rpc, send: pmPhoneSender((n) => Deno.env.get(n), fetch), push: hotPush(sb), email: hotEmail,
       appUrl: Deno.env.get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com' }).catch((e) => ({ error: String(e).slice(0, 200) }))
-    await rpc('note_agent_run', { p_summary: { ...summary, notified, hot_alerts: hot, drafter: key ? 'claude' : 'none (ANTHROPIC_API_KEY not set)' } })
-    return Response.json({ ...summary, notified, hot_alerts: hot })
+    // packages (migration 0085): the email to Colin with everything, and the "number ready" push for the callback
+    const packages = await runPackageMail(deps, rpc, async (m) => {
+      const s: NotifySummary = { drafts: 0, reminders: 0, tasks: 0, pushes_ok: 0, pushes_failed: 0, emails: 0, email_errors: [] }
+      await pushAll(deps, m, s)
+    }).catch((e) => ({ error: String(e).slice(0, 200) }))
+    await rpc('note_agent_run', { p_summary: { ...summary, notified, hot_alerts: hot, packages, drafter: key ? 'claude' : 'none (ANTHROPIC_API_KEY not set)' } })
+    return Response.json({ ...summary, notified, hot_alerts: hot, packages })
   } catch (e) {
     await rpc('note_agent_run', { p_summary: { error: String(e instanceof Error ? e.message : e).slice(0, 300) } })
     return Response.json({ error: String(e) }, { status: 500 })

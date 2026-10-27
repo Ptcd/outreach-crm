@@ -93,7 +93,7 @@ ${why ? `<p style="color:#555">Why it needs you: ${esc(why)}</p>` : ''}
   return { subject, text, html }
 }
 
-async function pushAll(deps: NotifyDeps, message: object, s: NotifySummary) {
+export async function pushAll(deps: NotifyDeps, message: object, s: NotifySummary) {
   if (!deps.push) return
   for (const sub of await deps.subscriptions()) {
     const r = await deps.push(sub, message)

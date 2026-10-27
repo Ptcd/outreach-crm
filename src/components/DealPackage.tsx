@@ -1,0 +1,338 @@
+// The package (Colin 2026-10-27, the partner model run Rick's way; migration 0085). The caller's first call never
+// prices: it ends here, in a package Colin gets by email with everything in it. Muse adds the value and comps, Colin
+// sets the number (and grades the package), the caller delivers it on the callback as "around {number}, once my
+// partner sees it", then books Colin's walk. Each state shows who is up and what they do.
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge, ErrorNote, Section, Select, Textarea } from '@/components/ui/form'
+import { supabase } from '@/lib/supabaseClient'
+import { fmtDateTime, isoToLocalInput, localInputToIso } from '@/lib/format'
+import { useAuth } from '@/providers/AuthProvider'
+import type { Lead } from '@/lib/types'
+
+export const CONDITION_ITEMS: { key: string; label: string; ask: string }[] = [
+  { key: 'roof', label: 'Roof', ask: 'How old is the roof? Any leaks?' },
+  { key: 'hvac', label: 'Furnace and AC', ask: 'How old are the furnace and the air? Both working?' },
+  { key: 'water_heater', label: 'Water heater', ask: 'How old is the water heater?' },
+  { key: 'foundation', label: 'Foundation and basement', ask: 'Any cracks, or water in the basement?' },
+  { key: 'electrical', label: 'Electrical', ask: 'Breakers or the old fuse box? Old wiring?' },
+  { key: 'plumbing', label: 'Plumbing', ask: 'Any leaks, or old pipes?' },
+  { key: 'windows', label: 'Windows', ask: 'Original, or replaced?' },
+  { key: 'kitchen_baths', label: 'Kitchen and baths', ask: 'When were they last updated?' },
+  { key: 'yard', label: 'Yard and outside', ask: 'The yard, driveway, garage, trees near the house, a fence?' },
+  { key: 'fix_first', label: 'Fix first', ask: 'If you listed it tomorrow, what would you have to fix first?' },
+  { key: 'other', label: 'Anything else', ask: '' },
+]
+
+const FIELDS: { key: string; label: string; hint: string; long?: boolean }[] = [
+  { key: 'need', label: 'Need', hint: 'Why they would sell, in their words', long: true },
+  { key: 'timeline', label: 'Timeline', hint: 'Where they are moving, and when' },
+  { key: 'their_number', label: 'Their number', hint: 'Word for word' },
+  { key: 'their_basis', label: 'How they came up with it', hint: 'A payoff, back taxes, Zillow, a neighbor...' },
+  { key: 'on_title', label: 'On the title / decision makers', hint: 'Every name' },
+  { key: 'owed', label: 'What is owed', hint: 'Mortgage or liens, behind or not; roughly is fine' },
+  { key: 'occupancy', label: 'Who lives there', hint: 'Them, tenants (and rents), or empty' },
+  { key: 'photos', label: 'Photos', hint: 'Will they text some? Did they?' },
+  { key: 'other_buyers', label: 'Other buyers or agents', hint: 'Who else they have talked to' },
+  { key: 'concerns', label: 'What concerns them most', hint: '' },
+  { key: 'motivation', label: 'Motivation learned in conversation', hint: 'One line for Colin', long: true },
+]
+
+const STATUS: Record<string, { label: string; tone: 'muted' | 'warn' | 'bad' | 'good' | 'info'; who: string }> = {
+  waiting_value: { label: 'Waiting for the value', tone: 'info', who: 'Muse pulls the value and comps; Colin can price without them' },
+  waiting_number: { label: "Colin's turn: the number", tone: 'warn', who: 'Colin prices it today' },
+  counter: { label: 'Countered: back to Colin', tone: 'warn', who: 'Colin answers the counter' },
+  number_ready: { label: 'Number ready: callback', tone: 'good', who: 'The caller calls back at the time promised' },
+  agreed: { label: 'Agreed: book the walk', tone: 'good', who: "Book Colin's walk with everyone on the title there" },
+  walk_booked: { label: 'Walk booked', tone: 'good', who: '' },
+  declined: { label: 'Declined', tone: 'muted', who: '' },
+  dead: { label: 'Closed', tone: 'muted', who: '' },
+}
+
+type Pkg = Record<string, unknown> & { id: string; status: string; condition: Record<string, string> | null; comps: unknown[] | null }
+type Person = { interest_id: string; name: string; role: string; status: string }
+
+const money = (n: unknown) => (n == null || n === '' ? '' : `$${Math.round(Number(n)).toLocaleString('en-US')}`)
+const OPEN = ['waiting_value', 'waiting_number', 'number_ready', 'counter', 'agreed']
+
+export function DealPackage({ lead }: { lead: Lead }) {
+  const { isOwner } = useAuth()
+  const qc = useQueryClient()
+  const q = useQuery({ queryKey: ['package', lead.id], queryFn: async () => {
+    const r = await supabase.from('deal_packages').select('*').eq('lead_id', lead.id).order('created_at', { ascending: false }).limit(1)
+    if (r.error) throw new Error(r.error.message)
+    return ((r.data ?? [])[0] ?? null) as Pkg | null
+  } })
+  const refresh = () => { void qc.invalidateQueries({ queryKey: ['package', lead.id] }); void qc.invalidateQueries({ queryKey: ['packages_open'] }); void qc.invalidateQueries({ queryKey: ['lead', lead.id] }) }
+  const p = q.data
+  const open = !!p && OPEN.includes(p.status)
+  return (
+    <div id="package" className="scroll-mt-16">
+      <Section title="Package for Colin" right={p ? <Badge tone={STATUS[p.status]?.tone ?? 'muted'}>{STATUS[p.status]?.label ?? p.status}</Badge> : undefined}>
+        <ErrorNote error={q.error} />
+        {open ? <OpenPackage p={p!} isOwner={isOwner} onDone={refresh} /> : <SendPackage lead={lead} last={p} onDone={refresh} />}
+      </Section>
+    </div>
+  )
+}
+
+function Summary({ p }: { p: Pkg }) {
+  const cond = p.condition ?? {}
+  return (
+    <dl className="grid gap-x-3 gap-y-1 text-sm sm:grid-cols-[12rem_1fr]">
+      {FIELDS.filter((f) => p[f.key]).map((f) => (
+        <div key={f.key} className="contents"><dt className="text-muted-foreground">{f.label}</dt><dd>{String(p[f.key])}</dd></div>
+      ))}
+      {CONDITION_ITEMS.filter((c) => cond[c.key]).map((c) => (
+        <div key={c.key} className="contents"><dt className="text-muted-foreground">{c.label}</dt><dd>{cond[c.key]}</dd></div>
+      ))}
+    </dl>
+  )
+}
+
+function OpenPackage({ p, isOwner, onDone }: { p: Pkg; isOwner: boolean; onDone: () => void }) {
+  const [err, setErr] = useState<string | null>(null)
+  const [num, setNum] = useState('')
+  const [grade, setGrade] = useState('')
+  const [note, setNote] = useState('')
+  const [resp, setResp] = useState('yes')
+  const [counter, setCounter] = useState('')
+  const run = async (fn: string, args: Record<string, unknown>) => {
+    setErr(null)
+    const r = await supabase.rpc(fn, args)
+    if (r.error) { setErr(r.error.message); return }
+    const d = r.data as { ok?: boolean; reason?: string } | null
+    if (d && d.ok === false) { setErr(d.reason ?? 'not saved'); return }
+    onDone()
+  }
+  const comps = (p.comps ?? []) as { address?: string; price?: number; sold_price?: number; date?: string; sold_date?: string; sqft?: number; url?: string; note?: string }[]
+  return (
+    <div className="space-y-3 text-sm">
+      <p className="text-muted-foreground">
+        {STATUS[p.status]?.who}
+        {p.callback_at ? ` · callback promised ${fmtDateTime(String(p.callback_at))}` : ''}
+        {p.walk_booked_on_call ? ' · walk booked on the call' : ''}
+        {p.hot ? ' · HOT' : ''}
+      </p>
+      <Summary p={p} />
+      {p.arv != null && (
+        <div className="rounded-lg bg-muted p-3">
+          <p><span className="font-medium">Value (after repairs):</span> {money(p.arv)} <span className="text-muted-foreground">by {String(p.valued_by ?? 'Muse')}</span></p>
+          {p.arv_basis != null && <p className="text-muted-foreground">{String(p.arv_basis)}</p>}
+          {comps.length > 0 && (
+            <ul className="mt-1 list-disc pl-5">
+              {comps.slice(0, 8).map((c, i) => (
+                <li key={i}>{c.url ? <a className="underline" href={c.url} target="_blank" rel="noreferrer">{c.address ?? 'comp'}</a> : c.address}
+                  {' '}{money(c.sold_price ?? c.price)}{c.sold_date ?? c.date ? `, ${c.sold_date ?? c.date}` : ''}{c.sqft ? `, ${c.sqft} sf` : ''}{c.note ? ` (${c.note})` : ''}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      {p.our_number != null && <p className="text-base"><span className="font-semibold">Colin&apos;s number:</span> around {money(p.our_number)}{p.number_note ? ` · ${String(p.number_note)}` : ''}</p>}
+      {p.status === 'counter' && <p><Badge tone="warn">Counter</Badge> They asked for {money(p.counter_number)}{p.response_note ? `: ${String(p.response_note)}` : ''}</p>}
+
+      {isOwner && ['waiting_value', 'waiting_number', 'counter', 'number_ready'].includes(p.status) && (
+        <div className="space-y-2 rounded-lg border p-3">
+          <p className="font-medium">{p.status === 'number_ready' ? 'Change your number' : 'Set your number'}</p>
+          <div className="grid gap-2 sm:grid-cols-[10rem_7rem_1fr_auto]">
+            <Input inputMode="numeric" placeholder="Number ($)" value={num} onChange={(e) => setNum(e.target.value.replace(/[^0-9]/g, ''))} aria-label="Your number" />
+            <Select value={grade} onChange={(e) => setGrade(e.target.value)} aria-label="Grade the package">
+              <option value="">Grade</option><option value="A">A</option><option value="B">B</option><option value="C">C</option>
+            </Select>
+            <Input placeholder="Note for the caller (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+            <Button disabled={!num} onClick={() => void run('package_price', { p_id: p.id, p_number: Number(num), p_note: note || null, p_grade: grade || null })}>Send to caller</Button>
+          </div>
+          <p className="text-xs text-muted-foreground">The caller says it as &quot;around {num ? money(num) : '{number}'}, once my partner sees it&quot;, and nothing else.</p>
+        </div>
+      )}
+
+      {p.status === 'number_ready' && (
+        <div className="space-y-2 rounded-lg border p-3">
+          <p className="font-medium">The callback</p>
+          <blockquote className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-2 dark:bg-amber-950/30">
+            &quot;My partner and I went over it. With {p.condition && Object.values(p.condition).find(Boolean) ? 'what you mentioned about the place' : 'everything you told me'}, we&apos;d be at around {money(p.our_number)}, once my partner sees it in person.&quot; Then stop talking. Then: &quot;Does that work for you?&quot;
+          </blockquote>
+          <div className="grid gap-2 sm:grid-cols-[12rem_10rem_1fr_auto]">
+            <Select value={resp} onChange={(e) => setResp(e.target.value)} aria-label="What they said">
+              <option value="yes">Yes</option><option value="close">Close: wants the walk</option><option value="counter">Countered</option><option value="no">No</option>
+            </Select>
+            {resp === 'counter'
+              ? <Input inputMode="numeric" placeholder="Their counter ($)" value={counter} onChange={(e) => setCounter(e.target.value.replace(/[^0-9]/g, ''))} />
+              : <span />}
+            <Input placeholder="What they said, their words" value={note} onChange={(e) => setNote(e.target.value)} />
+            <Button onClick={() => void run('package_delivered', { p_id: p.id, p_said: Number(p.our_number), p_response: resp, p_counter: counter ? Number(counter) : null, p_note: note || null })}>Log the callback</Button>
+          </div>
+          <p className="text-xs text-muted-foreground">A counter goes to Colin: &quot;Let me take that to my partner and come back to you.&quot; Never negotiate.</p>
+        </div>
+      )}
+
+      {p.status === 'agreed' && (
+        <div className="space-y-2 rounded-lg border p-3">
+          <p className="font-medium">Book Colin&apos;s walk</p>
+          <p>&quot;When&apos;s a good time for my partner Colin to come see it? Will everyone on the title be there? It takes about 40 minutes, and at the end a yes or a no is fine.&quot; Set the <strong>Walk-through</strong> on the card; this package closes when it is booked.</p>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {p.status === 'agreed' && <Button size="sm" variant="outline" onClick={() => void run('package_close', { p_id: p.id, p_status: 'walk_booked', p_note: null })}>Walk is booked</Button>}
+        <Button size="sm" variant="ghost" onClick={() => void run('package_close', { p_id: p.id, p_status: 'dead', p_note: 'closed from the card' })}>Close this package</Button>
+      </div>
+      {err && <p className="text-sm text-red-600">{err}</p>}
+    </div>
+  )
+}
+
+function SendPackage({ lead, last, onDone }: { lead: Lead; last: Pkg | null; onDone: () => void }) {
+  const [openForm, setOpen] = useState(false)
+  const [f, setF] = useState<Record<string, string>>({})
+  const [cond, setCond] = useState<Record<string, string>>({})
+  const [hot, setHot] = useState(false)
+  const [walk, setWalk] = useState(false)
+  const [source, setSource] = useState('')
+  const [interest, setInterest] = useState('')
+  const [cb, setCb] = useState(isoToLocalInput(new Date(Date.now() + 24 * 3600_000).toISOString()))
+  const [err, setErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const people = useQuery({ queryKey: ['card_interests', lead.id], enabled: openForm, queryFn: async () => {
+    const r = await supabase.rpc('card_interests', { p_lead: lead.id })
+    return ((r.data ?? []) as Person[]).filter((x) => x.status === 'active')
+  } })
+  const send = async () => {
+    setBusy(true); setErr(null)
+    const condition = Object.fromEntries(Object.entries(cond).filter(([, v]) => v.trim()))
+    const r = await supabase.rpc('package_submit', { p: { lead_id: lead.id, interest_id: interest || null, source: source || null, hot,
+      walk_booked_on_call: walk, callback_at: walk ? null : localInputToIso(cb), condition, ...f } })
+    setBusy(false)
+    if (r.error) { setErr(r.error.message); return }
+    const d = r.data as { ok: boolean; reason?: string }
+    if (!d.ok) { setErr(d.reason ?? 'not sent'); return }
+    setOpen(false); setF({}); setCond({})
+    onDone()
+  }
+  if (!openForm) {
+    return (
+      <div className="space-y-2 text-sm">
+        {last && <p className="text-muted-foreground">Last package: {STATUS[last.status]?.label ?? last.status}{last.our_number != null ? `, Colin's number around ${money(last.our_number)}` : ''}.</p>}
+        <p className="text-muted-foreground">After a good first call: everything you learned goes to Colin in one email. Never a number on this call.</p>
+        <Button onClick={() => setOpen(true)}>Send package to Colin</Button>
+      </div>
+    )
+  }
+  return (
+    <div className="space-y-3 text-sm">
+      <div className="grid gap-2 sm:grid-cols-3">
+        <Select value={interest} onChange={(e) => setInterest(e.target.value)} aria-label="Who you talked to">
+          <option value="">Who you talked to</option>
+          {(people.data ?? []).map((x) => <option key={x.interest_id} value={x.interest_id}>{x.name} ({x.role.replace(/_/g, ' ')})</option>)}
+        </Select>
+        <Select value={source} onChange={(e) => setSource(e.target.value)} aria-label="Where this lead came from">
+          <option value="">Where it came from (auto)</option>
+          <option value="hot_text">Hot lead from texting</option><option value="inbound">Inbound call</option><option value="cold_list">Cold call</option><option value="other">Other</option>
+        </Select>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={hot} onChange={(e) => setHot(e.target.checked)} /> Hot (need + rough house, or a sale/move date)</label>
+      </div>
+      {FIELDS.map((x) => (
+        <label key={x.key} className="block">
+          <span className="font-medium">{x.label}</span>{x.hint && <span className="text-muted-foreground"> · {x.hint}</span>}
+          {x.long
+            ? <Textarea rows={2} value={f[x.key] ?? ''} onChange={(e) => setF({ ...f, [x.key]: e.target.value })} />
+            : <Input value={f[x.key] ?? ''} onChange={(e) => setF({ ...f, [x.key]: e.target.value })} />}
+        </label>
+      ))}
+      <fieldset className="space-y-2 rounded-lg border p-3">
+        <legend className="px-1 font-medium">Condition checklist (their words; &quot;don&apos;t know&quot; is fine)</legend>
+        {CONDITION_ITEMS.map((c) => (
+          <label key={c.key} className="block">
+            <span className="font-medium">{c.label}</span>{c.ask && <span className="text-muted-foreground"> · &quot;{c.ask}&quot;</span>}
+            <Input value={cond[c.key] ?? ''} onChange={(e) => setCond({ ...cond, [c.key]: e.target.value })} />
+          </label>
+        ))}
+      </fieldset>
+      <div className="grid gap-2 sm:grid-cols-[auto_1fr] sm:items-center">
+        <label className="flex items-center gap-2"><input type="checkbox" checked={walk} onChange={(e) => setWalk(e.target.checked)} /> Walk booked on this call (hot)</label>
+        {!walk && (
+          <label className="flex items-center gap-2"><span className="whitespace-nowrap">Callback promised</span>
+            <Input type="datetime-local" value={cb} onChange={(e) => setCb(e.target.value)} /></label>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <Button disabled={busy} onClick={() => void send()}>Send to Colin</Button>
+        <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+      </div>
+      {err && <p className="text-sm text-red-600">{err}</p>}
+    </div>
+  )
+}
+
+type OpenRow = { package: Pkg; lead: { id: string; owner_name: string | null; property_address: string | null; municipality: string | null }; person: string | null; late: string | null }
+
+/** Today: the packages that are someone's turn. Colin prices the same day; the caller calls back at the time promised. */
+export function PackagesToday() {
+  const { isOwner } = useAuth()
+  const q = useQuery({ queryKey: ['packages_open'], refetchInterval: 120_000, queryFn: async () => {
+    const r = await supabase.rpc('packages_open')
+    if (r.error) throw new Error(r.error.message)
+    return (r.data ?? []) as OpenRow[]
+  } })
+  const rows = (q.data ?? []).filter((x) => isOwner ? ['waiting_value', 'waiting_number', 'counter'].includes(x.package.status) : ['number_ready', 'agreed'].includes(x.package.status))
+  if (!q.data || rows.length === 0) return null
+  return (
+    <Section title={`${isOwner ? 'Packages to price' : 'Callbacks with Colin\u2019s number'} (${rows.length})`}>
+      <ErrorNote error={q.error} />
+      <ul className="divide-y text-sm">
+        {rows.map((x) => (
+          <li key={x.package.id} className="flex flex-wrap items-center gap-2 py-2">
+            <a className="font-medium underline" href={`/lead/${x.lead.id}#package`}>{x.person || x.lead.owner_name}, {x.lead.property_address}</a>
+            <Badge tone={STATUS[x.package.status]?.tone ?? 'muted'}>{STATUS[x.package.status]?.label}</Badge>
+            {x.package.hot ? <Badge tone="bad">HOT</Badge> : null}
+            {x.package.callback_at ? <span className="text-muted-foreground">callback {fmtDateTime(String(x.package.callback_at))}</span> : null}
+            {x.late && <Badge tone="bad">{x.late}</Badge>}
+          </li>
+        ))}
+      </ul>
+    </Section>
+  )
+}
+
+type FunnelRow = { week: string; source: string; calls: number; reached: number; packages: number; hot: number; valued: number; priced: number
+  delivered: number; agreed: number; walks: number; grades: { A: number; B: number; C: number } }
+const SOURCE_LABEL: Record<string, string> = { hot_text: 'Hot text', inbound: 'Inbound', cold_list: 'Cold call', other: 'Other' }
+
+/** The Scoreboard funnel by list (Colin: "8 should be done somehow"): calls to walks, per week and source. */
+export function DealsFunnel() {
+  const q = useQuery({ queryKey: ['deals_funnel'], queryFn: async () => {
+    const r = await supabase.rpc('deals_funnel', { p_weeks: 6 })
+    if (r.error) throw new Error(r.error.message)
+    return (r.data ?? []) as FunnelRow[]
+  } })
+  const rows = (q.data ?? []).filter((x) => x.calls || x.packages)
+  return (
+    <Section title="Deals funnel by list">
+      <p className="mb-2 text-sm text-muted-foreground">Calls, then packages, Colin&apos;s number, the callback, a yes and the walk, per week and by where the lead came from. Grades are Colin&apos;s A/B/C when he prices.</p>
+      <ErrorNote error={q.error} />
+      {rows.length === 0 ? <p className="text-sm text-muted-foreground">No calls or packages yet.</p> : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="text-left text-muted-foreground">
+              {['Week', 'List', 'Calls', 'Reached', 'Packages', 'Hot', 'Valued', 'Priced', 'Called back', 'Yes', 'Walks', 'A/B/C'].map((h) => <th key={h} className="px-2 py-1 font-medium">{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {rows.map((x) => (
+                <tr key={`${x.week}-${x.source}`} className="border-t">
+                  <td className="px-2 py-1">{x.week}</td><td className="px-2 py-1">{SOURCE_LABEL[x.source] ?? x.source}</td>
+                  <td className="px-2 py-1">{x.calls}</td><td className="px-2 py-1">{x.reached}</td><td className="px-2 py-1">{x.packages}</td>
+                  <td className="px-2 py-1">{x.hot}</td><td className="px-2 py-1">{x.valued}</td><td className="px-2 py-1">{x.priced}</td>
+                  <td className="px-2 py-1">{x.delivered}</td><td className="px-2 py-1">{x.agreed}</td><td className="px-2 py-1">{x.walks}</td>
+                  <td className="px-2 py-1">{x.grades.A}/{x.grades.B}/{x.grades.C}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Section>
+  )
+}

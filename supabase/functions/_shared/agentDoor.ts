@@ -115,6 +115,11 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
     inputSchema: { type: 'object', properties: { address: S('part of the street address'), phone: S('a phone number'),
       name: S('part of the owner name'), lead_id: S('a card id'), only_agent: { type: 'boolean', description: 'only cards an agent loaded' },
       limit: { type: 'integer', maximum: 100 } } } },
+  { role: 'intake', name: 'packages_to_value', description: 'Packages a caller sent Colin that still need a value: the card (property, people, phones), the condition checklist in the words of the seller, their number and who lives there. For each, find the after-repair value from recent nearby sales and send it with set_package_value. You never set or suggest our number: Colin prices it himself.',
+    inputSchema: { type: 'object', properties: { limit: { type: 'integer', maximum: 50 } } } },
+  { role: 'intake', name: 'set_package_value', description: 'Write the after-repair value (ARV) for a package: the dollar value, the basis in one or two sentences (which sales, which sources, adjustments), and the comps (address, sold_price, sold_date, sqft, beds, baths, distance, url, note). Colin checks it on the card before he prices. Never a purchase number.',
+    inputSchema: { type: 'object', properties: { package_id: S('the package'), arv: { type: 'number', description: 'after-repair value, dollars' },
+      basis: S('how you got it'), comps: { type: 'array', items: { type: 'object' } } }, required: ['package_id', 'arv', 'basis'] } },
   { role: 'intake', name: 'prospect_counts', description: 'How many agent-loaded cards there are, by stage and by source.',
     inputSchema: { type: 'object', properties: {} } },
   { role: 'sender', name: 'texting_rules', description: 'The rules every text must follow, and the current sending switches. Read this before writing texts.',
@@ -251,6 +256,12 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       return { value: await db.findProspects({ address: args.address as string, phone: args.phone as string, name: args.name as string,
         lead_id: args.lead_id as string, only_agent: !!args.only_agent, limit: int(args.limit, 20, 100) }) }
     case 'prospect_counts': return { value: await db.prospectCounts() }
+    case 'packages_to_value': return { value: await db.records('agent_packages_to_value', { p_limit: int(args.limit, 20, 50) }) }
+    case 'set_package_value': {
+      const r = await db.records('package_set_value', { p_id: String(args.package_id ?? ''), p_arv: Number(args.arv), p_basis: String(args.basis ?? ''),
+        p_comps: Array.isArray(args.comps) ? args.comps : [], p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
     case 'texting_rules': return { value: { rules: TEXTING_RULES, status: await db.status() } }
     case 'sending_status': return { value: await db.status() }
     case 'ready_to_text':
