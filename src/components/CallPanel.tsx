@@ -62,7 +62,7 @@ export function CallPanel({ lead, contacts, inbound, replyFacts, messages }: {
     setTimeout(() => document.getElementById('call-script')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }
   return (
-    <section className="sticky top-16 z-20 space-y-2.5 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-card to-card p-4 shadow-[var(--shadow-lift)]">
+    <section className="z-20 space-y-2.5 md:sticky md:top-16 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-card to-card p-4 shadow-[var(--shadow-lift)]">
       {phone ? (
         <div className="flex flex-wrap items-center gap-2">
           <div className="min-w-0 flex-1">
