@@ -147,7 +147,9 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     const d = r.data as { token?: string; error?: string }
     if (!d.token) throw new Error(d.error ?? 'No dialer token')
     const { Device } = await import('@twilio/voice-sdk')
-    const dev = new Device(d.token, { closeProtection: true, logLevel: 'error' })
+    // our own ring for incoming calls (Colin 2026-10-27: "change the phone ringing tone"): a desk-phone double ring,
+    // public/sounds/ring.wav, in place of Twilio's default
+    const dev = new Device(d.token, { closeProtection: true, logLevel: 'error', sounds: { incoming: '/sounds/ring.wav' } as never })
     dev.on('tokenWillExpire', async () => {
       const rr = await supabase.functions.invoke('voice-token')
       const dd = rr.data as { token?: string } | null
