@@ -6,7 +6,7 @@ import { Badge, Select, Textarea } from '@/components/ui/form'
 import { ConfirmButton } from '@/components/ui/confirm'
 import { api } from '@/lib/queries'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso, todayLocal } from '@/lib/format'
-import { CALL_OUTCOMES, NEXT_STEP, PHONE_SCRIPT, callScript, scriptLine, type CallQuestion } from '@/lib/callScript'
+import { CALL_OUTCOMES, NEXT_STEP, PHONE_SCRIPT, callScript, packetHot, scriptLine, type CallQuestion } from '@/lib/callScript'
 import { answerOf, answerText, gateFromCall, stopsFromCall, type CallFacts, type CallValue } from '@/lib/callGate'
 import { bookingVerdict, type BookingVerdict } from '@/lib/bookingVerdict'
 import { VerdictBox } from '@/components/BookingVerdict'
@@ -23,12 +23,14 @@ const title = (s: string) => s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUp
 const ENTITY = /\b(LLC|INC|TRUST|ESTATE|CORP|COMPANY|PROPERTIES|HOLDINGS|BANK|CHURCH)\b/i
 
 /** Names for the script's {placeholders}: the street, the owner's first name, the signer. */
-function scriptVars(lead: Lead, facts: CallFacts): Record<string, string> {
+function scriptVars(lead: Lead, facts: CallFacts, caller = 'thalia'): Record<string, string> {
   const street = (lead.property_address ?? '').replace(/,.*$/, '').trim()
   const first = ENTITY.test(lead.owner_name) || /^New caller/.test(lead.owner_name) ? '' : title(lead.owner_name.split(/\s+/)[0] ?? '')
   const dm = answerOf(facts, 'decision_makers')?.text?.trim()
   return { street: street ? title(street) : 'the property', first_name: first || 'there', signer: dm || 'everyone who signs',
-    day: answerOf(facts, 'next_step')?.when ? new Date(answerOf(facts, 'next_step')!.when!).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/Chicago' }) : 'tomorrow' }
+    day: answerOf(facts, 'next_step')?.when ? new Date(answerOf(facts, 'next_step')!.when!).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/Chicago' }) : 'tomorrow',
+    time: answerOf(facts, 'next_step')?.when ? new Date(answerOf(facts, 'next_step')!.when!).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' }) : '{a time that works}',
+    caller: caller.charAt(0).toUpperCase() + caller.slice(1) }
 }
 
 // Read top to bottom while on the phone: what we already know, then each question to ask with the
@@ -70,7 +72,11 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
   const opener = messages.find((m) => m.is_opener && m.direction === 'out')
   const replies = messages.filter((m) => m.direction === 'in' && m.channel === 'sms')
   const known = SELLER_FACTS.map((f) => ({ ...f, v: replyFacts[f.id] })).filter((f) => typeof f.v === 'string' && (f.v as string).trim())
-  const vars = scriptVars(lead, facts)
+  const vars = scriptVars(lead, facts, caller)
+  // which call this is (the packet's three): they called us just now, they texted us, or a cold call
+  const callKind: CallKind = messages.some((m) => m.channel === 'call' && m.direction === 'in' && Date.now() - new Date(m.sent_at).getTime() < 3 * 3600_000)
+    ? 'inbound' : replies.length > 0 ? 'hot_text' : 'cold'
+  const hot = packetHot(facts as never)
   const questions = callScript(vars)
   const answered = questions.filter((q) => answerOf(facts, q.id)).length
 
@@ -91,14 +97,24 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
       {phone && <p className="text-sm">Calling from <strong>{fmtPhone(phone)}</strong>{lead.property_address ? ` - ${lead.property_address}` : ''}</p>}
 
       <div className="rounded-md bg-muted p-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pick up with</p>
-        <p className="mt-1 text-lg font-semibold">&ldquo;{pickupLine(caller)}&rdquo;</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{CALL_KIND_LABEL[callKind]}: open with</p>
+        <p className="mt-1 text-lg font-semibold">&ldquo;{pickupLine(caller, callKind, vars)}&rdquo;</p>
         <p className="text-sm text-muted-foreground">{PHONE_SCRIPT.voice}</p>
+        {caller !== 'colin' && <details className="mt-1 text-sm">
+          <summary className="cursor-pointer text-muted-foreground">The other openers</summary>
+          <ul className="mt-1 space-y-1">
+            {(['hot_text', 'inbound', 'cold'] as CallKind[]).filter((k) => k !== callKind).map((k) => (
+              <li key={k}><span className="font-medium">{CALL_KIND_LABEL[k]}:</span> &ldquo;{pickupLine(caller, k, vars)}&rdquo;</li>
+            ))}
+          </ul>
+        </details>}
       </div>
-      <details className="rounded-md border p-3">
-        <summary className="cursor-pointer font-semibold">Before you pick up</summary>
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">{PHONE_SCRIPT.before_pickup.map((l) => <li key={l}>{l}</li>)}</ul>
-      </details>
+      {caller === 'colin' && (
+        <details className="rounded-md border p-3">
+          <summary className="cursor-pointer font-semibold">Before you pick up</summary>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">{PHONE_SCRIPT.before_pickup.map((l) => <li key={l}>{l}</li>)}</ul>
+        </details>
+      )}
 
       <details open className="rounded-md border p-3">
         <summary className="cursor-pointer font-semibold">What we already know</summary>
@@ -125,7 +141,7 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
 
       <ol className="space-y-3">
         {questions.map((q, i) => (
-          <QuestionCard key={q.qid} n={i + 1} q={q} facts={facts} replyFacts={replyFacts} onSave={save} />
+          <QuestionCard key={q.qid} n={i + 1} q={q} facts={facts} replyFacts={replyFacts} onSave={save} showGates={caller === 'colin'} />
         ))}
       </ol>
       {err && <p className="rounded bg-red-50 p-2 text-sm text-red-800">Not saved: {err}</p>}
@@ -145,10 +161,10 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
         </ul>
       </details>
 
-      <VerdictBox v={verdict} />
-      <Close verdict={verdict} vars={vars} facts={facts} replyFacts={replyFacts} onSave={save} canOverride={!!canOverride} />
+      {caller === 'colin' && <VerdictBox v={verdict} />}
+      <Close verdict={verdict} hot={hot} vars={vars} facts={facts} replyFacts={replyFacts} onSave={save} canOverride={!!canOverride} />
 
-      <details className="rounded-md border p-3">
+      {caller === 'colin' && <details className="rounded-md border p-3">
         <summary className="cursor-pointer font-semibold">Gate items this call settles</summary>
         <ul className="mt-1 space-y-1 text-sm">
           {GATE_ITEMS.map((g) => {
@@ -164,7 +180,7 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
           {stops.map((s) => <li key={s} className="font-medium text-red-700">Hard stop: {HARD_STOPS.find((h) => h.id === s)?.label ?? s}</li>)}
         </ul>
         <p className="mt-1 text-xs text-muted-foreground">These fill in Colin&apos;s score on the card; the booking decision above is the card&apos;s.</p>
-      </details>
+      </details>}
 
       <LogCall lead={lead} contacts={contacts} phone={phone} onLogged={onLogged} />
     </section>
@@ -173,62 +189,58 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
 
 const LABEL_OUTCOME: Record<string, string> = Object.fromEntries(CALL_OUTCOMES.map((o) => [o.id, o.label]))
 
-/** The close the card decided on. The Walk-through choice only exists when the card said book (or for Colin). */
-function Close({ verdict, vars, facts, replyFacts, onSave, canOverride }: {
-  verdict: BookingVerdict; vars: Record<string, string>; facts: CallFacts; replyFacts: Record<string, unknown>
+/** The close (docs/THALIA_TRAINING.md): every good call ends in a package for Colin. A clearly hot seller (a need and a
+ *  rough house, or a sale or move date) gets Colin's walk booked now; everyone else a callback at a set time, when the
+ *  caller delivers Colin's number. Not ready: the not-ready lines and a dated check-back. */
+function Close({ verdict, hot, vars, facts, replyFacts, onSave, canOverride }: {
+  verdict: BookingVerdict; hot: boolean; vars: Record<string, string>; facts: CallFacts; replyFacts: Record<string, unknown>
   onSave: (k: string, v: CallValue | null) => Promise<void>; canOverride: boolean
 }) {
   const booked = answerOf(facts, 'next_step')
-  const walkAllowed = verdict.verdict === 'book' || canOverride || !!booked?.choices?.includes('walk')
+  const walkAllowed = hot || verdict.verdict === 'book' || canOverride || !!booked?.choices?.includes('walk')
   const step: CallQuestion = { ...NEXT_STEP, qid: 'booking', gate: [], say: [],
-    choices: (NEXT_STEP.choices ?? []).filter((c) => c.id !== 'walk' || walkAllowed) }
-  const stepCard = <QuestionCard n={0} q={step} facts={facts} replyFacts={replyFacts} onSave={onSave} />
+    choices: (NEXT_STEP.choices ?? []).filter((c) => c.id !== 'walk' || walkAllowed).map((c) => c.id === 'walk' ? { ...c, label: "Colin's walk" } : c) }
+  const stepCard = <QuestionCard n={0} q={step} facts={facts} replyFacts={replyFacts} onSave={onSave} showGates={false} />
   const lines = (keep: (id: string) => boolean) => PHONE_SCRIPT.booking.filter((l) => keep(l.id)).map((l) => scriptLine(l, vars))
   const notReady = PHONE_SCRIPT.not_ready.map((l) => scriptLine(l, vars))
-  const override = canOverride && verdict.verdict !== 'book' && (
-    <p className="text-xs text-muted-foreground">Colin can still book a walk-through here; nobody else can until the card says book.</p>
+  const toPackage = (
+    <Button variant="outline" className="w-full" onClick={() => document.getElementById('package')?.scrollIntoView({ behavior: 'smooth' })}>
+      Then send the package to Colin (it fills in from these answers)
+    </Button>
   )
-
-  if (verdict.verdict === 'book') return (
-    <div className="space-y-2 rounded-md border-2 border-emerald-300 p-3">
-      <p className="font-semibold">Close: book the visit</p>
-      <ScriptLines lines={lines((id) => id !== 'b8_call_instead')} />
-      {stepCard}
-    </div>
-  )
-  if (verdict.verdict === 'call_back') return (
-    <div className="space-y-2 rounded-md border-2 border-amber-300 p-3">
-      <p className="font-semibold">Close: one more call</p>
-      <p className="text-sm">For: {verdict.because.join('; ')}.</p>
-      <ScriptLines lines={lines((id) => id === 'b8_call_instead')} />
-      {stepCard}
-      {override}
-    </div>
-  )
-  if (verdict.verdict === 'no') return (
+  if (verdict.verdict === 'no' && !hot) return (
     <div className="space-y-2 rounded-md border-2 border-red-300 p-3">
       <p className="font-semibold">Close: not ready yet</p>
       <ScriptLines lines={notReady} />
       {(booked || canOverride) && stepCard}
-      {override}
     </div>
   )
   return (
-    <div className="space-y-2 rounded-md border p-3">
-      <p className="font-semibold">Close: not decided yet</p>
-      <p className="text-sm text-muted-foreground">Keep going. The close (book, one more call, or not ready) shows once the card has the answers above.</p>
-      {(booked || canOverride) && stepCard}
-      {override}
-      <details>
-        <summary className="cursor-pointer text-sm font-medium">If they want out now: the not-ready lines</summary>
+    <div className="space-y-3">
+      {hot && (
+        <div className="space-y-2 rounded-md border-2 border-emerald-400 p-3">
+          <p className="font-semibold">Hot: book Colin&apos;s walk on this call</p>
+          <p className="text-sm text-muted-foreground">A need and a rough house, or a sale or move date. Don&apos;t wait for a number: Colin prices it at the house.</p>
+          <ScriptLines lines={lines((id) => id !== 'b8_call_instead')} />
+        </div>
+      )}
+      <div className="space-y-2 rounded-md border-2 border-amber-300 p-3">
+        <p className="font-semibold">{hot ? 'Or, if they want a number first: the callback' : 'Close: the package and a callback'}</p>
+        <ScriptLines lines={lines((id) => id === 'b8_call_instead')} />
+        {stepCard}
+        {toPackage}
+      </div>
+      <details className="rounded-md border p-3">
+        <summary className="cursor-pointer text-sm font-medium">Not ready: the not-ready lines</summary>
         <div className="mt-2"><ScriptLines lines={notReady} /></div>
       </details>
     </div>
   )
 }
 
-function QuestionCard({ n, q, facts, replyFacts, onSave }: {
+function QuestionCard({ n, q, facts, replyFacts, onSave, showGates = true }: {
   n: number; q: CallQuestion; facts: CallFacts; replyFacts: Record<string, unknown>; onSave: (k: string, v: CallValue | null) => Promise<void>
+  showGates?: boolean
 }) {
   const v = answerOf(facts, q.id)
   const [editing, setEditing] = useState(!v)
@@ -250,7 +262,7 @@ function QuestionCard({ n, q, facts, replyFacts, onSave }: {
     <li className={cn('rounded-md border p-3', v ? 'border-emerald-300 bg-emerald-50/40' : 'border-input')}>
       <div className="flex items-start justify-between gap-2">
         <p className="font-semibold">{n ? `${n}. ` : ''}{q.title}{' '}
-          {q.gate.map((g) => <Badge key={g} tone="info" className="mr-1">Gate {g}: {PHONE_SCRIPT.gate_legend[String(g)]}</Badge>)}
+          {showGates && q.gate.map((g) => <Badge key={g} tone="info" className="mr-1">Gate {g}: {PHONE_SCRIPT.gate_legend[String(g)]}</Badge>)}
         </p>
         {v ? <Badge tone="good">Answered</Badge> : fromTexts ? <Badge tone="warn">From texts</Badge> : <Badge>Ask</Badge>}
       </div>
@@ -327,23 +339,27 @@ function LogCall({ lead, contacts, phone, onLogged }: { lead: Lead; contacts: Co
     setBusy(true)
     setMsg(null)
     const when = outcome === 'not_now' && notNowKind === 'date' && until ? localInputToIso(`${until}T12:00`) : null
-    const r = await api.logCall(lead.id, from || null, outcome, note.trim() || null, when)
+    // a voicemail is a no-answer that left a message (the packet's outcome list)
+    const sent = outcome === 'voicemail' ? 'no_answer' : outcome
+    const words = outcome === 'voicemail' ? ['Left a voicemail.', note.trim()].filter(Boolean).join(' ') : note.trim()
+    const r = await api.logCall(lead.id, from || null, sent, words || null, when)
     setBusy(false)
     const d = r.data as { ok: boolean; reason?: string } | null
     if (r.error || !d?.ok) { setMsg({ ok: false, text: r.error?.message ?? d?.reason ?? 'Not saved' }); return }
-    setMsg({ ok: true, text: `Logged: ${LABEL_OUTCOME[outcome]}.` })
+    setMsg({ ok: true, text: `Logged: ${outcome === 'voicemail' ? 'Voicemail' : LABEL_OUTCOME[outcome]}.` })
     const logged = outcome
     setOutcome('')
     setNote('')
     for (const k of [['lead', lead.id], ['leads'], ['pipeline_counts'], ['phone_lookup'], ['seller_recovery_queue']]) void qc.invalidateQueries({ queryKey: k })
     onLogged?.(logged)
   }
-  const chosen = CALL_OUTCOMES.find((o) => o.id === outcome)
+  const OUTCOMES = [...CALL_OUTCOMES.slice(0, 1), { id: 'voicemail', label: 'Voicemail', hint: 'Left a voicemail; under 20 seconds, your name and the street' } as const, ...CALL_OUTCOMES.slice(1)]
+  const chosen = OUTCOMES.find((o) => o.id === outcome)
   return (
     <div className="space-y-2 rounded-md border-2 p-3">
       <p className="font-semibold">Log this call</p>
       {phones.length > 1 && (
-        <label className="block text-sm font-medium">They called from
+        <label className="block text-sm font-medium">The number you talked on
           <Select className="mt-1" value={from} onChange={(e) => setFrom(e.target.value)}>
             {phone && !phones.includes(phone) && <option value={phone}>{fmtPhone(phone)}</option>}
             {phones.map((p) => <option key={p} value={p}>{fmtPhone(p)}</option>)}
@@ -351,7 +367,7 @@ function LogCall({ lead, contacts, phone, onLogged }: { lead: Lead; contacts: Co
         </label>
       )}
       <div className="grid grid-cols-2 gap-2">
-        {CALL_OUTCOMES.map((o) => (
+        {OUTCOMES.map((o) => (
           <button key={o.id} type="button" aria-pressed={outcome === o.id} onClick={() => setOutcome(o.id)}
             className={cn('min-h-11 rounded-md border px-2 py-2 text-sm font-medium',
               outcome === o.id ? (o.id === 'dnc' ? 'border-red-700 bg-red-700 text-white' : 'border-primary bg-primary text-primary-foreground') : 'bg-background')}>
@@ -403,10 +419,17 @@ function ScriptLines({ lines }: { lines: { id: string; say: string; note?: strin
   )
 }
 
-/** The first words on a call. Rick's lead manager is "an assistant checking what's going on with the property"; the
- *  buyer (Colin) talks to the ones who want to sell (Colin 2026-10-25: "What would Rick do"). */
+type CallKind = 'hot_text' | 'inbound' | 'cold'
+const CALL_KIND_LABEL: Record<CallKind, string> = { hot_text: 'They texted us', inbound: 'They called us', cold: 'Cold call' }
+
+/** The first words on a call (docs/THALIA_TRAINING.md): the caller's own name, the street, and the question that fits. */
 // eslint-disable-next-line react-refresh/only-export-components
-export function pickupLine(caller: string): string {
+export function pickupLine(caller: string, kind: CallKind = 'cold', vars: Record<string, string> = {}): string {
   if (caller === 'colin') return PHONE_SCRIPT.pickup
-  return `Hi, this is ${caller.charAt(0).toUpperCase()}${caller.slice(1)}, Colin Merrill's assistant. I'm just checking in about the place.`
+  const name = caller.charAt(0).toUpperCase() + caller.slice(1)
+  const street = vars.street ?? 'the property'
+  const first = vars.first_name && vars.first_name !== 'there' ? vars.first_name : null
+  if (kind === 'inbound') return `Hi, this is ${name}. Is this about ${street}?`
+  if (kind === 'hot_text') return `Hi, is this ${first ?? 'the owner'}? This is ${name}, I'm calling about ${street}. You were texting with us about it. Did I catch you at an OK time?`
+  return `Hi, is this ${first ?? 'the owner'}? This is ${name}, I'm calling about ${street}. Are you still the owner there?`
 }

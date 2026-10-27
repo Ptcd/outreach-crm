@@ -89,7 +89,7 @@ export default function LeadDetail() {
       )}
       <CallPanel lead={lead} contacts={contacts} inbound={q.data.inbound} replyFacts={facts} messages={messages} />
       <CallNotes leadId={lead.id} messages={messages} />
-      <TextThread leadId={lead.id} phone={bestPhone(contacts, q.data.inbound)} messages={messages} inbound={q.data.inbound}
+      <TextThread leadId={lead.id} phone={bestPhone(contacts, q.data.inbound, lead.owner_name)} messages={messages} inbound={q.data.inbound}
         closed={lead.stage === 'dnc'} />
       {/* the script sits right under the Call button, open on a hot card (someone just said they'd sell) */}
       <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}

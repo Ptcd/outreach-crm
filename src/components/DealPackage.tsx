@@ -10,6 +10,8 @@ import { Badge, ErrorNote, Section, Select, Textarea } from '@/components/ui/for
 import { supabase } from '@/lib/supabaseClient'
 import { fmtDateTime, isoToLocalInput, localInputToIso } from '@/lib/format'
 import { useAuth } from '@/providers/AuthProvider'
+import { api } from '@/lib/queries'
+import { NEXT_STEP, callScript, packageFromCall } from '@/lib/callScript'
 import type { Lead } from '@/lib/types'
 
 export const CONDITION_ITEMS: { key: string; label: string; ask: string }[] = [
@@ -54,6 +56,15 @@ const STATUS: Record<string, { label: string; tone: 'muted' | 'warn' | 'bad' | '
 type Pkg = Record<string, unknown> & { id: string; status: string; condition: Record<string, string> | null; comps: unknown[] | null }
 type Person = { interest_id: string; name: string; role: string; status: string }
 
+// the script's one-tap answer labels, for turning the call's answers into package words
+const CALL_LABELS: Record<string, string> = Object.fromEntries([...callScript(), NEXT_STEP].flatMap((q) => (q.choices ?? []).map((c) => [c.id, c.label])))
+
+/** "the roof and the furnace you mentioned": the first two things she wrote down about the house, for the callback line */
+function mentioned(cond: Record<string, string> | null): string {
+  const names = CONDITION_ITEMS.filter((c) => cond?.[c.key] && !['fix_first', 'other'].includes(c.key)).slice(0, 2).map((c) => `the ${c.label.toLowerCase()}`)
+  return names.length ? `With ${names.join(' and ')} you mentioned` : 'With everything you told me about the place'
+}
+
 const money = (n: unknown) => (n == null || n === '' ? '' : `$${Math.round(Number(n)).toLocaleString('en-US')}`)
 const OPEN = ['waiting_value', 'waiting_number', 'number_ready', 'counter', 'agreed']
 
@@ -72,7 +83,7 @@ export function DealPackage({ lead }: { lead: Lead }) {
     <div id="package" className="scroll-mt-16">
       <Section title="Package for Colin" right={p ? <Badge tone={STATUS[p.status]?.tone ?? 'muted'}>{STATUS[p.status]?.label ?? p.status}</Badge> : undefined}>
         <ErrorNote error={q.error} />
-        {open ? <OpenPackage p={p!} isOwner={isOwner} onDone={refresh} /> : <SendPackage lead={lead} last={p ?? null} onDone={refresh} />}
+        {open ? <OpenPackage p={p!} lead={lead} isOwner={isOwner} onDone={refresh} /> : <SendPackage lead={lead} last={p ?? null} onDone={refresh} />}
       </Section>
     </div>
   )
@@ -92,13 +103,32 @@ function Summary({ p }: { p: Pkg }) {
   )
 }
 
-function OpenPackage({ p, isOwner, onDone }: { p: Pkg; isOwner: boolean; onDone: () => void }) {
+function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner: boolean; onDone: () => void }) {
   const [err, setErr] = useState<string | null>(null)
   const [num, setNum] = useState('')
   const [grade, setGrade] = useState('')
   const [note, setNote] = useState('')
   const [resp, setResp] = useState('yes')
   const [counter, setCounter] = useState('')
+  const [walkAt, setWalkAt] = useState('')
+  // Colin's walk, booked on the card the same way the call script books it (the belt moves the card to Walk booked,
+  // which closes this package)
+  const bookWalk = async () => {
+    const when = localInputToIso(walkAt)
+    if (!when) { setErr('pick the day and time of the walk'); return }
+    setErr(null)
+    const r = await api.callAnswer(lead.id, 'next_step', { choices: ['walk'], kind: 'walk', when, at: when })
+    if (r.error) { setErr(r.error.message); return }
+    const d = r.data as { ok?: boolean; reason?: string } | null
+    if (d && d.ok === false) { setErr(d.reason ?? 'not booked'); return }
+    onDone()
+  }
+  const walkBox = (
+    <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+      <Input type="datetime-local" value={walkAt} onChange={(e) => setWalkAt(e.target.value)} aria-label="Day and time of Colin's walk" />
+      <Button onClick={() => void bookWalk()}>Book Colin&apos;s walk</Button>
+    </div>
+  )
   const run = async (fn: string, args: Record<string, unknown>) => {
     setErr(null)
     const r = await supabase.rpc(fn, args)
@@ -153,7 +183,7 @@ function OpenPackage({ p, isOwner, onDone }: { p: Pkg; isOwner: boolean; onDone:
         <div className="space-y-2 rounded-lg border p-3">
           <p className="font-medium">The callback</p>
           <blockquote className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-2 dark:bg-amber-950/30">
-            &quot;My partner and I went over it. With {p.condition && Object.values(p.condition).find(Boolean) ? 'what you mentioned about the place' : 'everything you told me'}, we&apos;d be at around {money(p.our_number)}, once my partner sees it in person.&quot; Then stop talking. Then: &quot;Does that work for you?&quot;
+            &quot;My partner and I went over it. {mentioned(p.condition)}, we&apos;d be at around {money(p.our_number)}, once my partner sees it in person.&quot; Then stop talking. Then: &quot;Does that work for you?&quot;
           </blockquote>
           <div className="grid gap-2 sm:grid-cols-[12rem_10rem_1fr_auto]">
             <Select value={resp} onChange={(e) => setResp(e.target.value)} aria-label="What they said">
@@ -172,12 +202,19 @@ function OpenPackage({ p, isOwner, onDone }: { p: Pkg; isOwner: boolean; onDone:
       {p.status === 'agreed' && (
         <div className="space-y-2 rounded-lg border p-3">
           <p className="font-medium">Book Colin&apos;s walk</p>
-          <p>&quot;When&apos;s a good time for my partner Colin to come see it? Will everyone on the title be there? It takes about 40 minutes, and at the end a yes or a no is fine.&quot; Set the <strong>Walk-through</strong> on the card; this package closes when it is booked.</p>
+          <p>&quot;When&apos;s a good time for my partner Colin to come see it? Will everyone on the title be there? It takes about 40 minutes, and at the end a yes or a no is fine.&quot;</p>
+          {walkBox}
+          <p className="text-xs text-muted-foreground">Then text Colin the time. This package closes when the walk is booked.</p>
         </div>
       )}
 
+      {!!p.hot && ['waiting_value', 'waiting_number'].includes(p.status) && !p.walk_booked_on_call && (
+        <details className="rounded-lg border p-3">
+          <summary className="cursor-pointer font-medium">Hot: book Colin&apos;s walk now instead of waiting for the number</summary>
+          <div className="mt-2">{walkBox}</div>
+        </details>
+      )}
       <div className="flex flex-wrap gap-2">
-        {p.status === 'agreed' && <Button size="sm" variant="outline" onClick={() => void run('package_close', { p_id: p.id, p_status: 'walk_booked', p_note: null })}>Walk is booked</Button>}
         <Button size="sm" variant="ghost" onClick={() => void run('package_close', { p_id: p.id, p_status: 'dead', p_note: 'closed from the card' })}>Close this package</Button>
       </div>
       {err && <p className="text-sm text-red-600">{err}</p>}
@@ -186,14 +223,15 @@ function OpenPackage({ p, isOwner, onDone }: { p: Pkg; isOwner: boolean; onDone:
 }
 
 function SendPackage({ lead, last, onDone }: { lead: Lead; last: Pkg | null; onDone: () => void }) {
+  const fromCall = packageFromCall((lead.call_facts ?? {}) as never, CALL_LABELS)
   const [openForm, setOpen] = useState(false)
-  const [f, setF] = useState<Record<string, string>>({})
-  const [cond, setCond] = useState<Record<string, string>>({})
-  const [hot, setHot] = useState(false)
-  const [walk, setWalk] = useState(false)
+  const [f, setF] = useState<Record<string, string>>(() => Object.fromEntries(Object.entries(fromCall.fields).filter(([, v]) => v)))
+  const [cond, setCond] = useState<Record<string, string>>(fromCall.condition)
+  const [hot, setHot] = useState(fromCall.hot)
+  const [walk, setWalk] = useState(fromCall.walk)
   const [source, setSource] = useState('')
   const [interest, setInterest] = useState('')
-  const [cb, setCb] = useState(isoToLocalInput(new Date(Date.now() + 24 * 3600_000).toISOString()))
+  const [cb, setCb] = useState(isoToLocalInput(fromCall.callback ?? new Date(Date.now() + 24 * 3600_000).toISOString()))
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const people = useQuery({ queryKey: ['card_interests', lead.id], enabled: openForm, queryFn: async () => {
@@ -216,7 +254,7 @@ function SendPackage({ lead, last, onDone }: { lead: Lead; last: Pkg | null; onD
     return (
       <div className="space-y-2 text-sm">
         {last && <p className="text-muted-foreground">Last package: {STATUS[last.status]?.label ?? last.status}{last.our_number != null ? `, Colin's number around ${money(last.our_number)}` : ''}.</p>}
-        <p className="text-muted-foreground">After a good first call: everything you learned goes to Colin in one email. Never a number on this call.</p>
+        <p className="text-muted-foreground">After a good first call: everything you learned goes to Colin in one email. Never a number on this call.{Object.values(fromCall.fields).some(Boolean) ? ' The answers you tapped in the call script are already filled in; check them and add the rest.' : ''}</p>
         <Button onClick={() => setOpen(true)}>Send package to Colin</Button>
       </div>
     )

@@ -6,6 +6,7 @@ import { firstNameOf } from '@/lib/inbox'
 import { fmtPhone } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Contact, Lead, Message, TwilioInbound } from '@/lib/types'
+import { isOwnersPhone } from '@/lib/phoneOrder'
 
 /** The name our first text greeted ("Hi Laurie, Colin Merrill here ..."), else the owner's first name. A trust's
  *  texts go to a person (Laurie), not to the name on title ("R Darrell Sutton Revocable Trust"). */
@@ -33,14 +34,15 @@ export function pillarsDone(callFacts: CallFacts, replyFacts: Record<string, unk
 }
 
 /** The number to call: the one they texted us from, else the first usable phone on the card. */
-export function bestPhone(contacts: Contact[], inbound: TwilioInbound[]): Contact | null {
+export function bestPhone(contacts: Contact[], inbound: TwilioInbound[], ownerName?: string | null): Contact | null {
   const phones = contacts.filter((c) => c.kind === 'phone' && c.status !== 'bad' && !c.dnc_app && !c.suppressed)
   const texted = [...(inbound ?? [])].sort((a, b) => b.received_at.localeCompare(a.received_at)).map((t) => t.from10)
   for (const p of texted) {
     const hit = phones.find((c) => (c.value_normalized ?? c.value).replace(/\D/g, '').slice(-10) === p)
     if (hit) return hit
   }
-  return phones.find((c) => c.line_type === 'mobile') ?? phones[0] ?? null
+  // the owner's own mobile first (lib/phoneOrder), then any mobile
+  return phones.find((c) => c.line_type === 'mobile' && isOwnersPhone(c, ownerName)) ?? phones.find((c) => c.line_type === 'mobile') ?? phones[0] ?? null
 }
 
 // The top of a card (Colin 2026-10-24: "Where is the place to call", "figuring out how to do the pillars on a call is
@@ -51,7 +53,7 @@ export function CallPanel({ lead, contacts, inbound, replyFacts, messages }: {
 }) {
   const nav = useNavigate()
   if (lead.stage === 'dnc') return null
-  const phone = bestPhone(contacts, inbound)
+  const phone = bestPhone(contacts, inbound, lead.owner_name)
   const done = pillarsDone((lead.call_facts ?? {}) as CallFacts, replyFacts)
   const first = greetedName(messages, lead.owner_name)
   const texted = !!phone && (inbound ?? []).some((t) => (phone.value_normalized ?? phone.value).replace(/\D/g, '').slice(-10) === t.from10)

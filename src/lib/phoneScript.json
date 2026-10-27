@@ -1,7 +1,7 @@
 {
-  "version": "2026-10-22",
-  "source": "docs/PHONE_SCRIPT.md",
-  "voice": "Colin, first person. No business name, no cash claims, no number from our side, no promises on closing dates or tenants. Our side never says offer, price, investor, contract or home (Rick's poison words, docs/RICK_PLAYBOOK.md section 4): say a number, an agreement, the place.",
+  "version": "2026-10-27",
+  "source": "docs/THALIA_TRAINING.md",
+  "voice": "Your own name: \"This is Thalia.\" Colin is \"my partner\"; say his name only when they ask who texted them, or when you book his walk. Never a number on the first call (only Colin's, on the callback). Never offer, price, investor, contract, cash, as-is, assistant or a company name: say a number, an agreement, the place.",
   "gate_legend": {
     "1": "reason + clock",
     "2": "decision makers",
@@ -25,275 +25,340 @@
     {
       "id": "q1_property",
       "gate_item": [],
-      "say": "Thanks for calling me back. Which place is this about, the one on {street}?",
-      "listen_for": "The address matches the card. A different address is a new property: ask whose name it is in. Unknown number: ask the address first."
+      "say": "Are you still the owner of {street}?",
+      "listen_for": "Yes, sold it, or not them. A different address is a new property: ask whose name it is in."
+    },
+    {
+      "id": "q1b_interest",
+      "gate_item": [],
+      "say": "Any interest in selling it?",
+      "listen_for": "Yes: 'What's got you thinking about it?' Maybe ('everything's for sale'): 'Were you thinking about selling before we reached out?' Flat no: 'No problem. Before I go, do you own anything else you'd ever consider selling?' Then let go."
     },
     {
       "id": "q2_identity",
-      "gate_item": [2],
-      "say": "And is it your place, {first_name}, or are you helping someone with it?",
+      "gate_item": [
+        2
+      ],
+      "say": "And is it your place, or are you helping someone with it?",
       "listen_for": "Owner, spouse, adult child, tenant, manager, agent, wholesaler. Anyone but an owner or named family changes the call. Title is checked in records, not asked.",
       "branch": "tenant -> reassure, no landlord plans discussed; agent -> stay out of the way, ask the listing end date; wholesaler -> polite exit; relative -> ask whether the owner would want to hear about it and how to reach them"
     },
     {
       "id": "q3_motivation",
-      "gate_item": [1],
+      "gate_item": [
+        1
+      ],
       "say": "So what's the story over there? What's got you thinking about selling now?",
       "listen_for": "Silence after asking. A need (move, money, tenant, death, behind) rather than a want; whether they connect it to selling. 'If the price is right' with nothing behind it is not a lead.",
       "branch": "asked why I want to know -> 'I ask everyone, so I don't waste your time with a number that was never going to work.'"
     },
     {
       "id": "q4_condition",
-      "gate_item": [5],
+      "gate_item": [
+        5
+      ],
       "say": "Tell me a little about the place.",
-      "listen_for": "Specific defects in their own words are the clearest sign of a real seller. Vague 'needs some work' is a 1. A perfect house: loop back to the reason.",
+      "listen_for": "Their words. Then only what they left out, one at a time: the roof (how old, leaks), the furnace and AC (how old, working), the water heater, the foundation and basement (cracks, water), electrical (breakers or the old fuse box), plumbing, windows (original or replaced), the kitchen and baths (last updated), the yard and outside (driveway, garage, trees near the house, a fence). 'Don't know' is fine.",
       "branch": "perfect house -> 'Sounds like a great place. Why would you even think about selling it?'"
     },
     {
       "id": "q4a_occupancy",
-      "gate_item": [5],
+      "gate_item": [
+        5
+      ],
       "say": "Who's living there right now, you, a tenant, or is it sitting empty?",
       "listen_for": "Owner / tenant / vacant; access for a visit. Only if not already said."
     },
     {
       "id": "q4b_list_tomorrow",
-      "gate_item": [5],
-      "say": "If you listed it tomorrow, what would you have to do to it first?",
+      "gate_item": [
+        5
+      ],
+      "say": "If you listed it tomorrow, what would you have to fix first?",
       "listen_for": "Their own list of work. Only if not already said."
     },
     {
       "id": "q4c_happened",
-      "gate_item": [5],
+      "gate_item": [
+        5
+      ],
       "say": "Anything ever happen to it, like a leak or a fire?",
       "listen_for": "A fire, water, foundation, a raze or code order. Only if not already said."
     },
     {
+      "id": "q4d_photos",
+      "gate_item": [],
+      "say": "Could you text me a few pictures, inside and out?",
+      "listen_for": "Photos let Colin price it before he sees it."
+    },
+    {
       "id": "q5_timeline",
-      "gate_item": [1],
-      "say": "If I bought it, where would you be headed, and when?",
-      "listen_for": "A concrete plan (sister's house, lease start, closing on the next place, court date) vs 'haven't thought about it'. Inside about 90 days gets full attention. A date with nothing behind it is a brush-off: ask what happens on that date."
+      "gate_item": [
+        1
+      ],
+      "say": "If we're able to buy the place, where are you moving to?",
+      "listen_for": "Silence. Then, if needed: 'And how soon?' A place and a date inside 90 days is strong. No place in mind means 90 days or more: a check-back, not a deal."
     },
     {
       "id": "q6_decision_makers",
-      "gate_item": [2],
-      "say": "Is it just you on this, or is there anyone else who'd want to weigh in before you said yes?",
+      "gate_item": [
+        2
+      ],
+      "say": "Is it just you on this, or is anyone else on the title or in the family who'd want a say?",
       "listen_for": "Spouse, siblings, heir, partner, 'my kids handle it'. Get the name and whether they can be on the next call or at the visit.",
       "branch": "estate -> 'Are you the one handling the house for the family, and have the court papers come through yet?'; company -> who signs for it"
     },
     {
       "id": "q7_number",
-      "gate_item": [3],
+      "gate_item": [
+        3
+      ],
       "say": "What do you need to get out of it to move on?",
-      "listen_for": "A figure, a refusal, or 'make me an offer'. Never 'asking price', 'what would you like' or 'lowest you'd take'. At most two asks on the whole call; a second refusal is the answer: write 'refused after two asks'.",
+      "listen_for": "A figure, a refusal, or 'make me an offer'. Never 'asking price', 'what would you like' or 'lowest you'd take'. At most two asks on the whole call; a second refusal is the answer: write 'refused after two asks'. After you ask, go quiet and let them talk.",
       "branch": "'what do you mean?' -> 'The number that makes it worth selling to you.'; 'make me an offer' -> objection obj_give_me_a_number"
     },
     {
       "id": "q8_anchor",
-      "gate_item": [3],
+      "gate_item": [
+        3
+      ],
       "say": "How did you come up with that?",
       "listen_for": "Silence after asking. Need (payoff, arrears, what they paid, the next place) vs market (Zillow, bank estimate, neighbour's sale, refused offers). Never argue the comps on the phone."
     },
     {
       "id": "q9_flexibility",
-      "gate_item": [4],
-      "say": "I buy as-is and cover the repairs and the selling costs, so where I come in usually lands under what a listed sale would bring. If I came in under yours, would you still want to hear it?",
+      "gate_item": [
+        4
+      ],
+      "say": "If we could close fast and cover the closing costs, would you have any flexibility on that?",
       "listen_for": "Moved / open / depends / terms only / firm. A firm floor resting on a real need (payoff plus arrears) is a 1, not a 0."
     },
     {
       "id": "q10_owed",
-      "gate_item": [6],
+      "gate_item": [
+        6
+      ],
       "say": "Do you owe anything on it? Roughly what's left is fine.",
       "listen_for": "Only once a number is on the table or the records show distress. Payoff near or above their number: special review. 'Don't know' is fine; never interrogate."
     },
     {
       "id": "q10a_behind",
-      "gate_item": [6],
+      "gate_item": [
+        6
+      ],
       "say": "Are you behind on anything, the payment or the taxes?",
       "listen_for": "A sale date. Inside 14 days is a hard stop: say honestly there isn't time for a sale, mention a free HUD housing counselor.",
       "branch": "sale date inside 14 days -> hard stop, no walk"
     },
     {
+      "id": "q10b_other_buyers",
+      "gate_item": [],
+      "say": "Have you talked to any other buyers or agents about it?",
+      "listen_for": "Who, and whether anything is signed. Signed: a hard stop."
+    },
+    {
+      "id": "q10c_concerns",
+      "gate_item": [],
+      "say": "What concerns you most about selling?",
+      "listen_for": "Often the real blocker. Write it word for word."
+    },
+    {
       "id": "q11_condition_decision",
-      "gate_item": [2, 6],
-      "say": "Here's how I work. I'll come see it once, I'll have a straight number for you before I leave, and I'll tell you honestly if I can't get there. Before I come out: if the number works for both of us, are you in a spot to say yes or no on it, with everyone who'd need to sign there?",
-      "listen_for": "A plain yes; 'talk to my wife' (get her to the visit); 'think about it' (fine, ask what they'd want to think through). No guilt, no fake busyness, no market fear.",
-      "branch": "yes -> booking; not ready -> not_ready close"
+      "gate_item": [
+        2,
+        6
+      ],
+      "say": "Let me go over this with my partner. I'll call you back tomorrow at {time}. Does that work? And when I call, can you just tell me straight whether it works or not? A no is completely fine.",
+      "listen_for": "Set the callback at that exact time (the close below). A clearly hot seller (a need and a rough house, or a sale or move date) gets Colin's walk booked now instead.",
+      "branch": "yes -> the package and the callback (or the walk if hot); not ready -> not_ready close"
     }
   ],
   "booking": [
     {
       "id": "b1_ask",
-      "say": "When's a good time for me to come by and see it?",
-      "note": "One open question; it is also the test. A motivated owner names a time; a tire-kicker keeps asking for the number."
+      "say": "When's a good time for my partner Colin to come see it?",
+      "note": "Offer the soonest times first: the first buyer through the door usually wins."
     },
     {
       "id": "b2_two_options",
-      "say": "Tomorrow afternoon, or would the weekend suit better?",
-      "note": "Only if they hesitate. Book inside 48 hours, not across a weekend where possible."
+      "say": "Tomorrow afternoon, or would {day} be better?",
+      "note": "Only if they hesitate."
     },
     {
       "id": "b3_access",
-      "say": "Who'll let me in, you or a tenant? I'll work around your tenant; nobody has to move out for a sale.",
+      "say": "Who'll let him in, you or a tenant? Nobody has to move out for a sale.",
       "note": "Confirm the address and access."
     },
     {
       "id": "b4_signers",
-      "say": "Will {signer} be there? I'd rather hear everyone's questions at once than relay them.",
-      "note": "Everyone who would sign present or agreed. The most critical phone question."
+      "say": "Will everyone on the title be there?",
+      "note": "Every signer there, or agreed. The most important booking question."
     },
     {
       "id": "b5_number",
-      "say": "Is this the best number? If I don't pick up, text me; same for me.",
+      "say": "Is this the best number to reach you?",
       "note": "Best number and the text-if-no-answer rule."
     },
     {
       "id": "b6_preframe",
-      "say": "It takes about forty-five minutes. I'll walk it, ask a few things, and give you a straight number before I leave. Either way I'll tell you what I'd suggest in your shoes.",
-      "note": "Length, what happens, that a number comes before leaving."
+      "say": "It takes about 40 minutes. He walks the place with you, and at the end a yes or a no is fine.",
+      "note": "How long, what happens, that a decision is fine either way."
     },
     {
       "id": "b7_confirm",
-      "say": "I'll text you the morning of to confirm.",
+      "say": "We'll text you the morning of to confirm.",
       "note": "The app sends the morning-of reminder (cadence spec 3.4)."
     },
     {
       "id": "b8_call_instead",
-      "say": "Let me look everything over and call you back {day}. What time of day is best?",
-      "note": "When a visit is not warranted yet: no reason, a far number, a missing signer, or a desk check first. Honour the time exactly."
+      "say": "Let me go over this with my partner. I'll call you back {day} at {time}. Does that work?",
+      "note": "Then the soft agreement: 'When I call, can you just tell me straight whether it works or not? A no is completely fine.' Honour the time exactly."
     }
   ],
   "objections": [
     {
       "id": "obj_who_are_you",
       "trigger": "Who are you / what company?",
-      "say": "It's just me, Colin Merrill. I buy houses around here myself and I'm looking for a couple more.",
-      "note": "No company name; no 'my partner'."
+      "say": "{caller}. My partner and I buy houses in the area.",
+      "note": "No company name."
+    },
+    {
+      "id": "obj_who_texted",
+      "trigger": "Who texted me?",
+      "say": "That was my partner, Colin.",
+      "note": "The only time Colin's name comes up before the walk."
     },
     {
       "id": "obj_wholesaler",
       "trigger": "Are you a wholesaler / do you buy it yourself?",
-      "say": "Depends on the deal. Some I keep and rent, some I fix up or pass along to a partner. Either way you deal with me, and I'll tell you up front which it is.",
+      "say": "Depends on the deal. Some we keep and rent, some we fix up or pass along to a partner. Either way you deal with us, and we tell you up front which it is.",
       "note": "Rick's answer (docs/RICK_PLAYBOOK.md: 'depends on the deal', said plainly, never brought up first); Colin 2026-10-22: 'do whatever Rick does'. Never 'never say wholesaler'."
     },
     {
       "id": "obj_my_number",
       "trigger": "How did you get my number?",
-      "say": "The address is public record. The phone number came from a data provider I subscribe to.",
+      "say": "Your address is public record, and we look up owners' phone numbers from it.",
       "note": "Never a marketing-department cover."
     },
     {
       "id": "obj_scam",
       "trigger": "Is this a scam?",
-      "say": "Fair question. Look me up: Colin Merrill, Milwaukee. I'll meet you anywhere you like, and I'll show ID at the door.",
+      "say": "Fair question. We're local, around Milwaukee. Nothing happens until my partner has walked the place with you, and nobody signs anything over the phone.",
       "note": "Only what is true."
     },
     {
       "id": "obj_give_me_a_number",
       "trigger": "Just give me a number / what's your offer?",
-      "say": "I can't put a real number on a place I haven't seen; it'd be like buying a car without a test drive, and a guess would just waste your time. Mind if I ask a few quick questions, then come see it?",
-      "note": "If they push: q7_number. Never a number, range or percentage."
+      "say": "I can't put a number on a place we haven't seen, any more than you'd buy a car without driving it. Let me get the details, my partner and I will go over it, and I'll call you back tomorrow.",
+      "note": "Never a number, range or percentage on the first call."
     },
     {
       "id": "obj_lowball",
       "trigger": "Are you going to lowball me?",
-      "say": "I won't be the highest number you could ever get; I'll be a straight one, as-is, with nothing to fix and no showings. If you need the most money, an agent is the better route.",
+      "say": "We won't be the highest number you could ever get; we'll be a straight one, with nothing to fix and no showings. If you need the most money, an agent is the better route.",
       "note": "Best offer, not highest."
     },
     {
       "id": "obj_retail",
       "trigger": "I want retail / Zillow says X",
-      "say": "That's fair, and if the most money is what matters, listing it is probably your better route. What I'm good for is speed, certainty and taking it as it sits. If that ever matters more, keep this number.",
+      "say": "That's fair, and if the most money is what matters, listing it is probably your better route. What we're good for is speed and certainty. If that ever matters more, keep this number.",
       "note": "No Zillow digs, no net-proceeds arithmetic."
     },
     {
       "id": "obj_listed",
       "trigger": "I have an agent / it's listed",
-      "say": "Then I'll stay out of your agent's way. When does the agreement run through? If it ends without a sale, mind if I check in then?",
-      "note": "Hard stop for a walk. Date becomes a follow-up."
+      "say": "Then we'll leave it with your agent. Good luck with it.",
+      "note": "Hard stop. Log it."
     },
     {
       "id": "obj_think",
       "trigger": "I'll think about it",
-      "say": "Of course. What's the part you'd want to think through? Sometimes it's something I can just answer.",
-      "note": "Silence after. If nothing: 'Take your time. When should I check back, or would you rather reach out?' No guilt, no swing-by, no sitting in the car."
+      "say": "Of course. What's the main thing you want to think over?",
+      "note": "Then a call-back tomorrow, at a time they pick."
     },
     {
       "id": "obj_spouse",
       "trigger": "I need to talk to my wife / husband / kids",
-      "say": "Totally fair. When are you two together next? I'll call then, or come by then, so you don't have to relay it.",
-      "note": "No 'is it because the number's low?', no calling the bluff."
+      "say": "Makes sense. When could we get you both on the phone?",
+      "note": "Book that call, with both of them."
     },
     {
       "id": "obj_send_offer",
       "trigger": "Send me an offer by text / email",
-      "say": "I'd be guessing, and a guess would only cost you. Let me come see it, and you'll have a straight number before I leave.",
-      "note": "If they refuse any visit: desk check and a call back; no written number."
+      "say": "We'd be guessing, and a guess would only cost you. Let me get the details, my partner and I will go over it, and I'll call you back.",
+      "note": "No written number. The callback carries Colin's number."
     },
     {
       "id": "obj_other_offer",
       "trigger": "I already have another offer",
-      "say": "Good, you have options. Why haven't you taken it? I won't bid against them by phone. If it comes through, great; if it falls apart, would you want me as your backup?",
+      "say": "Good, you have options. Why haven't you taken it? We won't bid against them by phone. If it falls apart, would you want us as your backup?",
       "note": "Ask once whether anything is signed. Signed: hard stop. No running the other buyer down."
     },
     {
       "id": "obj_good_shape",
       "trigger": "My house is in good shape, why would I sell cheap?",
-      "say": "You might not. Plenty of nice houses sell to me because of the timing, not the condition. What's got you thinking about it at all?",
+      "say": "You might not. Plenty of nice houses sell to us because of the timing, not the condition. What's got you thinking about it at all?",
       "note": "Perfect house plus retail ask is a follow-up, not a visit."
     },
     {
       "id": "obj_no_hurry",
       "trigger": "I'm not in a hurry / don't need to sell",
-      "say": "Understood, no pressure here. Before my text, were you thinking about selling at all?",
-      "note": "If no: 'Then I won't take your time. Do you own anything else you'd ever consider selling?' One exit question only."
+      "say": "No pressure. Before we reached out, were you thinking about selling at all?",
+      "note": "If no: 'Do you own anything else you'd ever consider selling?' One exit question only."
     },
     {
       "id": "obj_what_do_you_do",
       "trigger": "What do you do with the houses?",
-      "say": "Depends on the house. Some I fix and rent, some I fix and sell. I'll tell you which when I've seen it.",
+      "say": "Depends on the house. Some we fix and rent, some we fix and sell. We tell you which once my partner has seen it.",
       "note": "Only true statements."
     },
     {
       "id": "obj_real_person",
-      "trigger": "Are you a real person?",
-      "say": "Yes, it's Colin, same guy who texted you. An automated assistant helps me with texts and notes; anything that matters, I handle myself.",
+      "trigger": "Are you a real person? / who texted me?",
+      "say": "Yes, I'm {caller}. The texts were from my partner, Colin; an automated assistant helps us with texts.",
       "note": "On a live call this is simply true."
     },
     {
       "id": "obj_behind",
       "trigger": "We're behind on payments / there's a sale date",
-      "say": "Thank you for telling me. What's the date? Nobody chooses not to pay; what happened?",
-      "note": "Inside 14 days: 'I'll be honest, there isn't time for me to help with a sale. A HUD housing counselor is free and can sometimes slow it down.' No fear close."
+      "say": "Thank you for telling me. What's the date?",
+      "note": "Inside 14 days: 'Honestly, there isn't time for a sale to help.' Don't book. If they ask where to turn, a HUD housing counselor is free: 800-569-4287."
     },
     {
       "id": "obj_probate",
       "trigger": "The house is in probate / my mother passed",
-      "say": "I'm sorry about your mother. Are you the one handling the house for the family, and have the court papers come through yet? There's no hurry on my end.",
+      "say": "I'm sorry about your mother. Are you the right person to talk to about the property, and have the court papers come through? There's no hurry on our end.",
       "note": "Condolence once. Elderly owner: the deal is with the family and their attorney, never the owner alone."
     },
     {
       "id": "obj_curious",
       "trigger": "I'm just curious what it's worth",
-      "say": "I'm not the right source for a value; I'm a buyer, not an appraiser, and I only price a place after I've seen it. Is selling something you're actually weighing, or just curious?",
+      "say": "We're buyers, not appraisers, and my partner only puts a number on a place once he's gone over it. Is selling something you're actually weighing?",
       "note": "Curious only: polite exit."
     },
     {
       "id": "obj_busy",
       "trigger": "I'm busy, call me later",
-      "say": "No problem. What day and time, and is this the best number? I'll text my name so you know it's me.",
+      "say": "No problem. What day and time works, and is this the best number?",
       "note": "Honour the time exactly; no extra questions."
     },
     {
       "id": "obj_stop",
       "trigger": "Stop calling / take me off",
-      "say": "Done. You won't hear from me again. Sorry to have bothered you.",
+      "say": "Done. You won't hear from us again. Sorry to have bothered you.",
       "note": "STOP everywhere, every phone, forever."
     },
     {
       "id": "obj_flat_no",
       "trigger": "A flat no",
-      "say": "No problem. Is that no to me, or no to ever selling?",
-      "note": "One ask, then let go."
+      "say": "No problem. Before I go, do you own anything else you'd ever consider selling?",
+      "note": "One exit question, then let go."
+    },
+    {
+      "id": "obj_counter",
+      "trigger": "(On the callback) Can you do more?",
+      "say": "Let me take that to my partner and come back to you.",
+      "note": "Never negotiate, never split the difference: the number is Colin's."
     }
   ],
   "not_ready": [
@@ -305,21 +370,21 @@
     {
       "id": "nr1b_concerns",
       "say": "What concerns you most about selling it?",
-      "note": "Rick's second qualifying question (utzhagndcks): the answer is often the real blocker (the move, the cost, 'can you actually buy it'), and it is something I can answer or note. Then silence. Only when they are not ready; skip if the reason is already plain."
+      "note": "Often the real blocker. Then silence. Only when they are not ready; skip if the reason is already plain."
     },
     {
       "id": "nr2_permission",
-      "say": "Mind if I check back around then? And if anything changes before that, this number reaches me; text if I don't pick up.",
+      "say": "Mind if we check back around then? And if anything changes before that, this number reaches us.",
       "note": "Date goes in exactly as said, with the event. Never call before it."
     },
     {
       "id": "nr2b_half_rule",
-      "say": "Things sometimes move sooner than people expect. Mind if I check in around {half_date} as well, just in case? If not, I'll wait for {date}.",
+      "say": "Things sometimes move sooner than people expect. Mind if we check in around {half_date} as well, just in case? If not, we'll wait for {date}.",
       "note": "Rick's half rule (QE8CCPM58XI, 8JKQipxh0xM): a 'call me in six months' gets a permission ask for a check-in at three. Only for a far date (over 60 days out); only once; their answer is final and goes in as the follow-up date. A no means the full date, exactly as said."
     },
     {
       "id": "nr3_nothing_would_change",
-      "say": "Understood. I'll leave it with you, then. Keep this number.",
+      "say": "Understood. We'll leave it with you, then. Keep this number.",
       "note": "No check-back set; Dead unless a public record changes."
     },
     {
@@ -329,44 +394,227 @@
     },
     {
       "id": "nr5_backup",
-      "say": "If that buyer isn't ready when it comes to it, I am. Call me if anything changes.",
+      "say": "If that buyer isn't ready when it comes to it, we are. Call us if anything changes.",
       "note": "When another buyer exists."
     }
   ],
   "after_call": [
-    {"field": "reason", "gate_item": [1], "what": "Reason in their words, with the date it was said"},
-    {"field": "named_date / named_event", "gate_item": [1], "what": "The date and the event behind it, or 'none'"},
-    {"field": "decision_makers", "gate_item": [2], "what": "Names, relationship, whether each can be at the visit"},
-    {"field": "price_expectation / price_anchor", "gate_item": [3], "what": "Their number exactly as said or 'refused after two asks'; need / market / mixed"},
-    {"field": "flexibility", "gate_item": [4], "what": "moved / open / depends / terms only / firm; whether the floor rests on a need"},
-    {"field": "condition / occupancy", "gate_item": [5], "what": "Occupancy, the defects they named, access, anything that happened to it"},
-    {"field": "known_debt / sheriff flag", "gate_item": [6], "what": "Ballpark owed, behind on anything, any sale date"},
-    {"field": "flags", "gate_item": [], "what": "elderly or ill, grief, capacity concern, listed, signed elsewhere, family said no"},
-    {"field": "next_touch_at / next_touch_owner / reference_text", "gate_item": [], "what": "Date, channel, who, and the one thing to reference"},
-    {"field": "outcome", "gate_item": [], "what": "visit booked / call back at time / not now with date / not now no date / no / STOP / wrong person"},
-    {"field": "quotes", "gate_item": [], "what": "Rapport notes in their words: family, occupation, what they care about"},
-    {"field": "gate_score", "gate_item": [1, 2, 3, 4, 5, 6], "what": "Six items, 0-2 each, filled after the call"}
+    {
+      "field": "reason",
+      "gate_item": [
+        1
+      ],
+      "what": "Reason in their words, with the date it was said"
+    },
+    {
+      "field": "named_date / named_event",
+      "gate_item": [
+        1
+      ],
+      "what": "The date and the event behind it, or 'none'"
+    },
+    {
+      "field": "decision_makers",
+      "gate_item": [
+        2
+      ],
+      "what": "Names, relationship, whether each can be at the visit"
+    },
+    {
+      "field": "price_expectation / price_anchor",
+      "gate_item": [
+        3
+      ],
+      "what": "Their number exactly as said or 'refused after two asks'; need / market / mixed"
+    },
+    {
+      "field": "flexibility",
+      "gate_item": [
+        4
+      ],
+      "what": "moved / open / depends / terms only / firm; whether the floor rests on a need"
+    },
+    {
+      "field": "condition / occupancy",
+      "gate_item": [
+        5
+      ],
+      "what": "Occupancy, the defects they named, access, anything that happened to it"
+    },
+    {
+      "field": "known_debt / sheriff flag",
+      "gate_item": [
+        6
+      ],
+      "what": "Ballpark owed, behind on anything, any sale date"
+    },
+    {
+      "field": "flags",
+      "gate_item": [],
+      "what": "elderly or ill, grief, capacity concern, listed, signed elsewhere, family said no"
+    },
+    {
+      "field": "next_touch_at / next_touch_owner / reference_text",
+      "gate_item": [],
+      "what": "Date, channel, who, and the one thing to reference"
+    },
+    {
+      "field": "outcome",
+      "gate_item": [],
+      "what": "visit booked / call back at time / not now with date / not now no date / no / STOP / wrong person"
+    },
+    {
+      "field": "quotes",
+      "gate_item": [],
+      "what": "Rapport notes in their words: family, occupation, what they care about"
+    },
+    {
+      "field": "gate_score",
+      "gate_item": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "what": "Six items, 0-2 each, filled after the call"
+    }
   ],
   "sources": [
-    "JDC0-TSPb_I", "OOmVxvm0Xf0", "MrtcsWHK25E", "EWYMV7QBw7E", "-iCWNPCSXDg", "yUoBGwpI1X0", "4r-nL9TW4-c",
-    "9UVvCDhhx-A", "4qtHISvbLHg", "IPLWw380jys", "XPFC2OID3ZU", "2R_5DWeM7Lg", "CZud_1FG1Ck", "tOaHuLRu_sk",
-    "DIko4AXaUIk", "O53EnK3ndG4", "KWlVj5biL64", "482S6u4kFKE", "ChbdH6F5mek", "VhBOMeeds74", "OCFb50R3RAs",
-    "126mOZnJXI0", "9YVDzwxFWTE", "6WXL7NK6KJc", "5GFbHeJVix0", "HlBWKic1Xuo", "1s3QLvB0Ia0", "8OYQ3UUEmAk",
-    "JAZ0POLTNKs", "PucNTdrsJC0", "F0FmT5JKGZA", "8AEZDz8vlJU", "JmjiFpaVHrs", "4EYvRkAMDhQ", "3Wvxf1F3VQA",
-    "Jd7dYlRBHQo", "BG1v84l1s7o", "8EOFb7hfABg", "_tXGckbqm3s", "7eezo4OVl3g", "CRoK-ML7WXk", "IeBzgLc_hyI",
-    "RICL8lcwrAw", "2sZdwfcq1uk", "4muxp0oxZlg", "8zfXs82djag", "3KutMQcIin8", "-DkjkGuCDeQ", "OqSC5nKoCFM",
-    "2w4p0euDwWQ", "--brmZtZPqs", "DBemraYqesI", "iz9_m7XOjnM", "CpleQ-E9Lt4", "FD390_X66Qo", "o8CQn4aLKHo",
-    "xF-z9tWkVg0", "cSgmc3_sFgU", "hF0VMwr98qI", "V50RVJAzpAQ", "MNTuecnkcVA", "X8vLqVUBf9s", "BENyzexrZnA",
-    "W3YAUiLuRTk", "RyQDqBS3YoM", "8xsDmy_YMMo", "xk8Pjj_Rgbc", "WexIFjLx3Qo", "-vGUibc51XU", "O9i0bELH3mk",
-    "Wb0GINH1CoA", "YRH5q4sccC4", "QI0jT5lkG8g", "jOeRKmfF8xQ", "vF_va4piqf8", "Y2QEv-_yeww", "kwHqWXHWJ2c",
-    "vvTgCFdpkNE", "VDDp9qOxiEU", "mqQAOr25Ov4", "ZelnmQIVUdU", "Kj7CKDI9vEI", "HCVtG9NTcdU", "1ShNYyejnNY",
-    "EWgc350YwWM", "yqYyjADZE9w", "xa3IJ8858_Y", "Oy6udpcckoA", "_s_dfiFHby8", "E6edTnEQARg", "5asZJkbu6Fg",
-    "0wlZVVcy0iU", "QSlm7fTDMY8", "C1my5IjMMOE", "LnzubHSaBmY", "FM02qIOBnrs", "T80jfdkEwF8", "IaPZMO6OQvA",
-    "UjBD16OoSvs", "8JKQipxh0xM", "zhq0eaxQXrA", "TVFe7YUEo24", "LFt3-JDUptA", "FBA-1oFjBQE", "XynoEcR_1ag",
-    "hTbgJ_2IjFQ", "hn3aRL30sZM", "BOYRu9wWoxk", "oH6_D7Q6ow4", "UtFnemJIFg4", "3YZhoaNt8Co", "CTnFfCx9sbo",
-    "LY2qUxTyGnw", "X2FfdjPUzLo", "94d0C8n8-lQ", "mb8xf7U9UD8", "y86lyTtL3T4", "hZkAU5S3Xms", "MPHdNIiB_8E",
-    "2OzwEmcE3ms", "OCL7bEF1--E", "9LPIauRxuow", "bDspZ0sM8Rs", "-O0baa5ye9c", "WEJF2HBMgCY", "zYO-YD8EXVI",
-    "RkwnJGHD5No", "affDOX4djhU", "9OYan7PuehI", "uwpwoYNS4gA", "4EMkJ_27Svo", "6skljsgwR9I", "8ytg80KoTF0",
+    "JDC0-TSPb_I",
+    "OOmVxvm0Xf0",
+    "MrtcsWHK25E",
+    "EWYMV7QBw7E",
+    "-iCWNPCSXDg",
+    "yUoBGwpI1X0",
+    "4r-nL9TW4-c",
+    "9UVvCDhhx-A",
+    "4qtHISvbLHg",
+    "IPLWw380jys",
+    "XPFC2OID3ZU",
+    "2R_5DWeM7Lg",
+    "CZud_1FG1Ck",
+    "tOaHuLRu_sk",
+    "DIko4AXaUIk",
+    "O53EnK3ndG4",
+    "KWlVj5biL64",
+    "482S6u4kFKE",
+    "ChbdH6F5mek",
+    "VhBOMeeds74",
+    "OCFb50R3RAs",
+    "126mOZnJXI0",
+    "9YVDzwxFWTE",
+    "6WXL7NK6KJc",
+    "5GFbHeJVix0",
+    "HlBWKic1Xuo",
+    "1s3QLvB0Ia0",
+    "8OYQ3UUEmAk",
+    "JAZ0POLTNKs",
+    "PucNTdrsJC0",
+    "F0FmT5JKGZA",
+    "8AEZDz8vlJU",
+    "JmjiFpaVHrs",
+    "4EYvRkAMDhQ",
+    "3Wvxf1F3VQA",
+    "Jd7dYlRBHQo",
+    "BG1v84l1s7o",
+    "8EOFb7hfABg",
+    "_tXGckbqm3s",
+    "7eezo4OVl3g",
+    "CRoK-ML7WXk",
+    "IeBzgLc_hyI",
+    "RICL8lcwrAw",
+    "2sZdwfcq1uk",
+    "4muxp0oxZlg",
+    "8zfXs82djag",
+    "3KutMQcIin8",
+    "-DkjkGuCDeQ",
+    "OqSC5nKoCFM",
+    "2w4p0euDwWQ",
+    "--brmZtZPqs",
+    "DBemraYqesI",
+    "iz9_m7XOjnM",
+    "CpleQ-E9Lt4",
+    "FD390_X66Qo",
+    "o8CQn4aLKHo",
+    "xF-z9tWkVg0",
+    "cSgmc3_sFgU",
+    "hF0VMwr98qI",
+    "V50RVJAzpAQ",
+    "MNTuecnkcVA",
+    "X8vLqVUBf9s",
+    "BENyzexrZnA",
+    "W3YAUiLuRTk",
+    "RyQDqBS3YoM",
+    "8xsDmy_YMMo",
+    "xk8Pjj_Rgbc",
+    "WexIFjLx3Qo",
+    "-vGUibc51XU",
+    "O9i0bELH3mk",
+    "Wb0GINH1CoA",
+    "YRH5q4sccC4",
+    "QI0jT5lkG8g",
+    "jOeRKmfF8xQ",
+    "vF_va4piqf8",
+    "Y2QEv-_yeww",
+    "kwHqWXHWJ2c",
+    "vvTgCFdpkNE",
+    "VDDp9qOxiEU",
+    "mqQAOr25Ov4",
+    "ZelnmQIVUdU",
+    "Kj7CKDI9vEI",
+    "HCVtG9NTcdU",
+    "1ShNYyejnNY",
+    "EWgc350YwWM",
+    "yqYyjADZE9w",
+    "xa3IJ8858_Y",
+    "Oy6udpcckoA",
+    "_s_dfiFHby8",
+    "E6edTnEQARg",
+    "5asZJkbu6Fg",
+    "0wlZVVcy0iU",
+    "QSlm7fTDMY8",
+    "C1my5IjMMOE",
+    "LnzubHSaBmY",
+    "FM02qIOBnrs",
+    "T80jfdkEwF8",
+    "IaPZMO6OQvA",
+    "UjBD16OoSvs",
+    "8JKQipxh0xM",
+    "zhq0eaxQXrA",
+    "TVFe7YUEo24",
+    "LFt3-JDUptA",
+    "FBA-1oFjBQE",
+    "XynoEcR_1ag",
+    "hTbgJ_2IjFQ",
+    "hn3aRL30sZM",
+    "BOYRu9wWoxk",
+    "oH6_D7Q6ow4",
+    "UtFnemJIFg4",
+    "3YZhoaNt8Co",
+    "CTnFfCx9sbo",
+    "LY2qUxTyGnw",
+    "X2FfdjPUzLo",
+    "94d0C8n8-lQ",
+    "mb8xf7U9UD8",
+    "y86lyTtL3T4",
+    "hZkAU5S3Xms",
+    "MPHdNIiB_8E",
+    "2OzwEmcE3ms",
+    "OCL7bEF1--E",
+    "9LPIauRxuow",
+    "bDspZ0sM8Rs",
+    "-O0baa5ye9c",
+    "WEJF2HBMgCY",
+    "zYO-YD8EXVI",
+    "RkwnJGHD5No",
+    "affDOX4djhU",
+    "9OYan7PuehI",
+    "uwpwoYNS4gA",
+    "4EMkJ_27Svo",
+    "6skljsgwR9I",
+    "8ytg80KoTF0",
     "UPQcjExAKTU"
   ]
 }

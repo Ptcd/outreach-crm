@@ -17,7 +17,7 @@ import { StatTiles } from '@/components/StatTiles'
 import { ClipboardList, MessageCircle, PhoneCall, Sparkles } from 'lucide-react'
 
 export default function Today() {
-  const { member, user } = useAuth()
+  const { member, user, isOwner } = useAuth()
   const [picked] = useOnPhone()
   const worker = workerFor(member, picked)
   const [chosen, setWho] = useState<TaskOwner | null>(null)
@@ -34,6 +34,12 @@ export default function Today() {
   const done = useWrite((id: string) => api.finishTask(id), [['tasks'], ['lead']])
   const seen = useWrite((id: string) => api.markSeen(id, user!.id), [['messages'], ['lead']])
   const now = Date.now()
+  // a caller's Today shows what she acts on (found walking the app as Thalia, 2026-10-27): STOPs need nothing from
+  // her, and cards waiting on a text are Muse's, not hers
+  const stopReplies = (replies.data ?? []).filter((m) => m.is_opt_out)
+  const shownReplies = (replies.data ?? []).filter((m) => !m.is_opt_out)
+  const debtRows = (debt.data ?? []).filter((d) => isOwner || !['opener_queued', 'opener_sent', 'postcard_mailed'].includes(d.stage))
+  const markAllStops = async () => { for (const m of stopReplies) await seen.mutateAsync(m.id) }
 
   return (
     <div className="space-y-4">
@@ -48,7 +54,7 @@ export default function Today() {
         { label: 'Tasks due', value: tasks.data?.length, icon: ClipboardList, tone: 'amber' },
         { label: 'Seller asks', value: replyTasks.data?.length, icon: Sparkles, tone: 'rose' },
       ]} />
-      <BeltHealthStrip />
+      {isOwner && <BeltHealthStrip />}
       <MissedCalls />
       <PackagesToday />
       <Section title={`Tasks from replies${replyTasks.data ? ` (${replyTasks.data.length})` : ''}`}>
@@ -61,12 +67,18 @@ export default function Today() {
       </Section>
 
       <Section
-        title={`New replies${replies.data ? ` (${replies.data.length})` : ''}`}
+        title={`New replies${replies.data ? ` (${shownReplies.length})` : ''}`}
       >
         <ErrorNote error={replies.error} />
-        {replies.data?.length === 0 && <Empty>No new replies.</Empty>}
+        {replies.data && shownReplies.length === 0 && <Empty>No new replies.</Empty>}
+        {stopReplies.length > 0 && (
+          <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md bg-muted p-2 text-sm">
+            <span>{stopReplies.length} STOP {stopReplies.length === 1 ? 'reply' : 'replies'}: already blocked, nothing to do.</span>
+            <Button size="sm" variant="outline" disabled={seen.isPending} onClick={() => void markAllStops()}>Clear them</Button>
+          </div>
+        )}
         <ul className="divide-y">
-          {replies.data?.map((m) => (
+          {shownReplies.map((m) => (
             <li key={m.id} className="flex flex-col gap-1 py-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <Link to={`/lead/${m.lead_id}`} className="inline-flex min-h-11 items-center font-medium underline">
@@ -129,12 +141,12 @@ export default function Today() {
         </ul>
       </Section>
 
-      <Section title={`Follow-up debt${debt.data ? ` (${debt.data.length})` : ''}`}>
-        <p className="mb-2 text-sm text-muted-foreground">Leads 2 or more days past their next action. Goal: zero by Friday.</p>
+      <Section title={`Follow-up debt${debt.data ? ` (${debtRows.length})` : ''}`}>
+        <p className="mb-2 text-sm text-muted-foreground">Leads 2 or more days past their next action. Goal: zero by Friday.{isOwner ? '' : ' Cards waiting on a text are Muse’s and are left out.'}</p>
         <ErrorNote error={debt.error} />
-        {debt.data?.length === 0 && <Empty>None. Good.</Empty>}
+        {debt.data && debtRows.length === 0 && <Empty>None. Good.</Empty>}
         <ul className="divide-y">
-          {debt.data?.map((d) => (
+          {debtRows.map((d) => (
             <li key={d.lead_id} className="py-2 text-sm">
               <Link to={`/lead/${d.lead_id}`} className="inline-flex min-h-11 items-center font-medium underline">
                 {d.owner_name}

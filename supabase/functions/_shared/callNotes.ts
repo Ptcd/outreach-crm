@@ -22,13 +22,15 @@ export interface Sentence { media_channel?: number; sentence_index?: number; sta
 // The call script's answers (src/lib/callScript.ts ANSWERS): the call_facts key, its one-tap choice ids, whether more
 // than one choice can be true, and whether it takes a dollar number. tests/callNotes.test.ts keeps this in step.
 export const FACT_KEYS: Record<string, { choices: string[]; multi?: boolean; number?: boolean; label: string }> = {
-  owner: { label: 'Which property', choices: ['yes', 'other_property', 'sold'] },
+  owner: { label: 'Still the owner', choices: ['yes', 'other_property', 'sold', 'not_them'] },
+  interest: { label: 'Any interest in selling', choices: ['yes', 'maybe', 'no'] },
   identity: { label: 'Who they are', choices: ['owner', 'spouse', 'adult_child', 'relative', 'tenant', 'manager', 'agent', 'wholesaler'] },
   motivation: { label: 'Why selling', choices: ['tired_landlord', 'moving', 'inherited', 'behind', 'repairs', 'divorce', 'health', 'just_price'] },
-  condition: { label: 'Condition', multi: true, choices: ['roof', 'furnace', 'water', 'foundation', 'electrical', 'plumbing', 'cosmetic', 'perfect'] },
+  condition: { label: 'Condition', multi: true, choices: ['roof', 'furnace', 'water_heater', 'water', 'foundation', 'electrical', 'plumbing', 'windows', 'kitchen_baths', 'yard', 'cosmetic', 'perfect'] },
   occupancy: { label: 'Who lives there', choices: ['owner', 'tenants', 'family', 'empty'] },
   work_list: { label: 'Work before listing', choices: [] },
   happened: { label: 'Anything happen to it', multi: true, choices: ['leak', 'fire', 'foundation', 'code', 'none'] },
+  photos: { label: 'Photos', choices: ['will_send', 'sent', 'no'] },
   timeline: { label: 'Timeline', choices: ['asap', 'under_30', 'one_to_three', 'three_to_six', 'no_plan'] },
   decision_makers: { label: 'Who signs', multi: true, choices: ['only_them', 'spouse', 'family', 'estate', 'company'] },
   price: { label: 'Their number', number: true, choices: ['refused_once', 'refused', 'make_offer'] },
@@ -36,7 +38,9 @@ export const FACT_KEYS: Record<string, { choices: string[]; multi?: boolean; num
   flexibility: { label: 'Would they hear a number under theirs', choices: ['moved', 'open', 'depends', 'terms', 'firm'] },
   debt: { label: 'Anything owed', number: true, choices: ['free_clear', 'mortgage', 'dont_know'] },
   behind: { label: 'Behind on anything', multi: true, choices: ['no', 'payments', 'taxes', 'sale_date', 'sale_14'] },
-  ready: { label: 'Can they say yes, with every signer there', choices: ['yes', 'spouse', 'think'] },
+  other_buyers: { label: 'Other buyers or agents', choices: [] },
+  concerns: { label: 'What concerns them most', choices: [] },
+  ready: { label: 'The callback, and a straight answer', choices: ['yes', 'spouse', 'think'] },
 }
 
 export const MARKS = ['hot', 'not_now', 'held', 'dead', 'no_answer', 'reached', 'wrong_number', 'dnc'] as const

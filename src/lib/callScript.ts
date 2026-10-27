@@ -36,8 +36,10 @@ const c = (id: string, label: string): Choice => ({ id, label })
 // One-tap answers per question id. A question in the JSON without an entry here still shows,
 // with a notes box.
 const ANSWERS: Record<string, Answer> = {
-  q1_property: { id: 'owner', title: 'Which property', text: 'Address they named (if different)',
-    choices: [c('yes', 'This one'), c('other_property', 'Different property'), c('sold', 'Sold it')] },
+  q1_property: { id: 'owner', title: 'Still the owner', text: 'Address they named (if different)',
+    choices: [c('yes', 'Yes, the owner'), c('other_property', 'Different property'), c('sold', 'Sold it'), c('not_them', 'Not them')] },
+  q1b_interest: { id: 'interest', title: 'Any interest in selling',
+    choices: [c('yes', 'Yes'), c('maybe', 'Maybe'), c('no', 'No')], text: 'What they said' },
   q2_identity: { id: 'identity', title: 'Their place, or helping someone',
     choices: [c('owner', 'Owner'), c('spouse', 'Spouse'), c('adult_child', 'Adult child'), c('relative', 'Other relative'),
       c('tenant', 'Tenant'), c('manager', 'Manager'), c('agent', 'Agent'), c('wholesaler', 'Wholesaler')], text: 'Name' },
@@ -45,14 +47,16 @@ const ANSWERS: Record<string, Answer> = {
     choices: [c('tired_landlord', 'Tired landlord'), c('moving', 'Moving'), c('inherited', 'Inherited / death'), c('behind', 'Behind on payments'),
       c('repairs', 'Too many repairs'), c('divorce', 'Divorce'), c('health', 'Health / age'), c('just_price', 'Only for the right price')] },
   q4_condition: { id: 'condition', title: 'About the place (condition)', reply: ['condition'], multi: true, text: 'In their words',
-    choices: [c('roof', 'Roof'), c('furnace', 'Furnace / AC'), c('water', 'Water / leaks'), c('foundation', 'Foundation'),
-      c('electrical', 'Electrical'), c('plumbing', 'Plumbing'), c('cosmetic', 'Cosmetic only'), c('perfect', 'Says perfect')] },
+    choices: [c('roof', 'Roof'), c('furnace', 'Furnace / AC'), c('water_heater', 'Water heater'), c('water', 'Water / leaks'),
+      c('foundation', 'Foundation / basement'), c('electrical', 'Electrical'), c('plumbing', 'Plumbing'), c('windows', 'Windows'),
+      c('kitchen_baths', 'Kitchen / baths'), c('yard', 'Yard / outside'), c('cosmetic', 'Cosmetic only'), c('perfect', 'Says perfect')] },
   q4a_occupancy: { id: 'occupancy', title: 'Who lives there', reply: ['occupancy'],
     choices: [c('owner', 'They live there'), c('tenants', 'Tenants'), c('family', 'Family'), c('empty', 'Empty')], text: 'Access, rent, lease end' },
-  q4b_list_tomorrow: { id: 'work_list', title: 'Work before listing', text: 'Their list of work' },
+  q4b_list_tomorrow: { id: 'work_list', title: 'Fix first', text: 'Their list of work' },
   q4c_happened: { id: 'happened', title: 'Anything happen to it', multi: true,
     choices: [c('leak', 'Leak / water'), c('fire', 'Fire'), c('foundation', 'Foundation'), c('code', 'Code / raze order'), c('none', 'Nothing')] },
-  q5_timeline: { id: 'timeline', title: 'Where headed, and when (clock)', reply: ['timeline'], text: 'The plan and the date or event',
+  q4d_photos: { id: 'photos', title: 'Photos', choices: [c('will_send', 'Will text some'), c('sent', 'Sent'), c('no', 'No')], text: 'Notes' },
+  q5_timeline: { id: 'timeline', title: 'Where moving, and when', reply: ['timeline'], text: 'The plan and the date or event',
     choices: [c('asap', 'ASAP'), c('under_30', 'Within 30 days'), c('one_to_three', '1-3 months'), c('three_to_six', '3-6 months'),
       c('no_plan', "Hasn't thought about it")] },
   q6_decision_makers: { id: 'decision_makers', title: 'Anyone else on it', reply: ['decision_makers'], multi: true,
@@ -69,8 +73,10 @@ const ANSWERS: Record<string, Answer> = {
     choices: [c('free_clear', 'Nothing owed'), c('mortgage', 'Mortgage'), c('dont_know', "Doesn't know")] },
   q10a_behind: { id: 'behind', title: 'Behind on anything', multi: true, text: 'Sale date, if any',
     choices: [c('no', 'Not behind'), c('payments', 'Payments'), c('taxes', 'Taxes'), c('sale_date', 'Sale date set'), c('sale_14', 'Sale inside 14 days')] },
-  q11_condition_decision: { id: 'ready', title: 'Can they say yes, with every signer there',
-    choices: [c('yes', 'Yes, everyone there'), c('spouse', 'Has to bring someone'), c('think', 'Wants to think')] },
+  q10b_other_buyers: { id: 'other_buyers', title: 'Other buyers or agents', text: 'Who, and anything signed' },
+  q10c_concerns: { id: 'concerns', title: 'What concerns them most', text: 'Their words' },
+  q11_condition_decision: { id: 'ready', title: 'The callback, and a straight answer',
+    choices: [c('yes', 'Agreed: a straight yes or no'), c('spouse', 'Has to bring someone'), c('think', 'Wants to think')] },
 }
 
 const fill = (s: string, v: Record<string, string>) => s.replace(/\{(\w+)\}/g, (m, k: string) => v[k] ?? m)
@@ -101,3 +107,40 @@ export const CALL_OUTCOMES: { id: 'interested' | 'reached_no_decision' | 'no_ans
   { id: 'wrong_number', label: 'Wrong number', hint: 'That phone marked bad; stage: Wrong number' },
   { id: 'dnc', label: 'Do not contact', hint: 'Every phone of this owner blocked, like a texted STOP' },
 ]
+
+/** Clearly hot (the packet's rule): a need and a rough house, or a sale or move date. Book Colin's walk on this call. */
+export function packetHot(facts: Record<string, { value?: { choices?: string[] } } | undefined>): boolean {
+  const ch = (k: string) => facts[k]?.value?.choices ?? []
+  const need = ch('motivation').some((x) => x !== 'just_price')
+  const rough = ch('condition').some((x) => !['cosmetic', 'perfect'].includes(x)) || ch('happened').some((x) => x !== 'none')
+  const date = ch('timeline').some((x) => x === 'asap' || x === 'under_30') || ch('behind').includes('sale_date')
+  return (need && rough) || date
+}
+
+/** The call's answers, as a starting package for Colin (the caller checks it and sends it). */
+export function packageFromCall(facts: Record<string, { value?: { choices?: string[]; text?: string; number?: string; when?: string } } | undefined>,
+  labels: Record<string, string>): { fields: Record<string, string>; condition: Record<string, string>; hot: boolean; callback: string | null; walk: boolean } {
+  const v = (k: string) => facts[k]?.value
+  const words = (k: string) => {
+    const x = v(k)
+    if (!x) return ''
+    return [...(x.choices ?? []).map((id) => labels[id] ?? id), x.number ? `$${x.number}` : '', x.text ?? ''].filter(Boolean).join('; ')
+  }
+  const cond: Record<string, string> = {}
+  const map: Record<string, string> = { roof: 'roof', furnace: 'hvac', water_heater: 'water_heater', foundation: 'foundation', water: 'foundation',
+    electrical: 'electrical', plumbing: 'plumbing', windows: 'windows', kitchen_baths: 'kitchen_baths', yard: 'yard' }
+  for (const id of v('condition')?.choices ?? []) if (map[id]) cond[map[id]] = cond[map[id]] ?? 'mentioned on the call'
+  if (v('condition')?.text) cond.other = v('condition')!.text!
+  if (v('work_list')?.text) cond.fix_first = v('work_list')!.text!
+  if (words('happened')) cond.other = [cond.other, words('happened')].filter(Boolean).join('; ')
+  const step = v('next_step')
+  return {
+    fields: { need: words('motivation'), timeline: words('timeline'), their_number: v('price')?.number ? `$${v('price')!.number}` : words('price'),
+      their_basis: words('anchor'), on_title: words('decision_makers'), owed: words('debt'), occupancy: words('occupancy'), photos: words('photos'),
+      other_buyers: words('other_buyers'), concerns: words('concerns') },
+    condition: cond, hot: packetHot(facts as never),
+    callback: step?.choices?.includes('callback') ? step.when ?? null : null,
+    walk: !!step?.choices?.includes('walk'),
+  }
+}
+

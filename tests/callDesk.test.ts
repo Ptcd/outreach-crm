@@ -168,15 +168,17 @@ describe('call answers -> walk gate', () => {
 
   it("asks the phone script in its order, every question tied to its gate items, in Colin's voice", () => {
     expect(CALL_SCRIPT.map((q) => q.qid)).toEqual(PHONE_SCRIPT.questions.map((q) => q.id))
-    expect(CALL_SCRIPT.map((q) => q.id)).toEqual(['owner', 'identity', 'motivation', 'condition', 'occupancy', 'work_list', 'happened',
-      'timeline', 'decision_makers', 'price', 'anchor', 'flexibility', 'debt', 'behind', 'ready'])
+    expect(CALL_SCRIPT.map((q) => q.id)).toEqual(['owner', 'interest', 'identity', 'motivation', 'condition', 'occupancy', 'work_list', 'happened',
+      'photos', 'timeline', 'decision_makers', 'price', 'anchor', 'flexibility', 'debt', 'behind', 'other_buyers', 'concerns', 'ready'])
     expect(CALL_SCRIPT.find((q) => q.id === 'motivation')?.gate).toEqual([1])
     expect(CALL_SCRIPT.find((q) => q.id === 'ready')?.gate).toEqual([2, 6])
     expect(CALL_SCRIPT.every((q) => q.choices?.length || q.text || q.number)).toBe(true)
     const all = JSON.stringify(PHONE_SCRIPT)
     expect(all).not.toMatch(/\bSam\b/)
-    expect(PHONE_SCRIPT.objections).toHaveLength(22)
-    expect(callScript({ street: '2825 S Logan Av', first_name: 'John' })[0].say[0]).toBe('Thanks for calling me back. Which place is this about, the one on 2825 S Logan Av?')
+    expect(PHONE_SCRIPT.objections).toHaveLength(24)
+    // Thalia's packet (2026-10-27): her own name, Colin is "my partner", never as-is, never a number on the first call
+    expect(all).not.toMatch(/I buy as-is|Colin Merrill's assistant|before I leave/)
+    expect(callScript({ street: '2825 S Logan Av', first_name: 'John' })[0].say[0]).toBe('Are you still the owner of 2825 S Logan Av?')
   })
 
   it('firm on a real need is a 1, and an agent or a sale inside 14 days is a hard stop', () => {

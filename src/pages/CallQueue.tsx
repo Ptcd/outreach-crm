@@ -17,6 +17,7 @@ import { useAuth } from '@/providers/AuthProvider'
 import { ownerFilterFor, useOnPhone, workerFor } from '@/lib/onPhone'
 import { OnPhonePrompt, useColinHere } from '@/components/OnPhonePicker'
 import type { Task } from '@/lib/types'
+import { orderPhones } from '@/lib/phoneOrder'
 
 type QueueTask = Task & { lead: { id: string; owner_name: string; property_address: string | null; municipality?: string | null; property_zip?: string | null; stage: string } | null }
 
@@ -80,7 +81,7 @@ function QueueCard({ task, canOverride, onDone, onSkip }: { task: QueueTask; can
   if (!q.data) return <Empty>That card is gone.</Empty>
   const { lead, contacts, messages, gates } = q.data
   const facts = q.data.facts ?? {}
-  const phones = contacts.filter((c) => c.kind === 'phone')
+  const phones = orderPhones(contacts, lead.owner_name)
   const texted = messages.filter((m) => m.channel === 'sms' && m.direction === 'in').slice(-3)
   const hand = async () => {
     setBusy(true)
@@ -125,7 +126,7 @@ function QueueCard({ task, canOverride, onDone, onSkip }: { task: QueueTask; can
       )}
 
       <div>
-        <p className="text-sm font-medium">Numbers to dial</p>
+        <p className="text-sm font-medium">Numbers to dial <span className="font-normal text-muted-foreground">(the owner&apos;s first; someone else&apos;s number: ask for the owner)</span></p>
         {lead.belt === 'not_now_dated' && lead.named_date && new Date(lead.named_date).getTime() > Date.now() && (
           <p className="mt-1 rounded-md border border-amber-400 bg-amber-50 p-2 text-sm">
             They asked us to wait until {fmtDateTime(lead.named_date)}. Outbound call controls return then.
@@ -140,7 +141,9 @@ function QueueCard({ task, canOverride, onDone, onSkip }: { task: QueueTask; can
               <li key={c.id} className="flex flex-wrap items-center gap-2 text-sm">
                 <span>{fmtPhone(c.value_normalized ?? c.value)}</span>
                 {c.line_type && <Badge>{c.line_type}</Badge>}
-                {c.person_name && <span className="text-muted-foreground">{c.person_name}</span>}
+                {c.person_name && (c.owners
+                  ? <span className="text-muted-foreground">{c.person_name}</span>
+                  : <Badge tone="warn">Not the owner: {c.person_name}</Badge>)}
                 <CallButton to={c.value_normalized ?? c.value} name={lead.owner_name} address={lead.property_address} leadId={lead.id}
                   contactId={c.id} blocked={blocked} size="sm" notBefore={lead.belt === 'not_now_dated' ? lead.named_date : null} />
                 {/* the same door as on the card: a call from your own phone pauses the texts too, and a call that
