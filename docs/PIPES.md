@@ -52,6 +52,24 @@ An owner change on a carded parcel opens a `re_screen` item; a card whose owner 
 gets a conflict. Phase 1a stages no signals of its own (MPROP's distress columns are masked), so its only items
 are re-screens until 1b brings vacant buildings.
 
+## Phase 1b: Milwaukee vacant buildings and permits (live 2026-10-28)
+
+`python -m wpie.pipes.signals` runs in the nightly after the MPROP step (migrations 0107, 0108).
+
+- **Vacant buildings** (`mke.vacant`): WPIE already collects the city's list every day (`mke.city.vacant_buildings`),
+  so the pipe publishes WPIE's records instead of asking the city again. One signal per registration
+  (parcel:date opened). A registration is `active` while WPIE's latest successful run still saw it. One that leaves
+  the list stays staged as history, but no longer qualifies a parcel or opens an item.
+- **Permits** (`mke.permits`): the city's monthly permit work file, fetched when the last copy is 28 days old.
+  It has addresses only, so it is matched to MPROP parcels by address. A permit is context on an item; it never
+  qualifies a parcel or opens one (Colin's distress list has no permits).
+- The spec said "CKAN API". data.milwaukee.gov's robots.txt disallows `/api/`, so the pipes use the dataset pages' own
+  download links, as WPIE's collectors do.
+
+First live run: 1,832 vacant registrations (1,770 on today's list), all on staged parcels, 144 on cards. 16,684
+permit rows, 13,936 matched to a parcel by address, 103 on cards. With no map loaded, nothing in the City of
+Milwaukee is queued yet. About 1,200 vacant-building parcels pass every other gate (1,113 new, 109 stacks).
+
 ## Not built yet
 
-1b Milwaukee vacant buildings + permits (CKAN), 2 statewide V12, 3 county ArcGIS registry, 4 CourtListener + DOR.
+2 statewide V12, 3 county ArcGIS registry, 4 CourtListener + DOR.

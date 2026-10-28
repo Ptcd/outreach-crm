@@ -160,8 +160,29 @@ describe('pipes: dedupe and conflicts', () => {
     expect(s.screened).toBeGreaterThan(10)
     const g = await r(`public.pipe_gate_counts('mke.mprop')`)
     expect(g).toMatchObject({ first_static_fail: { type_3plus_units: 1, value_over_cap: 1 } })
-    expect(g.staged).toBe(22)
+    expect(g.staged).toBe(22)  // (before the 1b parcels load)
     expect(g.with_card_any).toBeGreaterThanOrEqual(5)
+  })
+})
+
+describe('pipes 1b: vacant buildings and permits as signals', () => {
+  it('signals load and refresh; one off the list stays as history but no longer qualifies; a permit never opens an item', async () => {
+    await load([parcel('4700000001', { lat: 42.99 }), parcel('4700000002', { situs_address: '9 N Permit St', lat: 42.99 }), parcel('4700000003', { lat: 42.99 })])
+    const c = await card({ owner: 'Pat Sample', address: '9 N Permit St', parcel: '4700000002', wpie: 4702, reasons: ['tax'] })
+    const vac = (id: string, active = true) => ({ source_record_id: id + ':2026-01-05', kind: 'vacant_building', county: 'Milwaukee', parcel_id: id,
+      address: '1 S Test St', municipality: 'Milwaukee', signal_date: '2026-01-05', active, detail: { status: 'open' } })
+    expect(await r(`public.pipe_upsert_signals('mke.vacant', $1::jsonb)`, [JSON.stringify([vac('4700000001'), vac('4700000003')])])).toEqual({ rows: 2, new: 2 })
+    expect(await r(`public.pipe_upsert_signals('mke.vacant', $1::jsonb)`, [JSON.stringify([vac('4700000001')])])).toEqual({ rows: 1, new: 0 })
+    expect(await r(`public.pipe_signals_listed('mke.vacant', array['4700000001:2026-01-05'])`)).toBe(1)
+    expect(await screen('4700000001')).toMatchObject({ pass: true, item_kind: 'new' })
+    expect(await screen('4700000003')).toMatchObject({ pass: false, fails: ['no_distress'], signals: 1, item: null })   // off the list: history only
+    expect(await rows(`select count(*)::int n from public.pipe_signals where source = 'mke.vacant'`)).toEqual([{ n: 2 }])
+    const permit = { source_record_id: 'RES-ALT-26-00001', kind: 'permit', county: 'Milwaukee', address: '9 N PERMIT ST', municipality: 'Milwaukee',
+      signal_date: '2026-09-01', detail: { type: 'Residential Alteration Permit', cost: 12000 } }
+    await r(`public.pipe_upsert_signals('mke.permits', $1::jsonb)`, [JSON.stringify([permit])])
+    expect(await screen('4700000002')).toMatchObject({ pass: true, signals: 1, cards: [c.id], item: null })            // context, not distress
+    expect(await r(`public.pipe_signal_counts('mke.permits')`)).toMatchObject({ signals: 1, on_a_staged_parcel: 1, active_on_a_card: 1 })
+    await expect(r(`public.pipe_upsert_signals('nope', '[]'::jsonb)`)).rejects.toThrow(/unknown pipe source/)
   })
 })
 
