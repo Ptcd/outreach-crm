@@ -62,7 +62,7 @@ type Pkg = Record<string, unknown> & { id: string; status: string; condition: Re
 type Person = { interest_id: string; name: string; role: string; status: string }
 
 // the script's one-tap answer labels, for turning the call's answers into package words
-const CALL_LABELS: Record<string, string> = Object.fromEntries([...callScript(), NEXT_STEP].flatMap((q) => (q.choices ?? []).map((c) => [c.id, c.label])))
+const CALL_LABELS: Record<string, string> = Object.fromEntries([...callScript(), NEXT_STEP].flatMap((q) => (q.choices ?? []).flatMap((c) => [[c.id, c.label], [`${q.id}:${c.id}`, c.label]])))
 
 /** "the roof and the furnace you mentioned": the first two things she wrote down about the house, for the callback line */
 function mentioned(cond: Record<string, string> | null): string {

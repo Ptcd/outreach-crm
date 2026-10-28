@@ -137,7 +137,8 @@ export function packageFromCall(facts: Record<string, { value?: { choices?: stri
   const words = (k: string) => {
     const x = v(k)
     if (!x) return ''
-    return [...(x.choices ?? []).map((id) => labels[id] ?? id), x.number ? `$${x.number}` : '', x.text ?? ''].filter(Boolean).join('; ')
+    // each answer in its own question's words: several questions share a choice id like 'no' ("Photos: Not behind", 2026-10-28)
+    return [...(x.choices ?? []).map((id) => labels[`${k}:${id}`] ?? labels[id] ?? id), x.number ? `$${x.number}` : '', x.text ?? ''].filter(Boolean).join('; ')
   }
   const cond: Record<string, string> = {}
   const map: Record<string, string> = { roof: 'roof', furnace: 'hvac', water_heater: 'water_heater', foundation: 'foundation', water: 'foundation',
