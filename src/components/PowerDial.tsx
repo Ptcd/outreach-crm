@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Badge, Empty, ErrorNote } from '@/components/ui/form'
 import { CallScript, pickupLine } from '@/components/CallScript'
+import { PHONE_SCRIPT } from '@/lib/callScript'
 import { supabase } from '@/lib/supabaseClient'
 import { api, useLead } from '@/lib/queries'
 import { useDialer } from '@/lib/dialer'
@@ -16,7 +17,7 @@ import { fmtDateTime, fmtPhone } from '@/lib/format'
 type Item = {
   lead_id: string; task_id: string | null; source: 'call_list' | 'texted_silent'; why: string | null
   owner_name: string; address: string | null; municipality: string | null; reasons: string[] | null; lane: string | null
-  texts_sent: number; first_text_at: string | null; last_text_at: string | null; dials_7d: number; last_dial: string | null
+  texts_sent: number; first_text_at: string | null; last_text_at: string | null; dials_7d: number; dials_total?: number; last_dial: string | null
   phone: string; line_type: string | null; phone_person: string | null; other_phones: number
 }
 type Stats = { dials: number; reached: number; voicemails: number; interested: number; done: string[]; started: number | null }
@@ -33,6 +34,11 @@ function loadStats(): Stats {
   try { const s = localStorage.getItem(todayKey()); return s ? { ...empty(), ...JSON.parse(s) } : empty() } catch { return empty() }
 }
 function saveStats(s: Stats) { try { localStorage.setItem(todayKey(), JSON.stringify(s)) } catch { /* private window: counts live for this sitting */ } }
+
+// Rick: only four objections come up in the first 30 seconds (plus "who texted me?" for owners we texted)
+const FIRST_30 = ['obj_who_are_you', 'obj_who_texted', 'obj_scam', 'obj_my_number', 'obj_flat_no']
+  .map((id) => (PHONE_SCRIPT as unknown as { objections: { id: string; trigger: string; say: string }[] }).objections.find((o) => o.id === id))
+  .filter((o): o is { id: string; trigger: string; say: string } => !!o)
 
 const OUTCOMES = [
   { key: '1', id: 'no_answer', label: 'No answer', note: 'No answer (Power hour).' },
@@ -190,7 +196,10 @@ export function PowerDial({ caller }: { caller: string }) {
             </p>
           </div>
 
-          <p className="rounded-md bg-muted p-2 text-sm"><span className="font-semibold">Open with:</span> &ldquo;{pickupLine(caller, 'cold', vars)}&rdquo;</p>
+          <div className="rounded-md bg-muted p-2 text-sm">
+            <p><span className="font-semibold">Open with:</span> &ldquo;{pickupLine(caller, 'cold', vars)}&rdquo;</p>
+            <p className="mt-1"><span className="font-semibold">Then:</span> &ldquo;Any interest in selling it?&rdquo; Yes: &ldquo;What&apos;s got you thinking about it?&rdquo; and tap <span className="font-medium">We talked</span>. A flat no: &ldquo;Before I go, do you own anything else you&apos;d ever consider selling?&rdquo; then <span className="font-medium">Not interested</span>.</p>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             {live ? (
               <Button className="h-14 flex-1 text-lg" variant="destructive" onClick={hangUp}>Hang up</Button>
@@ -227,7 +236,17 @@ export function PowerDial({ caller }: { caller: string }) {
               <Button variant="ghost" className="h-12" disabled={live} onClick={skip}>Skip<span className="ml-1 hidden text-xs text-muted-foreground sm:inline">(S)</span></Button>
             </div>
           )}
-          <p className="rounded-md bg-muted p-2 text-sm"><span className="font-semibold">Voicemail (under 20 s):</span> &ldquo;Hi{vars.first_name === 'there' ? '' : ` ${vars.first_name}`}, it&apos;s {callerName}. I had a quick question about the place on {vars.street}. Give me a call when you get a minute.&rdquo;</p>
+          {(cur.dials_total ?? 0) >= 2 ? (
+            <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm dark:bg-amber-950/30"><span className="font-semibold">Try {(cur.dials_total ?? 0) + 1}: leave this voicemail (under 20 s):</span> &ldquo;Hi{vars.first_name === 'there' ? '' : ` ${vars.first_name}`}, it&apos;s {callerName}. I had a quick question about the place on {vars.street}. Give me a call when you get a minute.&rdquo;</p>
+          ) : (
+            <p className="rounded-md bg-muted p-2 text-sm text-muted-foreground"><span className="font-semibold">Try {(cur.dials_total ?? 0) + 1}: no voicemail.</span> If it goes to voicemail, hang up and tap No answer. Rick leaves one short voicemail on the third try; the first two make them curious.</p>
+          )}
+          <details className="rounded-md border p-2 text-sm">
+            <summary className="cursor-pointer font-medium">If they say... (the first 30 seconds)</summary>
+            <ul className="mt-1 space-y-1">
+              {FIRST_30.map((o) => <li key={o.id}><span className="text-muted-foreground">{o.trigger}</span> &rarr; &ldquo;{o.say.replace(/\{caller\}/g, callerName)}&rdquo;</li>)}
+            </ul>
+          </details>
           {err && <p className="text-sm text-red-700">{err}</p>}
           <p className="hidden text-xs text-muted-foreground sm:block">Keys: D or Enter dials · H hangs up · 1 no answer · 2 voicemail · 3 wrong number · 4 not interested · 5 we talked · S skip · Esc stops auto-dial</p>
         </section>
