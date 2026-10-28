@@ -11,6 +11,8 @@ describe('workNeeded', () => {
     ['Can you send pictures of what you buy?', 'send_docs'],
     ['can I send you photos?', 'send_docs'],
     ['Do you have proof of funds?', 'records'],
+    ['Can you send me the comps you used', 'records'],
+    ['proof of funds?', 'records'],
     ['Talk to my attorney', 'contact_other'],
     ["I'm 80, call my daughter instead", 'contact_other'],
     ["You'll have to talk to my power of attorney", 'contact_other'],
@@ -28,6 +30,9 @@ describe('workNeeded', () => {
     'who is this?',
     'not interested',
     'The roof is old and the tenant leaves in March',
+    // mentioning a record is not asking for one (Colin 2026-10-28)
+    "I'd have to look and see where everything is, but the last tax bill said FMV was $441K, and with all the work we're doing, I'm thinking closer to $500-525K.",
+    'The appraisal came in at 300 last year',
   ])('no task for: %s', (text) => {
     expect(workNeeded(text)).toBeNull()
   })

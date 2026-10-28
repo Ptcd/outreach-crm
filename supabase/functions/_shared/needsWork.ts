@@ -12,7 +12,12 @@ export interface WorkNeeded {
 const EMAIL_ADDR = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i
 const EMAIL_ASK = /\b(?:e-?mail|email)\s+(?:me|it|that|them|the\b|something|info|details|over)|\b(?:by|via|over|through|in an?|to my)\s+e-?mail\b|\bmy\s+e-?mail\s+(?:is|address)\b|\bsend\b.{0,40}\be-?mail\b/i
 const RECORDS = /\b(?:proof of funds|pof|deed|title (?:work|search|report|info)|tax (?:bill|records?)|property records?|appraisal|inspection report|comps\b|comparables|your (?:license|company info|w-?9|references))\b/i
-const DOCS = /\b(?:send|mail|text|email|forward|share|show|get)\b.{0,40}\b(?:photos?|pictures?|pics|paperwork|papers|documents?|docs|contract|agreement|purchase agreement|offer letter|something in writing|in writing|the info|more info|information|details|brochure)\b|\b(?:put (?:it|that|an offer) in writing|written offer|offer in writing)\b/i
+// a records task only when they ASK us for one ("do you have proof of funds?", "send me comps", "can I see your license"),
+// never when they mention one ("the last tax bill said FMV was $441K", Colin 2026-10-28: "your logic is wrong on this")
+const RECORDS_WORD = RECORDS.source.slice(2, -2)
+const RECORDS_ASK = new RegExp(`\\b(?:send|show|provide|see|share|give|email|need|want|do you have|have you got|got any|can i get|could i get|where(?:'s| is)|what about)`
+  + `(?:\\s+(?:me|us))?(?:\\s+(?:your|the|a|an|any|some|a copy of|copies of|copy of))?\\s+(?:${RECORDS_WORD})\\b|\\b(?:${RECORDS_WORD})\\b[^.!?\\n]{0,40}\\?`, 'i')
+const DOCS =/\b(?:send|mail|text|email|forward|share|show|get)\b.{0,40}\b(?:photos?|pictures?|pics|paperwork|papers|documents?|docs|contract|agreement|purchase agreement|offer letter|something in writing|in writing|the info|more info|information|details|brochure)\b|\b(?:put (?:it|that|an offer) in writing|written offer|offer in writing)\b/i
 // Only when WE are asked to reach them ("please call my son", "talk to my attorney", "you'll have to
 // go through my POA"), not "I'll talk to my wife" or "don't text my husband".
 const NEGATED_ASK = /\b(?:don'?t|do not|never|no need to)\s+(?:talk|speak|call|contact|text|reach)\b/i
@@ -27,7 +32,7 @@ export function workNeeded(text: string): WorkNeeded | null {
   if (addr || EMAIL_ASK.test(t)) {
     return { kind: 'email', title: addr ? `Email them at ${addr}` : 'They asked for an email: get their address and send it', email: addr }
   }
-  if (RECORDS.test(t)) return { kind: 'records', title: 'They asked for records or proof (e.g. proof of funds, title, tax bill): send or arrange it', email: null }
+  if (RECORDS_ASK.test(t)) return { kind: 'records', title: 'They asked for records or proof (e.g. proof of funds, title, tax bill): send or arrange it', email: null }
   if (THEY_SEND.test(t)) return { kind: 'send_docs', title: 'They want to send you photos or paperwork: tell them where (email or this number)', email: null }
   if (DOCS.test(t)) return { kind: 'send_docs', title: 'They want something sent (photos, paperwork, details or an offer in writing)', email: null }
   const who = NEGATED_ASK.test(t) ? undefined : t.match(OTHER_PERSON)?.[1]
