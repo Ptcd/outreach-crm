@@ -207,7 +207,7 @@
     {
       "id": "b6b_yes_no",
       "say": "If his number works for you, are you ready to give him a yes or a no that day? A no is completely fine.",
-      "note": "Rick's upfront agreement: ask it before the walk is set, and again on the confirm call the day before."
+      "note": "The yes-or-no agreement: ask it before the walk is set, and again on the confirm call the day before."
     },
     {
       "id": "b7_confirm",
@@ -237,7 +237,7 @@
       "id": "obj_wholesaler",
       "trigger": "Are you a wholesaler / do you buy it yourself?",
       "say": "Depends on the deal. Some we keep and rent, some we fix up or pass along to a partner. Either way you deal with us, and we tell you up front which it is.",
-      "note": "Rick's answer (docs/RICK_PLAYBOOK.md: 'depends on the deal', said plainly, never brought up first); Colin 2026-10-22: 'do whatever Rick does'. Never 'never say wholesaler'."
+      "note": "Say it plainly, never bring it up first."
     },
     {
       "id": "obj_my_number",
@@ -385,7 +385,7 @@
     {
       "id": "nr2b_half_rule",
       "say": "Things sometimes move sooner than people expect. Mind if we check in around {half_date} as well, just in case? If not, we'll wait for {date}.",
-      "note": "Rick's half rule (QE8CCPM58XI, 8JKQipxh0xM): a 'call me in six months' gets a permission ask for a check-in at three. Only for a far date (over 60 days out); only once; their answer is final and goes in as the follow-up date. A no means the full date, exactly as said."
+      "note": "A 'call me in six months' gets a permission ask for a check-in at three. Only for a far date (over 60 days out); only once; their answer is final and goes in as the follow-up date. A no means the full date, exactly as said."
     },
     {
       "id": "nr3_nothing_would_change",

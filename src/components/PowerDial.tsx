@@ -289,7 +289,7 @@ export function PowerDial({ caller }: { caller: string }) {
           {cur.source === 'replied' || cur.source === 'missed_call' ? null : (cur.dials_total ?? 0) >= 2 ? (
             <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm dark:bg-amber-950/30"><span className="font-semibold">Try {(cur.dials_total ?? 0) + 1}: leave this voicemail (under 20 s):</span> &ldquo;Hi{vars.first_name === 'there' ? '' : ` ${vars.first_name}`}, it&apos;s {callerName}. I had a quick question about the place on {vars.street}. Give me a call when you get a minute.&rdquo;</p>
           ) : (
-            <p className="rounded-md bg-muted p-2 text-sm text-muted-foreground"><span className="font-semibold">Try {(cur.dials_total ?? 0) + 1}: no voicemail.</span> If it goes to voicemail, hang up and tap No answer. Rick leaves one short voicemail on the third try; the first two make them curious.</p>
+            <p className="rounded-md bg-muted p-2 text-sm text-muted-foreground"><span className="font-semibold">Try {(cur.dials_total ?? 0) + 1}: no voicemail.</span> If it goes to voicemail, hang up and tap No answer. Leave one short voicemail on the third try; the first two make them curious.</p>
           )}
           <details className="rounded-md border p-2 text-sm">
             <summary className="cursor-pointer font-medium">If they say... (the first 30 seconds)</summary>
