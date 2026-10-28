@@ -209,9 +209,14 @@ export function DialerProvider({ children }: { children: ReactNode }) {
       const mic = await navigator.mediaDevices.getUserMedia({ audio: true })
       mic.getTracks().forEach((t) => t.stop())
       takeoverKey = callAttemptKey()
-      const gate = await supabase.rpc('begin_human_call', {
-        p_lead_id: leadId, p_phone: to, p_source: 'app', p_key: takeoverKey,
-      })
+      const begin = () => supabase.rpc('begin_human_call', { p_lead_id: leadId, p_phone: to, p_source: 'app', p_key: takeoverKey })
+      let gate = await begin()
+      // a card busy for a moment (the laptop's sync writing it) can time the check out: one quiet retry before
+      // showing an error (2026-10-28: "Call failed ... canceling statement due to statement timeout")
+      if (gate.error && /statement timeout|lock timeout|deadlock/i.test(gate.error.message)) {
+        await new Promise((r) => setTimeout(r, 1500))
+        gate = await begin()
+      }
       const allowed = gate.data as { ok?: boolean; paused?: boolean; reason?: string } | null
       if (gate.error || !humanCallAuthorized(allowed)) throw new Error(gate.error?.message ?? allowed?.reason ?? 'Call authorization is not active')
       void contactId
