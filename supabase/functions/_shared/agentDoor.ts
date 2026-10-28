@@ -171,6 +171,18 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
       subject: S('subject line'), body: S('the letter'), in_reply_to: S('the Message-ID being answered, for follow_up and reply') }, required: ['request_id', 'to', 'subject', 'body'] } },
   { role: 'records', name: 'records_propose_batch', description: 'Propose drafts to send, up to 40 letters per call (the mailbox has a daily cap). Follow-ups and re-requests to an address this request already had a letter sent to go out on standing approval (the laptop sends them on its next pass, no click); first requests, replies to a clerk, and any letter that mentions money wait for Colin to approve in the app. The answer says which letters went which way, and why each waiting one waits. Send every records letter through here, never by email outside WPIE, so the record stays in one place.',
     inputSchema: { type: 'object', properties: { draft_ids: { type: 'array', items: { type: 'string' }, maxItems: 40 }, note: S('one line for Colin: what this batch is and why now') }, required: ['draft_ids'] } },
+  { role: 'records', name: 'records_agent_state', description: 'The laptop records agent at a glance: whether it is on the ramp (its first 7 days and 25 sent letters; while on it you release its follow-ups), letters sent today against the 60-a-day cap, the backlog stamp and whether new first requests are open, and unread notes for it.',
+    inputSchema: { type: 'object', properties: {} } },
+  { role: 'records', name: 'records_release_batch', description: 'Ramp review: release (approve=true) or return (approve=false) a batch the records agent proposed. drop = draft ids to send back to the agent with your note while releasing the rest. You cannot release a first request (Colin approves those in the app), a letter that mentions money, or a first DA/AG letter in a county.',
+    inputSchema: { type: 'object', properties: { batch_id: S('the batch'), approve: { type: 'boolean' }, drop: { type: 'array', items: { type: 'string' } }, note: S('why, for the agent') }, required: ['batch_id', 'approve'] } },
+  { role: 'records', name: 'records_post_backlog', description: 'Post the unverified-address backlog count (net-new manifest addresses not yet verified). The agent opens new first requests only under 2,000, holds steady from 2,000 to 3,000, pauses them over 3,000, and pauses them when the newest stamp is older than 8 days. Post it every night.',
+    inputSchema: { type: 'object', properties: { count: { type: 'integer', minimum: 0 }, note: S('optional') }, required: ['count'] } },
+  { role: 'records', name: 'records_log', description: 'The shared notes between you and the records agent (the coordination log, in WPIE): the last days of notes for you or from it. unresolved=true for open items only.',
+    inputSchema: { type: 'object', properties: { days: { type: 'integer', maximum: 90 }, unresolved: { type: 'boolean' } } } },
+  { role: 'records', name: 'records_log_write', description: 'Leave a note for the records agent (for=records_agent), for Colin (for=colin) or for both (for=all), optionally about one request; resolve=<id> closes a note instead.',
+    inputSchema: { type: 'object', properties: { note: S('the note'), for: S('records_agent | colin | all'), request_id: S('optional'), resolve: { type: 'integer' } } } },
+  { role: 'records', name: 'records_reinstate_ramp', description: 'A failed audit (a letter outside the playbook, an unstamped ask, a sheet/mailbox mismatch): put the records agent back on the ramp (on=true), or clear it after a clean sample (on=false).',
+    inputSchema: { type: 'object', properties: { on: { type: 'boolean' }, reason: S('what failed, or what passed') }, required: ['on', 'reason'] } },
   { role: 'records', name: 'records_mark', description: 'Update a request after reading a reply or a bounce: status (acknowledged, replied, received, no_records, needs_payment, denied, bounced, skip, draft), a note, received_date, records_through (the last date the records cover: the next re-request starts the day after), next_due (received and no_records default to the cadence_days of the request), a corrected to_email, and reply_id to mark that reply handled.',
     inputSchema: { type: 'object', properties: { request_id: S('the request'), status: S('new status'), note: S('what happened'), received_date: S('YYYY-MM-DD'),
       records_through: S('date the records cover through'), next_due: S('YYYY-MM-DD'), to_email: S('corrected address'), reply_id: S('the reply this handles') }, required: ['request_id'] } },
@@ -292,6 +304,16 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       p_in_reply_to: args.in_reply_to ? String(args.in_reply_to) : null, p_agent: agent.name }) }
     case 'records_propose_batch': return { value: await db.records('records_propose_batch', { p_draft_ids: Array.isArray(args.draft_ids) ? (args.draft_ids as unknown[]).map(String) : [],
       p_note: args.note ? String(args.note) : null, p_agent: agent.name }) }
+    case 'records_agent_state': return { value: await db.records('records_agent_state', {}) }
+    case 'records_release_batch': return { value: await db.records('records_muse_decide', { p_batch_id: String(args.batch_id ?? ''), p_approve: args.approve === true,
+      p_drop: Array.isArray(args.drop) ? (args.drop as unknown[]).map(String) : [], p_note: args.note ? String(args.note) : null, p_agent: agent.name }) }
+    case 'records_post_backlog': return { value: await db.records('records_post_backlog', { p_count: Math.max(0, Math.floor(Number(args.count ?? -1))), p_note: args.note ? String(args.note) : null, p_agent: agent.name }) }
+    case 'records_log': return { value: await db.records('records_log_read', { p_for: 'muse', p_days: int(args.days, 7, 90), p_unresolved: args.unresolved === true }) }
+    case 'records_log_write':
+      if (args.resolve) return { value: await db.records('records_log_resolve', { p_id: int(args.resolve, 0, 2147483647), p_by: agent.name }) }
+      return { value: await db.records('records_log_write', { p_author: 'muse', p_for: String(args.for ?? 'records_agent'), p_note: String(args.note ?? ''),
+        p_request_id: args.request_id ? String(args.request_id) : null }) }
+    case 'records_reinstate_ramp': return { value: await db.records('records_reinstate_ramp', { p_reason: String(args.reason ?? ''), p_agent: agent.name, p_on: args.on !== false }) }
     case 'records_mark': return { value: await db.records('records_mark', { p_request_id: String(args.request_id ?? ''), p_status: args.status ? String(args.status) : null,
       p_note: args.note ? String(args.note) : null, p_received_date: args.received_date ? String(args.received_date) : null,
       p_records_through: args.records_through ? String(args.records_through) : null, p_next_due: args.next_due ? String(args.next_due) : null,
