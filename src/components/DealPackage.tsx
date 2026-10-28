@@ -1,7 +1,8 @@
 // The package (Colin 2026-10-27, the partner model run Rick's way; migration 0085). The caller's first call never
 // prices: it ends here, in a package Colin gets by email with everything in it. Muse adds the value and comps, Colin
-// sets the number (and grades the package), the caller delivers it on the callback as "around {number}, once my
-// partner sees it", then books Colin's walk. Each state shows who is up and what they do.
+// decides walk it or pass (and grades the package), and the caller's callback gets the yes-or-no agreement and books
+// Colin's walk. No number on the phone (Colin 2026-10-28, migration 0114): Colin gives his at the house. Each state
+// shows who is up and what they do.
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
@@ -43,8 +44,9 @@ const FIELDS: { key: string; label: string; hint: string; long?: boolean }[] = [
 ]
 
 const STATUS: Record<string, { label: string; tone: 'muted' | 'warn' | 'bad' | 'good' | 'info'; who: string }> = {
-  waiting_value: { label: 'Waiting for the value', tone: 'info', who: 'Muse pulls the value and comps; Colin can price without them' },
-  waiting_number: { label: "Colin's turn: the number", tone: 'warn', who: 'Colin prices it today' },
+  waiting_value: { label: 'Waiting for the value', tone: 'info', who: 'Muse pulls the value and comps; Colin can decide without them' },
+  waiting_number: { label: "Colin's turn: walk it or pass", tone: 'warn', who: 'Colin decides today' },
+  go_walk: { label: 'Colin wants to walk it: callback', tone: 'good', who: 'The caller calls back at the time promised and books his walk' },
   counter: { label: 'Countered: back to Colin', tone: 'warn', who: 'Colin answers the counter' },
   number_ready: { label: 'Number ready: callback', tone: 'good', who: 'The caller calls back at the time promised' },
   agreed: { label: 'Agreed: book the walk', tone: 'good', who: "Book Colin's walk with everyone on the title there" },
@@ -66,8 +68,8 @@ function mentioned(cond: Record<string, string> | null): string {
 }
 
 const money = (n: unknown) => (n == null || n === '' ? '' : `$${Math.round(Number(n)).toLocaleString('en-US')}`)
-const OPEN = ['waiting_value', 'waiting_number', 'number_ready', 'counter', 'agreed']
-/** a promised callback within 3 hours (or past) and Colin's number not in yet (migration 0112 pushes Colin the same) */
+const OPEN = ['waiting_value', 'waiting_number', 'go_walk', 'number_ready', 'counter', 'agreed']
+/** a promised callback within 3 hours (or past) and Colin has not said walk it or pass (0112 pushes Colin the same) */
 export const numberNotReady = (pk: { status: string; callback_at?: unknown }, now = Date.now()) =>
   ['waiting_value', 'waiting_number'].includes(pk.status) && !!pk.callback_at && new Date(String(pk.callback_at)).getTime() < now + 3 * 3600_000
 
@@ -108,15 +110,12 @@ function Summary({ p }: { p: Pkg }) {
 
 function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner: boolean; onDone: () => void }) {
   const [err, setErr] = useState<string | null>(null)
-  const [num, setNum] = useState('')
   const [grade, setGrade] = useState('')
   const [note, setNote] = useState('')
-  const [resp, setResp] = useState('yes')
-  const [counter, setCounter] = useState('')
   const [walkAt, setWalkAt] = useState('')
   const [newCb, setNewCb] = useState(() => isoToLocalInput(new Date(Date.now() + 24 * 3600_000).toISOString()))
   // Colin's walk, booked on the card the same way the call script books it (the belt moves the card to Walk booked,
-  // which closes this package)
+  // which closes this package and its callback, and gives the caller the confirm call the day before)
   const bookWalk = async () => {
     const when = localInputToIso(walkAt)
     if (!when) { setErr('pick the day and time of the walk'); return }
@@ -142,6 +141,7 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
     onDone()
   }
   const comps = (p.comps ?? []) as { address?: string; price?: number; sold_price?: number; date?: string; sold_date?: string; sqft?: number; url?: string; note?: string }[]
+  const say = 'rounded-md border-l-4 border-amber-400 bg-amber-50 p-2 dark:bg-amber-950/30'
   return (
     <div className="space-y-3 text-sm">
       <p className="text-muted-foreground">
@@ -165,30 +165,29 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
           )}
         </div>
       )}
-      {p.our_number != null && <p className="text-base"><span className="font-semibold">Colin&apos;s number:</span> around {money(p.our_number)}{p.number_note ? ` · ${String(p.number_note)}` : ''}</p>}
-      {p.status === 'counter' && <p><Badge tone="warn">Counter</Badge> They asked for {money(p.counter_number)}{p.response_note ? `: ${String(p.response_note)}` : ''}</p>}
+      {p.number_note != null && <p><span className="font-medium">Colin&apos;s note:</span> {String(p.number_note)}</p>}
 
-      {isOwner && ['waiting_value', 'waiting_number', 'counter', 'number_ready'].includes(p.status) && (
+      {isOwner && ['waiting_value', 'waiting_number', 'go_walk'].includes(p.status) && (
         <div className="space-y-2 rounded-lg border p-3">
-          <p className="font-medium">{p.status === 'number_ready' ? 'Change your number' : 'Set your number'}</p>
-          <div className="grid gap-2 sm:grid-cols-[10rem_7rem_1fr_auto]">
-            <Input inputMode="numeric" placeholder="Number ($)" value={num} onChange={(e) => setNum(e.target.value.replace(/[^0-9]/g, ''))} aria-label="Your number" />
+          <p className="font-medium">{p.status === 'go_walk' ? 'You said walk it (change your mind?)' : 'Walk it or pass?'}</p>
+          <div className="grid gap-2 sm:grid-cols-[7rem_1fr_auto_auto]">
             <Select value={grade} onChange={(e) => setGrade(e.target.value)} aria-label="Grade the package">
               <option value="">Grade</option><option value="A">A</option><option value="B">B</option><option value="C">C</option>
             </Select>
-            <Input placeholder="Note for the caller (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
-            <Button disabled={!num} onClick={() => void run('package_price', { p_id: p.id, p_number: Number(num), p_note: note || null, p_grade: grade || null })}>Send to caller</Button>
+            <Input placeholder="Note for the caller (optional, never a number)" value={note} onChange={(e) => setNote(e.target.value)} />
+            {p.status !== 'go_walk' && <Button onClick={() => void run('package_decide', { p_id: p.id, p_walk: true, p_note: note || null, p_grade: grade || null })}>Walk it</Button>}
+            <Button variant="outline" onClick={() => void run('package_decide', { p_id: p.id, p_walk: false, p_note: note || null, p_grade: grade || null })}>Pass</Button>
           </div>
-          <p className="text-xs text-muted-foreground">The caller says it as &quot;around {num ? money(num) : '{number}'}, once my partner sees it&quot;, and nothing else.</p>
+          <p className="text-xs text-muted-foreground">No number goes out on the phone. The caller books your walk with everyone on the title there, and you give your number at the house.</p>
         </div>
       )}
 
       {numberNotReady(p) && (
         <div className="space-y-2 rounded-lg border border-amber-400 p-3">
-          <p className="font-medium">Callback {fmtDateTime(String(p.callback_at))}, and Colin&apos;s number isn&apos;t in yet</p>
-          <p className="text-muted-foreground">Colin got a push to price it. If it&apos;s still not here at the time you promised, call anyway: never let a promised callback go quiet, and never guess a number.</p>
-          <blockquote className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-2 dark:bg-amber-950/30">
-            &quot;Hi, it&apos;s [your name]. I told you I&apos;d call today. My partner is still going over everything you told me, and I don&apos;t want to give you a number that&apos;s not right. Can I call you back [day] at [time]?&quot;
+          <p className="font-medium">Callback {fmtDateTime(String(p.callback_at))}, and Colin hasn&apos;t decided yet</p>
+          <p className="text-muted-foreground">Colin got a push. If he still hasn&apos;t decided at the time you promised, call anyway: never let a promised callback go quiet.</p>
+          <blockquote className={say}>
+            &quot;Hi, it&apos;s [your name]. I told you I&apos;d call today. My partner is still going over everything you told me. Can I call you back [day] at [time]?&quot;
           </blockquote>
           <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
             <Input type="datetime-local" value={newCb} onChange={(e) => setNewCb(e.target.value)} aria-label="The new callback time" />
@@ -197,38 +196,34 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
         </div>
       )}
 
-      {p.status === 'number_ready' && (
+      {p.status === 'go_walk' && (
         <div className="space-y-2 rounded-lg border p-3">
-          <p className="font-medium">The callback</p>
-          <blockquote className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-2 dark:bg-amber-950/30">
-            &quot;My partner and I went over it. {mentioned(p.condition)}, we&apos;d be at around {money(p.our_number)}, once my partner sees it in person.&quot; Then stop talking. Then: &quot;Does that work for you?&quot;
+          <p className="font-medium">The callback: book Colin&apos;s walk (no number on the phone)</p>
+          <blockquote className={say}>
+            &quot;Hi, it&apos;s [your name]. My partner and I went over everything you told me. {mentioned(p.condition)}, he&apos;d like to come see it himself. He only puts a number on a place once he&apos;s walked it, so it&apos;s a real number and not a guess.&quot;
           </blockquote>
-          <div className="grid gap-2 sm:grid-cols-[12rem_10rem_1fr_auto]">
-            <Select value={resp} onChange={(e) => setResp(e.target.value)} aria-label="What they said">
-              <option value="yes">Yes</option><option value="close">Close: wants the walk</option><option value="counter">Countered</option><option value="no">No</option>
-            </Select>
-            {resp === 'counter'
-              ? <Input inputMode="numeric" placeholder="Their counter ($)" value={counter} onChange={(e) => setCounter(e.target.value.replace(/[^0-9]/g, ''))} />
-              : <span />}
-            <Input placeholder="What they said, their words" value={note} onChange={(e) => setNote(e.target.value)} />
-            <Button onClick={() => void run('package_delivered', { p_id: p.id, p_said: Number(p.our_number), p_response: resp, p_counter: counter ? Number(counter) : null, p_note: note || null })}>Log the callback</Button>
-          </div>
-          <p className="text-xs text-muted-foreground">A counter goes to Colin: &quot;Let me take that to my partner and come back to you.&quot; Never negotiate.</p>
-        </div>
-      )}
-
-      {p.status === 'agreed' && (
-        <div className="space-y-2 rounded-lg border p-3">
-          <p className="font-medium">Book Colin&apos;s walk</p>
-          <p>&quot;When&apos;s a good time for my partner Colin to come see it? Will everyone on the title be there? It takes about 40 minutes, and at the end a yes or a no is fine.&quot;</p>
+          <p className="font-medium">Before the time, the yes-or-no question:</p>
+          <blockquote className={say}>
+            &quot;Before he comes out: if his number works for you, are you ready to give him a yes or a no that day? A no is completely fine.&quot;
+          </blockquote>
+          <p className="font-medium">A yes: book it.</p>
+          <blockquote className={say}>
+            &quot;When&apos;s a good time for him to come by? Will everyone on the title be there? It takes about 40 minutes.&quot;
+          </blockquote>
           {walkBox}
-          <p className="text-xs text-muted-foreground">Then text Colin the time. This package closes when the walk is booked.</p>
+          <p className="text-xs text-muted-foreground">If they push for a number: &quot;He doesn&apos;t guess over the phone. If it&apos;s not a fit when he&apos;s there, he&apos;ll tell you straight, and a no is fine too.&quot; Never a number, a range or a percentage.</p>
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+            <Input placeholder="What they said, their words" value={note} onChange={(e) => setNote(e.target.value)} />
+            <Button variant="outline" onClick={() => void run('package_callback', { p_id: p.id, p_response: 'not_ready', p_note: note || null })}>Not ready to decide</Button>
+            <Button variant="outline" onClick={() => void run('package_callback', { p_id: p.id, p_response: 'no', p_note: note || null })}>No</Button>
+          </div>
+          <p className="text-xs text-muted-foreground">Not ready: use the not-ready lines and log the call with a check-back date as usual.</p>
         </div>
       )}
 
       {!!p.hot && ['waiting_value', 'waiting_number'].includes(p.status) && !p.walk_booked_on_call && (
         <details className="rounded-lg border p-3">
-          <summary className="cursor-pointer font-medium">Hot: book Colin&apos;s walk now instead of waiting for the number</summary>
+          <summary className="cursor-pointer font-medium">Hot: book Colin&apos;s walk now instead of waiting for him</summary>
           <div className="mt-2">{walkBox}</div>
         </details>
       )}
@@ -271,8 +266,13 @@ function SendPackage({ lead, last, onDone }: { lead: Lead; last: Pkg | null; onD
   if (!openForm) {
     return (
       <div className="space-y-2 text-sm">
-        {last && <p className="text-muted-foreground">Last package: {STATUS[last.status]?.label ?? last.status}{last.our_number != null ? `, Colin's number around ${money(last.our_number)}` : ''}.</p>}
-        <p className="text-muted-foreground">After a good first call: everything you learned goes to Colin in one email. Never a number on this call.{Object.values(fromCall.fields).some(Boolean) ? ' The answers you tapped in the call script are already filled in; check them and add the rest.' : ''}</p>
+        {last && <p className="text-muted-foreground">Last package: {last.colin_call === 'pass' ? 'Colin passed' : STATUS[last.status]?.label ?? last.status}.</p>}
+        {last?.colin_call === 'pass' && last.status === 'declined' && !last.delivered_at && (
+          <blockquote className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-2 dark:bg-amber-950/30">
+            The promised callback, when Colin passed: &quot;Hi, it&apos;s [your name]. My partner and I went over everything, and we&apos;re not the right fit for this one right now. I didn&apos;t want to leave you waiting. If anything changes, keep this number.&quot; Then mark the callback Done.
+          </blockquote>
+        )}
+        <p className="text-muted-foreground">After a good first call: everything you learned goes to Colin in one email. Never a number on the phone.{Object.values(fromCall.fields).some(Boolean) ? ' The answers you tapped in the call script are already filled in; check them and add the rest.' : ''}</p>
         <Button onClick={() => setOpen(true)}>Send package to Colin</Button>
       </div>
     )
@@ -333,11 +333,11 @@ export function PackagesToday() {
     if (r.error) throw new Error(r.error.message)
     return (r.data ?? []) as OpenRow[]
   } })
-  const rows = (q.data ?? []).filter((x) => isOwner ? ['waiting_value', 'waiting_number', 'counter'].includes(x.package.status)
-    : ['number_ready', 'agreed'].includes(x.package.status) || numberNotReady(x.package))
+  const rows = (q.data ?? []).filter((x) => isOwner ? ['waiting_value', 'waiting_number'].includes(x.package.status)
+    : x.package.status === 'go_walk' || numberNotReady(x.package))
   if (!q.data || rows.length === 0) return null
   return (
-    <Section title={`${isOwner ? 'Packages to price' : 'Callbacks with Colin\u2019s number'} (${rows.length})`}>
+    <Section title={`${isOwner ? 'Packages: walk it or pass' : 'Callbacks: book Colin\u2019s walk'} (${rows.length})`}>
       <ErrorNote error={q.error} />
       <ul className="divide-y text-sm">
         {rows.map((x) => (
@@ -347,7 +347,7 @@ export function PackagesToday() {
             {x.package.hot ? <Badge tone="bad">HOT</Badge> : null}
             {x.package.callback_at ? <span className="text-muted-foreground">callback {fmtDateTime(String(x.package.callback_at))}</span> : null}
             {x.late && <Badge tone="bad">{x.late}</Badge>}
-            {numberNotReady(x.package) && <Badge tone="warn">callback soon, no number yet</Badge>}
+            {numberNotReady(x.package) && <Badge tone="warn">callback soon, Colin hasn&apos;t decided</Badge>}
           </li>
         ))}
       </ul>
@@ -369,13 +369,13 @@ export function DealsFunnel() {
   const rows = (q.data ?? []).filter((x) => x.calls || x.packages)
   return (
     <Section title="Deals funnel by list">
-      <p className="mb-2 text-sm text-muted-foreground">Calls, then packages, Colin&apos;s number, the callback, a yes and the walk, per week and by where the lead came from. Grades are Colin&apos;s A/B/C when he prices.</p>
+      <p className="mb-2 text-sm text-muted-foreground">Calls, then packages, Colin&apos;s walk-it calls, the callback and the walk, per week and by where the lead came from. Grades are Colin&apos;s A/B/C when he decides.</p>
       <ErrorNote error={q.error} />
       {rows.length === 0 ? <p className="text-sm text-muted-foreground">No calls or packages yet.</p> : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead><tr className="text-left text-muted-foreground">
-              {['Week', 'List', 'Calls', 'Reached', 'Packages', 'Hot', 'Valued', 'Priced', 'Called back', 'Yes', 'Walks', 'A/B/C'].map((h) => <th key={h} className="px-2 py-1 font-medium">{h}</th>)}
+              {['Week', 'List', 'Calls', 'Reached', 'Packages', 'Hot', 'Valued', 'Walk it', 'Called back', 'Yes', 'Walks', 'A/B/C'].map((h) => <th key={h} className="px-2 py-1 font-medium">{h}</th>)}
             </tr></thead>
             <tbody>
               {rows.map((x) => (

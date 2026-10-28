@@ -192,7 +192,8 @@ const LABEL_OUTCOME: Record<string, string> = Object.fromEntries(CALL_OUTCOMES.m
 
 /** The close (docs/THALIA_TRAINING.md): every good call ends in a package for Colin. A clearly hot seller (a need and a
  *  rough house, or a sale or move date) gets Colin's walk booked now; everyone else a callback at a set time, when the
- *  caller delivers Colin's number. Not ready: the not-ready lines and a dated check-back. */
+ *  caller books Colin's walk if he said walk it. No number on the phone, ever: Colin gives his at the house (0114).
+ *  Not ready: the not-ready lines and a dated check-back. */
 function Close({ verdict, hot, vars, facts, replyFacts, onSave, canOverride }: {
   verdict: BookingVerdict; hot: boolean; vars: Record<string, string>; facts: CallFacts; replyFacts: Record<string, unknown>
   onSave: (k: string, v: CallValue | null) => Promise<void>; canOverride: boolean
@@ -221,12 +222,12 @@ function Close({ verdict, hot, vars, facts, replyFacts, onSave, canOverride }: {
       {hot && (
         <div className="space-y-2 rounded-md border-2 border-emerald-400 p-3">
           <p className="font-semibold">Hot: book Colin&apos;s walk on this call</p>
-          <p className="text-sm text-muted-foreground">A need and a rough house, or a sale or move date. Don&apos;t wait for a number: Colin prices it at the house.</p>
+          <p className="text-sm text-muted-foreground">A need and a rough house, or a sale or move date. Book it now: Colin gives his number at the house, never on the phone.</p>
           <ScriptLines lines={lines((id) => id !== 'b8_call_instead')} />
         </div>
       )}
       <div className="space-y-2 rounded-md border-2 border-amber-300 p-3">
-        <p className="font-semibold">{hot ? 'Or, if they want a number first: the callback' : 'Close: the package and a callback'}</p>
+        <p className="font-semibold">{hot ? 'Or, if they would rather wait: the package and a callback' : 'Close: the package and a callback'}</p>
         <ScriptLines lines={lines((id) => id === 'b8_call_instead')} />
         {stepCard}
         {toPackage}

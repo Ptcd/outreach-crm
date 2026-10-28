@@ -194,7 +194,7 @@ describe('pages render', () => {
     expect(screen.getByText(/If they say\.\.\. \(24 answers\)/)).toBeTruthy()
     // The card has not decided yet (only the reason is in), so the close is held back: no Walk-through to tap.
     expect(screen.getAllByText('Not decided yet').length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/^(Close: the package and a callback|Or, if they want a number first: the callback|Close: not ready yet)$/).length).toBe(1)
+    expect(screen.getAllByText(/^(Close: the package and a callback|Or, if they would rather wait: the package and a callback|Close: not ready yet)$/).length).toBe(1)
     expect(screen.queryByText('Close: book the visit')).toBeNull()
     expect(screen.getAllByText(/Still to ask:/).length).toBeGreaterThan(0)              // on the card
     expect(screen.getByText(/Tired landlord/)).toBeTruthy()                              // answered on an earlier call

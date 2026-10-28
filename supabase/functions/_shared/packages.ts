@@ -52,7 +52,7 @@ export function packageEmail(r: PackageRow, appUrl: string): { subject: string; 
     ...rows.map(([k, v]) => `${k}: ${v}`), '',
     'Condition, in their words:',
     ...(condRows.length ? condRows.map(([k, v]) => `- ${k}: ${v}`) : ['- (nothing recorded)']), '',
-    `Price it on the card: ${link}`,
+    `Walk it or pass, on the card (no number goes out by phone; you give yours at the house): ${link}`,
   ].join('\n')
   const tr = (k: string, v: string) => `<tr><td style="padding:4px 10px 4px 0;color:#52606d;vertical-align:top;white-space:nowrap">${esc(k)}</td><td style="padding:4px 0">${esc(v)}</td></tr>`
   const html = `<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1f2933">
@@ -60,15 +60,15 @@ export function packageEmail(r: PackageRow, appUrl: string): { subject: string; 
 <table style="border-collapse:collapse">${rows.map(([k, v]) => tr(k, v)).join('')}</table>
 <h3 style="margin:14px 0 6px">Condition, in their words</h3>
 <table style="border-collapse:collapse">${condRows.length ? condRows.map(([k, v]) => tr(k, v)).join('') : tr('', '(nothing recorded)')}</table>
-<p style="margin-top:16px"><a href="${esc(link)}" style="background:#102a43;color:#fff;padding:9px 14px;border-radius:6px;text-decoration:none">Price it on the card</a></p>
+<p style="margin-top:16px"><a href="${esc(link)}" style="background:#102a43;color:#fff;padding:9px 14px;border-radius:6px;text-decoration:none">Walk it or pass, on the card</a></p>
 </div>`
   return { subject, text, html }
 }
 
 export type PackageSummary = { emailed: number; failed: number; ready_pings: number; number_due_pings: number }
 
-/** Email new packages to Colin; push "Colin's number is ready" for priced ones, and "number needed by" for a callback
- *  coming up (within 3 hours, or past) whose number is not in yet (migration 0112). */
+/** Email new packages to Colin; push "Colin wants to walk it" to the caller once he decides (migration 0114: no number
+ *  on the phone), and "walk it or pass, by" to Colin for a callback coming up (within 3 hours, or past) he has not decided. */
 export async function runPackageMail(deps: NotifyDeps, rpc: Rpc, fanOut?: (m: { title: string; body: string; url: string; tag: string }) => Promise<unknown>): Promise<PackageSummary> {
   const s: PackageSummary = { emailed: 0, failed: 0, ready_pings: 0, number_due_pings: 0 }
   if (deps.email && deps.emailTo) {
@@ -86,15 +86,15 @@ export async function runPackageMail(deps: NotifyDeps, rpc: Rpc, fanOut?: (m: { 
   if (fanOut) {
     const r = await rpc('package_ready_claim', {})
     for (const x of ((r.data as { lead_id: string; property_address: string | null; callback_at: string | null }[] | null) ?? [])) {
-      await fanOut({ title: `Colin's number is ready: ${x.property_address ?? 'a package'}`,
-        body: x.callback_at ? 'Make the callback at the time you promised.' : 'Call them back with it.',
+      await fanOut({ title: `Colin wants to walk it: ${x.property_address ?? 'a package'}`,
+        body: x.callback_at ? 'On the callback you promised: the yes-or-no question, then book his walk.' : 'Call them back and book his walk.',
         url: `${deps.appUrl.replace(/\/$/, '')}/lead/${x.lead_id}#package`, tag: `package-${x.lead_id}` }).catch(() => null)
       s.ready_pings++
     }
     const due = await rpc('package_number_due_claim', {})
     for (const x of ((due.data as { lead_id: string; property_address: string | null; callback_at: string }[] | null) ?? [])) {
-      await fanOut({ title: `Number needed by ${clock(x.callback_at)}: ${x.property_address ?? 'a package'}`,
-        body: 'Thalia promised this callback and there is no number yet. Price it on the card, or she calls on time and sets a new callback.',
+      await fanOut({ title: `Walk it or pass, by ${clock(x.callback_at)}: ${x.property_address ?? 'a package'}`,
+        body: 'Thalia promised this callback and you have not decided yet. Decide on the card, or she calls on time and sets a new callback.',
         url: `${deps.appUrl.replace(/\/$/, '')}/lead/${x.lead_id}#package`, tag: `package-due-${x.lead_id}` }).catch(() => null)
       s.number_due_pings++
     }
