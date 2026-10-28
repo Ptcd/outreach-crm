@@ -38,6 +38,7 @@ export interface ActiveCall {
   answered: boolean
   inbound: boolean       // they called us
   line: string | null    // the seller number they called (inbound only)
+  quiet?: boolean        // Power hour asks the outcome on its own card, so the call bar does not
 }
 
 /** A call ringing in, before Accept / Decline. `matches` is null while the call desk is still looking. */
@@ -53,7 +54,7 @@ interface DialerApi {
   incoming: IncomingCall | null
   supported: boolean
   ready: boolean          // registered with Twilio: a seller's call can ring here
-  start: (x: { to: string; label: string; leadId: string | null; contactId: string | null }) => Promise<void>
+  start: (x: { to: string; label: string; leadId: string | null; contactId: string | null; quiet?: boolean }) => Promise<void>
   accept: () => Promise<{ leadId: string | null; phone: string } | null>
   decline: () => void
   hangUp: () => void
@@ -196,10 +197,10 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('pagehide', hang)
   }, [])
 
-  const start = useCallback<DialerApi['start']>(async ({ to, label, leadId, contactId }) => {
+  const start = useCallback<DialerApi['start']>(async ({ to, label, leadId, contactId, quiet }) => {
     if (callRef.current || incomingRef.current) return
     answeredRef.current = false
-    setActive({ status: 'connecting', to, label, leadId, startedAt: null, muted: false, error: null, answered: false, inbound: false, line: null })
+    setActive({ status: 'connecting', to, label, leadId, startedAt: null, muted: false, error: null, answered: false, inbound: false, line: null, quiet: !!quiet })
     let takeoverKey: string | null = null
     try {
       const dev = await device()

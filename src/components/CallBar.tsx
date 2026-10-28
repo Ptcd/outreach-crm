@@ -48,7 +48,7 @@ export function CallBar() {
     if (r.error) { setMsg(r.error.message); return }
     dismiss()
   }
-  const askOutcome = !live && !!active.leadId && !active.inbound
+  const askOutcome = !live && !!active.leadId && !active.inbound && !active.quiet
 
   const where = active.inbound
     ? `calling in from ${fmtPhone(active.to) || 'a withheld number'}${active.line ? ` on ${fmtPhone(active.line)}` : ''}`

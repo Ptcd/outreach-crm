@@ -18,6 +18,7 @@ import { ownerFilterFor, useOnPhone, workerFor } from '@/lib/onPhone'
 import { OnPhonePrompt, useColinHere } from '@/components/OnPhonePicker'
 import type { Task } from '@/lib/types'
 import { orderPhones } from '@/lib/phoneOrder'
+import { PowerDial } from '@/components/PowerDial'
 
 type QueueTask = Task & { lead: { id: string; owner_name: string; property_address: string | null; municipality?: string | null; property_zip?: string | null; stage: string } | null }
 
@@ -44,9 +45,29 @@ export default function CallQueue() {
   // which the belt would read as a plain Done and route again.
   const refresh = useWrite(async () => ({ data: null, error: null }), [['tasks'], ['lead'], ['leads'], ['pipeline_counts']])
   const total = queue.length + done.length
+  // Power hour: the fast cold-call mode (Colin 2026-10-28); remembered per device
+  const [mode, setModeState] = useState<'list' | 'power'>(() => { try { return localStorage.getItem('calls:mode') === 'power' ? 'power' : 'list' } catch { return 'list' } })
+  const setMode = (m: 'list' | 'power') => { setModeState(m); try { localStorage.setItem('calls:mode', m) } catch { /* fine */ } }
+  const tabs = (
+    <div className="flex gap-2" role="tablist">
+      <Button role="tab" aria-selected={mode === 'list'} variant={mode === 'list' ? 'default' : 'outline'} className="h-10" onClick={() => setMode('list')}>Today&apos;s list</Button>
+      <Button role="tab" aria-selected={mode === 'power'} variant={mode === 'power' ? 'default' : 'outline'} className="h-10" onClick={() => setMode('power')}>Power hour</Button>
+    </div>
+  )
+  if (mode === 'power') {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold tracking-tight">Calls</h1>
+        {tabs}
+        <OnPhonePrompt />
+        <PowerDial caller={worker ?? member?.person ?? 'thalia'} />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
+      {tabs}
       <div className="flex items-baseline justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Calls</h1>
         <p className="text-sm text-muted-foreground" data-testid="queue-count">
