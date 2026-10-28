@@ -67,6 +67,9 @@ function mentioned(cond: Record<string, string> | null): string {
 
 const money = (n: unknown) => (n == null || n === '' ? '' : `$${Math.round(Number(n)).toLocaleString('en-US')}`)
 const OPEN = ['waiting_value', 'waiting_number', 'number_ready', 'counter', 'agreed']
+/** a promised callback within 3 hours (or past) and Colin's number not in yet (migration 0112 pushes Colin the same) */
+export const numberNotReady = (pk: { status: string; callback_at?: unknown }, now = Date.now()) =>
+  ['waiting_value', 'waiting_number'].includes(pk.status) && !!pk.callback_at && new Date(String(pk.callback_at)).getTime() < now + 3 * 3600_000
 
 export function DealPackage({ lead }: { lead: Lead }) {
   const { isOwner } = useAuth()
@@ -111,6 +114,7 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
   const [resp, setResp] = useState('yes')
   const [counter, setCounter] = useState('')
   const [walkAt, setWalkAt] = useState('')
+  const [newCb, setNewCb] = useState(() => isoToLocalInput(new Date(Date.now() + 24 * 3600_000).toISOString()))
   // Colin's walk, booked on the card the same way the call script books it (the belt moves the card to Walk booked,
   // which closes this package)
   const bookWalk = async () => {
@@ -176,6 +180,20 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
             <Button disabled={!num} onClick={() => void run('package_price', { p_id: p.id, p_number: Number(num), p_note: note || null, p_grade: grade || null })}>Send to caller</Button>
           </div>
           <p className="text-xs text-muted-foreground">The caller says it as &quot;around {num ? money(num) : '{number}'}, once my partner sees it&quot;, and nothing else.</p>
+        </div>
+      )}
+
+      {numberNotReady(p) && (
+        <div className="space-y-2 rounded-lg border border-amber-400 p-3">
+          <p className="font-medium">Callback {fmtDateTime(String(p.callback_at))}, and Colin&apos;s number isn&apos;t in yet</p>
+          <p className="text-muted-foreground">Colin got a push to price it. If it&apos;s still not here at the time you promised, call anyway: never let a promised callback go quiet, and never guess a number.</p>
+          <blockquote className="rounded-md border-l-4 border-amber-400 bg-amber-50 p-2 dark:bg-amber-950/30">
+            &quot;Hi, it&apos;s [your name]. I told you I&apos;d call today. My partner is still going over everything you told me, and I don&apos;t want to give you a number that&apos;s not right. Can I call you back [day] at [time]?&quot;
+          </blockquote>
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+            <Input type="datetime-local" value={newCb} onChange={(e) => setNewCb(e.target.value)} aria-label="The new callback time" />
+            <Button variant="outline" onClick={() => void run('package_move_callback', { p_id: p.id, p_at: localInputToIso(newCb) })}>Set the new callback</Button>
+          </div>
         </div>
       )}
 
@@ -315,7 +333,8 @@ export function PackagesToday() {
     if (r.error) throw new Error(r.error.message)
     return (r.data ?? []) as OpenRow[]
   } })
-  const rows = (q.data ?? []).filter((x) => isOwner ? ['waiting_value', 'waiting_number', 'counter'].includes(x.package.status) : ['number_ready', 'agreed'].includes(x.package.status))
+  const rows = (q.data ?? []).filter((x) => isOwner ? ['waiting_value', 'waiting_number', 'counter'].includes(x.package.status)
+    : ['number_ready', 'agreed'].includes(x.package.status) || numberNotReady(x.package))
   if (!q.data || rows.length === 0) return null
   return (
     <Section title={`${isOwner ? 'Packages to price' : 'Callbacks with Colin\u2019s number'} (${rows.length})`}>
@@ -328,6 +347,7 @@ export function PackagesToday() {
             {x.package.hot ? <Badge tone="bad">HOT</Badge> : null}
             {x.package.callback_at ? <span className="text-muted-foreground">callback {fmtDateTime(String(x.package.callback_at))}</span> : null}
             {x.late && <Badge tone="bad">{x.late}</Badge>}
+            {numberNotReady(x.package) && <Badge tone="warn">callback soon, no number yet</Badge>}
           </li>
         ))}
       </ul>

@@ -65,11 +65,12 @@ export function packageEmail(r: PackageRow, appUrl: string): { subject: string; 
   return { subject, text, html }
 }
 
-export type PackageSummary = { emailed: number; failed: number; ready_pings: number }
+export type PackageSummary = { emailed: number; failed: number; ready_pings: number; number_due_pings: number }
 
-/** Email new packages to Colin; push "Colin's number is ready" for priced ones. */
+/** Email new packages to Colin; push "Colin's number is ready" for priced ones, and "number needed by" for a callback
+ *  coming up (within 3 hours, or past) whose number is not in yet (migration 0112). */
 export async function runPackageMail(deps: NotifyDeps, rpc: Rpc, fanOut?: (m: { title: string; body: string; url: string; tag: string }) => Promise<unknown>): Promise<PackageSummary> {
-  const s: PackageSummary = { emailed: 0, failed: 0, ready_pings: 0 }
+  const s: PackageSummary = { emailed: 0, failed: 0, ready_pings: 0, number_due_pings: 0 }
   if (deps.email && deps.emailTo) {
     const r = await rpc('package_mail_claim', { p_limit: 5 })
     for (const row of ((r.data as PackageRow[] | null) ?? [])) {
@@ -90,6 +91,23 @@ export async function runPackageMail(deps: NotifyDeps, rpc: Rpc, fanOut?: (m: { 
         url: `${deps.appUrl.replace(/\/$/, '')}/lead/${x.lead_id}#package`, tag: `package-${x.lead_id}` }).catch(() => null)
       s.ready_pings++
     }
+    const due = await rpc('package_number_due_claim', {})
+    for (const x of ((due.data as { lead_id: string; property_address: string | null; callback_at: string }[] | null) ?? [])) {
+      await fanOut({ title: `Number needed by ${clock(x.callback_at)}: ${x.property_address ?? 'a package'}`,
+        body: 'Thalia promised this callback and there is no number yet. Price it on the card, or she calls on time and sets a new callback.',
+        url: `${deps.appUrl.replace(/\/$/, '')}/lead/${x.lead_id}#package`, tag: `package-due-${x.lead_id}` }).catch(() => null)
+      s.number_due_pings++
+    }
   }
   return s
+}
+
+/** "2:00 PM" today, "Thu 2:00 PM" another day, "2:00 PM (late)" once past; Central time. */
+export function clock(at: string, now = new Date()): string {
+  const d = new Date(at)
+  const tz = 'America/Chicago'
+  const day = (x: Date) => x.toLocaleDateString('en-US', { timeZone: tz })
+  const t = d.toLocaleTimeString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit' })
+  const w = day(d) === day(now) ? t : `${d.toLocaleDateString('en-US', { timeZone: tz, weekday: 'short' })} ${t}`
+  return d < now ? `${w} (late)` : w
 }

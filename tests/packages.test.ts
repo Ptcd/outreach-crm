@@ -77,6 +77,25 @@ describe('the package', () => {
     expect(f.find((x) => x.source === 'cold_list' && x.packages === 1)).toMatchObject({ priced: 1, agreed: 1, walks: 1, grades: { A: 1 } })
   })
 
+  it('a callback coming up with no number: Colin is pinged once; the caller moves the callback (0112)', async () => {
+    const lead = (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'DUE PACKAGE', owner_type: 'individual',
+      address: '23 Package Test St', city: 'Waukesha', phones: [{ number: '4145562103', name: 'DUE PACKAGE' }] })])).lead_id as string
+    const soon = new Date(Date.now() + 2 * 3600_000).toISOString()
+    const sent = await as(THALIA, () => r(`public.package_submit($1::jsonb)`, [JSON.stringify({ lead_id: lead, need: 'downsizing', callback_at: soon })]))
+    const id = sent.package_id as string
+    const due = (await r(`public.package_number_due_claim()`)) as unknown as { lead_id: string; property_address: string }[]
+    expect(due.map((x) => x.lead_id)).toContain(lead)
+    expect(((await r(`public.package_number_due_claim()`)) as unknown as { lead_id: string }[]).map((x) => x.lead_id)).not.toContain(lead)
+    expect(await as(THALIA, () => r(`public.package_move_callback($1, now() - interval '1 hour')`, [id]))).toMatchObject({ ok: false })
+    const later = new Date(Date.now() + 26 * 3600_000).toISOString()
+    expect(await as(THALIA, () => r(`public.package_move_callback($1, $2::timestamptz)`, [id, later]))).toMatchObject({ ok: true })
+    expect((await db.query(`select due_at from public.tasks where lead_id = $1 and kind = 'callback' and done_at is null`, [lead])).rows).toEqual([{ due_at: new Date(later) }])
+    expect((await db.query(`select number_due_pinged_at from public.deal_packages where id = $1`, [id])).rows[0]).toEqual({ number_due_pinged_at: null })
+    // not due again until it is within 3 hours of the new time
+    expect(((await r(`public.package_number_due_claim()`)) as unknown as { lead_id: string }[]).map((x) => x.lead_id)).not.toContain(lead)
+    await db.query(`update public.deal_packages set status = 'dead' where id = $1`, [id])
+  })
+
   it('a counter goes back to Colin; Colin late on the same day shows on Today', async () => {
     const lead = (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'CODY COUNTER', owner_type: 'individual',
       address: '22 Package Test St', phones: ['4145562201'] })])).lead_id as string
