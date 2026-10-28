@@ -36,7 +36,8 @@ language sql stable security definer set search_path = public as $$
      where (select ok from me)
        -- a walkthrough runs on TEST cards only, and the real queue never shows them
        and (l.owner_name ilike 'TEST %') = coalesce(p_test, false)
-       and (dt.task_id is not null or (l.stage = 'opener_sent' and ft.sent_at < p_now - interval '3 days'))
+       and (dt.task_id is not null or (l.stage = 'opener_sent' and ft.sent_at < p_now - interval '3 days')
+            or (coalesce(p_test, false) and l.stage = 'opener_sent'))   -- a TEST card needs no task and no texts
        and l.stage not in ('dnc', 'dead', 'closed_no_contact', 'closed_won', 'under_contract', 'walkthrough_booked', 'offer')
        and not coalesce(l.elderly_or_ill, false) and not coalesce(l.grief, false)
        and l.human_takeover_at is null
