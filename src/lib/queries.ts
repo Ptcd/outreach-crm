@@ -29,6 +29,9 @@ export function useDueTasks(untilIso: string, owner: Person | 'all' | 'callers')
       else if (owner !== 'all') q = q.eq('owner', owner)
       return check(await q) as (Task & { lead: Pick<Lead, 'id' | 'owner_name' | 'property_address' | 'municipality' | 'property_zip' | 'stage'> | null })[]
     },
+    // the laptop drops the day's call list in every 10 minutes: a list left open picks it up without a reload
+    // (Thalia 2026-10-28: "there's only one lead showing up")
+    refetchInterval: 60_000,
   })
 }
 
