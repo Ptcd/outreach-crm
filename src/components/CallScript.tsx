@@ -12,6 +12,7 @@ import { bookingVerdict, type BookingVerdict } from '@/lib/bookingVerdict'
 import { VerdictBox } from '@/components/BookingVerdict'
 import { DECISION_LABEL, GATE_ITEMS, HARD_STOPS, SELLER_FACTS, STAGE_LABEL } from '@/lib/wpie'
 import { cn } from '@/lib/utils'
+import { OddHourHint } from '@/components/OddHourHint'
 import { useAuth } from '@/providers/AuthProvider'
 import { useOnPhone, workerFor } from '@/lib/onPhone'
 import type { Contact, GateScore, Lead, Message } from '@/lib/types'
@@ -299,8 +300,9 @@ function QuestionCard({ n, q, facts, replyFacts, onSave, showGates = true }: {
           {q.number && <Field label={q.number} initial={cur.number ?? ''} inputMode="decimal" onCommit={(x) => put({ number: x })} />}
           {q.when && (
             <label className="block text-sm font-medium">{q.when}
-              <Input type="datetime-local" className="mt-1 h-11" defaultValue={isoToLocalInput(cur.when ?? null)}
+              <Input key={cur.when ?? ''} type="datetime-local" className="mt-1 h-11" defaultValue={isoToLocalInput(cur.when ?? null)}
                 onBlur={(e) => { const iso = localInputToIso(e.target.value); if (iso !== (cur.when ?? null)) put({ when: iso ?? undefined }) }} />
+              <OddHourHint iso={cur.when} onFix={(fixed) => put({ when: fixed })} />
             </label>
           )}
           {q.text && <Field label={q.text} initial={cur.text ?? ''} multiline onCommit={(x) => put({ text: x })} />}
