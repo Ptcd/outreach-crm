@@ -45,7 +45,8 @@ export function PowerDial({ caller }: { caller: string }) {
   const q = useQuery({
     queryKey: ['power_dial'], staleTime: Infinity, refetchOnWindowFocus: false,
     queryFn: async () => {
-      const r = await supabase.rpc('power_dial_queue', { p_limit: 150 })
+      const test = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('test') === '1'
+      const r = await supabase.rpc('power_dial_queue', test ? { p_limit: 150, p_test: true } : { p_limit: 150 })
       if (r.error) throw new Error(r.error.message)
       return (r.data ?? []) as Item[]
     },
@@ -54,6 +55,10 @@ export function PowerDial({ caller }: { caller: string }) {
   const [skipped, setSkipped] = useState<string[]>([])
   const [talking, setTalking] = useState<string | null>(null)
   const [auto, setAuto] = useState(false)
+  // hang up a call nobody answered after about five rings and log it as no answer (Twilio itself gives up at 30 s)
+  const [ringLimit, setRingLimit] = useState(true)
+  const RING_SECONDS = 22
+  const pendingNoAnswer = useRef<string | null>(null)
   const [countdown, setCountdown] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -81,10 +86,10 @@ export function PowerDial({ caller }: { caller: string }) {
   const next = useCallback((id: string, logged: boolean) => {
     update((s) => ({ ...s, done: [...s.done, id] }))
     setTalking(null)
-    if (logged && auto) setCountdown(3)
+    if (logged && auto) setCountdown(2)
   }, [auto, update])
 
-  const log = useCallback(async (o: (typeof OUTCOMES)[number]) => {
+  const log = useCallback(async (o: { id: string; note: string }) => {
     if (!cur || live || busy) return
     setBusy(true)
     setErr(null)
@@ -105,7 +110,25 @@ export function PowerDial({ caller }: { caller: string }) {
     setTalking(null)
   }, [cur, live, onThis, dismiss])
 
-  // auto-dial: 3, 2, 1, dial (any key or Cancel stops it)
+  // five rings and nobody: hang up, and the no answer is logged when the call has ended
+  const dialedAt = useRef<number | null>(null)
+  useEffect(() => {
+    if (!onThis || !active) { dialedAt.current = null; return }
+    if (active.status === 'connecting' && dialedAt.current === null) dialedAt.current = Date.now()
+    if (!ringLimit || !(active.status === 'connecting' || active.status === 'ringing')) return
+    const left = RING_SECONDS * 1000 - (Date.now() - (dialedAt.current ?? Date.now()))
+    const t = setTimeout(() => { pendingNoAnswer.current = cur?.lead_id ?? null; hangUp() }, Math.max(0, left))
+    return () => clearTimeout(t)
+  }, [onThis, active, ringLimit, hangUp, cur])
+  useEffect(() => {
+    if (!cur || !onThis || !active || pendingNoAnswer.current !== cur.lead_id) return
+    if (active.status === 'ended' || active.status === 'error') {
+      pendingNoAnswer.current = null
+      void log({ ...OUTCOMES[0], note: `No answer: rang ${RING_SECONDS} s, hung up (Power hour).` })
+    }
+  }, [cur, onThis, active, log])
+
+  // auto-dial: 2, 1, dial (any key or Cancel stops it)
   useEffect(() => {
     if (countdown === null) return
     if (countdown <= 0) { setCountdown(null); dial(); return }
@@ -123,6 +146,7 @@ export function PowerDial({ caller }: { caller: string }) {
       if (e.metaKey || e.ctrlKey || e.altKey) return
       const k = keys.current
       if (e.key === 'Escape') { setCountdown(null); return }
+      if ((e.key === 'h' || e.key === 'H') && k.live) { hangUp(); return }
       if (talking) return
       if (e.key === 'd' || e.key === 'D' || e.key === 'Enter') { e.preventDefault(); k.dial() }
       else if (e.key === 's' || e.key === 'S') k.skip()
@@ -131,7 +155,7 @@ export function PowerDial({ caller }: { caller: string }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [talking, update])
+  }, [talking, update, hangUp])
 
   const minutes = stats.started ? Math.max(1, Math.round((Date.now() - stats.started) / 60000)) : 0
   return (
@@ -142,6 +166,7 @@ export function PowerDial({ caller }: { caller: string }) {
         <span>{stats.voicemails} voicemails</span>
         <span className="text-muted-foreground">{list.length} left{minutes ? ` · ${minutes} min` : ''}</span>
         <label className="ml-auto flex items-center gap-1.5"><input type="checkbox" checked={auto} onChange={(e) => { setAuto(e.target.checked); setCountdown(null) }} /> Auto-dial next</label>
+        <label className="flex items-center gap-1.5"><input type="checkbox" checked={ringLimit} onChange={(e) => setRingLimit(e.target.checked)} /> Hang up after 5 rings</label>
       </div>
       <ErrorNote error={q.error} />
       {q.isLoading && <Empty>Loading the calls...</Empty>}
@@ -200,7 +225,7 @@ export function PowerDial({ caller }: { caller: string }) {
           )}
           <p className="rounded-md bg-muted p-2 text-sm"><span className="font-semibold">Voicemail (under 20 s):</span> &ldquo;Hi{vars.first_name === 'there' ? '' : ` ${vars.first_name}`}, it&apos;s {callerName}. I had a quick question about the place on {vars.street}. Give me a call when you get a minute.&rdquo;</p>
           {err && <p className="text-sm text-red-700">{err}</p>}
-          <p className="hidden text-xs text-muted-foreground sm:block">Keys: D or Enter dials · 1 no answer · 2 voicemail · 3 wrong number · 4 not interested · 5 we talked · S skip · Esc stops auto-dial</p>
+          <p className="hidden text-xs text-muted-foreground sm:block">Keys: D or Enter dials · H hangs up · 1 no answer · 2 voicemail · 3 wrong number · 4 not interested · 5 we talked · S skip · Esc stops auto-dial</p>
         </section>
       )}
     </div>
