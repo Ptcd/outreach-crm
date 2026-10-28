@@ -20,7 +20,7 @@ One key does everything Colin switches on for it. Each scope is a switch on the 
 
 | Scope | Tools |
 |---|---|
-| **prospects** | `add_prospects`, `find_prospects`, `prospect_counts`, `packages_to_value`, `set_package_value` |
+| **prospects** | `add_prospects`, `find_prospects`, `prospect_counts`, `packages_to_value`, `set_package_value`, and the pipes' verification queue: `pipe_counts`, `pipe_queue`, `pipe_claim`, `pipe_item`, `pipe_close`, `pipe_set_map` (docs/PIPES.md) |
 | **texting** | `texting_rules`, `sending_status`, `ready_to_text`, `queue_texts`, `test_results`, `text_templates`, `set_text_template`, `replies_waiting`, `send_reply`, `todays_queue`, `withdraw_texts`, `pause_sending`, `resume_sending`, `text_results` |
 | **calendar** | `open_slots`, `book_slot`, `cancel_booking` |
 | **records** | `records_overview`, `records_list`, `records_set_request`, `records_templates`, `records_replies`, `records_save_draft`, `records_propose_batch`, `records_mark` |

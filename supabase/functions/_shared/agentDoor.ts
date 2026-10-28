@@ -122,6 +122,25 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
       basis: S('how you got it'), comps: { type: 'array', items: { type: 'object' } } }, required: ['package_id', 'arv', 'basis'] } },
   { role: 'intake', name: 'prospect_counts', description: 'How many agent-loaded cards there are, by stage and by source.',
     inputSchema: { type: 'object', properties: {} } },
+  // The data pipes' verification queue (migration 0103, Muse's pipes spec 2026-10-28). Staged parcels + signals that
+  // passed the gates; a lane claims, verifies and closes with an outcome code. The pipe never makes a card: a verified
+  // new item is promoted through add_prospects.
+  { role: 'intake', name: 'pipe_counts', description: 'The data pipes at a glance: each source (file date, rows staged), the last runs with their gate counts, the verification queue by state and kind, open owner conflicts on cards, staged signals by kind, and whether the Milwaukee map is loaded.',
+    inputSchema: { type: 'object', properties: {} } },
+  { role: 'intake', name: 'pipe_queue', description: 'List verification-queue items. state: open (default), claimed, held_buffer (waits for Colin\'s parcel ruling), held, verified, killed. kind: new (no card: promote through add_prospects once verified), stack (a new signal on an existing card), re_screen (a card whose owner changed in the source or disagrees with it).',
+    inputSchema: { type: 'object', properties: { state: S('open | claimed | held_buffer | held | verified | killed'), county: S('county'), kind: S('new | stack | re_screen'),
+      limit: { type: 'integer', maximum: 200 } } } },
+  { role: 'intake', name: 'pipe_claim', description: 'Claim open items for your lane (re-screens first, then oldest). Each comes whole: the signals with source and date, the parcel facts each with source and vintage (owner, mailing, assessed value with its assessment year, type and units), every conflict, what is missing (phones, current_ownership_confirmation, unit_count_evidence, case_detail_read) and the card if it is a stack. A claim you do not close goes back to open after 24 hours. item_id claims one item (or takes back a held one).',
+    inputSchema: { type: 'object', properties: { limit: { type: 'integer', maximum: 50 }, county: S('county'), kind: S('new | stack | re_screen'), item_id: S('one item') } } },
+  { role: 'intake', name: 'pipe_item', description: 'Read one queue item whole, with its last parcel changes from the source.',
+    inputSchema: { type: 'object', properties: { item_id: S('the item') }, required: ['item_id'] } },
+  { role: 'intake', name: 'pipe_close', description: 'Close a claimed item. outcome verified: verified = {field: {value, source, date YYYY-MM-DD}} for each field you confirmed (a value field also needs basis "assessed value"; never a judgment, listing, mortgage or estimate), then promote a new one with add_prospects (pass lead_id here if you already did). outcome killed: code = not_residential | over_value_cap | owner_mismatch | sold_or_transferred | no_distress | distress_resolved | bankruptcy_active | deceased_no_representative | card_dead_or_dnc | map_excluded | listed_for_sale | duplicate | bad_data | out_of_area | other (other needs a note). outcome held: note names the blocker. outcome release: back to open. A held_buffer item takes only Colin\'s ruling: ruled_in or ruled_out, with his words in note.',
+    inputSchema: { type: 'object', properties: { item_id: S('the item'), outcome: S('verified | killed | held | release | ruled_in | ruled_out'), code: S('the kill code, or a short verified code'),
+      note: S('what you found; the blocker for held; Colin\'s words for a ruling'), verified: { type: 'object', description: '{field: {value, source, date, basis?}}' },
+      lead_id: S('the card you promoted it to, if any') }, required: ['item_id', 'outcome'] } },
+  { role: 'intake', name: 'pipe_set_map', description: 'Load the Milwaukee map as GeoJSON (Polygon, MultiPolygon, Feature or FeatureCollection; [lon, lat]). kind exclusion: inside = excluded, within buffer_m (default 275 m) of its edge = held_buffer for Colin\'s ruling. kind clear: a place the band does not reach (Riverwest: on or east of Holton St is fine). Loading the same name again replaces it. Until an exclusion map is loaded, City of Milwaukee parcels are not queued (map_not_loaded), never guessed.',
+    inputSchema: { type: 'object', properties: { name: S('the area name'), kind: S('exclusion | clear'), geojson: { type: 'object' }, buffer_m: { type: 'number' }, note: S('where it came from') },
+      required: ['name', 'kind', 'geojson'] } },
   { role: 'sender', name: 'texting_rules', description: 'The rules every text must follow, and the current sending switches. Read this before writing texts.',
     inputSchema: { type: 'object', properties: {} } },
   { role: 'sender', name: 'sending_status', description: 'Is sending on or paused, the window, the daily limit and how much of it is used today, and today\'s texts by status.',
@@ -272,6 +291,27 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
     case 'set_package_value': {
       const r = await db.records('package_set_value', { p_id: String(args.package_id ?? ''), p_arv: Number(args.arv), p_basis: String(args.basis ?? ''),
         p_comps: Array.isArray(args.comps) ? args.comps : [], p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'pipe_counts': return { value: await db.records('pipe_door_counts', {}) }
+    case 'pipe_queue': return { value: await db.records('pipe_door_list', { p_state: args.state ? String(args.state) : 'open', p_county: args.county ? String(args.county) : null,
+      p_kind: args.kind ? String(args.kind) : null, p_limit: int(args.limit, 50, 200) }) }
+    case 'pipe_claim': return { value: await db.records('pipe_door_claim', { p_agent: agent.name, p_limit: int(args.limit, 10, 50), p_county: args.county ? String(args.county) : null,
+      p_kind: args.kind ? String(args.kind) : null, p_item: args.item_id ? String(args.item_id) : null }) }
+    case 'pipe_item': {
+      const r = await db.records('pipe_door_item', { p_id: String(args.item_id ?? '') }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'pipe_close': {
+      const r = await db.records('pipe_door_close', { p_id: String(args.item_id ?? ''), p_agent: agent.name, p_outcome: String(args.outcome ?? ''),
+        p_code: args.code ? String(args.code) : null, p_note: args.note ? String(args.note) : null,
+        p_verified: args.verified && typeof args.verified === 'object' ? args.verified : null, p_lead_id: args.lead_id ? String(args.lead_id) : null }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'pipe_set_map': {
+      const r = await db.records('pipe_door_set_map', { p_agent: agent.name, p_name: String(args.name ?? ''), p_kind: String(args.kind ?? ''),
+        p_geojson: args.geojson ?? null, p_buffer_m: args.buffer_m === undefined || args.buffer_m === null ? null : Number(args.buffer_m),
+        p_note: args.note ? String(args.note) : null }) as Json
       return { value: r, isError: r?.ok === false }
     }
     case 'texting_rules': return { value: { rules: TEXTING_RULES, status: await db.status() } }
