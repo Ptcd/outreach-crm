@@ -82,7 +82,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (checkedFor.current === email) return
       await checkMember(email)
     }
-    supabase.auth.getSession().then(({ data }) => load(data.session))
+    supabase.auth.getSession().then(({ data }) => {
+      void load(data.session)
+      // a session ended on the server (a sign-out of every browser, 2026-10-28) signs this browser out on its next load,
+      // not an hour later when its pass runs out; a network error is not an answer and changes nothing
+      if (data.session) {
+        void supabase.auth.getUser().then(({ error }) => {
+          const status = (error as { status?: number } | null)?.status
+          if (error && (status === 401 || status === 403 || /session/i.test(error.message))) {
+            void supabase.auth.signOut({ scope: 'local' })
+          }
+        })
+      }
+    })
     const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       if (event === 'PASSWORD_RECOVERY') setRecovering(true)
       // defer: calling Supabase inside this callback can deadlock the auth client
