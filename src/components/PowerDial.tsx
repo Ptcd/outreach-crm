@@ -161,6 +161,7 @@ export function PowerDial({ caller }: { caller: string }) {
             </p>
           </div>
 
+          <p className="rounded-md bg-muted p-2 text-sm"><span className="font-semibold">Open with:</span> &ldquo;{pickupLine(caller, 'cold', vars)}&rdquo;</p>
           <div className="flex flex-wrap items-center gap-3">
             {live ? (
               <Button className="h-14 flex-1 text-lg" variant="destructive" onClick={hangUp}>Hang up</Button>
@@ -177,10 +178,6 @@ export function PowerDial({ caller }: { caller: string }) {
             {onThis && active?.status ? ` · ${active.status === 'in_call' ? 'in call' : active.status}` : ''}{onThis && active?.error ? ` - ${active.error}` : ''}
           </p>
 
-          <div className="rounded-md bg-muted p-2 text-sm">
-            <p><span className="font-semibold">Open with:</span> &ldquo;{pickupLine(caller, 'cold', vars)}&rdquo;</p>
-            <p className="mt-1"><span className="font-semibold">Voicemail (under 20 s):</span> &ldquo;Hi {vars.first_name === 'there' ? '' : `${vars.first_name}, `}it&apos;s {callerName}. I had a quick question about the place on {vars.street}. Give me a call when you get a minute.&rdquo;</p>
-          </div>
 
           {talking === cur.lead_id ? (
             <TalkPanel leadId={cur.lead_id} phone={cur.phone} onLogged={(o) => {
@@ -201,6 +198,7 @@ export function PowerDial({ caller }: { caller: string }) {
               <Button variant="ghost" className="h-12" disabled={live} onClick={skip}>Skip<span className="ml-1 hidden text-xs text-muted-foreground sm:inline">(S)</span></Button>
             </div>
           )}
+          <p className="rounded-md bg-muted p-2 text-sm"><span className="font-semibold">Voicemail (under 20 s):</span> &ldquo;Hi{vars.first_name === 'there' ? '' : ` ${vars.first_name}`}, it&apos;s {callerName}. I had a quick question about the place on {vars.street}. Give me a call when you get a minute.&rdquo;</p>
           {err && <p className="text-sm text-red-700">{err}</p>}
           <p className="hidden text-xs text-muted-foreground sm:block">Keys: D or Enter dials · 1 no answer · 2 voicemail · 3 wrong number · 4 not interested · 5 we talked · S skip · Esc stops auto-dial</p>
         </section>
