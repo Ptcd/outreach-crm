@@ -1,6 +1,6 @@
 {
-  "version": "2026-10-27",
-  "source": "docs/THALIA_TRAINING.md",
+  "version": "2026-10-28",
+  "source": "docs/THALIA_PLAYBOOK.md",
   "voice": "Your own name: \"This is Thalia.\" Colin is \"my partner\"; say his name only when they ask who texted them, or when you book his walk. Never a number on the phone, not even on the callback: Colin gives his number at the house. Never offer, price, investor, contract, cash, as-is, assistant or a company name: say a number, an agreement, the place.",
   "gate_legend": {
     "1": "reason + clock",
@@ -625,7 +625,8 @@
   "openers": {
     "cold": "Hi, is this {first_name}? This is {caller}, I'm calling about {street}. Are you still the owner there?",
     "hot_text": "Hi, is this {first_name}? This is {caller}, I'm calling about {street}. You were texting with us about it. Did I catch you at an OK time?",
-    "inbound": "Hi, this is {caller}. Is this about {street}?"
+    "inbound": "Hi, this is {caller}. Is this about {street}?",
+    "returned": "Hi, is this {first_name}? This is {caller}, returning your call about {street}."
   },
-  "openers_note": "We call them (cold, or after they texted) far more often than they call us. Every caller uses their own name; Colin is \"my partner\" (when Colin calls, he is the caller and says his own name). Inbound only when they called our line in the last few hours."
+  "openers_note": "We call them (cold, or after they texted) far more often than they call us. Every caller uses their own name; Colin is \"my partner\" (when Colin calls, he is the caller and says his own name). Inbound only when they called our line in the last few hours. A seller who called our line and got nobody is called back first in Power hour, with their voicemail on the card."
 }
