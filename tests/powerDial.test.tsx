@@ -101,5 +101,18 @@ describe('Power hour', () => {
       expect(screen.getByText(/thalia \(hot_text\)/)).toBeTruthy()
     } finally { items.shift() }
   })
+
+  it('a seller who called us and was not reached comes first, with their voicemail and the returning-your-call opener (0117)', async () => {
+    const missed = { ...items[0], lead_id: 'L4', task_id: null, source: 'missed_call', missed_at: '2026-10-28T20:22:00Z', voicemail: true,
+      voicemail_words: 'I wanna move out of the state, call me back soon', owner_name: 'SAMPLE FAMILY TRUST', address: '400 CALLER RD', phone: '4145550144' }
+    items.unshift(missed as never)
+    try {
+      wrap()
+      expect(await screen.findByText('Sample Family Trust')).toBeTruthy()
+      expect(screen.getByText('Called us: call back now')).toBeTruthy()
+      expect(screen.getByText(/I wanna move out of the state/)).toBeTruthy()
+      expect(screen.getByText(/Hi, this is Thalia, returning your call about 400 Caller Rd/)).toBeTruthy()
+    } finally { items.shift() }
+  })
 })
 

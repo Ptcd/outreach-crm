@@ -4,7 +4,8 @@
 // real conversation. On a computer the keys do it all: D or Enter dials, 1-5 log, S skips. Auto-dial (off by default)
 // calls the next card three seconds after an outcome unless she cancels.
 // Someone who just texted back with a bit of interest (Muse's call_next, migration 0115) comes up next: the list
-// refreshes every 30 seconds, and the card she is on never changes under her.
+// refreshes every 30 seconds, and the card she is on never changes under her. A seller who called us and wasn't reached
+// comes before everyone (0117), with their voicemail.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
@@ -17,7 +18,8 @@ import { useDialer } from '@/lib/dialer'
 import { fmtDateTime, fmtPhone } from '@/lib/format'
 
 type Item = {
-  lead_id: string; task_id: string | null; source: 'replied' | 'call_list' | 'texted_silent'; why: string | null; reply?: string | null
+  lead_id: string; task_id: string | null; source: 'missed_call' | 'replied' | 'call_list' | 'texted_silent'; why: string | null; reply?: string | null
+  missed_at?: string | null; voicemail?: boolean | null; voicemail_words?: string | null
   owner_name: string; address: string | null; municipality: string | null; reasons: string[] | null; lane: string | null
   texts_sent: number; first_text_at: string | null; last_text_at: string | null; dials_7d: number; dials_total?: number; last_dial: string | null
   phone: string; line_type: string | null; phone_person: string | null; other_phones: number
@@ -207,31 +209,41 @@ export function PowerDial({ caller }: { caller: string }) {
       {incoming && <p role="status" className="rounded-lg border-2 border-emerald-400 bg-emerald-50 p-2 text-sm font-medium dark:bg-emerald-950/30">A seller is calling in: take it at the top of the screen. Power hour waits; their card opens when you answer.</p>}
       {q.isLoading && <Empty>Loading the calls...</Empty>}
       {!q.isLoading && !cur && <Empty>Nobody left to dial right now. <Button variant="link" onClick={() => void q.refetch()}>Check again</Button></Empty>}
-      {cur && pin === cur.lead_id && list.slice(1).some((x) => x.source === 'replied') && (
-        <p role="status" className="rounded-lg border-2 border-amber-300 bg-amber-50 p-2 text-sm font-medium dark:bg-amber-950/30">Someone just texted back: they are next, right after this card.</p>
+      {cur && pin === cur.lead_id && list.slice(1).some((x) => x.source === 'replied' || x.source === 'missed_call') && (
+        <p role="status" className="rounded-lg border-2 border-amber-300 bg-amber-50 p-2 text-sm font-medium dark:bg-amber-950/30">
+          {list.slice(1).some((x) => x.source === 'missed_call') ? 'A seller called us' : 'Someone just texted back'}: they are next, right after this card.</p>
       )}
       {cur && (
         <section className="space-y-3 rounded-lg border-2 border-primary/40 bg-card p-3" data-testid="power-card">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-semibold">{title(cur.owner_name)}</h2>
-              <Badge tone={cur.source === 'replied' ? 'warn' : cur.source === 'call_list' ? 'info' : undefined}>
-                {cur.source === 'replied' ? 'Texted back: call now' : cur.source === 'call_list' ? 'On today’s list' : 'Texted, no reply'}</Badge>
+              <Badge tone={cur.source === 'missed_call' ? 'bad' : cur.source === 'replied' ? 'warn' : cur.source === 'call_list' ? 'info' : undefined}>
+                {cur.source === 'missed_call' ? 'Called us: call back now' : cur.source === 'replied' ? 'Texted back: call now' : cur.source === 'call_list' ? 'On today’s list' : 'Texted, no reply'}</Badge>
             </div>
             <p className="text-sm">{street(cur.address)}{cur.municipality ? `, ${cur.municipality}` : ''}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {cur.source === 'replied' ? 'They texted back' : cur.texts_sent ? `${cur.texts_sent} text${cur.texts_sent > 1 ? 's' : ''}, last ${fmtDateTime(cur.last_text_at)}, no reply` : 'Never texted'}
+              {cur.source === 'missed_call' ? `They called us ${fmtDateTime(cur.missed_at ?? null)}${cur.voicemail ? ' and left a voicemail' : ''}` : cur.source === 'replied' ? 'They texted back' : cur.texts_sent ? `${cur.texts_sent} text${cur.texts_sent > 1 ? 's' : ''}, last ${fmtDateTime(cur.last_text_at)}, no reply` : 'Never texted'}
               {cur.dials_7d ? ` · dialed ${cur.dials_7d}x this week` : ''}
               {cur.reasons?.length ? ` · on the list for: ${cur.reasons.join(', ')} (never say this)` : ''}
             </p>
           </div>
 
+          {cur.source === 'missed_call' && (
+            <p className="rounded-md border-2 border-red-300 bg-red-50 p-2 text-sm dark:bg-red-950/30">
+              {cur.voicemail_words ? <><span className="font-semibold">Their voicemail:</span> &ldquo;{cur.voicemail_words}&rdquo;</> : <span className="font-semibold">They called and nobody picked up.{cur.voicemail ? ' The voicemail is still being written out.' : ''}</span>}
+            </p>
+          )}
           {cur.source === 'replied' && cur.reply && (
             <p className="rounded-md border-2 border-amber-300 bg-amber-50 p-2 text-sm dark:bg-amber-950/30"><span className="font-semibold">They texted:</span> &ldquo;{cur.reply}&rdquo;</p>
           )}
           <div className="rounded-md bg-muted p-2 text-sm">
-            <p><span className="font-semibold">Open with:</span> &ldquo;{pickupLine(caller, cur.source === 'replied' ? 'hot_text' : 'cold', vars)}&rdquo;</p>
-            {cur.source === 'replied' ? (
+            <p><span className="font-semibold">Open with:</span> &ldquo;{cur.source === 'missed_call'
+              ? `Hi${vars.first_name === 'there' ? '' : `, is this ${vars.first_name}?`}${vars.first_name === 'there' ? ', this' : ' This'} is ${callerName}, returning your call about ${vars.street}.`
+              : pickupLine(caller, cur.source === 'replied' ? 'hot_text' : 'cold', vars)}&rdquo;</p>
+            {cur.source === 'missed_call' ? (
+              <p className="mt-1"><span className="font-semibold">Then:</span> let them tell you why they called, and tap <span className="font-medium">We talked</span>. No answer: leave a short voicemail (&ldquo;Hi{vars.first_name === 'there' ? '' : ` ${vars.first_name}`}, it&apos;s {callerName} returning your call about {vars.street}. Call me back at this number when you can.&rdquo;), then tap <span className="font-medium">Left voicemail</span>.</p>
+            ) : cur.source === 'replied' ? (
               <p className="mt-1"><span className="font-semibold">Then:</span> &ldquo;What&apos;s got you thinking about it?&rdquo; and tap <span className="font-medium">We talked</span>. No answer: tap No answer, and Muse texts them back.</p>
             ) : (
             <p className="mt-1"><span className="font-semibold">Then:</span> &ldquo;Any interest in selling it?&rdquo; Yes: &ldquo;What&apos;s got you thinking about it?&rdquo; and tap <span className="font-medium">We talked</span>. A flat no: &ldquo;Before I go, do you own anything else you&apos;d ever consider selling?&rdquo; then <span className="font-medium">Not interested</span>.</p>
@@ -273,7 +285,7 @@ export function PowerDial({ caller }: { caller: string }) {
               <Button variant="ghost" className="h-12" disabled={live} onClick={skip}>Skip<span className="ml-1 hidden text-xs text-muted-foreground sm:inline">(S)</span></Button>
             </div>
           )}
-          {cur.source === 'replied' ? null : (cur.dials_total ?? 0) >= 2 ? (
+          {cur.source === 'replied' || cur.source === 'missed_call' ? null : (cur.dials_total ?? 0) >= 2 ? (
             <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm dark:bg-amber-950/30"><span className="font-semibold">Try {(cur.dials_total ?? 0) + 1}: leave this voicemail (under 20 s):</span> &ldquo;Hi{vars.first_name === 'there' ? '' : ` ${vars.first_name}`}, it&apos;s {callerName}. I had a quick question about the place on {vars.street}. Give me a call when you get a minute.&rdquo;</p>
           ) : (
             <p className="rounded-md bg-muted p-2 text-sm text-muted-foreground"><span className="font-semibold">Try {(cur.dials_total ?? 0) + 1}: no voicemail.</span> If it goes to voicemail, hang up and tap No answer. Rick leaves one short voicemail on the third try; the first two make them curious.</p>
