@@ -17,10 +17,10 @@ const logCall = vi.fn(async () => ({ data: { ok: true }, error: null }))
 const start = vi.fn(async () => undefined)
 const hangUp = vi.fn()
 const dialer: { active: null | { status: string; leadId: string; to: string }; incoming: null | { from: string; busy: boolean } } = { active: null, incoming: null }
-vi.mock('@/lib/supabaseClient', () => ({ supabase: { rpc: vi.fn(async () => ({ data: items, error: null })) }, supabaseConfigured: true }))
+vi.mock('@/lib/supabaseClient', () => ({ supabase: { rpc: vi.fn(async () => ({ data: [...items], error: null })) }, supabaseConfigured: true }))
 vi.mock('@/lib/queries', () => ({ api: { logCall: (...a: unknown[]) => logCall(...(a as [])) }, useLead: () => ({ isLoading: true }) }))
 vi.mock('@/lib/dialer', () => ({ useDialer: () => ({ active: dialer.active, incoming: dialer.incoming, start, dismiss: vi.fn(), hangUp, supported: true }) }))
-vi.mock('@/components/CallScript', () => ({ CallScript: () => null, pickupLine: (c: string) => `Hi, this is ${c}` }))
+vi.mock('@/components/CallScript', () => ({ CallScript: () => null, pickupLine: (c: string, k?: string) => `Hi, this is ${c} (${k ?? "cold"})` }))
 
 import { PowerDial } from '@/components/PowerDial'
 
@@ -80,4 +80,26 @@ describe('Power hour', () => {
     fireEvent.keyDown(window, { key: 'd' })
     expect(start).not.toHaveBeenCalled()
   })
+
+  it('a texter Muse sent over (call_next) comes up next, with their words; the card she dialed stays put (0115)', async () => {
+    const replied = { ...items[0], lead_id: 'L3', task_id: 'T3', source: 'replied', reply: 'maybe, depends what you would give', owner_name: 'PAT TEXTER',
+      address: '300 REPLY ST', phone: '4145550133', dials_7d: 0, dials_total: 0 }
+    const client = new QueryClient()
+    render(<QueryClientProvider client={client}><PowerDial caller="thalia" /></QueryClientProvider>)
+    await screen.findByText('Jane Q Sample')
+    fireEvent.click(screen.getByText(/Dial \(414\) 555-0101/))
+    items.unshift(replied as never)
+    try {
+      await client.refetchQueries({ queryKey: ['power_dial'] })
+      // still Jane on screen (she was dialed), with the texter waiting right behind
+      expect(screen.getByText('Jane Q Sample')).toBeTruthy()
+      expect(await screen.findByText(/Someone just texted back/)).toBeTruthy()
+      fireEvent.click(screen.getByText('No answer'))
+      expect(await screen.findByText('Pat Texter')).toBeTruthy()
+      expect(screen.getByText('Texted back: call now')).toBeTruthy()
+      expect(screen.getByText(/maybe, depends what you would give/)).toBeTruthy()
+      expect(screen.getByText(/thalia \(hot_text\)/)).toBeTruthy()
+    } finally { items.shift() }
+  })
 })
+

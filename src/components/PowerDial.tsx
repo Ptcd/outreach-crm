@@ -3,6 +3,8 @@
 // Dial, one tap for the outcome, and the next card is up. "We talked" opens the full call script on the card for a
 // real conversation. On a computer the keys do it all: D or Enter dials, 1-5 log, S skips. Auto-dial (off by default)
 // calls the next card three seconds after an outcome unless she cancels.
+// Someone who just texted back with a bit of interest (Muse's call_next, migration 0115) comes up next: the list
+// refreshes every 30 seconds, and the card she is on never changes under her.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
@@ -15,7 +17,7 @@ import { useDialer } from '@/lib/dialer'
 import { fmtDateTime, fmtPhone } from '@/lib/format'
 
 type Item = {
-  lead_id: string; task_id: string | null; source: 'call_list' | 'texted_silent'; why: string | null
+  lead_id: string; task_id: string | null; source: 'replied' | 'call_list' | 'texted_silent'; why: string | null; reply?: string | null
   owner_name: string; address: string | null; municipality: string | null; reasons: string[] | null; lane: string | null
   texts_sent: number; first_text_at: string | null; last_text_at: string | null; dials_7d: number; dials_total?: number; last_dial: string | null
   phone: string; line_type: string | null; phone_person: string | null; other_phones: number
@@ -51,7 +53,7 @@ export function PowerDial({ caller }: { caller: string }) {
   const qc = useQueryClient()
   const { active, incoming, start, dismiss, hangUp, supported } = useDialer()
   const q = useQuery({
-    queryKey: ['power_dial'], staleTime: Infinity, refetchOnWindowFocus: false,
+    queryKey: ['power_dial'], staleTime: Infinity, refetchOnWindowFocus: false, refetchInterval: 30_000,
     queryFn: async () => {
       const test = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('test') === '1'
       const r = await supabase.rpc('power_dial_queue', test ? { p_limit: 150, p_test: true } : { p_limit: 150 })
@@ -62,6 +64,8 @@ export function PowerDial({ caller }: { caller: string }) {
   const [stats, setStats] = useState<Stats>(loadStats)
   const [skipped, setSkipped] = useState<string[]>([])
   const [talking, setTalking] = useState<string | null>(null)
+  // the card she dialed or is talking to stays on screen while a refresh brings a texter to the top
+  const [pin, setPin] = useState<string | null>(null)
   const [auto, setAuto] = useState(false)
   // hang up a call nobody answered after about five rings and log it as no answer (Twilio itself gives up at 30 s)
   const [ringLimit, setRingLimit] = useState(true)
@@ -75,8 +79,10 @@ export function PowerDial({ caller }: { caller: string }) {
 
   const list = useMemo(() => {
     const all = (q.data ?? []).filter((x) => !stats.done.includes(x.lead_id))
-    return [...all.filter((x) => !skipped.includes(x.lead_id)), ...all.filter((x) => skipped.includes(x.lead_id))]
-  }, [q.data, stats.done, skipped])
+    const ordered = [...all.filter((x) => !skipped.includes(x.lead_id)), ...all.filter((x) => skipped.includes(x.lead_id))]
+    const held = pin ? ordered.find((x) => x.lead_id === pin) : undefined
+    return held ? [held, ...ordered.filter((x) => x !== held)] : ordered
+  }, [q.data, stats.done, skipped, pin])
   const cur = list[0] ?? null
   const onThis = !!active && !!cur && active.leadId === cur.lead_id
   const live = onThis && ['connecting', 'ringing', 'in_call'].includes(active!.status)
@@ -89,12 +95,14 @@ export function PowerDial({ caller }: { caller: string }) {
     setCountdown(null)
     if (active) dismiss()
     update((s) => ({ ...s, dials: s.dials + 1, started: s.started ?? Date.now() }))
+    setPin(cur.lead_id)
     void start({ to: cur.phone, label: `${title(cur.owner_name)} - ${street(cur.address)}`, leadId: cur.lead_id, contactId: null, quiet: true })
   }, [cur, supported, live, incoming, active, dismiss, start, update])
 
   const next = useCallback((id: string, logged: boolean) => {
     update((s) => ({ ...s, done: [...s.done, id] }))
     setTalking(null)
+    setPin(null)
     if (logged && auto) setCountdown(2)
   }, [auto, update])
 
@@ -117,6 +125,7 @@ export function PowerDial({ caller }: { caller: string }) {
     if (onThis) dismiss()
     setSkipped((s) => [...s.filter((x) => x !== cur.lead_id), cur.lead_id])
     setTalking(null)
+    setPin(null)
   }, [cur, live, onThis, dismiss])
 
   // five rings and nobody: hang up, and the no answer is logged when the call has ended
@@ -176,7 +185,7 @@ export function PowerDial({ caller }: { caller: string }) {
       if (talking || k.incoming) return   // a call coming in: the keys wait for the bar at the top
       if (e.key === 'd' || e.key === 'D' || e.key === 'Enter') { e.preventDefault(); k.dial() }
       else if (e.key === 's' || e.key === 'S') k.skip()
-      else if (e.key === '5' && k.cur && !k.live) { if (k.cur) { update((s) => ({ ...s, reached: s.reached + 1 })); setTalking(k.cur.lead_id) } }
+      else if (e.key === '5' && k.cur && !k.live) { if (k.cur) { update((s) => ({ ...s, reached: s.reached + 1 })); setTalking(k.cur.lead_id); setPin(k.cur.lead_id) } }
       else { const o = OUTCOMES.find((x) => x.key === e.key); if (o) void k.log(o) }
     }
     window.addEventListener('keydown', onKey)
@@ -198,24 +207,35 @@ export function PowerDial({ caller }: { caller: string }) {
       {incoming && <p role="status" className="rounded-lg border-2 border-emerald-400 bg-emerald-50 p-2 text-sm font-medium dark:bg-emerald-950/30">A seller is calling in: take it at the top of the screen. Power hour waits; their card opens when you answer.</p>}
       {q.isLoading && <Empty>Loading the calls...</Empty>}
       {!q.isLoading && !cur && <Empty>Nobody left to dial right now. <Button variant="link" onClick={() => void q.refetch()}>Check again</Button></Empty>}
+      {cur && pin === cur.lead_id && list.slice(1).some((x) => x.source === 'replied') && (
+        <p role="status" className="rounded-lg border-2 border-amber-300 bg-amber-50 p-2 text-sm font-medium dark:bg-amber-950/30">Someone just texted back: they are next, right after this card.</p>
+      )}
       {cur && (
         <section className="space-y-3 rounded-lg border-2 border-primary/40 bg-card p-3" data-testid="power-card">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-semibold">{title(cur.owner_name)}</h2>
-              <Badge tone={cur.source === 'call_list' ? 'info' : undefined}>{cur.source === 'call_list' ? 'On today’s list' : 'Texted, no reply'}</Badge>
+              <Badge tone={cur.source === 'replied' ? 'warn' : cur.source === 'call_list' ? 'info' : undefined}>
+                {cur.source === 'replied' ? 'Texted back: call now' : cur.source === 'call_list' ? 'On today’s list' : 'Texted, no reply'}</Badge>
             </div>
             <p className="text-sm">{street(cur.address)}{cur.municipality ? `, ${cur.municipality}` : ''}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {cur.texts_sent ? `${cur.texts_sent} text${cur.texts_sent > 1 ? 's' : ''}, last ${fmtDateTime(cur.last_text_at)}, no reply` : 'Never texted'}
+              {cur.source === 'replied' ? 'They texted back' : cur.texts_sent ? `${cur.texts_sent} text${cur.texts_sent > 1 ? 's' : ''}, last ${fmtDateTime(cur.last_text_at)}, no reply` : 'Never texted'}
               {cur.dials_7d ? ` · dialed ${cur.dials_7d}x this week` : ''}
               {cur.reasons?.length ? ` · on the list for: ${cur.reasons.join(', ')} (never say this)` : ''}
             </p>
           </div>
 
+          {cur.source === 'replied' && cur.reply && (
+            <p className="rounded-md border-2 border-amber-300 bg-amber-50 p-2 text-sm dark:bg-amber-950/30"><span className="font-semibold">They texted:</span> &ldquo;{cur.reply}&rdquo;</p>
+          )}
           <div className="rounded-md bg-muted p-2 text-sm">
-            <p><span className="font-semibold">Open with:</span> &ldquo;{pickupLine(caller, 'cold', vars)}&rdquo;</p>
+            <p><span className="font-semibold">Open with:</span> &ldquo;{pickupLine(caller, cur.source === 'replied' ? 'hot_text' : 'cold', vars)}&rdquo;</p>
+            {cur.source === 'replied' ? (
+              <p className="mt-1"><span className="font-semibold">Then:</span> &ldquo;What&apos;s got you thinking about it?&rdquo; and tap <span className="font-medium">We talked</span>. No answer: tap No answer, and Muse texts them back.</p>
+            ) : (
             <p className="mt-1"><span className="font-semibold">Then:</span> &ldquo;Any interest in selling it?&rdquo; Yes: &ldquo;What&apos;s got you thinking about it?&rdquo; and tap <span className="font-medium">We talked</span>. A flat no: &ldquo;Before I go, do you own anything else you&apos;d ever consider selling?&rdquo; then <span className="font-medium">Not interested</span>.</p>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-3">
             {live ? (
@@ -247,13 +267,13 @@ export function PowerDial({ caller }: { caller: string }) {
                   {o.label}<span className="ml-1 hidden text-xs text-muted-foreground sm:inline">({o.key})</span>
                 </Button>
               ))}
-              <Button className="h-12" disabled={busy} onClick={() => { update((s) => ({ ...s, reached: s.reached + 1 })); setTalking(cur.lead_id) }}>
+              <Button className="h-12" disabled={busy} onClick={() => { update((s) => ({ ...s, reached: s.reached + 1 })); setTalking(cur.lead_id); setPin(cur.lead_id) }}>
                 We talked: script<span className="ml-1 hidden text-xs sm:inline">(5)</span>
               </Button>
               <Button variant="ghost" className="h-12" disabled={live} onClick={skip}>Skip<span className="ml-1 hidden text-xs text-muted-foreground sm:inline">(S)</span></Button>
             </div>
           )}
-          {(cur.dials_total ?? 0) >= 2 ? (
+          {cur.source === 'replied' ? null : (cur.dials_total ?? 0) >= 2 ? (
             <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm dark:bg-amber-950/30"><span className="font-semibold">Try {(cur.dials_total ?? 0) + 1}: leave this voicemail (under 20 s):</span> &ldquo;Hi{vars.first_name === 'there' ? '' : ` ${vars.first_name}`}, it&apos;s {callerName}. I had a quick question about the place on {vars.street}. Give me a call when you get a minute.&rdquo;</p>
           ) : (
             <p className="rounded-md bg-muted p-2 text-sm text-muted-foreground"><span className="font-semibold">Try {(cur.dials_total ?? 0) + 1}: no voicemail.</span> If it goes to voicemail, hang up and tap No answer. Rick leaves one short voicemail on the third try; the first two make them curious.</p>

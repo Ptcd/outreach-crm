@@ -72,7 +72,8 @@ export const TEXTING_RULES = [
   'Follow-ups (steps 2-5) go only to people who never answered, at least 3 days apart; the sequence the team uses is days 1, 3, 10, 17, 24.',
   'Texts go out 10 AM to 7 PM in the recipient\'s time zone, never on Sunday, and share one daily limit with the laptop\'s own texts. Queue them and the server sends them in that window.',
   'Replies: you answer them now (replies_waiting, then send_reply), on the same thread. Read the whole conversation and the card first. One reply per text from them; never a first text or follow-up (queue_texts) to someone who has texted back.',
-  'In a reply: never give, guess or react to a price; Colin prices every deal himself on a call. Your job is to learn why they would sell, the condition, the timing, who signs and their number, then book a call with Colin.',
+  'Power hour (weekdays 4 to 6 PM Central): read replies_waiting every few minutes. A reply with any interest at all ("maybe", "what would you pay", "depends", a question about selling, "call me") goes to call_next with their words and the number they texted from, and you do NOT text them back: the caller phones them next (Rick: interest means a call, not more texts). If the call does not reach them, their reply is still waiting for you: answer it then. Not interest (STOP, no, wrong number, not the owner, an older or grieving owner): handle it as usual.',
+  'In a reply: never give, guess or react to a price; Colin gives his number himself, in person at the house. Your job is to learn why they would sell, the condition, the timing, who signs and their number, then book a call with Colin.',
   "Booking: open_slots gives Colin's real open times (his calendar and his hours). Offer two or three, book_slot the one they pick with the 4 pillars, and confirm the time in your reply. Never promise a time you did not book.",
   "Phone calls: the card's call_notes say what was said on each recorded call (summary, the 4 pillars and who signs, outcome, next step, the mark the caller confirmed). Read them before you text: never ask again what they already told us on the phone, and follow the next step they agreed to.",
   'A card is one property; the people on it (people[] on every card) each have a role, a status, their own address and their own phones. Text a person (interest_id), on one of their numbers. Never text a person who is not active. One person on a card at a time: the next person gets a first text only after the one you texted is closed (deceased, dnc, wrong_person) or every first text to them bounced.',
@@ -170,6 +171,10 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
   { role: 'sender', name: 'replies_waiting',
     description: 'People who texted back and have no answer from us yet, oldest first. Each comes with the whole card: property, owner, mailing address, reasons, the full conversation both ways, calls, what we already know (motivation, timeline, condition, price, who signs), the card stage and next step, whether it is hot, and how the reply agent read their text (intent, outcome, its suggested reply). Answer each with send_reply.',
     inputSchema: { type: 'object', properties: { days: { type: 'integer', maximum: 30 } } } },
+  { role: 'sender', name: 'call_next',
+    description: 'Put someone who texted back with a bit of interest at the top of the caller\'s Power hour list, to be called next on the number they texted from. Use it in Power hour (weekdays 4 to 6 PM Central) instead of texting back. words = their reply, word for word. Refused for a dead, DNC, booked or held card, an older or grieving owner, or an opted-out phone. The answer says whether Power hour is on now.',
+    inputSchema: { type: 'object', properties: { lead_id: S('card id'), phone: S('their phone (the one that texted us)'), words: S('what they texted, word for word') },
+      required: ['lead_id', 'phone', 'words'] } },
   { role: 'sender', name: 'send_reply',
     description: 'Answer someone who texted us, on the same thread (same number). Sent now, unless it is quiet hours, when it goes in the morning. Refused if they opted out, if they texted again since you read the thread (read it again), or if it breaks the wording rules. A STOP line is not needed in a reply.',
     inputSchema: { type: 'object', properties: { lead_id: S('card id'), phone: S('their phone (the one that texted us)'), body: S('your reply') },
@@ -373,6 +378,11 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       return { value: await db.linkCards({ lead_id: String(args.lead_id ?? ''), other_id: String(args.other_id ?? ''), kind: String(args.kind ?? ''),
         note: args.note ? String(args.note) : null }, agent.name) }
     case 'replies_waiting': return { value: await db.repliesWaiting(int(args.days, 7, 30)) }
+    case 'call_next': {
+      const r = await db.records('agent_call_next', { p_lead_id: String(args.lead_id ?? ''), p_phone: String(args.phone ?? ''),
+        p_words: String(args.words ?? ''), p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
     case 'send_reply': {
       const body = String(args.body ?? '').replace(/\s+/g, ' ').trim()
       const why = replyProblem(body)
