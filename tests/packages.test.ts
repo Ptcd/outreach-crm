@@ -151,5 +151,9 @@ describe('the package', () => {
     await handleMessage({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'set_package_value', arguments: { package_id: 'P1', arv: 265000, basis: '3 sales', comps: [] } } }, muse, db2)
     expect(calls).toEqual([['agent_packages_to_value', { p_limit: 20 }],
       ['package_set_value', { p_id: 'P1', p_arv: 265000, p_basis: '3 sales', p_comps: [], p_agent: 'Muse' }]])
+    // Power hour: a reply with a bit of interest goes to the caller next (0115)
+    const muse2 = { id: 'k2', name: 'Muse', role: 'sender' as const }
+    await handleMessage({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'call_next', arguments: { lead_id: 'L1', phone: '4145550101', words: 'maybe' } } }, muse2, db2)
+    expect(calls[2]).toEqual(['agent_call_next', { p_lead_id: 'L1', p_phone: '4145550101', p_words: 'maybe', p_agent: 'Muse' }])
   })
 })
