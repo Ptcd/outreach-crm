@@ -24,7 +24,9 @@ Deno.serve(async (req) => {
   const auth = req.headers.get('Authorization') ?? ''
   const asUser = createClient(url, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
     global: { headers: { Authorization: auth } }, auth: { persistSession: false } })
-  const me = await asUser.from('team_members').select('person, display_name').limit(1).maybeSingle()
+  // the signed-in person's own row: every team member can read the whole team, so never just the first row
+  const myEmail = ((await asUser.auth.getUser()).data.user?.email ?? '').toLowerCase()
+  const me = await asUser.from('team_members').select('person, display_name').eq('email', myEmail).maybeSingle()
   if (me.error || !me.data) return json({ error: 'not on the team' }, 403)
   const missing = ['TWILIO_ACCOUNT_SID', 'TWILIO_API_KEY_SID', 'TWILIO_API_KEY_SECRET', 'TWILIO_TWIML_APP_SID']
     .filter((k) => !(Deno.env.get(k) ?? '').trim())

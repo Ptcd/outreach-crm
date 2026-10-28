@@ -10,13 +10,14 @@ import { NotifyPanel } from '@/components/NotifyPanel'
 import { personAlerts, setPersonAlerts } from '@/lib/apiExtra'
 import { OnPhonePrompt, useColinHere } from '@/components/OnPhonePicker'
 import { AgentKeys } from '@/components/AgentKeys'
+import { MyCode, TeamCodes } from '@/components/TeamCodes'
 import { CalendarPanel } from '@/components/CalendarPanel'
 import { useOnPhone, workerFor } from '@/lib/onPhone'
 import { personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
 
 export default function Settings() {
-  const { member } = useAuth()
+  const { member, isOwner } = useAuth()
   const [picked] = useOnPhone()
   const who = workerFor(member, picked)
   const colinHere = useColinHere()
@@ -95,6 +96,14 @@ export default function Settings() {
           <CalendarPanel />
         </Section>
       )}
+      {isOwner && colinHere && (
+        <Section title="Team codes (Thalia and Adil)">
+          <TeamCodes />
+        </Section>
+      )}
+      <Section title="Your sign-in code">
+        <MyCode />
+      </Section>
       {colinHere && (
         <Section title="Agent keys (Muse)">
           <AgentKeys />

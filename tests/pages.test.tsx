@@ -272,18 +272,21 @@ describe('pages render', () => {
   })
 })
 
-describe('login with one app password', () => {
-  it('asks only for the app password, never an email', async () => {
+describe('login with a code per person', () => {
+  it('asks who is signing in and their code, never an email', async () => {
     const { default: Login } = await import('@/pages/Login')
     const { container } = render(<Login />)
-    expect(screen.getByLabelText('App password')).toBeTruthy()
+    for (const name of ['Colin', 'Thalia', 'Adil']) expect(screen.getByRole('radio', { name })).toBeTruthy()
+    expect(screen.getByLabelText('Your code')).toBeTruthy()
     expect(container.querySelector('input[type="email"]')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Set or reset the app password' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /Forgot Colin's code/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole('radio', { name: 'Thalia' }))
+    expect(screen.getByText(/Colin sets a new one for you in Settings/)).toBeTruthy()
   })
-  it('sets a new password from the email link, at least 12 characters', async () => {
+  it("sets Colin's new code from the email link, at least 6 characters", async () => {
     const { default: SetPassword } = await import('@/pages/SetPassword')
     render(<SetPassword />)
-    expect(screen.getByLabelText('New password')).toBeTruthy()
-    expect(screen.getByText(/At least 12 characters/)).toBeTruthy()
+    expect(screen.getByLabelText('New code')).toBeTruthy()
+    expect(screen.getByText(/At least 6 characters/)).toBeTruthy()
   })
 })

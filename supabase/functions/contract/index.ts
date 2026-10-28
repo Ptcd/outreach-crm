@@ -16,7 +16,9 @@ Deno.serve(async (req) => {
     global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } }, auth: { persistSession: false } })
   const owner = await asUser.rpc('is_owner')
   if (owner.error || owner.data !== true) return json({ ok: false, reason: 'Only the owner can send contracts.' }, 403)
-  const me = await asUser.from('team_members').select('display_name').limit(1).maybeSingle()
+  // the signed-in person's own row: every team member can read the whole team, so never just the first row
+  const myEmail = ((await asUser.auth.getUser()).data.user?.email ?? '').toLowerCase()
+  const me = await asUser.from('team_members').select('display_name').eq('email', myEmail).maybeSingle()
   const actor = (me.data?.display_name as string | undefined) ?? 'Colin'
   const u = await asUser.auth.getUser()
   const body = await req.json().catch(() => ({}))

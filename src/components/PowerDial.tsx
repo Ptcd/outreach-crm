@@ -150,6 +150,30 @@ export function PowerDial({ caller }: { caller: string }) {
     }
   }, [cur, onThis, active, log])
 
+  // two callers at once (0120): the card on my screen is mine for a few minutes, renewed while it stays up; when
+  // someone else already has it, the list is fetched again and their card drops out of mine
+  const claimed = useRef<string | null>(null)
+  useEffect(() => {
+    const id = cur?.lead_id
+    if (!id) return
+    let on = true
+    const claim = async () => {
+      const r = await supabase.rpc('power_claim', { p_lead_id: id })
+      const d = r.data as { ok?: boolean } | null
+      if (!on) return
+      if (d && d.ok === false && pin !== id) { void q.refetch(); return }
+      claimed.current = id
+    }
+    void claim()
+    const t = setInterval(() => void claim(), 120_000)
+    return () => {
+      on = false
+      clearInterval(t)
+      if (claimed.current === id) { claimed.current = null; void supabase.rpc('power_release', { p_lead_id: id }) }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cur?.lead_id])
+
   // a seller calling in comes first (Colin 2026-10-28): auto-dial stops, and a call still only ringing out is dropped
   // and logged as no answer, so the bar at the top can take theirs. A conversation already going is hers to end
   // ("Hang up and answer" on that bar); its card stays here, unlogged, for after.

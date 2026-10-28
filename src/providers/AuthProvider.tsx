@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { appLoginEmail, supabase, supabaseConfigured } from '@/lib/supabaseClient'
+import { teamEmail, type SignInPerson } from '@/lib/teamCodes'
 import type { TeamMember } from '@/lib/types'
 import { clearCachedData } from '@/lib/queryClient'
 
@@ -18,7 +19,7 @@ interface AuthContextType {
   loading: boolean
   isOwner: boolean
   recovering: boolean // opened from a "set the app password" email: show the new-password form
-  signInWithPassword: (password: string) => Promise<{ error: string | null }>
+  signInWithPassword: (password: string, person?: SignInPerson) => Promise<{ error: string | null }>
   sendPasswordLink: () => Promise<{ error: string | null }>
   setPassword: (password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
@@ -93,12 +94,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [checkMember])
 
-  // One shared app account: the login screen asks only for the app password.
+  // A code per person (Colin 2026-10-28): Colin signs in to the app's main account; Thalia and Adil to their own
+  // (<person>@team.junkcarsmequon.com, codes set by Colin in Settings), so every call and package is theirs.
   const notSetUp = 'The app account is not set up yet (VITE_WPIE_APP_EMAIL on Vercel, see DEPLOY.md).'
-  const signInWithPassword = async (password: string) => {
-    if (!appLoginEmail) return { error: notSetUp }
-    const { error } = await supabase.auth.signInWithPassword({ email: appLoginEmail, password })
-    return { error: error ? (error.message === 'Invalid login credentials' ? 'Wrong password.' : error.message) : null }
+  const signInWithPassword = async (password: string, person: SignInPerson = 'colin') => {
+    const email = person === 'colin' ? appLoginEmail : teamEmail(person)
+    if (!email) return { error: notSetUp }
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    return { error: error ? (error.message === 'Invalid login credentials' ? 'Wrong code.' : error.message) : null }
   }
 
   // Emails the app account's owner (Colin) a link that opens this app to set a new password.
@@ -117,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     checkedFor.current = null
     clearCachedData()
-    // Only this phone: everyone shares one login, so a global sign-out would sign out every phone.
+    // Only this phone: Colin's account is open on several phones, so a global sign-out would sign them all out.
     await supabase.auth.signOut({ scope: 'local' })
   }
 

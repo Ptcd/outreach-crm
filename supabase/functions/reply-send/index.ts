@@ -24,7 +24,9 @@ Deno.serve(async (req) => {
   const asUser = createClient(url, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
     global: { headers: { Authorization: auth } }, auth: { persistSession: false } })
   // Any team member approves or skips a draft (Colin 2026-10-22: "they approve the texts and drafts").
-  const me = await asUser.from('team_members').select('person, display_name').limit(1).maybeSingle()
+  // the signed-in person's own row: every team member can read the whole team, so never just the first row
+  const myEmail = ((await asUser.auth.getUser()).data.user?.email ?? '').toLowerCase()
+  const me = await asUser.from('team_members').select('person, display_name').eq('email', myEmail).maybeSingle()
   if (me.error || !me.data) return json({ outcome: 'refused', reason: 'not on the team' }, 403)
   const actor = (me.data?.display_name as string | undefined) ?? 'Colin'
 
