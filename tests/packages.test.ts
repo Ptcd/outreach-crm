@@ -143,6 +143,21 @@ describe('the package', () => {
     expect((await db.query(`select owner::text from public.tasks where lead_id = $1 and kind = 'callback'`, [lead2])).rows).toEqual([{ owner: 'thalia' }])
   })
 
+  it('Ask first: Colin sends questions, the callback carries them, the answers ping Colin (0122)', async () => {
+    const lead = (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'ASK FIRST', owner_type: 'individual',
+      address: '28 Package Test St', phones: ['4145562208'] })])).lead_id as string
+    const id = (await as(THALIA, () => r(`public.package_submit($1::jsonb)`, [JSON.stringify({ lead_id: lead, need: 'moving', callback_at: '2030-01-08T22:00:00Z' })]))).package_id as string
+    await expect(as(THALIA, () => r(`public.package_ask($1, 'timeline?')`, [id]))).rejects.toThrow(/only Colin/)
+    expect(await as(COLIN, () => r(`public.package_ask($1, 'we could pay around $150,000')`, [id]))).toMatchObject({ ok: false })
+    expect(await as(COLIN, () => r(`public.package_ask($1, 'Timeline? Does 1.5 mean 1.5 million? How many units and rents?')`, [id]))).toMatchObject({ ok: true })
+    expect((await db.query(`select note from public.tasks where lead_id = $1 and kind = 'callback' and done_at is null`, [lead])).rows[0].note).toContain('Colin needs answers first')
+    expect(((await r(`public.package_number_due_claim()`)) as unknown as { lead_id: string }[]).map((x) => x.lead_id)).not.toContain(lead)
+    expect(await as(THALIA, () => r(`public.package_answer($1, 'moving by March; 1.5 = $150k; 3 houses, 900 a month each')`, [id]))).toMatchObject({ ok: true })
+    expect(((await r(`public.package_answers_claim()`)) as unknown as { lead_id: string }[]).map((x) => x.lead_id)).toContain(lead)
+    expect((await r(`public.package_answers_claim()`)) as unknown as unknown[]).toEqual([])
+    expect(await as(COLIN, () => r(`public.package_decide($1, true, null, 'B')`, [id]))).toMatchObject({ ok: true, status: 'go_walk' })
+  })
+
   it('the door: Muse lists packages to value and writes the value, never a number', async () => {
     const calls: [string, Record<string, unknown>][] = []
     const db2 = { records: async (fn: string, args: Record<string, unknown>) => { calls.push([fn, args]); return { ok: true } } } as unknown as DoorDb

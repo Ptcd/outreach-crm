@@ -117,6 +117,8 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
   const [note, setNote] = useState('')
   const [walkAt, setWalkAt] = useState('')
   const [newCb, setNewCb] = useState(() => isoToLocalInput(new Date(Date.now() + 24 * 3600_000).toISOString()))
+  const [answers, setAnswers] = useState('')
+  const asking = !!p.colin_asks && !p.caller_answers && ['waiting_value', 'waiting_number'].includes(p.status)
   // Colin's walk, booked on the card the same way the call script books it (the belt moves the card to Walk booked,
   // which closes this package and its callback, and gives the caller the confirm call the day before)
   const bookWalk = async () => {
@@ -178,15 +180,37 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
             <Select value={grade} onChange={(e) => setGrade(e.target.value)} aria-label="Grade the package">
               <option value="">Grade</option><option value="A">A</option><option value="B">B</option><option value="C">C</option>
             </Select>
-            <Input placeholder="Note for the caller (optional, never a number)" value={note} onChange={(e) => setNote(e.target.value)} />
+            <Input placeholder="Note for the caller, or what you need to know first (never a number)" value={note} onChange={(e) => setNote(e.target.value)} />
             {p.status !== 'go_walk' && <Button onClick={() => void run('package_decide', { p_id: p.id, p_walk: true, p_note: note || null, p_grade: grade || null })}>Walk it</Button>}
             <Button variant="outline" onClick={() => void run('package_decide', { p_id: p.id, p_walk: false, p_note: note || null, p_grade: grade || null })}>Pass</Button>
           </div>
+          {p.status !== 'go_walk' && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="secondary" disabled={!note.trim()} onClick={() => void run('package_ask', { p_id: p.id, p_asks: note })}>Ask first</Button>
+              <span className="text-xs text-muted-foreground">Not sure yet? Type what you need to know in the box (for example: their timeline, what their number means, how many units and the rents) and tap Ask first. The caller gets the answers on the callback and you decide then.</span>
+            </div>
+          )}
           <p className="text-xs text-muted-foreground">No number goes out on the phone. The caller books your walk with everyone on the title there, and you give your number at the house.</p>
         </div>
       )}
 
-      {numberNotReady(p) && (
+      {!!p.colin_asks && (
+        <div className="space-y-2 rounded-lg border-2 border-sky-300 p-3">
+          <p className="font-medium">Colin needs to know first</p>
+          <p className="whitespace-pre-line">{String(p.colin_asks)}</p>
+          {p.caller_answers ? (
+            <p className="whitespace-pre-line rounded bg-muted p-2"><span className="font-medium">Their answers:</span> {String(p.caller_answers)}</p>
+          ) : !isOwner && asking ? (
+            <>
+              <p className="text-muted-foreground">On the callback at the time you promised: &quot;Hi, it&apos;s [your name]. My partner is going over everything you told me and had a couple of quick questions.&quot; Ask each one, write their words, then: &quot;Thanks. He&apos;ll go over it, and I&apos;ll call you back [day] at [time].&quot; Set that time below.</p>
+              <Textarea rows={3} placeholder="Their answers, in their words" value={answers} onChange={(e) => setAnswers(e.target.value)} />
+              <Button disabled={!answers.trim()} onClick={() => void run('package_answer', { p_id: p.id, p_answers: answers })}>Send answers to Colin</Button>
+            </>
+          ) : <p className="text-xs text-muted-foreground">Waiting for the caller to ask them on the callback.</p>}
+        </div>
+      )}
+
+      {numberNotReady(p) && !asking && (
         <div className="space-y-2 rounded-lg border border-amber-400 p-3">
           <p className="font-medium">Callback {fmtDateTime(String(p.callback_at))}, and Colin hasn&apos;t decided yet</p>
           <p className="text-muted-foreground">Colin got a push. If he still hasn&apos;t decided at the time you promised, call anyway: never let a promised callback go quiet.</p>
