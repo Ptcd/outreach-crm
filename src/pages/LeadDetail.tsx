@@ -19,7 +19,7 @@ import { AppointmentPacket } from '@/components/AppointmentPacket'
 import { CallPanel, bestPhone } from '@/components/CallPanel'
 import { CallNotes } from '@/components/CallNotes'
 import { TextThread } from '@/components/TextThread'
-import { DealPackage } from '@/components/DealPackage'
+import { DealPackage, PackageDecisionBanner } from '@/components/DealPackage'
 import { api, useDeals, useLead, useWrite } from '@/lib/queries'
 import { useDialer } from '@/lib/dialer'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso, fullAddress } from '@/lib/format'
@@ -72,6 +72,7 @@ export default function LeadDetail() {
         </div>
       )}
       <HotBanner leadId={lead.id} />
+      <PackageDecisionBanner lead={lead} />
       {lead.human_takeover_at && (
         <div className="rounded-md border-2 border-amber-400 bg-amber-50 p-3 text-sm">
           {liveHere ? (

@@ -13,7 +13,7 @@ import { fmtDateTime, isoToLocalInput, localInputToIso } from '@/lib/format'
 import { useAuth } from '@/providers/AuthProvider'
 import { api } from '@/lib/queries'
 import { OddHourHint } from '@/components/OddHourHint'
-import { useOnPhone, workerFor } from '@/lib/onPhone'
+import { useOnPhone, workerFor, writeOnPhone } from '@/lib/onPhone'
 import { useColinHere } from '@/components/OnPhonePicker'   // Colin himself, not a caller on his shared login
 import { NEXT_STEP, callScript, packageFromCall } from '@/lib/callScript'
 import type { Lead } from '@/lib/types'
@@ -77,14 +77,74 @@ const OPEN = ['waiting_value', 'waiting_number', 'go_walk', 'number_ready', 'cou
 export const numberNotReady = (pk: { status: string; callback_at?: unknown }, now = Date.now()) =>
   ['waiting_value', 'waiting_number'].includes(pk.status) && !!pk.callback_at && new Date(String(pk.callback_at)).getTime() < now + 3 * 3600_000
 
+/** The card's latest package (one query, shared by the package section and the decision box at the top). */
+const packageQuery = (leadId: string) => ({ queryKey: ['package', leadId], queryFn: async () => {
+  const r = await supabase.from('deal_packages').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(1)
+  if (r.error) throw new Error(r.error.message)
+  return ((r.data ?? [])[0] ?? null) as Pkg | null
+} })
+
+/** Top of the card when a package waits on Colin (Colin 2026-10-28: "the card is confusing and i dont see anywhere to
+ *  dispo it"): his three choices in one place, or, on his login set to someone else's name, a one-tap switch. */
+export function PackageDecisionBanner({ lead }: { lead: Lead }) {
+  const { isOwner } = useAuth()
+  const colin = useColinHere()
+  const [picked] = useOnPhone()
+  const qc = useQueryClient()
+  const q = useQuery(packageQuery(lead.id))
+  const [asks, setAsks] = useState('')
+  const [err, setErr] = useState<string | null>(null)
+  const p = q.data
+  if (!isOwner || !p || !['waiting_value', 'waiting_number'].includes(p.status)) return null
+  const refresh = () => { void qc.invalidateQueries({ queryKey: ['package', lead.id] }); void qc.invalidateQueries({ queryKey: ['packages_open'] }) }
+  const run = async (fn: string, args: Record<string, unknown>) => {
+    setErr(null)
+    const r = await supabase.rpc(fn, args)
+    const d = r.data as { ok?: boolean; reason?: string } | null
+    if (r.error || d?.ok === false) { setErr(r.error?.message ?? d?.reason ?? 'Not saved'); return }
+    refresh()
+  }
+  if (!colin) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 rounded-md border-2 border-sky-400 bg-sky-50 p-3 text-sm dark:bg-sky-950/30">
+        <span className="flex-1"><b>A package is waiting for Colin&apos;s decision.</b> This browser is set to {picked ? picked.charAt(0).toUpperCase() + picked.slice(1) : 'someone else'} (top right).</span>
+        <Button size="sm" onClick={() => writeOnPhone('colin')}>I&apos;m Colin: show my decision</Button>
+      </div>
+    )
+  }
+  const waitingOnAnswers = !!p.colin_asks && !p.caller_answers
+  return (
+    <div className="space-y-2 rounded-md border-2 border-sky-400 bg-sky-50 p-3 text-sm dark:bg-sky-950/30">
+      <p className="text-base font-semibold">{waitingOnAnswers ? 'You asked first: waiting for the answers' : 'Package: your decision'}</p>
+      <p>
+        {p.need ? <>Why: <b>{String(p.need)}</b>. </> : null}
+        {p.their_number ? <>Their number: <b>{String(p.their_number)}</b>. </> : null}
+        {p.callback_at ? <>Callback promised {fmtDateTime(String(p.callback_at))}. </> : null}
+        <a className="underline" href="#package">The whole package</a>
+      </p>
+      {p.caller_answers ? <p className="rounded bg-background p-2"><b>Their answers:</b> {String(p.caller_answers)}</p> : null}
+      {!waitingOnAnswers && (
+        <>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => void run('package_decide', { p_id: p.id, p_walk: true, p_note: null, p_grade: null })}>Walk it</Button>
+            <Button variant="outline" onClick={() => void run('package_decide', { p_id: p.id, p_walk: false, p_note: null, p_grade: null })}>Pass</Button>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+            <Input placeholder="Not sure yet? What do you need to know first (never a number)" value={asks} onChange={(e) => setAsks(e.target.value)} />
+            <Button variant="secondary" disabled={!asks.trim()} onClick={() => void run('package_ask', { p_id: p.id, p_asks: asks })}>Ask first</Button>
+          </div>
+          <p className="text-xs text-muted-foreground">Walk it: the caller books your walk on the callback. Pass: she closes politely. Ask first: she asks your questions on the callback and you get the answers.</p>
+        </>
+      )}
+      {err && <p className="text-red-700">{err}</p>}
+    </div>
+  )
+}
+
 export function DealPackage({ lead }: { lead: Lead }) {
   const isOwner = useColinHere()
   const qc = useQueryClient()
-  const q = useQuery({ queryKey: ['package', lead.id], queryFn: async () => {
-    const r = await supabase.from('deal_packages').select('*').eq('lead_id', lead.id).order('created_at', { ascending: false }).limit(1)
-    if (r.error) throw new Error(r.error.message)
-    return ((r.data ?? [])[0] ?? null) as Pkg | null
-  } })
+  const q = useQuery(packageQuery(lead.id))
   const refresh = () => { void qc.invalidateQueries({ queryKey: ['package', lead.id] }); void qc.invalidateQueries({ queryKey: ['packages_open'] }); void qc.invalidateQueries({ queryKey: ['lead', lead.id] }) }
   const p = q.data
   const open = !!p && OPEN.includes(p.status)

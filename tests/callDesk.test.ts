@@ -168,7 +168,7 @@ describe('call answers -> walk gate', () => {
 
   it("asks the phone script in its order, every question tied to its gate items, in Colin's voice", () => {
     expect(CALL_SCRIPT.map((q) => q.qid)).toEqual(PHONE_SCRIPT.questions.map((q) => q.id))
-    expect(CALL_SCRIPT.map((q) => q.id)).toEqual(['owner', 'interest', 'identity', 'motivation', 'condition', 'occupancy', 'work_list', 'happened',
+    expect(CALL_SCRIPT.map((q) => q.id)).toEqual(['owner', 'interest', 'identity', 'motivation', 'layout', 'condition', 'occupancy', 'work_list', 'happened',
       'photos', 'timeline', 'decision_makers', 'price', 'anchor', 'flexibility', 'debt', 'behind', 'other_buyers', 'concerns', 'ready'])
     expect(CALL_SCRIPT.find((q) => q.id === 'motivation')?.gate).toEqual([1])
     expect(CALL_SCRIPT.find((q) => q.id === 'ready')?.gate).toEqual([2, 6])
