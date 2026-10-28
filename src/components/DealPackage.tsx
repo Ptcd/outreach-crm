@@ -118,6 +118,7 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
   const [walkAt, setWalkAt] = useState('')
   const [newCb, setNewCb] = useState(() => isoToLocalInput(new Date(Date.now() + 24 * 3600_000).toISOString()))
   const [answers, setAnswers] = useState('')
+  const [closing, setClosing] = useState(false)
   const asking = !!p.colin_asks && !p.caller_answers && ['waiting_value', 'waiting_number'].includes(p.status)
   // Colin's walk, booked on the card the same way the call script books it (the belt moves the card to Walk booked,
   // which closes this package and its callback, and gives the caller the confirm call the day before)
@@ -255,9 +256,19 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
           <div className="mt-2">{walkBox}</div>
         </details>
       )}
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="ghost" onClick={() => void run('package_close', { p_id: p.id, p_status: 'dead', p_note: 'closed from the card' })}>Close this package</Button>
-      </div>
+      {/* closing ends the package and cancels the promised callback: a two-step, and named for what it is (Shirikin's
+          package was closed by mistake, 2026-10-28) */}
+      {closing ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border-2 border-red-300 p-2">
+          <span className="flex-1">End this package for good? The promised callback is cancelled too. (To decide, use Walk it, Pass or Ask first.)</span>
+          <Button size="sm" variant="destructive" onClick={() => void run('package_close', { p_id: p.id, p_status: 'dead', p_note: 'closed from the card' })}>Yes, end it</Button>
+          <Button size="sm" variant="outline" onClick={() => setClosing(false)}>Keep it</Button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setClosing(true)}>End this package (seller is out)</Button>
+        </div>
+      )}
       {err && <p className="text-sm text-red-600">{err}</p>}
     </div>
   )
