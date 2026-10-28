@@ -12,12 +12,13 @@ import { useAuth } from '@/providers/AuthProvider'
 import { PackagesToday } from '@/components/DealPackage'
 import { MissedCalls } from '@/components/MissedCalls'
 import { ownerFilterFor, useOnPhone, workerFor, type TaskOwner } from '@/lib/onPhone'
-import { OnPhonePrompt } from '@/components/OnPhonePicker'
+import { OnPhonePrompt, useColinHere } from '@/components/OnPhonePicker'
 import { StatTiles } from '@/components/StatTiles'
 import { ClipboardList, MessageCircle, PhoneCall, Sparkles } from 'lucide-react'
 
 export default function Today() {
-  const { member, user, isOwner } = useAuth()
+  const { member, user } = useAuth()
+  const isOwner = useColinHere()   // Colin's view: on the shared login, the phone set to Colin (not Thalia on his login)
   const [picked] = useOnPhone()
   const worker = workerFor(member, picked)
   const [chosen, setWho] = useState<TaskOwner | null>(null)

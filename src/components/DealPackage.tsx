@@ -13,6 +13,7 @@ import { fmtDateTime, isoToLocalInput, localInputToIso } from '@/lib/format'
 import { useAuth } from '@/providers/AuthProvider'
 import { api } from '@/lib/queries'
 import { useOnPhone, workerFor } from '@/lib/onPhone'
+import { useColinHere } from '@/components/OnPhonePicker'   // Colin himself, not a caller on his shared login
 import { NEXT_STEP, callScript, packageFromCall } from '@/lib/callScript'
 import type { Lead } from '@/lib/types'
 
@@ -66,14 +67,6 @@ const CALL_LABELS: Record<string, string> = Object.fromEntries([...callScript(),
 function mentioned(cond: Record<string, string> | null): string {
   const names = CONDITION_ITEMS.filter((c) => cond?.[c.key] && !['fix_first', 'other'].includes(c.key)).slice(0, 2).map((c) => `the ${c.label[0].toLowerCase()}${c.label.slice(1)}`)
   return names.length ? `With ${names.join(' and ')} you mentioned` : 'With everything you told me about the place'
-}
-
-/** Colin himself, not Thalia or Adil working on his shared login (found in the end-to-end test, 2026-10-28):
- *  the walk-it-or-pass buttons are his, the callbacks theirs. A phone nobody has picked on yet counts as Colin's. */
-function useColinHere(): boolean {
-  const { isOwner, member } = useAuth()
-  const [picked] = useOnPhone()
-  return isOwner && (workerFor(member, picked) ?? 'colin') === 'colin'
 }
 
 const money = (n: unknown) => (n == null || n === '' ? '' : `$${Math.round(Number(n)).toLocaleString('en-US')}`)
