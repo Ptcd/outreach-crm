@@ -85,9 +85,11 @@ export async function runPackageMail(deps: NotifyDeps, rpc: Rpc, fanOut?: (m: { 
   }
   if (fanOut) {
     const r = await rpc('package_ready_claim', {})
-    for (const x of ((r.data as { lead_id: string; property_address: string | null; callback_at: string | null }[] | null) ?? [])) {
-      await fanOut({ title: `Colin wants to walk it: ${x.property_address ?? 'a package'}`,
-        body: x.callback_at ? 'On the callback you promised: the yes-or-no question, then book his walk.' : 'Call them back and book his walk.',
+    for (const x of ((r.data as { lead_id: string; property_address: string | null; callback_at: string | null; colin_call?: string | null }[] | null) ?? [])) {
+      const passed = x.colin_call === 'pass'
+      await fanOut({ title: passed ? `Colin passed: ${x.property_address ?? 'a package'}` : `Colin wants to walk it: ${x.property_address ?? 'a package'}`,
+        body: passed ? 'Close politely at the callback you promised (the words are on the card).'
+          : x.callback_at ? 'On the callback you promised: the yes-or-no question, then book his walk.' : 'Call them back and book his walk.',
         url: `${deps.appUrl.replace(/\/$/, '')}/lead/${x.lead_id}#package`, tag: `package-${x.lead_id}` }).catch(() => null)
       s.ready_pings++
     }

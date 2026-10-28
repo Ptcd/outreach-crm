@@ -19,7 +19,9 @@ import { likelyDisconnected, useDialer } from '@/lib/dialer'
 import { fmtDateTime, fmtPhone } from '@/lib/format'
 
 type Item = {
-  lead_id: string; task_id: string | null; source: 'missed_call' | 'replied' | 'call_list' | 'texted_silent'; why: string | null; reply?: string | null
+  lead_id: string; task_id: string | null; source: 'missed_call' | 'callback' | 'replied' | 'call_list' | 'texted_silent'; why: string | null; reply?: string | null
+  task_note?: string | null
+  package?: { id: string; status: string; colin_call: string | null; colin_asks: string | null; caller_answers: string | null; callback_at: string | null; number_note: string | null } | null
   missed_at?: string | null; voicemail?: boolean | null; voicemail_words?: string | null
   owner_name: string; address: string | null; municipality: string | null; reasons: string[] | null; lane: string | null
   texts_sent: number; first_text_at: string | null; last_text_at: string | null; dials_7d: number; dials_total?: number; last_dial: string | null
@@ -251,8 +253,8 @@ export function PowerDial({ caller }: { caller: string }) {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-semibold">{title(cur.owner_name)}</h2>
-              <Badge tone={cur.source === 'missed_call' ? 'bad' : cur.source === 'replied' ? 'warn' : cur.source === 'call_list' ? 'info' : undefined}>
-                {cur.source === 'missed_call' ? 'Called us: call back now' : cur.source === 'replied' ? 'Texted back: call now' : cur.source === 'call_list' ? 'On today’s list' : 'Texted, no reply'}</Badge>
+              <Badge tone={cur.source === 'missed_call' || cur.source === 'callback' ? 'bad' : cur.source === 'replied' ? 'warn' : cur.source === 'call_list' ? 'info' : undefined}>
+                {cur.source === 'missed_call' ? 'Called us: call back now' : cur.source === 'callback' ? 'Promised callback' : cur.source === 'replied' ? 'Texted back: call now' : cur.source === 'call_list' ? 'On today’s list' : 'Texted, no reply'}</Badge>
             </div>
             <p className="text-sm">{street(cur.address)}{cur.municipality ? `, ${cur.municipality}` : ''}</p>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -270,12 +272,27 @@ export function PowerDial({ caller }: { caller: string }) {
           {cur.source === 'replied' && cur.reply && (
             <p className="rounded-md border-2 border-amber-300 bg-amber-50 p-2 text-sm dark:bg-amber-950/30"><span className="font-semibold">They texted:</span> &ldquo;{cur.reply}&rdquo;</p>
           )}
-          <History leadId={cur.lead_id} open={cur.source === 'replied' || cur.source === 'missed_call'} />
+          {cur.source === 'callback' && <CallbackPlan item={cur} caller={callerName} street={vars.street} busy={busy} live={live}
+            onDone={async (note) => {
+              setBusy(true)
+              const r = await supabase.rpc('callback_done', { p_lead_id: cur.lead_id, p_note: note })
+              setBusy(false)
+              if (r.error) { setErr(r.error.message); return }
+              if (onThis) dismiss()
+              update((st) => ({ ...st, reached: st.reached + 1 }))
+              void qc.invalidateQueries({ queryKey: ['tasks'] })
+              next(cur.lead_id, true)
+            }} />}
+          <History leadId={cur.lead_id} open={cur.source === 'replied' || cur.source === 'missed_call' || cur.source === 'callback'} />
           <div className="rounded-md bg-muted p-2 text-sm">
-            <p><span className="font-semibold">Open with:</span> &ldquo;{cur.source === 'missed_call'
+            <p><span className="font-semibold">Open with:</span> &ldquo;{cur.source === 'callback'
+              ? `Hi${vars.first_name === 'there' ? '' : `, is this ${vars.first_name}?`}${vars.first_name === 'there' ? ', this' : ' This'} is ${callerName}, calling you back about ${vars.street} like I said I would.`
+              : cur.source === 'missed_call'
               ? `Hi${vars.first_name === 'there' ? '' : `, is this ${vars.first_name}?`}${vars.first_name === 'there' ? ', this' : ' This'} is ${callerName}, returning your call about ${vars.street}.`
               : pickupLine(caller, cur.source === 'replied' ? 'hot_text' : 'cold', vars)}&rdquo;</p>
-            {cur.source === 'missed_call' ? (
+            {cur.source === 'callback' ? (
+              <p className="mt-1"><span className="font-semibold">Then:</span> what&apos;s in the red box above, for what Colin decided.</p>
+            ) : cur.source === 'missed_call' ? (
               <p className="mt-1"><span className="font-semibold">Then:</span> let them tell you why they called, and tap <span className="font-medium">We talked</span>. No answer: leave a short voicemail (&ldquo;Hi{vars.first_name === 'there' ? '' : ` ${vars.first_name}`}, it&apos;s {callerName} returning your call about {vars.street}. Call me back at this number when you can.&rdquo;), then tap <span className="font-medium">Left voicemail</span>.</p>
             ) : cur.source === 'replied' ? (
               <p className="mt-1"><span className="font-semibold">Then:</span> &ldquo;What&apos;s got you thinking about it?&rdquo; and tap <span className="font-medium">We talked</span>. No answer: tap No answer, and Muse texts them back.</p>
@@ -323,7 +340,7 @@ export function PowerDial({ caller }: { caller: string }) {
             </div>
             </>
           )}
-          {cur.source === 'replied' || cur.source === 'missed_call' ? null : (cur.dials_total ?? 0) >= 2 ? (
+          {cur.source === 'replied' || cur.source === 'missed_call' || cur.source === 'callback' ? null : (cur.dials_total ?? 0) >= 2 ? (
             <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm dark:bg-amber-950/30"><span className="font-semibold">Try {(cur.dials_total ?? 0) + 1}: leave this voicemail (under 20 s):</span> &ldquo;Hi{vars.first_name === 'there' ? '' : ` ${vars.first_name}`}, it&apos;s {callerName}. I had a quick question about the place on {vars.street}. Give me a call when you get a minute.&rdquo;</p>
           ) : (
             <p className="rounded-md bg-muted p-2 text-sm text-muted-foreground"><span className="font-semibold">Try {(cur.dials_total ?? 0) + 1}: no voicemail.</span> If it goes to voicemail, hang up and tap No answer. Leave one short voicemail on the third try; the first two make them curious.</p>
@@ -377,6 +394,51 @@ function History({ leadId, open }: { leadId: string; open: boolean }) {
         ))}
       </ul>
     </details>
+  )
+}
+
+/** A promised callback (0124): what Colin decided on the package, the words for it, and how to finish. */
+function CallbackPlan({ item, caller, street, busy, live, onDone }: { item: Item; caller: string; street: string; busy: boolean; live: boolean
+  onDone: (note: string) => Promise<void> }) {
+  const p = item.package
+  const say = 'rounded-md border-l-4 border-amber-400 bg-amber-50 p-2 dark:bg-amber-950/30'
+  const open = <a className="underline" href={`/lead/${item.lead_id}#package`}>Open his card</a>
+  let title = 'The callback you promised'
+  let body: React.ReactNode = <p>Call at the time you promised. {open} for the package.</p>
+  let doneLabel = 'Callback done'
+  if (p && p.colin_call === 'pass') {
+    title = 'Colin passed: close politely'
+    body = <blockquote className={say}>&ldquo;Hi, it&apos;s {caller}. My partner and I went over everything, and we&apos;re not the right fit for this one right now. I didn&apos;t want to leave you waiting. If anything changes, keep this number.&rdquo;</blockquote>
+    doneLabel = 'Told them: callback done'
+  } else if (p && p.status === 'go_walk') {
+    title = 'Colin wants to walk it: book his walk'
+    body = <>
+      <blockquote className={say}>&ldquo;My partner and I went over everything you told me. He&apos;d like to come see it himself. He only puts a number on a place once he&apos;s walked it.&rdquo; Then: &ldquo;If his number works for you, are you ready to give him a yes or a no that day? A no is completely fine.&rdquo;</blockquote>
+      <p>A yes: {open} and tap <b>Book Colin&apos;s walk</b> (it closes the callback). Never a number on the phone.</p>
+    </>
+    doneLabel = ''
+  } else if (p && p.colin_asks && !p.caller_answers) {
+    title = 'Colin needs answers first'
+    body = <>
+      <p className="whitespace-pre-line rounded bg-muted p-2">{p.colin_asks}</p>
+      <p>&ldquo;My partner is going over everything you told me and had a couple of quick questions.&rdquo; Then {open} and type their answers under <b>Colin needs to know first</b>, and set the next callback.</p>
+    </>
+    doneLabel = ''
+  } else if (p && ['waiting_value', 'waiting_number'].includes(p.status)) {
+    title = "Colin hasn't decided yet"
+    body = <>
+      <blockquote className={say}>&ldquo;Hi, it&apos;s {caller}. I told you I&apos;d call today. My partner is still going over everything you told me. Can I call you back [day] at [time]?&rdquo;</blockquote>
+      <p>Then {open} and tap <b>Set the new callback</b>.</p>
+    </>
+    doneLabel = ''
+  }
+  return (
+    <div className="space-y-2 rounded-md border-2 border-red-300 p-2 text-sm">
+      <p className="font-semibold">{title}</p>
+      {item.task_note && <p className="text-xs text-muted-foreground">{item.task_note}</p>}
+      {body}
+      {doneLabel && <Button size="sm" disabled={busy || live} onClick={() => void onDone(doneLabel === 'Callback done' ? 'callback made' : `told them: ${title.toLowerCase()} (${street})`)}>{doneLabel}</Button>}
+    </div>
   )
 }
 

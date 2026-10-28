@@ -156,5 +156,20 @@ describe('Power hour', () => {
     fireEvent.click(screen.getByText('No answer'))
     await waitFor(() => expect(logCall).toHaveBeenCalledWith('L1', '4145550101', 'no_answer', 'No answer (Power hour). daughter answered, call after 6', null))
   })
+
+  it('a promised callback after Colin passed: the polite close and Callback done (0124)', async () => {
+    const cb = { ...items[0], lead_id: 'L5', task_id: 'T5', source: 'callback', owner_name: 'PAT CALLBACK', address: '500 PROMISE RD', phone: '4145550155',
+      task_note: 'Callback: Colin is passing on this one.', package: { id: 'P5', status: 'declined', colin_call: 'pass', colin_asks: null, caller_answers: null, callback_at: null, number_note: null } }
+    items.unshift(cb as never)
+    try {
+      wrap()
+      expect(await screen.findByText('Pat Callback')).toBeTruthy()
+      expect(screen.getByText('Promised callback')).toBeTruthy()
+      expect(screen.getByText('Colin passed: close politely')).toBeTruthy()
+      expect(screen.getByText(/we're not the right fit for this one right now/)).toBeTruthy()
+      expect(screen.getByText(/calling you back about 500 Promise Rd like I said I would/)).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Told them: callback done' })).toBeTruthy()
+    } finally { items.shift() }
+  })
 })
 
