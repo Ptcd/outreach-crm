@@ -68,6 +68,14 @@ function mentioned(cond: Record<string, string> | null): string {
   return names.length ? `With ${names.join(' and ')} you mentioned` : 'With everything you told me about the place'
 }
 
+/** Colin himself, not Thalia or Adil working on his shared login (found in the end-to-end test, 2026-10-28):
+ *  the walk-it-or-pass buttons are his, the callbacks theirs. A phone nobody has picked on yet counts as Colin's. */
+function useColinHere(): boolean {
+  const { isOwner, member } = useAuth()
+  const [picked] = useOnPhone()
+  return isOwner && (workerFor(member, picked) ?? 'colin') === 'colin'
+}
+
 const money = (n: unknown) => (n == null || n === '' ? '' : `$${Math.round(Number(n)).toLocaleString('en-US')}`)
 const OPEN = ['waiting_value', 'waiting_number', 'go_walk', 'number_ready', 'counter', 'agreed']
 /** a promised callback within 3 hours (or past) and Colin has not said walk it or pass (0112 pushes Colin the same) */
@@ -75,7 +83,7 @@ export const numberNotReady = (pk: { status: string; callback_at?: unknown }, no
   ['waiting_value', 'waiting_number'].includes(pk.status) && !!pk.callback_at && new Date(String(pk.callback_at)).getTime() < now + 3 * 3600_000
 
 export function DealPackage({ lead }: { lead: Lead }) {
-  const { isOwner } = useAuth()
+  const isOwner = useColinHere()
   const qc = useQueryClient()
   const q = useQuery({ queryKey: ['package', lead.id], queryFn: async () => {
     const r = await supabase.from('deal_packages').select('*').eq('lead_id', lead.id).order('created_at', { ascending: false }).limit(1)
@@ -332,7 +340,7 @@ type OpenRow = { package: Pkg; lead: { id: string; owner_name: string | null; pr
 
 /** Today: the packages that are someone's turn. Colin prices the same day; the caller calls back at the time promised. */
 export function PackagesToday() {
-  const { isOwner } = useAuth()
+  const isOwner = useColinHere()
   const q = useQuery({ queryKey: ['packages_open'], refetchInterval: 120_000, queryFn: async () => {
     const r = await supabase.rpc('packages_open')
     if (r.error) throw new Error(r.error.message)
