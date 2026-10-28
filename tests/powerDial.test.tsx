@@ -132,5 +132,21 @@ describe('Power hour', () => {
     fireEvent.keyDown(window, { key: '6' })
     await waitFor(() => expect(logCall).toHaveBeenCalledWith('L1', '4145550101', 'disconnected', 'Disconnected number (Power hour).', null))
   })
+
+  it('the card she dialed stays on screen even when a refresh no longer lists it (Thalia 2026-10-28)', async () => {
+    const client = new QueryClient()
+    render(<QueryClientProvider client={client}><PowerDial caller="thalia" /></QueryClientProvider>)
+    await screen.findByText('Jane Q Sample')
+    fireEvent.click(screen.getByText(/Dial \(414\) 555-0101/))
+    const jane = items.shift()!   // a call open on her card: the queue no longer lists it
+    try {
+      await client.refetchQueries({ queryKey: ['power_dial'] })
+      await new Promise((r) => setTimeout(r, 50))
+      expect(screen.getByText('Jane Q Sample')).toBeTruthy()
+      expect(screen.queryByText('Robert Example')).toBeNull()
+      fireEvent.click(screen.getByText('No answer'))
+      expect(await screen.findByText('Robert Example')).toBeTruthy()
+    } finally { items.unshift(jane) }
+  })
 })
 

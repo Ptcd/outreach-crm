@@ -3,7 +3,7 @@
 // card says who, where, why they are on the list, what they texted, the numbers to dial, then the script with
 // the booking verdict and Log this call. Logging the call finishes the task and brings the next one; Skip
 // moves it to the end of this sitting; Hand to Colin gives him the card with one line and pings him.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge, Empty, ErrorNote, Textarea } from '@/components/ui/form'
@@ -19,6 +19,7 @@ import { OnPhonePrompt, useColinHere } from '@/components/OnPhonePicker'
 import type { Task } from '@/lib/types'
 import { orderPhones } from '@/lib/phoneOrder'
 import { PowerDial } from '@/components/PowerDial'
+import { useDialer } from '@/lib/dialer'
 
 type QueueTask = Task & { lead: { id: string; owner_name: string; property_address: string | null; municipality?: string | null; property_zip?: string | null; stage: string } | null }
 
@@ -39,7 +40,15 @@ export default function CallQueue() {
     const tail = skipped.map((id) => all.find((t) => t.id === id)).filter((t): t is QueueTask => !!t)
     return [...head, ...tail]
   }, [tasks.data, skipped, done])
-  const current = queue[0] ?? null
+  // the card a call is open on stays up until it is logged or skipped, even when the minute's refresh no longer lists
+  // it (Thalia 2026-10-28: the next lead came up while she was still on the call)
+  const { active } = useDialer()
+  const [held, setHeld] = useState<QueueTask | null>(null)
+  const top = queue[0] ?? null
+  useEffect(() => {
+    if (active?.leadId && top?.lead_id === active.leadId && held?.id !== top.id) setHeld(top)
+  }, [active?.leadId, top, held?.id])
+  const current = held && !done.includes(held.id) && !skipped.includes(held.id) ? held : top
   // A logged call closes the stop on the server (log_call's call row; the belt's trigger) and a hand-off closes the
   // caller's open stops itself, so the queue only steps forward and refreshes; it never marks a stop Done by hand,
   // which the belt would read as a plain Done and route again.

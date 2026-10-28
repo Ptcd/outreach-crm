@@ -67,8 +67,11 @@ export function PowerDial({ caller }: { caller: string }) {
   const [stats, setStats] = useState<Stats>(loadStats)
   const [skipped, setSkipped] = useState<string[]>([])
   const [talking, setTalking] = useState<string | null>(null)
-  // the card she dialed or is talking to stays on screen while a refresh brings a texter to the top
+  // the card she dialed or is talking to stays on screen while a refresh brings a texter to the top, and stays even
+  // when the refresh no longer lists it (a card with a call open drops out of the queue: Thalia 2026-10-28, "their info
+  // only stays on the screen for a second before it automatically moves to the next lead, even while I'm still on the call")
   const [pin, setPin] = useState<string | null>(null)
+  const pinItem = useRef<Item | null>(null)
   const [auto, setAuto] = useState(false)
   // hang up a call nobody answered after about five rings and log it as no answer (Twilio itself gives up at 30 s)
   const [ringLimit, setRingLimit] = useState(true)
@@ -83,8 +86,8 @@ export function PowerDial({ caller }: { caller: string }) {
   const list = useMemo(() => {
     const all = (q.data ?? []).filter((x) => !stats.done.includes(x.lead_id))
     const ordered = [...all.filter((x) => !skipped.includes(x.lead_id)), ...all.filter((x) => skipped.includes(x.lead_id))]
-    const held = pin ? ordered.find((x) => x.lead_id === pin) : undefined
-    return held ? [held, ...ordered.filter((x) => x !== held)] : ordered
+    const held = pin ? (ordered.find((x) => x.lead_id === pin) ?? (pinItem.current?.lead_id === pin && !stats.done.includes(pin) ? pinItem.current : undefined)) : undefined
+    return held ? [held, ...ordered.filter((x) => x.lead_id !== held.lead_id)] : ordered
   }, [q.data, stats.done, skipped, pin])
   const cur = list[0] ?? null
   const onThis = !!active && !!cur && active.leadId === cur.lead_id
@@ -98,6 +101,7 @@ export function PowerDial({ caller }: { caller: string }) {
     setCountdown(null)
     if (active) dismiss()
     update((s) => ({ ...s, dials: s.dials + 1, started: s.started ?? Date.now() }))
+    pinItem.current = cur
     setPin(cur.lead_id)
     void start({ to: cur.phone, label: `${title(cur.owner_name)} - ${street(cur.address)}`, leadId: cur.lead_id, contactId: null, quiet: true })
   }, [cur, supported, live, incoming, active, dismiss, start, update])
@@ -212,7 +216,7 @@ export function PowerDial({ caller }: { caller: string }) {
       if (talking || k.incoming) return   // a call coming in: the keys wait for the bar at the top
       if (e.key === 'd' || e.key === 'D' || e.key === 'Enter') { e.preventDefault(); k.dial() }
       else if (e.key === 's' || e.key === 'S') k.skip()
-      else if (e.key === '5' && k.cur && !k.live) { if (k.cur) { update((s) => ({ ...s, reached: s.reached + 1 })); setTalking(k.cur.lead_id); setPin(k.cur.lead_id) } }
+      else if (e.key === '5' && k.cur && !k.live) { if (k.cur) { update((s) => ({ ...s, reached: s.reached + 1 })); setTalking(k.cur.lead_id); pinItem.current = k.cur; setPin(k.cur.lead_id) } }
       else { const o = OUTCOMES.find((x) => x.key === e.key); if (o) void k.log(o) }
     }
     window.addEventListener('keydown', onKey)
@@ -305,7 +309,7 @@ export function PowerDial({ caller }: { caller: string }) {
                   {o.label}<span className="ml-1 hidden text-xs text-muted-foreground sm:inline">({o.key})</span>
                 </Button>
               ))}
-              <Button className="h-12" disabled={busy} onClick={() => { update((s) => ({ ...s, reached: s.reached + 1 })); setTalking(cur.lead_id); setPin(cur.lead_id) }}>
+              <Button className="h-12" disabled={busy} onClick={() => { update((s) => ({ ...s, reached: s.reached + 1 })); setTalking(cur.lead_id); pinItem.current = cur; setPin(cur.lead_id) }}>
                 We talked: script<span className="ml-1 hidden text-xs sm:inline">(5)</span>
               </Button>
               <Button variant="ghost" className="h-12" disabled={live} onClick={skip}>Skip<span className="ml-1 hidden text-xs text-muted-foreground sm:inline">(S)</span></Button>
