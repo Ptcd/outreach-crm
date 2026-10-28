@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { fmtDateTime, isoToLocalInput, localInputToIso } from '@/lib/format'
 import { useAuth } from '@/providers/AuthProvider'
 import { api } from '@/lib/queries'
+import { useOnPhone, workerFor } from '@/lib/onPhone'
 import { NEXT_STEP, callScript, packageFromCall } from '@/lib/callScript'
 import type { Lead } from '@/lib/types'
 
@@ -236,6 +237,10 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
 }
 
 function SendPackage({ lead, last, onDone }: { lead: Lead; last: Pkg | null; onDone: () => void }) {
+  const { member } = useAuth()
+  const [picked] = useOnPhone()
+  // the shared login is Colin's: the callback goes on the list of whoever this phone says is working it (0116)
+  const caller = workerFor(member, picked)
   const fromCall = packageFromCall((lead.call_facts ?? {}) as never, CALL_LABELS)
   const [openForm, setOpen] = useState(false)
   const [f, setF] = useState<Record<string, string>>(() => Object.fromEntries(Object.entries(fromCall.fields).filter(([, v]) => v)))
@@ -254,7 +259,7 @@ function SendPackage({ lead, last, onDone }: { lead: Lead; last: Pkg | null; onD
   const send = async () => {
     setBusy(true); setErr(null)
     const condition = Object.fromEntries(Object.entries(cond).filter(([, v]) => v.trim()))
-    const r = await supabase.rpc('package_submit', { p: { lead_id: lead.id, interest_id: interest || null, source: source || null, hot,
+    const r = await supabase.rpc('package_submit', { p: { lead_id: lead.id, interest_id: interest || null, source: source || null, hot, caller,
       walk_booked_on_call: walk, callback_at: walk ? null : localInputToIso(cb), condition, ...f } })
     setBusy(false)
     if (r.error) { setErr(r.error.message); return }

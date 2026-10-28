@@ -131,6 +131,18 @@ describe('the package', () => {
     expect(await open()).toEqual([])
   })
 
+  it("Thalia on Colin's login: the callback goes on the list of the person picked on the phone (0116)", async () => {
+    const lead = (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'SHARED LOGIN', owner_type: 'individual',
+      address: '26 Package Test St', phones: ['4145562206'] })])).lead_id as string
+    await as(COLIN, () => r(`public.package_submit($1::jsonb)`, [JSON.stringify({ lead_id: lead, need: 'moving', caller: 'thalia', callback_at: '2030-01-08T19:00:00Z' })]))
+    expect((await db.query(`select owner::text from public.tasks where lead_id = $1 and kind = 'callback'`, [lead])).rows).toEqual([{ owner: 'thalia' }])
+    // a caller with her own login cannot file one as someone else
+    const lead2 = (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'OWN LOGIN', owner_type: 'individual',
+      address: '27 Package Test St', phones: ['4145562207'] })])).lead_id as string
+    await as(THALIA, () => r(`public.package_submit($1::jsonb)`, [JSON.stringify({ lead_id: lead2, need: 'moving', caller: 'colin', callback_at: '2030-01-08T19:00:00Z' })]))
+    expect((await db.query(`select owner::text from public.tasks where lead_id = $1 and kind = 'callback'`, [lead2])).rows).toEqual([{ owner: 'thalia' }])
+  })
+
   it('the door: Muse lists packages to value and writes the value, never a number', async () => {
     const calls: [string, Record<string, unknown>][] = []
     const db2 = { records: async (fn: string, args: Record<string, unknown>) => { calls.push([fn, args]); return { ok: true } } } as unknown as DoorDb
