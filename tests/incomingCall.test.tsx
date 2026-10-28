@@ -43,7 +43,7 @@ describe('a call coming in', () => {
   })
 
   it('names the matched owner and property while ringing; Accept opens the card with the call script', async () => {
-    dialer.incoming = { from: '+14145550101', line: '+12624180202', matches: [jane], lookupError: null }
+    dialer.incoming = { from: '+14145550101', line: '+12624180202', matches: [jane], lookupError: null, busy: false }
     dialer.accept.mockResolvedValue({ leadId: 'L1', phone: '4145550101' })
     mount(<IncomingCallBar />)
     const bar = screen.getByRole('alert')
@@ -56,16 +56,26 @@ describe('a call coming in', () => {
   })
 
   it('says it is still looking, then that a stranger is calling; Decline only rejects here', () => {
-    dialer.incoming = { from: '+14145550199', line: null, matches: null, lookupError: null }
+    dialer.incoming = { from: '+14145550199', line: null, matches: null, lookupError: null, busy: false }
     const r = mount(<IncomingCallBar />)
     expect(screen.getByRole('alert').textContent).toContain('Looking them up...')
     r.unmount()
-    dialer.incoming = { from: '+14145550199', line: null, matches: [], lookupError: null }
+    dialer.incoming = { from: '+14145550199', line: null, matches: [], lookupError: null, busy: false }
     mount(<IncomingCallBar />)
     expect(screen.getByRole('alert').textContent).toContain('Not in the list - a new caller')
     fireEvent.click(screen.getByRole('button', { name: 'Decline' }))
     expect(dialer.decline).toHaveBeenCalledTimes(1)
     expect(dialer.accept).not.toHaveBeenCalled()
+  })
+
+  it('rings in while she is on a call: says so, and Accept reads "Hang up and answer" (2026-10-28)', () => {
+    dialer.active = { status: 'in_call', to: '4145550101', label: 'JANE ROE', leadId: 'L9', startedAt: Date.now(), muted: false,
+      error: null, answered: true, inbound: false, line: null }
+    dialer.incoming = { from: '+14145550101', line: '+12624180202', matches: [jane], lookupError: null, busy: true }
+    mount(<IncomingCallBar />)
+    expect(screen.getByRole('alert').textContent).toContain('while you are on a call: take it')
+    expect(screen.getByRole('button', { name: 'Hang up and answer' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Let it go to Colin' })).toBeTruthy()
   })
 
   it('a stranger on the line gets a New caller card from the in-call bar, which opens with the script', async () => {

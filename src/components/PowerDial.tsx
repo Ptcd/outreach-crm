@@ -49,7 +49,7 @@ const OUTCOMES = [
 
 export function PowerDial({ caller }: { caller: string }) {
   const qc = useQueryClient()
-  const { active, start, dismiss, hangUp, supported } = useDialer()
+  const { active, incoming, start, dismiss, hangUp, supported } = useDialer()
   const q = useQuery({
     queryKey: ['power_dial'], staleTime: Infinity, refetchOnWindowFocus: false,
     queryFn: async () => {
@@ -67,6 +67,7 @@ export function PowerDial({ caller }: { caller: string }) {
   const [ringLimit, setRingLimit] = useState(true)
   const RING_SECONDS = 22
   const pendingNoAnswer = useRef<string | null>(null)
+  const noAnswerNote = useRef<string | null>(null)
   const [countdown, setCountdown] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -83,13 +84,13 @@ export function PowerDial({ caller }: { caller: string }) {
   const vars: Record<string, string> = cur ? { first_name: firstName(cur.owner_name) || 'there', street: street(cur.address) } : { first_name: 'there', street: 'the property' }
 
   const dial = useCallback(() => {
-    if (!cur || !supported || live || (active && ['connecting', 'ringing', 'in_call'].includes(active.status))) return
+    if (!cur || !supported || live || incoming || (active && ['connecting', 'ringing', 'in_call'].includes(active.status))) return
     setErr(null)
     setCountdown(null)
     if (active) dismiss()
     update((s) => ({ ...s, dials: s.dials + 1, started: s.started ?? Date.now() }))
     void start({ to: cur.phone, label: `${title(cur.owner_name)} - ${street(cur.address)}`, leadId: cur.lead_id, contactId: null, quiet: true })
-  }, [cur, supported, live, active, dismiss, start, update])
+  }, [cur, supported, live, incoming, active, dismiss, start, update])
 
   const next = useCallback((id: string, logged: boolean) => {
     update((s) => ({ ...s, done: [...s.done, id] }))
@@ -132,9 +133,24 @@ export function PowerDial({ caller }: { caller: string }) {
     if (!cur || !onThis || !active || pendingNoAnswer.current !== cur.lead_id) return
     if (active.status === 'ended' || active.status === 'error') {
       pendingNoAnswer.current = null
-      void log({ ...OUTCOMES[0], note: `No answer: rang ${RING_SECONDS} s, hung up (Power hour).` })
+      const note = noAnswerNote.current ?? `No answer: rang ${RING_SECONDS} s, hung up (Power hour).`
+      noAnswerNote.current = null
+      void log({ ...OUTCOMES[0], note })
     }
   }, [cur, onThis, active, log])
+
+  // a seller calling in comes first (Colin 2026-10-28): auto-dial stops, and a call still only ringing out is dropped
+  // and logged as no answer, so the bar at the top can take theirs. A conversation already going is hers to end
+  // ("Hang up and answer" on that bar); its card stays here, unlogged, for after.
+  useEffect(() => {
+    if (!incoming) return
+    setCountdown(null)
+    if (cur && onThis && active && (active.status === 'connecting' || active.status === 'ringing')) {
+      pendingNoAnswer.current = cur.lead_id
+      noAnswerNote.current = 'No answer: hung up while ringing to take a call coming in (Power hour).'
+      hangUp()
+    }
+  }, [incoming, cur, onThis, active, hangUp])
 
   // auto-dial: 2, 1, dial (any key or Cancel stops it)
   useEffect(() => {
@@ -145,8 +161,8 @@ export function PowerDial({ caller }: { caller: string }) {
   }, [countdown, dial])
 
   // keys on a computer: D / Enter dial, 1-4 outcomes, 5 we talked, S skip, Esc cancels auto-dial
-  const keys = useRef({ dial, log, skip, cur, live })
-  keys.current = { dial, log, skip, cur, live }
+  const keys = useRef({ dial, log, skip, cur, live, incoming: !!incoming })
+  keys.current = { dial, log, skip, cur, live, incoming: !!incoming }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
@@ -157,7 +173,7 @@ export function PowerDial({ caller }: { caller: string }) {
       const k = keys.current
       if (e.key === 'Escape') { setCountdown(null); return }
       if ((e.key === 'h' || e.key === 'H') && k.live) { hangUp(); return }
-      if (talking) return
+      if (talking || k.incoming) return   // a call coming in: the keys wait for the bar at the top
       if (e.key === 'd' || e.key === 'D' || e.key === 'Enter') { e.preventDefault(); k.dial() }
       else if (e.key === 's' || e.key === 'S') k.skip()
       else if (e.key === '5' && k.cur && !k.live) { if (k.cur) { update((s) => ({ ...s, reached: s.reached + 1 })); setTalking(k.cur.lead_id) } }
@@ -179,6 +195,7 @@ export function PowerDial({ caller }: { caller: string }) {
         <label className="flex items-center gap-1.5"><input type="checkbox" checked={ringLimit} onChange={(e) => setRingLimit(e.target.checked)} /> Hang up after 5 rings</label>
       </div>
       <ErrorNote error={q.error} />
+      {incoming && <p role="status" className="rounded-lg border-2 border-emerald-400 bg-emerald-50 p-2 text-sm font-medium dark:bg-emerald-950/30">A seller is calling in: take it at the top of the screen. Power hour waits; their card opens when you answer.</p>}
       {q.isLoading && <Empty>Loading the calls...</Empty>}
       {!q.isLoading && !cur && <Empty>Nobody left to dial right now. <Button variant="link" onClick={() => void q.refetch()}>Check again</Button></Empty>}
       {cur && (

@@ -13,6 +13,10 @@
 // it). The caller's number is looked up on the call desk (phone_lookup) while it rings, so the bar names the
 // owner and property; Accept runs the call in the same in-call bar, opens the lead card, and marks the hot
 // alert as called. Only an app that is open on screen rings; otherwise the cell rings as before.
+//
+// A seller calling in while the caller is already on a call (Colin 2026-10-28: "if our inbound phone rings when she's
+// calling out she should take that call"): it shows too (busy), with a short ring in the headset. Accept ends the
+// call she is on and takes theirs; Power hour drops a call that is still only ringing out on its own.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabaseClient'
@@ -47,6 +51,7 @@ export interface IncomingCall {
   line: string | null
   matches: PhoneMatch[] | null
   lookupError: string | null
+  busy: boolean          // she was on a call when it rang: Accept ends that call
 }
 
 interface DialerApi {
@@ -116,12 +121,16 @@ export function DialerProvider({ children }: { children: ReactNode }) {
 
   // A seller calling in: hold the call, look the number up, and let the bar ask Accept / Decline.
   const onIncoming = useCallback((call: TwilioCall) => {
-    if (callRef.current || incomingRef.current) { call.reject(); return }   // already on a call
+    if (incomingRef.current) { call.reject(); return }   // one ringing in at a time
     incomingRef.current = call
+    const busy = !!callRef.current
+    if (busy) {   // Twilio stays quiet when a call is up: one short ring in her headset instead
+      try { void new Audio('/sounds/ring.wav').play().catch(() => undefined) } catch { /* no audio here */ }
+    }
     const from = call.parameters.From ?? ''
     const line = call.customParameters.get('line') ?? null
     const digits = callerDigits(from)
-    setIncoming({ from, line, matches: null, lookupError: null })
+    setIncoming({ from, line, matches: null, lookupError: null, busy })
     const lookup: Promise<PhoneMatch[]> = (async () => {
       if (!digits) return []
       const r = await supabase.rpc('phone_lookup', { p_digits: digits })
@@ -150,7 +159,8 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     const { Device } = await import('@twilio/voice-sdk')
     // our own ring for incoming calls (Colin 2026-10-27: "change the phone ringing tone"): a desk-phone double ring,
     // public/sounds/ring.wav, in place of Twilio's default
-    const dev = new Device(d.token, { closeProtection: true, logLevel: 'error', sounds: { incoming: '/sounds/ring.wav' } as never })
+    // allowIncomingWhileBusy: a seller calling in while she is on a call still shows (Twilio's default ignores it)
+    const dev = new Device(d.token, { closeProtection: true, logLevel: 'error', allowIncomingWhileBusy: true, sounds: { incoming: '/sounds/ring.wav' } as never })
     dev.on('tokenWillExpire', async () => {
       const rr = await supabase.functions.invoke('voice-token')
       const dd = rr.data as { token?: string } | null
@@ -233,10 +243,12 @@ export function DialerProvider({ children }: { children: ReactNode }) {
       })
       const key = takeoverKey
       const ended = () => releaseIfUnclaimed(leadId, key)
-      call.on('disconnect', () => { finish('ended', null); ended() })
-      call.on('cancel', () => { finish('ended', null); ended() })
-      call.on('reject', () => { finish('ended', 'They declined the call.'); ended() })
-      call.on('error', (e: { message?: string }) => { finish('error', e?.message ?? 'Call failed'); ended() })
+      // a call she ended to take one ringing in no longer owns the bar: only its card is released
+      const mine = () => callRef.current === call
+      call.on('disconnect', () => { if (mine()) finish('ended', null); ended() })
+      call.on('cancel', () => { if (mine()) finish('ended', null); ended() })
+      call.on('reject', () => { if (mine()) finish('ended', 'They declined the call.'); ended() })
+      call.on('error', (e: { message?: string }) => { if (mine()) finish('error', e?.message ?? 'Call failed'); ended() })
     } catch (e) {
       // Authorized but the call failed: released if pm-phone never claimed it (nobody rang); a claimed
       // call stays paused for its outcome, with "call did not happen — resume" on the card.
@@ -257,6 +269,8 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     const from = call.parameters.From ?? ''
     const line = call.customParameters.get('line') ?? null
     const digits = callerDigits(from)
+    const was = callRef.current   // the call she was on: it ends, theirs is answered
+    if (was && was !== call) { callRef.current = null; was.disconnect() }
     answeredRef.current = true
     callRef.current = call
     setIncoming(null)

@@ -16,16 +16,16 @@ const items = [
 const logCall = vi.fn(async () => ({ data: { ok: true }, error: null }))
 const start = vi.fn(async () => undefined)
 const hangUp = vi.fn()
-const dialer: { active: null | { status: string; leadId: string; to: string } } = { active: null }
+const dialer: { active: null | { status: string; leadId: string; to: string }; incoming: null | { from: string; busy: boolean } } = { active: null, incoming: null }
 vi.mock('@/lib/supabaseClient', () => ({ supabase: { rpc: vi.fn(async () => ({ data: items, error: null })) }, supabaseConfigured: true }))
 vi.mock('@/lib/queries', () => ({ api: { logCall: (...a: unknown[]) => logCall(...(a as [])) }, useLead: () => ({ isLoading: true }) }))
-vi.mock('@/lib/dialer', () => ({ useDialer: () => ({ active: dialer.active, start, dismiss: vi.fn(), hangUp, supported: true }) }))
+vi.mock('@/lib/dialer', () => ({ useDialer: () => ({ active: dialer.active, incoming: dialer.incoming, start, dismiss: vi.fn(), hangUp, supported: true }) }))
 vi.mock('@/components/CallScript', () => ({ CallScript: () => null, pickupLine: (c: string) => `Hi, this is ${c}` }))
 
 import { PowerDial } from '@/components/PowerDial'
 
 const wrap = () => render(<QueryClientProvider client={new QueryClient()}><PowerDial caller="thalia" /></QueryClientProvider>)
-afterEach(() => { cleanup(); localStorage.clear(); logCall.mockClear(); start.mockClear(); hangUp.mockClear(); dialer.active = null; vi.useRealTimers() })
+afterEach(() => { cleanup(); localStorage.clear(); logCall.mockClear(); start.mockClear(); hangUp.mockClear(); dialer.active = null; dialer.incoming = null; vi.useRealTimers() })
 
 describe('Power hour', () => {
   it('dials the card quietly, logs a voicemail in one tap, and brings the next card', async () => {
@@ -61,5 +61,23 @@ describe('Power hour', () => {
     view.rerender(<QueryClientProvider client={new QueryClient()}><PowerDial caller="thalia" /></QueryClientProvider>)
     vi.useRealTimers()
     await waitFor(() => expect(logCall).toHaveBeenCalledWith('L1', '4145550101', 'no_answer', 'No answer: rang 22 s, hung up (Power hour).', null))
+  })
+
+  it('a seller calling in while a call is still ringing out: drops that call, logs it no answer, and waits (2026-10-28)', async () => {
+    const view = wrap()
+    await screen.findByText('Jane Q Sample')
+    const again = () => view.rerender(<QueryClientProvider client={new QueryClient()}><PowerDial caller="thalia" /></QueryClientProvider>)
+    dialer.active = { status: 'ringing', leadId: 'L1', to: '4145550101' }
+    again()
+    dialer.incoming = { from: '+14145550199', busy: true }
+    again()
+    expect(hangUp).toHaveBeenCalledTimes(1)
+    expect(screen.getByText(/A seller is calling in/)).toBeTruthy()
+    dialer.active = { status: 'ended', leadId: 'L1', to: '4145550101' }
+    again()
+    await waitFor(() => expect(logCall).toHaveBeenCalledWith('L1', '4145550101', 'no_answer', 'No answer: hung up while ringing to take a call coming in (Power hour).', null))
+    // the keys wait while it rings: D does not dial the next card
+    fireEvent.keyDown(window, { key: 'd' })
+    expect(start).not.toHaveBeenCalled()
   })
 })
