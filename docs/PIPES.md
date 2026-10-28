@@ -70,6 +70,29 @@ First live run: 1,832 vacant registrations (1,770 on today's list), all on stage
 permit rows, 13,936 matched to a parcel by address, 103 on cards. With no map loaded, nothing in the City of
 Milwaukee is queued yet. About 1,200 vacant-building parcels pass every other gate (1,113 new, 109 stacks).
 
+## Phase 1, updated spec: Milwaukee delinquent tax and sheriff sales (live 2026-10-28, migration 0109)
+
+Same nightly step (`python -m wpie.pipes.signals`; readers in WPIE `wpie/pipes/milwaukee_signals.py`).
+
+- **Delinquent tax** (`mke.delqtax`): published from WPIE's own monthly collection of the city's Delinquent Real Estate
+  Tax Accounts file. One signal per tax key. `tax_years` = distinct unpaid levy years on the latest file, so the
+  2+ year rule reads the file's own depth. First run: 12,219 parcels (3,315 with 2+ years, 7,366 with one), 467 on cards.
+- **Sheriff sales** (`mkco.sheriff_sales`): Milwaukee County's Foreclosed_Parcels layer, one query a day. One signal
+  per case number (25CV… and 2025CV… are the same case), never per date. WPIE's 14-day rule applies:
+  - A sale qualifies only while scheduled 14+ days out.
+  - A scheduled sale inside 14 days, or already past, blocks the parcel even when it has other distress (`sheriff_sale_inside_14_days_or_past`).
+  - A sale sold in the last year blocks it (`sheriff_sale_sold`).
+  - When an adjournment moves the date, the sale counts as new again (`pipe_queue.signal_marks`).
+
+  First run: 345 cases (302 sold, 40 scheduled but all past-dated, 3 cancelled), **none scheduled 14+ days out**.
+  The layer's newest sale date is 2026-10-05, and its own update stamp is 2026-08-06, so it is behind the county's list.
+- **MPROP's TAX_DELQ / BI_VIOL / RAZE_STATUS** are not signals. On 2026-10-28 they were still one value on all
+  159,950 rows ('99999', 'XXXX', '9'). Each MPROP run records their values in `pipe_runs.counts.masked_flag_columns`
+  and prints a note if they ever vary.
+
+With every Milwaukee signal staged, about 3,600 city parcels pass every gate except the map (3,289 new, 315 stacks).
+That many items open the first night after Muse loads it, minus what the polygon excludes or holds.
+
 ## Not built yet
 
 2 statewide V12, 3 county ArcGIS registry, 4 CourtListener + DOR.

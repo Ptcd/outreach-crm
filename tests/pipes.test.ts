@@ -186,6 +186,41 @@ describe('pipes 1b: vacant buildings and permits as signals', () => {
   })
 })
 
+describe('pipes: Milwaukee delinquent tax and sheriff sales (the 14-day rule)', () => {
+  const day = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10)
+  const sale = (pid: string, date: string, o: J = {}) => ({ source_record_id: o.case ?? '2026CV00' + pid.slice(-4), kind: 'sheriff_sale', county: 'Milwaukee',
+    parcel_id: pid, address: '1 S Test St', municipality: 'Milwaukee', signal_date: date, active: o.active ?? true, detail: { status: o.status ?? 'scheduled' } })
+  const tax = (pid: string, years: number[]) => ({ source_record_id: pid, kind: 'tax_delinquent', county: 'Milwaukee', parcel_id: pid,
+    address: '1 S Test St', municipality: 'Milwaukee', signal_date: `${years[0]}-12-31`, tax_years: years.length, active: true, detail: { levy_years: years } })
+
+  it("tax: the file's own depth decides; one unpaid year does not qualify, two do", async () => {
+    await load([parcel('4800000001'), parcel('4800000002')])
+    await r(`public.pipe_upsert_signals('mke.delqtax', $1::jsonb)`, [JSON.stringify([tax('4800000001', [2025]), tax('4800000002', [2024, 2025])])])
+    expect(await screen('4800000001')).toMatchObject({ fails: ['tax_under_2_years'], item: null })
+    expect(await screen('4800000002')).toMatchObject({ pass: true, item_kind: 'new' })
+  })
+
+  it('a sale 14+ days out qualifies; inside 14 days or past blocks the parcel even with other distress; an adjournment brings it back', async () => {
+    await load([parcel('4900000001'), parcel('4900000002'), parcel('4900000003'), parcel('4900000004')])
+    await signal('v49', '4900000002')                                                     // vacant too: still blocked
+    await r(`public.pipe_upsert_signals('mkco.sheriff_sales', $1::jsonb)`, [JSON.stringify([sale('4900000001', day(30)), sale('4900000002', day(5), { active: false }),
+      sale('4900000003', day(-20), { active: false }), sale('4900000004', day(-100), { status: 'sold', active: false })])])
+    expect(await screen('4900000001')).toMatchObject({ pass: true, item_kind: 'new', item_state: 'open' })
+    expect(await screen('4900000002')).toMatchObject({ fails: ['sheriff_sale_inside_14_days_or_past'], item: null })
+    expect(await screen('4900000003')).toMatchObject({ fails: ['no_distress', 'sheriff_sale_inside_14_days_or_past'], item: null })
+    expect(await screen('4900000004')).toMatchObject({ fails: ['no_distress', 'sheriff_sale_sold'] })
+    // the date drifts inside the window: the unclaimed item closes itself
+    await r(`public.pipe_upsert_signals('mkco.sheriff_sales', $1::jsonb)`, [JSON.stringify([sale('4900000001', day(10), { active: false })])])
+    expect(await screen('4900000001')).toMatchObject({ item_state: 'killed', fails: ['no_distress', 'sheriff_sale_inside_14_days_or_past'] })
+    // adjourned: same case, a new date 40 days out -> a new item (dedupe on the case, re-test the new date)
+    await r(`public.pipe_upsert_signals('mkco.sheriff_sales', $1::jsonb)`, [JSON.stringify([sale('4900000001', day(40))])])
+    expect(await rows(`select count(*)::int n from public.pipe_signals where source = 'mkco.sheriff_sales' and parcel_id = '4900000001'`)).toEqual([{ n: 1 }])
+    expect(await screen('4900000001')).toMatchObject({ pass: true, item_kind: 'new', item_state: 'open' })
+    expect(await screen('4900000001')).toMatchObject({ item_state: 'open' })               // and only once
+    expect(await rows(`select state from public.pipe_queue where parcel_id = '4900000001' order by created_at`)).toEqual([{ state: 'killed' }, { state: 'open' }])
+  })
+})
+
 const MUSE: Agent = { id: 'k1', name: 'Muse', role: 'agent' }
 const LANE2: Agent = { id: 'k2', name: 'Muse lane 2', role: 'agent' }
 function doorDb(): DoorDb {
