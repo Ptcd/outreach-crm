@@ -105,8 +105,6 @@ export default function LeadDetail() {
       {(lead.belt === 'visit_booked' || lead.stage === 'walkthrough_booked') && (
         <AppointmentPacket lead={lead} callFacts={callFacts} replyFacts={facts} latestGate={gates[0] ?? null} />
       )}
-      <NextAction lead={lead} />
-      <SellerSaid facts={facts} />
       <Section title={`Tasks (${replyTasks.length})`}>
         <p className="mb-2 text-sm text-muted-foreground">Things the seller asked for that a text can&apos;t do. Adil by default.</p>
         {replyTasks.length === 0 && <Empty>No open tasks.</Empty>}
@@ -115,6 +113,18 @@ export default function LeadDetail() {
         </ul>
         <EmailAction leadId={lead.id} to={email} ownerName={lead.owner_name} address={lead.property_address} />
       </Section>
+      <Tasks leadId={lead.id} tasks={tasks.filter((t) => t.source !== 'reply')} />
+      <Contacts contacts={contacts} leadId={lead.id} lead={lead} />
+      {isOwner && <ContractBlock lead={lead} contacts={contacts} />}
+      {isOwner && <DealBlock leadId={lead.id} />}
+      <Notes lead={lead} />
+      {/* older tools nobody uses day to day, folded away (Colin 2026-10-28: "theres old stuff on the card that we don't use");
+          nothing is removed, and the package, not a score, decides what reaches Colin */}
+      <details className="rounded-lg border p-3">
+        <summary className="cursor-pointer font-medium">More: the stage box, the visit score, checkpoints, record facts</summary>
+        <div className="mt-3 space-y-4">
+      <NextAction lead={lead} />
+      <SellerSaid facts={facts} />
       <Section title="Book the visit?">
         <p className="mb-2 text-sm text-muted-foreground">The card decides from the call&apos;s answers: a reason with a date behind it, every signer lined up, a number they&apos;d hear under or one resting on a need, who lives there and what&apos;s wrong, no hard stop.</p>
         <VerdictBox v={verdict} />
@@ -126,13 +136,10 @@ export default function LeadDetail() {
           </div>
         </details>
       </Section>
-      <Tasks leadId={lead.id} tasks={tasks.filter((t) => t.source !== 'reply')} />
-      <Contacts contacts={contacts} leadId={lead.id} lead={lead} />
-      <Facts lead={lead} />
       <Milestones leadId={lead.id} done={milestones} />
-      {isOwner && <ContractBlock lead={lead} contacts={contacts} />}
-      {isOwner && <DealBlock leadId={lead.id} />}
-      <Notes lead={lead} />
+      <Facts lead={lead} />
+        </div>
+      </details>
     </div>
   )
 }
