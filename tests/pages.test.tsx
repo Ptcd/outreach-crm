@@ -189,7 +189,8 @@ describe('pages render', () => {
     expect(screen.getByText(/Calling from/)).toBeTruthy()
     expect(screen.getByText('What we already know')).toBeTruthy()
     expect(screen.getByText(/Are you still the owner of 100 N Main St\?/)).toBeTruthy()   // open question: words to say
-    expect(screen.getByText('This is Colin.', { exact: false })).toBeTruthy()
+    // we usually make the call: Colin opens like any caller, in his own name (Muse 2026-10-28)
+    expect(screen.getAllByText(/This is Colin, I'm calling about/).length).toBeGreaterThan(0)
     expect(screen.getByText(/If they say\.\.\. \(24 answers\)/)).toBeTruthy()
     // The card has not decided yet (only the reason is in), so the close is held back: no Walk-through to tap.
     expect(screen.getAllByText('Not decided yet').length).toBeGreaterThan(0)

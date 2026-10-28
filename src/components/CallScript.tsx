@@ -429,11 +429,10 @@ const CALL_KIND_LABEL: Record<CallKind, string> = { hot_text: 'They texted us', 
 /** The first words on a call (docs/THALIA_TRAINING.md): the caller's own name, the street, and the question that fits. */
 // eslint-disable-next-line react-refresh/only-export-components
 export function pickupLine(caller: string, kind: CallKind = 'cold', vars: Record<string, string> = {}): string {
-  if (caller === 'colin') return PHONE_SCRIPT.pickup
+  // the openers live in the script (phoneScript.json "openers", twin of WPIE docs/phone_script.json): every caller, Colin
+  // included, says their own name; we usually make the call, so "they called us" is only for a call that just came in
   const name = caller.charAt(0).toUpperCase() + caller.slice(1)
-  const street = vars.street ?? 'the property'
-  const first = vars.first_name && vars.first_name !== 'there' ? vars.first_name : null
-  if (kind === 'inbound') return `Hi, this is ${name}. Is this about ${street}?`
-  if (kind === 'hot_text') return `Hi, is this ${first ?? 'the owner'}? This is ${name}, I'm calling about ${street}. You were texting with us about it. Did I catch you at an OK time?`
-  return `Hi, is this ${first ?? 'the owner'}? This is ${name}, I'm calling about ${street}. Are you still the owner there?`
+  const first = vars.first_name && vars.first_name !== 'there' ? vars.first_name : 'the owner'
+  const line = (PHONE_SCRIPT as unknown as { openers: Record<CallKind, string> }).openers[kind]
+  return line.replace(/\{caller\}/g, name).replace(/\{first_name\}/g, first).replace(/\{street\}/g, vars.street ?? 'the property')
 }

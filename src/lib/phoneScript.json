@@ -616,5 +616,11 @@
     "6skljsgwR9I",
     "8ytg80KoTF0",
     "UPQcjExAKTU"
-  ]
+  ],
+  "openers": {
+    "cold": "Hi, is this {first_name}? This is {caller}, I'm calling about {street}. Are you still the owner there?",
+    "hot_text": "Hi, is this {first_name}? This is {caller}, I'm calling about {street}. You were texting with us about it. Did I catch you at an OK time?",
+    "inbound": "Hi, this is {caller}. Is this about {street}?"
+  },
+  "openers_note": "We call them (cold, or after they texted) far more often than they call us. Every caller uses their own name; Colin is \"my partner\" (when Colin calls, he is the caller and says his own name). Inbound only when they called our line in the last few hours."
 }
