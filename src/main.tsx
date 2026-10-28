@@ -7,6 +7,10 @@ import { DialerProvider } from '@/lib/dialer'
 import './index.css'
 import App from './App.tsx'
 import { keepAppCurrent } from '@/lib/appUpdate'
+import { applyTheme, getTheme } from '@/lib/theme'
+
+// light or dark, chosen on this browser, before the first paint
+applyTheme(getTheme())
 
 // Installable app + "reply needs you" notifications (public/sw.js).
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

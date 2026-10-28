@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
-/* Light only for now (Colin 2026-10-21: in phone dark mode text became unreadable). `dark:`
-   classes apply only under a .dark class, which nothing sets; the theme below stays light. */
+/* Light by default; dark only when someone picks it with the moon button (Colin 2026-10-28). It never follows the
+   phone's setting: that is what made text unreadable on 2026-10-21. `dark:` classes apply under the .dark class on <html>. */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* shadcn/ui theme tokens for Tailwind v4 */
@@ -56,8 +56,7 @@
   --shadow-lift: 0 4px 10px -2px rgb(16 24 40 / 0.08), 0 2px 4px -2px rgb(16 24 40 / 0.05);
 }
 
-/* Dark mode follows the phone's setting. */
-/* Dark theme tokens, kept for a later proper dark pass; only under .dark (never set today). */
+/* Dark theme tokens: under .dark, set by the moon button (src/lib/theme.ts). */
 .dark {
   & {
     --background: 222 47% 7%;
@@ -82,6 +81,27 @@
   }
   color-scheme: dark;
 }
+
+/* Dark mode, made safe (2026-10-28): the app has light tinted boxes and dark text colors written straight into the pages
+   (amber "needs you" boxes, green "done" notes, red warnings). Under .dark each becomes a dim tint of the same hue with
+   light text, so nothing reads dark-on-dark. Unlayered on purpose: it wins over the pages' own utility classes. */
+.dark body { background-image: radial-gradient(1200px 400px at 50% -120px, hsl(245 60% 22% / 0.55), transparent 70%); }
+.dark .bg-white { background-color: hsl(var(--card)); }
+.dark .bg-background { background-color: hsl(var(--background)); }
+.dark .bg-amber-50, .dark .bg-amber-100, .dark .bg-yellow-50 { background-color: rgb(245 158 11 / 0.14); }
+.dark .bg-red-50, .dark .bg-red-100, .dark .bg-rose-50 { background-color: rgb(239 68 68 / 0.14); }
+.dark .bg-emerald-50, .dark .bg-emerald-100, .dark .bg-green-50 { background-color: rgb(16 185 129 / 0.14); }
+.dark .bg-sky-50, .dark .bg-blue-50, .dark .bg-indigo-50, .dark .bg-violet-50 { background-color: rgb(56 189 248 / 0.12); }
+.dark .bg-slate-50, .dark .bg-gray-50, .dark .bg-slate-100, .dark .bg-gray-100 { background-color: hsl(var(--muted)); }
+.dark .text-amber-700, .dark .text-amber-800, .dark .text-amber-900, .dark .text-amber-950 { color: rgb(252 211 77); }
+.dark .text-red-600, .dark .text-red-700, .dark .text-red-800, .dark .text-red-900, .dark .text-rose-600, .dark .text-rose-700, .dark .text-rose-800 { color: rgb(252 165 165); }
+.dark .text-emerald-600, .dark .text-emerald-700, .dark .text-emerald-800, .dark .text-emerald-900 { color: rgb(110 231 183); }
+.dark .text-sky-600, .dark .text-blue-950, .dark .text-indigo-600, .dark .text-indigo-700, .dark .text-violet-600 { color: rgb(147 197 253); }
+.dark .border-amber-200, .dark .border-amber-300 { border-color: rgb(245 158 11 / 0.45); }
+.dark .border-red-300, .dark .border-red-400 { border-color: rgb(239 68 68 / 0.5); }
+.dark .border-emerald-200, .dark .border-emerald-300, .dark .border-emerald-400 { border-color: rgb(16 185 129 / 0.5); }
+.dark .border-sky-200, .dark .border-sky-300, .dark .border-sky-400, .dark .border-blue-200 { border-color: rgb(56 189 248 / 0.45); }
+.dark .ring-emerald-200 { --tw-ring-color: rgb(16 185 129 / 0.4); }
 
 @layer base {
   * { @apply border-border; }

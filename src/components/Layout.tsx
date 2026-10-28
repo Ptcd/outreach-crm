@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
-import { BarChart3, CalendarCheck, Flame, Home, Inbox, ListChecks, LogOut, MessageSquareText, PhoneCall, Settings as SettingsIcon } from 'lucide-react'
+import { BarChart3, CalendarCheck, Flame, Home, Inbox, ListChecks, LogOut, MessageSquareText, Moon, PhoneCall, Settings as SettingsIcon, Sun } from 'lucide-react'
+import { useTheme } from '@/lib/theme'
 import { useAuth } from '@/providers/AuthProvider'
 import { useRepliesWaiting } from '@/lib/queries'
 import { OfflineBanner } from '@/components/OfflineBanner'
@@ -66,6 +67,7 @@ export function Layout({ children }: { children: ReactNode }) {
             )}
             {member?.role === 'caller' && <span className="hidden text-muted-foreground sm:inline">{member?.display_name}</span>}
             <OnPhoneSwitch />
+            <ThemeButton />
             <NavLink to="/settings" aria-label="Settings" title="Settings: your alert email and phone, notifications"
               className={({ isActive }) => cn('flex h-10 w-10 items-center justify-center rounded-xl transition-colors', isActive ? 'bg-accent text-primary' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground')}>
               <SettingsIcon className="h-5 w-5" aria-hidden />
@@ -103,5 +105,18 @@ export function Layout({ children }: { children: ReactNode }) {
         ))}
       </nav>
     </div>
+  )
+}
+
+/** Light / dark, per browser (Colin 2026-10-28). */
+function ThemeButton() {
+  const [theme, setTheme] = useTheme()
+  const dark = theme === 'dark'
+  return (
+    <button type="button" onClick={() => setTheme(dark ? 'light' : 'dark')} aria-pressed={dark}
+      aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'} title={dark ? 'Light mode' : 'Dark mode'}
+      className="flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground">
+      {dark ? <Sun className="h-5 w-5" aria-hidden /> : <Moon className="h-5 w-5" aria-hidden />}
+    </button>
   )
 }
