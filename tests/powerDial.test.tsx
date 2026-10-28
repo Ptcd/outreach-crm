@@ -125,5 +125,12 @@ describe('Power hour', () => {
     expect(screen.getByText('who is this')).toBeTruthy()
     expect(screen.getByText(/Hi, is this still your place on Sample St/)).toBeTruthy()
   })
+
+  it('Disconnected (key 6) logs that number as disconnected; a call the network refused offers it (2026-10-28)', async () => {
+    wrap()
+    await screen.findByText('Jane Q Sample')
+    fireEvent.keyDown(window, { key: '6' })
+    await waitFor(() => expect(logCall).toHaveBeenCalledWith('L1', '4145550101', 'disconnected', 'Disconnected number (Power hour).', null))
+  })
 })
 

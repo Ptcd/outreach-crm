@@ -98,13 +98,14 @@ export function scriptLine(l: Line, vars: Record<string, string> = {}) {
 export const NEXT_STEP: Answer = { id: 'next_step', title: 'Booked', reply: ['callback_slot'], when: 'Day and time',
   choices: [c('walk', 'Walk-through'), c('callback', 'Call back')] }
 
-export const CALL_OUTCOMES: { id: 'interested' | 'reached_no_decision' | 'no_answer' | 'not_now' | 'not_interested' | 'wrong_number' | 'dnc'; label: string; hint: string }[] = [
+export const CALL_OUTCOMES: { id: 'interested' | 'reached_no_decision' | 'no_answer' | 'not_now' | 'not_interested' | 'wrong_number' | 'disconnected' | 'dnc'; label: string; hint: string }[] = [
   { id: 'no_answer', label: 'No answer', hint: 'Rang out, no voicemail left; nothing changes on the card' },
   { id: 'interested', label: 'Interested', hint: "Stage: Colin's call (or Walk booked)" },
   { id: 'reached_no_decision', label: 'Reached, no decision', hint: "Talked, nothing settled yet; stage: Colin's call" },
   { id: 'not_now', label: 'Not now', hint: 'Use the exact date they gave, or record the event/condition they named' },
   { id: 'not_interested', label: 'Not interested', hint: 'Stage: Dead' },
   { id: 'wrong_number', label: 'Wrong number', hint: 'That phone marked bad; stage: Wrong number' },
+  { id: 'disconnected', label: 'Disconnected', hint: 'Not in service, or the call fails before it rings: that number marked bad, and the next number of the owner gets tried' },
   { id: 'dnc', label: 'Do not contact', hint: 'Every phone of this owner blocked, like a texted STOP' },
 ]
 

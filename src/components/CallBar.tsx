@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
-import { callerDigits, fmtDuration, useDialer } from '@/lib/dialer'
+import { callerDigits, fmtDuration, likelyDisconnected, useDialer } from '@/lib/dialer'
 import { fmtPhone } from '@/lib/format'
 import { api } from '@/lib/queries'
 
@@ -39,7 +39,7 @@ export function CallBar() {
 
   // A finished call asks for its outcome right here (Colin 2026-10-24: a call that ends with nothing logged leaves the
   // card stuck on "call started"). The quick ones log in one tap; a real conversation opens the card's script to log.
-  const quickLog = async (outcome: 'no_answer', note: string) => {
+  const quickLog = async (outcome: 'no_answer' | 'disconnected', note: string) => {
     if (!active.leadId) return
     setBusy(true)
     setMsg(null)
@@ -82,6 +82,8 @@ export function CallBar() {
                 <span className="w-full text-right text-xs font-medium sm:w-auto">How did it go?</span>
                 <Button size="sm" disabled={busy} onClick={() => void quickLog('no_answer', 'No answer (logged from the call bar)')}>No answer</Button>
                 <Button size="sm" disabled={busy} onClick={() => void quickLog('no_answer', "Connected but we couldn't hear each other (logged from the call bar)")}>Couldn't hear</Button>
+                <Button size="sm" variant={likelyDisconnected(active.error) ? 'default' : 'outline'} disabled={busy}
+                  onClick={() => void quickLog('disconnected', 'Disconnected number (logged from the call bar)')}>Disconnected</Button>
                 <Button size="sm" asChild><Link to={`/lead/${active.leadId}?call=1#call-script`} onClick={dismiss}>We talked: log it</Link></Button>
               </div>
             ) : active.leadId && active.answered ? (

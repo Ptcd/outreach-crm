@@ -31,6 +31,16 @@ export const CALLER_ID = (import.meta.env.VITE_SELLER_CALLER_ID as string | unde
 
 export type CallStatus = 'idle' | 'connecting' | 'ringing' | 'in_call' | 'ended' | 'error'
 
+/** Twilio's error codes for a call the phone network refused (31005 "Error sent from gateway in HANGUP", 31003, 31009):
+ *  almost always the number itself, disconnected or not taking calls, not the app. */
+export function likelyDisconnected(error: string | null | undefined): boolean {
+  return /\b3100[359]\b|gateway in HANGUP/i.test(error ?? '')
+}
+/** What the call bar says about a failed call. */
+export function plainCallError(error: string): string {
+  return likelyDisconnected(error) ? 'The phone network hung up before it rang: usually a disconnected number. Tap Disconnected, or try once more.' : error
+}
+
 export interface ActiveCall {
   status: CallStatus
   to: string             // the other party's number
@@ -147,7 +157,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     call.on('cancel', gone)
     call.on('reject', gone)
     call.on('disconnect', () => { if (callRef.current === call) finish('ended', null); else gone() })
-    call.on('error', (e: { message?: string }) => { if (callRef.current === call) finish('error', e?.message ?? 'Call failed'); else gone() })
+    call.on('error', (e: { message?: string }) => { if (callRef.current === call) finish('error', plainCallError(e?.message ?? 'Call failed')); else gone() })
   }, [finish])
 
   const device = useCallback(async () => {
@@ -248,7 +258,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
       call.on('disconnect', () => { if (mine()) finish('ended', null); ended() })
       call.on('cancel', () => { if (mine()) finish('ended', null); ended() })
       call.on('reject', () => { if (mine()) finish('ended', 'They declined the call.'); ended() })
-      call.on('error', (e: { message?: string }) => { if (mine()) finish('error', e?.message ?? 'Call failed'); ended() })
+      call.on('error', (e: { message?: string }) => { if (mine()) finish('error', plainCallError(e?.message ?? 'Call failed')); ended() })
     } catch (e) {
       // Authorized but the call failed: released if pm-phone never claimed it (nobody rang); a claimed
       // call stays paused for its outcome, with "call did not happen — resume" on the card.

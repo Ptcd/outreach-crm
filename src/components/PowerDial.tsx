@@ -14,7 +14,7 @@ import { CallScript, pickupLine } from '@/components/CallScript'
 import { PHONE_SCRIPT } from '@/lib/callScript'
 import { supabase } from '@/lib/supabaseClient'
 import { api, useLead } from '@/lib/queries'
-import { useDialer } from '@/lib/dialer'
+import { likelyDisconnected, useDialer } from '@/lib/dialer'
 import { fmtDateTime, fmtPhone } from '@/lib/format'
 
 type Item = {
@@ -49,6 +49,7 @@ const OUTCOMES = [
   { key: '2', id: 'voicemail', label: 'Left voicemail', note: 'Left a voicemail (Power hour).' },
   { key: '3', id: 'wrong_number', label: 'Wrong number', note: 'Not them (Power hour).' },
   { key: '4', id: 'not_interested', label: 'Not interested', note: 'Not interested (Power hour).' },
+  { key: '6', id: 'disconnected', label: 'Disconnected', note: 'Disconnected number (Power hour).' },
 ] as const
 
 export function PowerDial({ caller }: { caller: string }) {
@@ -321,8 +322,14 @@ export function PowerDial({ caller }: { caller: string }) {
               {FIRST_30.map((o) => <li key={o.id}><span className="text-muted-foreground">{o.trigger}</span> &rarr; &ldquo;{o.say.replace(/\{caller\}/g, callerName)}&rdquo;</li>)}
             </ul>
           </details>
+          {onThis && active?.status === 'error' && likelyDisconnected(active.error) && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border-2 border-red-300 bg-red-50 p-2 text-sm dark:bg-red-950/30">
+              <span className="flex-1">The call failed before it rang: usually a disconnected number.</span>
+              <Button size="sm" disabled={busy} onClick={() => void log(OUTCOMES.find((o) => o.id === 'disconnected')!)}>Disconnected</Button>
+            </div>
+          )}
           {err && <p className="text-sm text-red-700">{err}</p>}
-          <p className="hidden text-xs text-muted-foreground sm:block">Keys: D or Enter dials · H hangs up · 1 no answer · 2 voicemail · 3 wrong number · 4 not interested · 5 we talked · S skip · Esc stops auto-dial</p>
+          <p className="hidden text-xs text-muted-foreground sm:block">Keys: D or Enter dials · H hangs up · 1 no answer · 2 voicemail · 3 wrong number · 4 not interested · 5 we talked · 6 disconnected · S skip · Esc stops auto-dial</p>
         </section>
       )}
     </div>
