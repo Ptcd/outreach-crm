@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Badge, Empty, ErrorNote } from '@/components/ui/form'
 import { CallScript, pickupLine } from '@/components/CallScript'
 import { PHONE_SCRIPT } from '@/lib/callScript'
@@ -81,6 +82,8 @@ export function PowerDial({ caller }: { caller: string }) {
   const [countdown, setCountdown] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  // a remark that goes with whichever outcome she taps (Thalia 2026-10-28: "add a remarks")
+  const [remark, setRemark] = useState('')
   const update = useCallback((f: (s: Stats) => Stats) => setStats((s) => { const n = f(s); saveStats(n); return n }), [])
 
   const list = useMemo(() => {
@@ -117,15 +120,16 @@ export function PowerDial({ caller }: { caller: string }) {
     if (!cur || live || busy) return
     setBusy(true)
     setErr(null)
-    const r = await api.logCall(cur.lead_id, cur.phone, o.id === 'voicemail' ? 'no_answer' : o.id, o.note, null)
+    const r = await api.logCall(cur.lead_id, cur.phone, o.id === 'voicemail' ? 'no_answer' : o.id, remark.trim() ? `${o.note} ${remark.trim()}` : o.note, null)
     setBusy(false)
     const d = r.data as { ok?: boolean; reason?: string } | null
     if (r.error || d?.ok === false) { setErr(r.error?.message ?? d?.reason ?? 'Not logged'); return }
     if (onThis) dismiss()
+    setRemark('')
     update((s) => ({ ...s, voicemails: s.voicemails + (o.id === 'voicemail' ? 1 : 0), reached: s.reached + (['wrong_number', 'not_interested'].includes(o.id) ? 1 : 0) }))
     void qc.invalidateQueries({ queryKey: ['tasks'] })
     next(cur.lead_id, true)
-  }, [cur, live, busy, onThis, dismiss, update, qc, next])
+  }, [cur, live, busy, onThis, dismiss, update, qc, next, remark])
 
   const skip = useCallback(() => {
     if (!cur || live) return
@@ -303,6 +307,9 @@ export function PowerDial({ caller }: { caller: string }) {
               next(cur.lead_id, false)
             }} />
           ) : (
+            <>
+            <Input placeholder="Remark (optional): saved with the button you tap" className="h-10" value={remark}
+              onChange={(e) => setRemark(e.target.value)} aria-label="Remark" />
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {OUTCOMES.map((o) => (
                 <Button key={o.id} variant="outline" className="h-12" disabled={live || busy} onClick={() => void log(o)}>
@@ -314,6 +321,7 @@ export function PowerDial({ caller }: { caller: string }) {
               </Button>
               <Button variant="ghost" className="h-12" disabled={live} onClick={skip}>Skip<span className="ml-1 hidden text-xs text-muted-foreground sm:inline">(S)</span></Button>
             </div>
+            </>
           )}
           {cur.source === 'replied' || cur.source === 'missed_call' ? null : (cur.dials_total ?? 0) >= 2 ? (
             <p className="rounded-md border border-amber-300 bg-amber-50 p-2 text-sm dark:bg-amber-950/30"><span className="font-semibold">Try {(cur.dials_total ?? 0) + 1}: leave this voicemail (under 20 s):</span> &ldquo;Hi{vars.first_name === 'there' ? '' : ` ${vars.first_name}`}, it&apos;s {callerName}. I had a quick question about the place on {vars.street}. Give me a call when you get a minute.&rdquo;</p>

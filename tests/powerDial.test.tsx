@@ -148,5 +148,13 @@ describe('Power hour', () => {
       expect(await screen.findByText('Robert Example')).toBeTruthy()
     } finally { items.unshift(jane) }
   })
+
+  it('a remark goes with the outcome she taps (Thalia 2026-10-28)', async () => {
+    wrap()
+    await screen.findByText('Jane Q Sample')
+    fireEvent.change(screen.getByLabelText('Remark'), { target: { value: 'daughter answered, call after 6' } })
+    fireEvent.click(screen.getByText('No answer'))
+    await waitFor(() => expect(logCall).toHaveBeenCalledWith('L1', '4145550101', 'no_answer', 'No answer (Power hour). daughter answered, call after 6', null))
+  })
 })
 
