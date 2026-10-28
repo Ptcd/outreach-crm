@@ -25,7 +25,9 @@ const ENTITY = /\b(LLC|INC|CORP|CO|TRUST|TRUSTEE|ESTATE|LTD|LP|BANK|CHURCH|PROPE
 const title = (s: string) => s.toLowerCase().replace(/\b([a-z])/g, (c) => c.toUpperCase())
 const firstName = (owner: string) => (ENTITY.test(owner) ? '' : title((owner.split(/[\s,]+/)[0] ?? '')))
 const street = (a: string | null) => (a ? title(a.split(';')[0].trim()) : 'the property')
-const todayKey = () => `power:${new Date().toISOString().slice(0, 10)}`
+// a practice run on TEST cards (?test=1) keeps its own count
+const isTest = () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('test') === '1'
+const todayKey = () => `power:${isTest() ? 'test:' : ''}${new Date().toISOString().slice(0, 10)}`
 const empty = (): Stats => ({ dials: 0, reached: 0, voicemails: 0, interested: 0, done: [], started: null })
 function loadStats(): Stats {
   try { const s = localStorage.getItem(todayKey()); return s ? { ...empty(), ...JSON.parse(s) } : empty() } catch { return empty() }
@@ -143,6 +145,8 @@ export function PowerDial({ caller }: { caller: string }) {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return
+      // Enter or Space on a focused button presses that button, nothing else (it used to also dial)
+      if ((e.key === 'Enter' || e.key === ' ') && t && (t.tagName === 'BUTTON' || t.tagName === 'A')) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
       const k = keys.current
       if (e.key === 'Escape') { setCountdown(null); return }
