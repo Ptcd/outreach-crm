@@ -11,7 +11,7 @@ export type PackageRow = {
 }
 
 export const CONDITION_ITEMS: [string, string][] = [
-  ['roof', 'Roof'], ['hvac', 'Furnace and AC'], ['water_heater', 'Water heater'], ['foundation', 'Foundation and basement'],
+  ['layout', 'The place (beds, baths, units)'], ['roof', 'Roof'], ['hvac', 'Furnace and AC'], ['water_heater', 'Water heater'], ['foundation', 'Foundation and basement'],
   ['electrical', 'Electrical'], ['plumbing', 'Plumbing'], ['windows', 'Windows'], ['kitchen_baths', 'Kitchen and baths'],
   ['yard', 'Yard and outside'], ['fix_first', 'Fix first before listing'], ['other', 'Anything else'],
 ]

@@ -46,12 +46,15 @@ const ANSWERS: Record<string, Answer> = {
   q3_motivation: { id: 'motivation', title: 'Why selling (reason)', reply: ['motivation'], text: 'Their reason, in their words',
     choices: [c('tired_landlord', 'Tired landlord'), c('moving', 'Moving'), c('inherited', 'Inherited / death'), c('behind', 'Behind on payments'),
       c('repairs', 'Too many repairs'), c('divorce', 'Divorce'), c('health', 'Health / age'), c('just_price', 'Only for the right price')] },
+  // the place itself before its condition (Colin 2026-10-28, after Shirikin's package: "add something to the script to
+  // get the seller to tell us all about the property"): beds, baths, how many houses or units
+  q4_layout: { id: 'layout', title: 'The place (beds, baths, units)', text: 'Beds, baths, one house or how many units, size, garage, lot' },
   q4_condition: { id: 'condition', title: 'About the place (condition)', reply: ['condition'], multi: true, text: 'In their words',
     choices: [c('roof', 'Roof'), c('furnace', 'Furnace / AC'), c('water_heater', 'Water heater'), c('water', 'Water / leaks'),
       c('foundation', 'Foundation / basement'), c('electrical', 'Electrical'), c('plumbing', 'Plumbing'), c('windows', 'Windows'),
       c('kitchen_baths', 'Kitchen / baths'), c('yard', 'Yard / outside'), c('cosmetic', 'Cosmetic only'), c('perfect', 'Says perfect')] },
   q4a_occupancy: { id: 'occupancy', title: 'Who lives there', reply: ['occupancy'],
-    choices: [c('owner', 'They live there'), c('tenants', 'Tenants'), c('family', 'Family'), c('empty', 'Empty')], text: 'Access, rent, lease end' },
+    choices: [c('owner', 'They live there'), c('tenants', 'Tenants'), c('family', 'Family'), c('empty', 'Empty')], text: 'Rent for each unit, lease or month to month, access' },
   q4b_list_tomorrow: { id: 'work_list', title: 'Fix first', text: 'Their list of work' },
   q4c_happened: { id: 'happened', title: 'Anything happen to it', multi: true,
     choices: [c('leak', 'Leak / water'), c('fire', 'Fire'), c('foundation', 'Foundation'), c('code', 'Code / raze order'), c('none', 'Nothing')] },
@@ -144,6 +147,7 @@ export function packageFromCall(facts: Record<string, { value?: { choices?: stri
   const map: Record<string, string> = { roof: 'roof', furnace: 'hvac', water_heater: 'water_heater', foundation: 'foundation', water: 'foundation',
     electrical: 'electrical', plumbing: 'plumbing', windows: 'windows', kitchen_baths: 'kitchen_baths', yard: 'yard' }
   for (const id of v('condition')?.choices ?? []) if (map[id]) cond[map[id]] = cond[map[id]] ?? 'mentioned on the call'
+  if (v('layout')?.text) cond.layout = v('layout')!.text!
   if (v('condition')?.text) cond.other = v('condition')!.text!
   if (v('work_list')?.text) cond.fix_first = v('work_list')!.text!
   if (words('happened')) cond.other = [cond.other, words('happened')].filter(Boolean).join('; ')

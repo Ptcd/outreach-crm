@@ -19,6 +19,7 @@ import { NEXT_STEP, callScript, packageFromCall } from '@/lib/callScript'
 import type { Lead } from '@/lib/types'
 
 export const CONDITION_ITEMS: { key: string; label: string; ask: string }[] = [
+  { key: 'layout', label: 'The place', ask: 'Beds and baths? One house or more than one on the lot?' },
   { key: 'roof', label: 'Roof', ask: 'How old is the roof? Any leaks?' },
   { key: 'hvac', label: 'Furnace and AC', ask: 'How old are the furnace and the air? Both working?' },
   { key: 'water_heater', label: 'Water heater', ask: 'How old is the water heater?' },
@@ -39,7 +40,7 @@ const FIELDS: { key: string; label: string; hint: string; long?: boolean }[] = [
   { key: 'their_basis', label: 'How they came up with it', hint: 'A payoff, back taxes, Zillow, a neighbor...' },
   { key: 'on_title', label: 'On the title / decision makers', hint: 'Every name' },
   { key: 'owed', label: 'What is owed', hint: 'Mortgage or liens, behind or not; roughly is fine' },
-  { key: 'occupancy', label: 'Who lives there', hint: 'Them, tenants (and rents), or empty' },
+  { key: 'occupancy', label: 'Who lives there', hint: 'Them, or tenants (the rent for each, lease or month to month), or empty' },
   { key: 'photos', label: 'Photos', hint: 'Will they text some? Did they?' },
   { key: 'other_buyers', label: 'Other buyers or agents', hint: 'Who else they have talked to' },
   { key: 'concerns', label: 'What concerns them most', hint: '' },

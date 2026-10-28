@@ -53,11 +53,19 @@
       "branch": "asked why I want to know -> 'I ask everyone, so I don't waste your time with a number that was never going to work.'"
     },
     {
+      "id": "q4_layout",
+      "gate_item": [
+        5
+      ],
+      "say": "Tell me a little about the place. How many bedrooms and baths? Is it just the one house, or more than one on the lot?",
+      "listen_for": "Let them talk. Beds and baths, one house or several (how many houses or units), roughly how big, the garage and the lot. Their words. Several units: how many, and what each one is."
+    },
+    {
       "id": "q4_condition",
       "gate_item": [
         5
       ],
-      "say": "Tell me a little about the place.",
+      "say": "How's it holding up? If we bought it, what work would it need?",
       "listen_for": "Their words. Then only what they left out, one at a time: the roof (how old, leaks), the furnace and AC (how old, working), the water heater, the foundation and basement (cracks, water), electrical (breakers or the old fuse box), plumbing, windows (original or replaced), the kitchen and baths (last updated), the yard and outside (driveway, garage, trees near the house, a fence). 'Don't know' is fine.",
       "branch": "perfect house -> 'Sounds like a great place. Why would you even think about selling it?'"
     },
@@ -67,7 +75,7 @@
         5
       ],
       "say": "Who's living there right now, you, a tenant, or is it sitting empty?",
-      "listen_for": "Owner / tenant / vacant; access for a visit. Only if not already said."
+      "listen_for": "Owner / tenant / vacant; access for a visit. Only if not already said. Tenants: 'What do they pay a month, and are they on a lease or month to month?' Several units: the rent for each."
     },
     {
       "id": "q4b_list_tomorrow",
