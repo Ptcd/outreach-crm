@@ -8,6 +8,7 @@ import { runReplyAgent } from '../_shared/replyAgent.ts'
 import { claudeDrafter } from '../_shared/drafter.ts'
 import { pushAll, runNotifications, type NotifySummary } from '../_shared/notify.ts'
 import { runPackageMail } from '../_shared/packages.ts'
+import { runVoicemailRead } from '../_shared/voicemailRead.ts'
 import { pmPhoneSender, runHotAlerts } from '../_shared/hotLeads.ts'
 import { hotPush, notifyDeps } from '../_shared/notifyDeno.ts'
 import { senderEnv, twilioPort, type Rpc } from '../_shared/sending.ts'
@@ -55,8 +56,11 @@ Deno.serve(async (req) => {
       const s: NotifySummary = { drafts: 0, reminders: 0, tasks: 0, pushes_ok: 0, pushes_failed: 0, emails: 0, email_errors: [] }
       await pushAll(deps, m, s)
     }).catch((e) => ({ error: String(e).slice(0, 200) }))
-    await rpc('note_agent_run', { p_summary: { ...summary, notified, hot_alerts: hot, packages, drafter: key ? 'claude' : 'none (ANTHROPIC_API_KEY not set)' } })
-    return Response.json({ ...summary, notified, hot_alerts: hot, packages })
+    // voicemails (migration 0118): who gets a call back, and who doesn't (upset, not a seller, a stop, the wrong person)
+    const voicemails = await runVoicemailRead(rpc, { apiKey: key, fetchFn: fetch, model: Deno.env.get('VOICEMAIL_MODEL') || undefined })
+      .catch((e) => ({ error: String(e).slice(0, 200) }))
+    await rpc('note_agent_run', { p_summary: { ...summary, notified, hot_alerts: hot, packages, voicemails, drafter: key ? 'claude' : 'none (ANTHROPIC_API_KEY not set)' } })
+    return Response.json({ ...summary, notified, hot_alerts: hot, packages, voicemails })
   } catch (e) {
     await rpc('note_agent_run', { p_summary: { error: String(e instanceof Error ? e.message : e).slice(0, 300) } })
     return Response.json({ error: String(e) }, { status: 500 })

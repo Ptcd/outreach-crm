@@ -237,6 +237,7 @@ export function PowerDial({ caller }: { caller: string }) {
           {cur.source === 'replied' && cur.reply && (
             <p className="rounded-md border-2 border-amber-300 bg-amber-50 p-2 text-sm dark:bg-amber-950/30"><span className="font-semibold">They texted:</span> &ldquo;{cur.reply}&rdquo;</p>
           )}
+          <History leadId={cur.lead_id} open={cur.source === 'replied' || cur.source === 'missed_call'} />
           <div className="rounded-md bg-muted p-2 text-sm">
             <p><span className="font-semibold">Open with:</span> &ldquo;{cur.source === 'missed_call'
               ? `Hi${vars.first_name === 'there' ? '' : `, is this ${vars.first_name}?`}${vars.first_name === 'there' ? ', this' : ' This'} is ${callerName}, returning your call about ${vars.street}.`
@@ -301,6 +302,38 @@ export function PowerDial({ caller }: { caller: string }) {
         </section>
       )}
     </div>
+  )
+}
+
+type HistoryRow = { id: string; direction: 'in' | 'out'; channel: string; body: string | null; status: string | null; sent_at: string }
+
+/** What already happened with this owner, on the card itself (Colin 2026-10-28: "how does thalia know about the context
+ *  ... whats been texted back and forth with him and the fact that he left a voicemail"): the last texts both ways,
+ *  calls and voicemails, oldest first. Open for someone who texted or called us; folded for a cold card. */
+function History({ leadId, open }: { leadId: string; open: boolean }) {
+  const q = useQuery({ queryKey: ['power_history', leadId], staleTime: 30_000, queryFn: async () => {
+    const r = await supabase.from('messages').select('id, direction, channel, body, status, sent_at').eq('lead_id', leadId)
+      .in('channel', ['sms', 'call']).order('sent_at', { ascending: false }).limit(12)
+    if (r.error) throw new Error(r.error.message)
+    return ((r.data ?? []) as HistoryRow[]).reverse()
+  } })
+  const rows = q.data ?? []
+  if (!rows.length) return null
+  const who = (m: HistoryRow) => m.channel === 'call'
+    ? (m.direction === 'in' ? 'They called' : 'We called') + (m.status ? ` (${m.status.replace(/_/g, ' ')})` : '')
+    : m.direction === 'in' ? 'They texted' : 'We texted'
+  return (
+    <details className="rounded-md border p-2 text-sm" open={open}>
+      <summary className="cursor-pointer font-medium">What already happened ({rows.length})</summary>
+      <ul className="mt-1 max-h-56 space-y-1 overflow-y-auto">
+        {rows.map((m) => (
+          <li key={m.id} className={m.direction === 'in' ? 'rounded bg-amber-50 p-1 dark:bg-amber-950/30' : 'p-1'}>
+            <span className="font-medium">{who(m)}</span> <span className="text-xs text-muted-foreground">{fmtDateTime(m.sent_at)}</span>
+            {m.body ? <span className="block whitespace-pre-line text-muted-foreground">{m.body.length > 400 ? `${m.body.slice(0, 400)}...` : m.body}</span> : null}
+          </li>
+        ))}
+      </ul>
+    </details>
   )
 }
 

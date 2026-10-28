@@ -17,7 +17,10 @@ const logCall = vi.fn(async () => ({ data: { ok: true }, error: null }))
 const start = vi.fn(async () => undefined)
 const hangUp = vi.fn()
 const dialer: { active: null | { status: string; leadId: string; to: string }; incoming: null | { from: string; busy: boolean } } = { active: null, incoming: null }
-vi.mock('@/lib/supabaseClient', () => ({ supabase: { rpc: vi.fn(async () => ({ data: [...items], error: null })) }, supabaseConfigured: true }))
+const history = [{ id: 'm1', direction: 'out', channel: 'sms', body: 'Hi, is this still your place on Sample St?', status: 'delivered', sent_at: '2026-10-20T15:00:00Z' },
+  { id: 'm2', direction: 'in', channel: 'sms', body: 'who is this', status: null, sent_at: '2026-10-21T15:00:00Z' }]
+const chain = { select: () => chain, eq: () => chain, in: () => chain, order: () => chain, limit: async () => ({ data: [...history].reverse(), error: null }) }
+vi.mock('@/lib/supabaseClient', () => ({ supabase: { rpc: vi.fn(async () => ({ data: [...items], error: null })), from: () => chain }, supabaseConfigured: true }))
 vi.mock('@/lib/queries', () => ({ api: { logCall: (...a: unknown[]) => logCall(...(a as [])) }, useLead: () => ({ isLoading: true }) }))
 vi.mock('@/lib/dialer', () => ({ useDialer: () => ({ active: dialer.active, incoming: dialer.incoming, start, dismiss: vi.fn(), hangUp, supported: true }) }))
 vi.mock('@/components/CallScript', () => ({ CallScript: () => null, pickupLine: (c: string, k?: string) => `Hi, this is ${c} (${k ?? "cold"})` }))
@@ -113,6 +116,14 @@ describe('Power hour', () => {
       expect(screen.getByText(/I wanna move out of the state/)).toBeTruthy()
       expect(screen.getByText(/Hi, this is Thalia, returning your call about 400 Caller Rd/)).toBeTruthy()
     } finally { items.shift() }
+  })
+
+  it('shows what already happened with the owner, texts both ways, on the card (2026-10-28)', async () => {
+    wrap()
+    await screen.findByText('Jane Q Sample')
+    expect(await screen.findByText('What already happened (2)')).toBeTruthy()
+    expect(screen.getByText('who is this')).toBeTruthy()
+    expect(screen.getByText(/Hi, is this still your place on Sample St/)).toBeTruthy()
   })
 })
 

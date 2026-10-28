@@ -7,11 +7,17 @@ import { Link } from 'react-router-dom'
 import { Badge, ErrorNote, Section } from '@/components/ui/form'
 import { supabase } from '@/lib/supabaseClient'
 import { fmtDateTime, fmtPhone } from '@/lib/format'
+import { useColinHere } from '@/components/OnPhonePicker'
 
 type Missed = { call_sid: string; at: string; phone: string; status: string; voicemail: boolean; words: string | null; lead_id: string | null
-  owner_name: string | null; property_address: string | null; municipality: string | null; stage: string | null; closed: boolean; card_closed?: boolean; phone_blocked?: boolean; called_back: boolean }
+  owner_name: string | null; property_address: string | null; municipality: string | null; stage: string | null; closed: boolean; card_closed?: boolean; phone_blocked?: boolean; called_back: boolean
+  verdict?: string | null; verdict_reason?: string | null }
+
+// the voicemail was read (0118): these are not called back by the team
+const NO_CALL: Record<string, string> = { upset: 'Upset: Colin decides', not_seller: 'Not a seller', stop: 'Asked us to stop', wrong_person: 'Not the owner' }
 
 export function MissedCalls() {
+  const colin = useColinHere()
   const q = useQuery({ queryKey: ['missed_calls'], refetchInterval: 60_000, queryFn: async () => {
     const r = await supabase.rpc('missed_calls_recent', { p_hours: 48 })
     if (r.error) throw new Error(r.error.message)
@@ -19,7 +25,8 @@ export function MissedCalls() {
   } })
   // only the calls that need someone: not called back yet, and not a stopped number or closed card (Colin 2026-10-28:
   // "this shouldnt show if it doesnt need our attention"); nothing to do = no box at all
-  const rows = (q.data ?? []).filter((x) => !x.closed && !x.called_back)
+  // an upset caller or someone who isn't a seller is Colin's to look at, never the team's to call (Colin 2026-10-28)
+  const rows = (q.data ?? []).filter((x) => !x.closed && !x.called_back && (!x.verdict || !NO_CALL[x.verdict] || (colin && ['upset', 'not_seller'].includes(x.verdict))))
   if (q.error) return <ErrorNote error={q.error} />
   if (!rows.length) return null
   return (
@@ -32,12 +39,13 @@ export function MissedCalls() {
                 ? <Link className="font-medium underline" to={`/lead/${x.lead_id}#history`}>{x.owner_name ?? 'Unknown'}{x.property_address ? `, ${x.property_address}` : ''}</Link>
                 : <span className="font-medium">No card for this number</span>}
               <span className="text-muted-foreground">{fmtPhone(x.phone)} · {fmtDateTime(x.at)}</span>
-              <Badge tone="warn">Call them back</Badge>
+              {x.verdict && NO_CALL[x.verdict] ? <Badge tone="bad">Don&apos;t call back: {NO_CALL[x.verdict]}</Badge> : <Badge tone="warn">Call them back</Badge>}
               {x.voicemail && <Badge tone="info">Voicemail</Badge>}
             </div>
             {x.words
               ? <blockquote className="mt-1 rounded border-l-4 border-sky-400 bg-sky-50 p-2 text-[0.95rem] dark:bg-sky-950/30">&ldquo;{x.words}&rdquo;</blockquote>
               : x.voicemail ? <p className="mt-1 text-muted-foreground">Voicemail left; the words are still being written out.</p> : null}
+            {x.verdict && NO_CALL[x.verdict] && x.verdict_reason && <p className="mt-1 text-xs text-muted-foreground">Why: {x.verdict_reason}</p>}
           </li>
         ))}
       </ul>
