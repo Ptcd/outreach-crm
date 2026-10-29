@@ -51,12 +51,13 @@ beforeEach(async () => {
 })
 
 describe('they called us', () => {
-  it('who is on shift: Thalia weekdays 9-5, Adil weekends 8-8, Colin otherwise (Central)', async () => {
+  it('who is on shift: Thalia weekdays 9-5, Adil weekdays 5-6 (0140) and weekends 8-8, Colin otherwise (Central)', async () => {
     const at = async (t: string) => (await one<{ p: string }>(`select public.on_shift_person($1::timestamptz)::text p`, [t])).p
     expect(await at(TUE_10AM)).toBe('thalia')
     expect(await at('2026-10-27T13:59:00Z')).toBe('colin')   // 8:59 AM Tue
     expect(await at('2026-10-27T14:00:00Z')).toBe('thalia')  // 9:00 AM Tue
-    expect(await at('2026-10-27T22:00:00Z')).toBe('colin')   // 5:00 PM Tue
+    expect(await at('2026-10-27T22:00:00Z')).toBe('adil')    // 5:00 PM Tue: Adil's weekday hour (0140)
+    expect(await at('2026-10-27T22:59:00Z')).toBe('adil')    // 5:59 PM Tue
     expect(await at(TUE_6PM)).toBe('colin')
     expect(await at(SAT_3PM)).toBe('adil')
     expect(await at('2026-10-31T13:00:00Z')).toBe('adil')    // 8:00 AM Sat

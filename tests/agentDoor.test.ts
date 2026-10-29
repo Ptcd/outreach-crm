@@ -610,6 +610,8 @@ describe('on the real migrations', () => {
     const wk = '2026-10-28T19:30:00Z'   // Wednesday 2:30 PM CT: Thalia's shift
     expect(await r(`public.inbound_call_ring('+1 (414) 555-0777', $1::timestamptz)`, [wk])).toEqual({ ring: ['thalia'], return_call: false, dialed_by: null })
     expect(await r(`public.inbound_call_ring('4145550777', '2026-10-28T22:00:00Z'::timestamptz)`)).toMatchObject({ ring: ['thalia', 'adil'], return_call: false })   // weekday 5 PM: both in Power hour
+    expect(await one(`select public.on_shift_person('2026-10-28T22:30:00Z'::timestamptz)::text s`)).toEqual({ s: 'adil' })   // weekday 5:30 PM is Adil's hour (0140)
+    expect(await one(`select public.on_shift_person('2026-10-28T21:30:00Z'::timestamptz)::text s`)).toEqual({ s: 'thalia' })
     expect(await r(`public.inbound_call_ring('4145550777', '2026-10-25T15:00:00Z'::timestamptz)`)).toMatchObject({ ring: ['adil'] })   // Saturday
     expect(await r(`public.inbound_call_ring('4145550777', '2026-10-28T04:00:00Z'::timestamptz)`)).toMatchObject({ ring: ['colin', 'thalia', 'adil'] })   // 11 PM
     await db.query(`insert into public.belt_events (lead_id, event, payload, at, by) values ($1, 'human_call_started', '{"phone": "4145550777", "source": "app"}', '2026-10-28T22:05:00Z', 'Adil')`, [a.lead_id])
