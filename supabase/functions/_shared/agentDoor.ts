@@ -452,7 +452,7 @@ export async function handleMessage(msg: Json, agent: Agent, db: DoorDb): Promis
       capabilities: { tools: {} },
       serverInfo: { name: SERVER_NAME, version: '1.0.0' },
       instructions: agent.role === 'agent'
-        ? `One key for WPIE, with these scopes switched on: ${scopesOf(agent).join(', ')}. Every call is logged. Texting: read texting_rules first. Records: Colin approves every batch before anything sends. Cards: read due_today every morning.`
+        ? `One key for WPIE, with these scopes switched on: ${scopesOf(agent).join(', ')}. Every call is logged and every tool has a per-minute budget per key (find_prospects 30, ready_to_text 10; queue_texts, send_reply, mark_card, call_next have none): over it you are refused, and three times over it in five minutes locks that tool for five minutes. Pace and batch lookups; the same database sends the texts. Read desk_inbox at the start of every session: the desk and Colin talk to you there. Texting: read texting_rules first. Records: a batch sends only after a review. Cards: read due_today every morning.`
         : agent.role === 'records'
         ? 'You run the public-records-request cycle: read records_overview, records_replies and records_list(due); mark what came back; draft letters from records_templates; propose batches. Colin approves every batch before anything sends.'
         : agent.role === 'intake'
