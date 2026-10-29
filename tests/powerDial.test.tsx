@@ -171,5 +171,17 @@ describe('Power hour', () => {
       expect(screen.getByRole('button', { name: 'Told them: callback done' })).toBeTruthy()
     } finally { items.shift() }
   })
+
+  it('a 90-day check-in call says so on the card (0127)', async () => {
+    const ck = { ...items[0], lead_id: 'L6', task_id: 'T6', source: 'checkin', owner_name: 'PAT CHECKIN', address: '600 REST RD', phone: '4145550166',
+      task_note: '90-day check-in call: 9 tries with no answer, last on Oct 28 (9 dials, never reached).' }
+    items.unshift(ck as never)
+    try {
+      wrap()
+      expect(await screen.findByText('Pat Checkin')).toBeTruthy()
+      expect(screen.getAllByText(/90-day check-in call/).length).toBeGreaterThan(0)
+      expect(screen.getByText(/9 tries with no answer, last on Oct 28/)).toBeTruthy()
+    } finally { items.shift() }
+  })
 })
 

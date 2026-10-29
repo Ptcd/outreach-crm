@@ -19,7 +19,7 @@ import { likelyDisconnected, useDialer } from '@/lib/dialer'
 import { fmtDateTime, fmtPhone } from '@/lib/format'
 
 type Item = {
-  lead_id: string; task_id: string | null; source: 'missed_call' | 'callback' | 'replied' | 'call_list' | 'texted_silent'; why: string | null; reply?: string | null
+  lead_id: string; task_id: string | null; source: 'missed_call' | 'callback' | 'replied' | 'checkin' | 'call_list' | 'texted_silent'; why: string | null; reply?: string | null
   task_note?: string | null
   package?: { id: string; status: string; colin_call: string | null; colin_asks: string | null; caller_answers: string | null; callback_at: string | null; number_note: string | null } | null
   missed_at?: string | null; voicemail?: boolean | null; voicemail_words?: string | null
@@ -254,7 +254,7 @@ export function PowerDial({ caller }: { caller: string }) {
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-semibold">{title(cur.owner_name)}</h2>
               <Badge tone={cur.source === 'missed_call' || cur.source === 'callback' ? 'bad' : cur.source === 'replied' ? 'warn' : cur.source === 'call_list' ? 'info' : undefined}>
-                {cur.source === 'missed_call' ? 'Called us: call back now' : cur.source === 'callback' ? 'Promised callback' : cur.source === 'replied' ? 'Texted back: call now' : cur.source === 'call_list' ? 'On today’s list' : 'Texted, no reply'}</Badge>
+                {cur.source === 'missed_call' ? 'Called us: call back now' : cur.source === 'callback' ? 'Promised callback' : cur.source === 'checkin' ? '90-day check-in call' : cur.source === 'replied' ? 'Texted back: call now' : cur.source === 'call_list' ? 'On today’s list' : 'Texted, no reply'}</Badge>
             </div>
             <p className="text-sm">{street(cur.address)}{cur.municipality ? `, ${cur.municipality}` : ''}</p>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -267,6 +267,11 @@ export function PowerDial({ caller }: { caller: string }) {
           {cur.source === 'missed_call' && (
             <p className="rounded-md border-2 border-red-300 bg-red-50 p-2 text-sm dark:bg-red-950/30">
               {cur.voicemail_words ? <><span className="font-semibold">Their voicemail:</span> &ldquo;{cur.voicemail_words}&rdquo;</> : <span className="font-semibold">They called and nobody picked up.{cur.voicemail ? ' The voicemail is still being written out.' : ''}</span>}
+            </p>
+          )}
+          {cur.source === 'checkin' && (
+            <p className="rounded-md border-2 border-sky-300 bg-sky-50 p-2 text-sm dark:bg-sky-950/30">
+              <span className="font-semibold">90-day check-in call.</span> {cur.task_note ?? 'We tried them before with no answer; this is the check-in.'}
             </p>
           )}
           {cur.source === 'replied' && cur.reply && (
