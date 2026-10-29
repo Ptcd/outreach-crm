@@ -629,6 +629,11 @@ describe('on the real migrations', () => {
     expect(rows[0]).toMatchObject({ call_sid: 'CAtest1', person: 'thalia', email: 'thalia@example.com', owner_name: 'Missed Caller' })
     await db.exec(`update public.team_members set alert_email = 'thalia.alerts@example.com' where person = 'thalia'`)
     expect(((await r(`public.missed_calls_to_alert()`)) as { email: string }[])[0].email).toBe('thalia.alerts@example.com')
+    await db.exec(`update public.team_members set alert_whatsapp = '+923246343665' where person = 'thalia'`)
+    expect(((await r(`public.missed_calls_to_alert()`)) as { whatsapp: string }[])[0].whatsapp).toBe('+923246343665')
+    await db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify({ sub: '00000000-0000-0000-0000-00000000000c', email: 'thalia@example.com' })])
+    expect(await one(`select (public.set_person_alerts('thalia', '', '', '634 3665')->>'reason') s`)).toEqual({ s: expect.stringContaining('country code') })
+    expect(await one(`select (public.set_person_alerts('thalia', '', '', '+92 324 6343665')->>'whatsapp') s`)).toEqual({ s: '+923246343665' })
     await db.exec(`select public.missed_call_alerted('CAtest1')`)
     expect(await r(`public.missed_calls_to_alert()`)).toEqual([])
     // Colin's own missed calls are not emailed here: his cell already gets the forwarding app's text

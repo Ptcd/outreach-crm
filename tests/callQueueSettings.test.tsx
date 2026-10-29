@@ -143,7 +143,7 @@ describe('Settings', () => {
     fireEvent.change(screen.getByLabelText(/Phone for text pings/), { target: { value: '414 555 0199' } })
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(setMyAlerts).toHaveBeenCalledWith('thalia', '414 555 0199', 'thalia@example.com'))
-    expect(await screen.findByText(/Saved\. Hot pings now go to that phone and that email\./)).toBeTruthy()
+    expect(await screen.findByText(/Saved\. Pings now go to that phone and that email\./)).toBeTruthy()
     expect(screen.getByText(/tell him when you set or change this/)).toBeTruthy()
     expect(screen.getByText(/On a computer, Chrome can show pings while the browser is running/)).toBeTruthy()
   })

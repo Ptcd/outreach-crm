@@ -25,6 +25,7 @@ export default function Settings() {
   const [email, setEmail] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [whatsapp, setWhatsapp] = useState('')
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [err, setErr] = useState<Error | null>(null)
 
@@ -37,6 +38,7 @@ export default function Settings() {
       if (!on) return
       setPhone(a.alert_phone ?? '')
       setEmail(a.alert_email ?? '')
+      setWhatsapp(a.alert_whatsapp ?? '')
       setLoaded(true)
     }).catch((e) => on && setErr(e instanceof Error ? e : new Error(String(e))))
     return () => { on = false }
@@ -47,8 +49,8 @@ export default function Settings() {
     setMsg(null)
     try {
       if (!who) return
-      const r = await setPersonAlerts(who, phone, email)
-      setMsg(r.ok ? { ok: true, text: 'Saved. Hot pings now go to ' + [r.phone ? 'that phone' : '', r.email ? 'that email' : ''].filter(Boolean).join(' and ') + (r.phone || r.email ? '.' : 'nothing but this app.') }
+      const r = await setPersonAlerts(who, phone, email, whatsapp)
+      setMsg(r.ok ? { ok: true, text: 'Saved. Pings now go to ' + [r.phone ? 'that phone' : '', r.email ? 'that email' : '', r.whatsapp ? 'WhatsApp' : ''].filter(Boolean).join(' and ') + (r.phone || r.email || r.whatsapp ? '.' : 'nothing but this app.') }
         : { ok: false, text: r.reason ?? 'Not saved' })
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : String(e) })
@@ -68,6 +70,12 @@ export default function Settings() {
         </p>
         <ErrorNote error={err} />
         <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm font-medium">
+            WhatsApp number for alerts
+            <Input type="tel" inputMode="tel" placeholder="+92 324 6343665 or +1 414 555 0101" className="mt-1 h-11" value={whatsapp}
+              onChange={(e) => setWhatsapp(e.target.value)} disabled={!who || (!loaded && !err)} />
+            <span className="mt-1 block text-xs font-normal text-muted-foreground">A missed call for you comes here too, with the country code.</span>
+          </label>
           <label className="text-sm font-medium">
             Email for hot pings
             <Input type="email" inputMode="email" placeholder="you@example.com" className="mt-1 h-11" value={email}

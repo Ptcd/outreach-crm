@@ -262,6 +262,21 @@ async function membersWithPhones(rpc: Rpc): Promise<Member[]> {
 }
 
 /** pm-phone's /api/alert: sends from the PM line to Colin's forward number, or to a listed member's `to`. */
+/** A WhatsApp alert through the same forwarding-app route (channel whatsapp, lib/whatsapp there): the forwarding app
+ * holds the sender and the allowed numbers; a template's variables ride along for outside the 24-hour window. */
+export function pmPhoneWhatsApp(get: (n: string) => string | undefined, fetchFn: typeof fetch):
+  ((to: string, text: string, vars: Record<string, string>) => Promise<{ ok: boolean; error?: string }>) | null {
+  const secret = (get('ALERT_SECRET') ?? '').trim()
+  if (!secret) return null
+  const url = (get('ALERT_URL') ?? '').trim() || 'https://junkcarsmequon.com/api/alert'
+  return async (to, text, vars) => {
+    const res = await fetchFn(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-alert-secret': secret },
+      body: JSON.stringify({ channel: 'whatsapp', to, text, vars }) })
+    const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+    return res.ok && j.ok ? { ok: true } : { ok: false, error: `pm-phone ${res.status}: ${j.error ?? 'error'}` }
+  }
+}
+
 export function pmPhoneSender(get: (n: string) => string | undefined, fetchFn: typeof fetch): AlertSend | null {
   const secret = (get('ALERT_SECRET') ?? '').trim()
   if (!secret) return null

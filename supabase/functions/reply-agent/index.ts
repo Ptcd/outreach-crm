@@ -9,7 +9,7 @@ import { claudeDrafter } from '../_shared/drafter.ts'
 import { pushAll, runNotifications, type NotifySummary } from '../_shared/notify.ts'
 import { runPackageMail } from '../_shared/packages.ts'
 import { runVoicemailRead } from '../_shared/voicemailRead.ts'
-import { pmPhoneSender, runHotAlerts } from '../_shared/hotLeads.ts'
+import { pmPhoneSender, pmPhoneWhatsApp, runHotAlerts } from '../_shared/hotLeads.ts'
 import { runMissedCallAlerts } from '../_shared/missedCalls.ts'
 import { hotPush, notifyDeps } from '../_shared/notifyDeno.ts'
 import { senderEnv, twilioPort, type Rpc } from '../_shared/sending.ts'
@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
     const voicemails = await runVoicemailRead(rpc, { apiKey: key, fetchFn: fetch, model: Deno.env.get('VOICEMAIL_MODEL') || undefined })
       .catch((e) => ({ error: String(e).slice(0, 200) }))
     // missed calls (migration 0139): the caller the call-back belongs to gets an email, once per call
-    const missed = await runMissedCallAlerts({ rpc, email: deps.email, appUrl: Deno.env.get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com' })
+    const missed = await runMissedCallAlerts({ rpc, email: deps.email, whatsapp: pmPhoneWhatsApp((n) => Deno.env.get(n), fetch), appUrl: Deno.env.get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com' })
       .catch((e) => ({ error: String(e).slice(0, 200) }))
     await rpc('note_agent_run', { p_summary: { ...summary, notified, hot_alerts: hot, packages, voicemails, missed_calls: missed, drafter: key ? 'claude' : 'none (ANTHROPIC_API_KEY not set)' } })
     return Response.json({ ...summary, notified, hot_alerts: hot, packages, voicemails, missed_calls: missed })
