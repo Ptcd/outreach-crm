@@ -523,6 +523,39 @@ describe('on the real migrations', () => {
     await db.exec(`update public.planned_openers set send_status = 'withdrawn' where send_status in ('planned', 'would_send')`)
   })
 
+  it('the desk channel: the desk asks, Muse in charge decides and reviews letters, Colin keeps money and can switch the grant off', async () => {
+    const q = await r(`public.desk_post('desk', 'muse', 'question', 'record cards', 'Send the Butler letter?', '[{"id":"send","label":"Send it"},{"id":"hold","label":"Hold"}]'::jsonb)`)
+    expect(q).toMatchObject({ ok: true })
+    expect(await r(`public.desk_post('desk', 'muse', 'question', 't', 'one option only', '[{"id":"a","label":"A"}]'::jsonb)`)).toMatchObject({ ok: false })
+    const inbox = await r(`public.desk_read('muse', 0, true)`) as { open_questions: { id: number }[]; in_charge: { muse_in_charge: boolean; colin_only: string[] } }
+    expect(inbox.in_charge.muse_in_charge).toBe(true)
+    expect(inbox.in_charge.colin_only.join(' ')).toContain('money')
+    expect(inbox.open_questions.map((x) => x.id)).toContain(q.id)
+    expect(await r(`public.desk_decide($1, 'maybe', 'x', 'muse')`, [q.id])).toMatchObject({ ok: false, reason: expect.stringContaining('send, hold') })
+    expect(await r(`public.desk_decide($1, 'send', '', 'muse')`, [q.id])).toMatchObject({ ok: false })
+    expect(await r(`public.desk_decide($1, 'send', 'it closes 25 unit legs at no cost', 'muse')`, [q.id])).toMatchObject({ ok: true, choice: 'send' })
+    expect(await r(`public.desk_decide($1, 'hold', 'again', 'muse')`, [q.id])).toMatchObject({ ok: false, reason: expect.stringContaining('answered') })
+    expect(await one(`select status, choice, decided_by from public.desk_messages where id = $1`, [q.id]))
+      .toEqual({ status: 'answered', choice: 'send', decided_by: "Muse (in charge, Colin's delegation)" })
+    const req = (await one<{ id: string }>(`insert into public.records_requests (kind, name, to_email) values ('municipal', 'Desk test office', 'clerk@example.gov') returning id`)).id
+    const draft = async (purpose: string, body: string) => (await one<{ id: string }>(
+      `insert into public.records_drafts (request_id, purpose, to_email, subject, body, status, written_by) values ($1, $2, 'clerk@example.gov', 's', $3, 'draft', 'Claude (laptop desk)') returning id`,
+      [req, purpose, body])).id
+    const plain = await draft('request', 'Please send the property record cards. Records Desk')
+    const money = await draft('request', 'We will pay the $20 fee. Records Desk')
+    const fee = await draft('fee', 'Please narrow the charge. Records Desk')
+    // nothing auto-sends: a first request still waits for a review; Muse in charge may release it, never money or a fee letter
+    expect(await one(`select public.records_draft_standing($1) s`, [plain])).toEqual({ s: 'a first request: Colin approves it in the app' })
+    expect(await one(`select public.records_muse_may_release($1) s`, [plain])).toEqual({ s: null })
+    expect(await one(`select public.records_muse_may_release($1) s`, [money])).toEqual({ s: 'mentions money: Colin approves it' })
+    expect((await one<{ s: string }>(`select public.records_muse_may_release($1) s`, [fee])).s).toContain('Colin approves it')
+    await db.exec(`update public.campaign_delegation set muse_in_charge = false`)
+    expect(await one(`select public.records_muse_may_release($1) s`, [plain])).toEqual({ s: 'a first request: Colin approves it in the app' })
+    const q2 = await r(`public.desk_post('desk', 'muse', 'question', 't', 'b', '[{"id":"a","label":"A"},{"id":"b","label":"B"}]'::jsonb)`)
+    expect(await r(`public.desk_decide($1, 'a', 'why', 'muse')`, [q2.id])).toMatchObject({ ok: false, reason: expect.stringContaining('waits for him') })
+    await db.exec(`update public.campaign_delegation set muse_in_charge = true`)
+  })
+
   it('the agent can lift only its own pause', async () => {
     expect(await r(`public.agent_pause('carrier errors', 'Muse sender')`)).toEqual({ paused: true })
     expect(await r(`public.agent_resume('Muse sender')`)).toEqual({ paused: false })
