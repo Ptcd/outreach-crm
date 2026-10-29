@@ -62,6 +62,7 @@ Deno.serve(async (req) => {
     testResults: (days, step) => rpc('agent_test_results', { p_days: days, p_step: step }) as Promise<Record<string, unknown>>,
     textTemplates: () => rpc('agent_text_templates', {}) as Promise<Record<string, unknown>>,
     setTextTemplate: (t, a) => rpc('agent_set_text_template', { p_variant: t.variant, p_name: t.name, p_wording: t.wording, p_note: t.note, p_agent: a }) as Promise<Record<string, unknown>>,
+    rateCheck: (tool) => rpc('agent_rate_check', { p_key_id: agent.id, p_tool: tool }) as Promise<string | null>,
     logCall: async (c) => { await sb.rpc('agent_log_call', { p_key_id: agent.id, p_tool: c.tool, p_scope: c.scope, p_ok: c.ok, p_error: c.error, p_ms: c.ms }) },
     queue: (d) => rpc('agent_queue_list', { p_date: d }) as Promise<unknown[]>,
     withdraw: (id, a, reason) => rpc('agent_withdraw_text', { p_id: id, p_agent: a, p_reason: reason }) as Promise<boolean>,

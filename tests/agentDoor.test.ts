@@ -64,6 +64,21 @@ describe('the MCP routing', () => {
     expect(keyFromUrl('https://x.supabase.co/functions/v1/agent-mcp/k/not-a-key')).toBeNull()
     expect(keyFrom(new Headers())).toBeNull()
   })
+  it('a key over its budget for a tool is refused before the tool runs, and the refusal is logged', async () => {
+    const muse: Agent = { id: 'k9', name: 'Muse', role: 'agent' }
+    const log: { tool: string; ok: boolean; error: string | null }[] = []
+    let ran = 0
+    const db = fakeDb({ rateCheck: async (tool: string) => tool === 'find_prospects' ? 'rate limit: find_prospects may be called 30 times a minute per key' : null,
+      find: async () => { ran++; return [] }, logCall: async (c) => { log.push(c) } })
+    const refused = await call(muse, 'find_prospects', { address: 'x' }, db)
+    expect(refused).toMatchObject({ isError: true, value: { error: expect.stringContaining('rate limit') } })
+    expect(ran).toBe(0)
+    expect((await call(muse, 'sending_status', {}, db)).isError).toBe(false)
+    expect(log.map((c) => [c.tool, c.ok])).toEqual([['find_prospects', false], ['sending_status', true]])
+    // a check that itself fails never blocks the call
+    const db2 = fakeDb({ rateCheck: async () => { throw new Error('db away') }, find: async () => [] })
+    expect((await call(muse, 'find_prospects', { address: 'x' }, db2)).isError).toBe(false)
+  })
   it('one key with scopes: it sees and calls only what its scopes allow, and every call is logged with its scope', async () => {
     const muse: Agent = { id: 'k9', name: 'Muse', role: 'agent', scopes: ['texting', 'records'] }
     const names = ((await handleMessage({ jsonrpc: '2.0', id: 3, method: 'tools/list' }, muse, fakeDb())) as
@@ -579,6 +594,17 @@ describe('on the real migrations', () => {
     expect(await r(`public.desk_decide($1, 'a', 'Dots agrees', 'muse')`, [q3.id])).toMatchObject({ ok: true })
   })
 
+  it('the rate limit counts a key\'s calls to one tool in the last minute; the work tools have none', async () => {
+    const kid = (await one<{ id: string }>(`insert into public.agent_keys (name, role, key_sha256, key_hint, created_by) values ('rate', 'agent', 'rate', 'rate', 'colin') returning id`)).id
+    expect(await one(`select public.agent_rate_check($1, 'find_prospects') s`, [kid])).toEqual({ s: null })
+    for (let i = 0; i < 30; i++) await db.query(`select public.agent_log_call($1, 'find_prospects', 'prospects', true, null, 5)`, [kid])
+    expect((await one<{ s: string }>(`select public.agent_rate_check($1, 'find_prospects') s`, [kid])).s).toMatch(/30 times a minute.*30 in the last minute/)
+    expect(await one(`select public.agent_rate_check($1, 'sending_status') s`, [kid])).toEqual({ s: null })
+    for (let i = 0; i < 200; i++) await db.query(`select public.agent_log_call($1, 'queue_texts', 'texting', true, null, 5)`, [kid])
+    expect(await one(`select public.agent_rate_check($1, 'queue_texts') s`, [kid])).toEqual({ s: null })
+    await db.query(`update public.agent_calls set at = now() - interval '2 minutes' where key_id = $1`, [kid])
+    expect(await one(`select public.agent_rate_check($1, 'find_prospects') s`, [kid])).toEqual({ s: null })
+  })
   it('the agent can lift only its own pause', async () => {
     expect(await r(`public.agent_pause('carrier errors', 'Muse sender')`)).toEqual({ paused: true })
     expect(await r(`public.agent_resume('Muse sender')`)).toEqual({ paused: false })

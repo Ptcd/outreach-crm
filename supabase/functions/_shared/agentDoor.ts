@@ -43,6 +43,8 @@ export interface DoorDb {
   setTextTemplate(t: { variant: string; name: string | null; wording: string; note: string }, agent: string): Promise<Record<string, unknown>>
   /** Every tools/call, with its scope: ok or refused, the error, how long it took. */
   logCall?(c: { tool: string; scope: Scope | null; ok: boolean; error: string | null; ms: number }): Promise<void>
+  /** A per-key, per-tool budget (0136): the reason to refuse, or null. */
+  rateCheck?(tool: string): Promise<string | null>
   repliesWaiting(days: number): Promise<unknown[]>
   dueToday(): Promise<Record<string, unknown>>
   records(fn: string, args: Record<string, unknown>): Promise<unknown>
@@ -474,6 +476,8 @@ export async function handleMessage(msg: Json, agent: Agent, db: DoorDb): Promis
       try { await db.logCall({ tool, scope: known ? scopeOf(known) : null, ok: okay, error: err, ms: Date.now() - started }) } catch { /* the log never blocks a call */ }
     }
     try {
+      const over = db.rateCheck && known ? await db.rateCheck(tool).catch(() => null) : null   // a failed check never blocks a call
+      if (over) { const value = { error: over }; await log(false, value); return ok(id, textResult(value, true)) }
       const r = await callTool(tool, (p.arguments ?? {}) as Json, agent, db)
       await log(!r.isError, r.value)
       return ok(id, textResult(r.value, !!r.isError))
