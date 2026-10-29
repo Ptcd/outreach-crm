@@ -605,6 +605,18 @@ describe('on the real migrations', () => {
     await db.query(`update public.agent_calls set at = now() - interval '2 minutes' where key_id = $1`, [kid])
     expect(await one(`select public.agent_rate_check($1, 'find_prospects') s`, [kid])).toEqual({ s: null })
   })
+  it('a seller calling back rings only the caller who dialed them; otherwise the shift (inbound_call_ring, 2026-10-29)', async () => {
+    const a = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'Ring Test', address: '9 Ring Rd', city: 'Waukesha', zip: '53186', county: 'Waukesha', mailing_state: 'WI', phones: ['4145550777'] })])
+    const wk = '2026-10-28T19:30:00Z'   // Wednesday 2:30 PM CT: Thalia's shift
+    expect(await r(`public.inbound_call_ring('+1 (414) 555-0777', $1::timestamptz)`, [wk])).toEqual({ ring: ['thalia'], return_call: false, dialed_by: null })
+    expect(await r(`public.inbound_call_ring('4145550777', '2026-10-28T22:00:00Z'::timestamptz)`)).toMatchObject({ ring: ['thalia', 'adil'], return_call: false })   // weekday 5 PM: both in Power hour
+    expect(await r(`public.inbound_call_ring('4145550777', '2026-10-25T15:00:00Z'::timestamptz)`)).toMatchObject({ ring: ['adil'] })   // Saturday
+    expect(await r(`public.inbound_call_ring('4145550777', '2026-10-28T04:00:00Z'::timestamptz)`)).toMatchObject({ ring: ['colin', 'thalia', 'adil'] })   // 11 PM
+    await db.query(`insert into public.belt_events (lead_id, event, payload, at, by) values ($1, 'human_call_started', '{"phone": "4145550777", "source": "app"}', '2026-10-28T22:05:00Z', 'Adil')`, [a.lead_id])
+    expect(await r(`public.inbound_call_ring('+14145550777', '2026-10-28T22:06:00Z'::timestamptz)`)).toEqual({ ring: ['adil'], return_call: true, dialed_by: 'adil' })
+    expect(await r(`public.inbound_call_ring('+14145550777', '2026-10-29T00:00:00Z'::timestamptz)`)).toMatchObject({ return_call: false })   // two hours later it is no longer a return call
+  })
+
   it('the agent can lift only its own pause', async () => {
     expect(await r(`public.agent_pause('carrier errors', 'Muse sender')`)).toEqual({ paused: true })
     expect(await r(`public.agent_resume('Muse sender')`)).toEqual({ paused: false })
