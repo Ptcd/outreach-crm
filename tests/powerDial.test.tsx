@@ -105,6 +105,22 @@ describe('Power hour', () => {
     } finally { items.shift() }
   })
 
+  it('a card already dialed today comes back when that seller calls us (Adil 2026-10-29: his screen hid it as done)', async () => {
+    wrap()
+    expect(await screen.findByText('Jane Q Sample')).toBeTruthy()
+    fireEvent.keyDown(window, { key: '1' })   // no answer: Jane is done for today on this screen
+    await waitFor(() => expect(logCall).toHaveBeenCalled())
+    expect(await screen.findByText('Robert Example')).toBeTruthy()
+    const back = { ...items[0], task_id: null, source: 'missed_call', missed_at: '2026-10-29T22:42:25Z', voicemail: false }   // Jane (L1) calls us back
+    items.unshift(back as never)
+    try {
+      fireEvent.keyDown(window, { key: '1' })   // logging Robert refreshes the list
+      await waitFor(() => expect(logCall).toHaveBeenCalledTimes(2))
+      expect(await screen.findByText('Jane Q Sample')).toBeTruthy()
+      expect(screen.getByText('Missed call: call back now')).toBeTruthy()
+    } finally { items.shift() }
+  })
+
   it('a seller who calls back while a card is up is the next card after the log, not 30 s later (Colin 2026-10-29)', async () => {
     wrap()
     expect(await screen.findByText('Jane Q Sample')).toBeTruthy()

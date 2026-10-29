@@ -93,7 +93,10 @@ export function PowerDial({ caller }: { caller: string }) {
   const update = useCallback((f: (s: Stats) => Stats) => setStats((s) => { const n = f(s); saveStats(n); return n }), [])
 
   const list = useMemo(() => {
-    const all = (q.data ?? []).filter((x) => !stats.done.includes(x.lead_id))
+    // a card logged earlier today stays off this screen, except when something new happened on it: a seller who
+    // called us back, a promised callback or a text back comes up again however often it was dialed (Adil 2026-10-29:
+    // the seller he had just dialed called back, and his screen hid the card as done)
+    const all = (q.data ?? []).filter((x) => !stats.done.includes(x.lead_id) || x.source === 'missed_call' || x.source === 'callback' || x.source === 'replied')
     const ordered = [...all.filter((x) => !skipped.includes(x.lead_id)), ...all.filter((x) => skipped.includes(x.lead_id))]
     const held = pin ? (ordered.find((x) => x.lead_id === pin) ?? (pinItem.current?.lead_id === pin && !stats.done.includes(pin) ? pinItem.current : undefined)) : undefined
     return held ? [held, ...ordered.filter((x) => x.lead_id !== held.lead_id)] : ordered
