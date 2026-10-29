@@ -59,7 +59,10 @@ export function PowerDial({ caller }: { caller: string }) {
   const qc = useQueryClient()
   const { active, incoming, start, dismiss, hangUp, supported } = useDialer()
   const q = useQuery({
-    queryKey: ['power_dial'], staleTime: Infinity, refetchOnWindowFocus: false, refetchInterval: 30_000,
+    // a missed call has to reach the screen fast (Colin 2026-10-29: Adil could not see a seller who called back during
+    // Power hour): poll every 10 s, keep polling while the phone's dialer has the browser in the background, and
+    // refresh on coming back to the tab
+    queryKey: ['power_dial'], staleTime: Infinity, refetchOnWindowFocus: true, refetchInterval: 10_000, refetchIntervalInBackground: true,
     queryFn: async () => {
       const test = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('test') === '1'
       const r = await supabase.rpc('power_dial_queue', test ? { p_limit: 150, p_test: true } : { p_limit: 150 })
@@ -67,6 +70,7 @@ export function PowerDial({ caller }: { caller: string }) {
       return (r.data ?? []) as Item[]
     },
   })
+  const refetch = q.refetch
   const [stats, setStats] = useState<Stats>(loadStats)
   const [skipped, setSkipped] = useState<string[]>([])
   const [talking, setTalking] = useState<string | null>(null)
@@ -115,8 +119,9 @@ export function PowerDial({ caller }: { caller: string }) {
     update((s) => ({ ...s, done: [...s.done, id] }))
     setTalking(null)
     setPin(null)
+    void refetch()   // a seller who called back while this card was up comes straight to the top
     if (logged && auto) setCountdown(2)
-  }, [auto, update])
+  }, [auto, update, refetch])
 
   const log = useCallback(async (o: { id: string; note: string }) => {
     if (!cur || live || busy) return
@@ -246,7 +251,7 @@ export function PowerDial({ caller }: { caller: string }) {
       {!q.isLoading && !cur && <Empty>Nobody left to dial right now. <Button variant="link" onClick={() => void q.refetch()}>Check again</Button></Empty>}
       {cur && pin === cur.lead_id && list.slice(1).some((x) => x.source === 'replied' || x.source === 'missed_call') && (
         <p role="status" className="rounded-lg border-2 border-amber-300 bg-amber-50 p-2 text-sm font-medium dark:bg-amber-950/30">
-          {list.slice(1).some((x) => x.source === 'missed_call') ? 'A seller called us' : 'Someone just texted back'}: they are next, right after this card.</p>
+          {list.slice(1).some((x) => x.source === 'missed_call') ? 'Missed call: a seller called us back' : 'Someone just texted back'}: they are next, right after this card.</p>
       )}
       {cur && (
         <section className="space-y-3 rounded-lg border-2 border-primary/40 bg-card p-3" data-testid="power-card">
@@ -254,7 +259,7 @@ export function PowerDial({ caller }: { caller: string }) {
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-semibold">{title(cur.owner_name)}</h2>
               <Badge tone={cur.source === 'missed_call' || cur.source === 'callback' ? 'bad' : cur.source === 'replied' ? 'warn' : cur.source === 'call_list' ? 'info' : undefined}>
-                {cur.source === 'missed_call' ? 'Called us: call back now' : cur.source === 'callback' ? 'Promised callback' : cur.source === 'checkin' ? '90-day check-in call' : cur.source === 'replied' ? 'Texted back: call now' : cur.source === 'call_list' ? 'On today’s list' : 'Texted, no reply'}</Badge>
+                {cur.source === 'missed_call' ? 'Missed call: call back now' : cur.source === 'callback' ? 'Promised callback' : cur.source === 'checkin' ? '90-day check-in call' : cur.source === 'replied' ? 'Texted back: call now' : cur.source === 'call_list' ? 'On today’s list' : 'Texted, no reply'}</Badge>
             </div>
             <p className="text-sm">{street(cur.address)}{cur.municipality ? `, ${cur.municipality}` : ''}</p>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -266,7 +271,7 @@ export function PowerDial({ caller }: { caller: string }) {
 
           {cur.source === 'missed_call' && (
             <p className="rounded-md border-2 border-red-300 bg-red-50 p-2 text-sm dark:bg-red-950/30">
-              {cur.voicemail_words ? <><span className="font-semibold">Their voicemail:</span> &ldquo;{cur.voicemail_words}&rdquo;</> : <span className="font-semibold">They called and nobody picked up.{cur.voicemail ? ' The voicemail is still being written out.' : ''}</span>}
+              {cur.voicemail_words ? <><span className="font-semibold">Their voicemail:</span> &ldquo;{cur.voicemail_words}&rdquo;</> : <span className="font-semibold">Missed call: they called us and nobody picked up.{cur.voicemail ? ' The voicemail is still being written out.' : ''}</span>}
             </p>
           )}
           {cur.source === 'checkin' && (

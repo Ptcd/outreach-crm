@@ -105,6 +105,23 @@ describe('Power hour', () => {
     } finally { items.shift() }
   })
 
+  it('a seller who calls back while a card is up is the next card after the log, not 30 s later (Colin 2026-10-29)', async () => {
+    wrap()
+    expect(await screen.findByText('Jane Q Sample')).toBeTruthy()
+    fireEvent.click(screen.getByText(/Dial \(414\) 555-0101/))
+    // the callback lands while Jane's card is up and unlogged
+    const missed = { ...items[0], lead_id: 'L9', task_id: null, source: 'missed_call', missed_at: '2026-10-29T22:42:25Z', voicemail: false,
+      owner_name: 'DAVID R CALLER', address: '646 W PIERCE ST', phone: '4145550199' }
+    items.unshift(missed as never)
+    try {
+      fireEvent.click(screen.getByText('Left voicemail'))
+      await waitFor(() => expect(logCall).toHaveBeenCalled())
+      expect(await screen.findByText('David R Caller')).toBeTruthy()
+      expect(screen.getByText('Missed call: call back now')).toBeTruthy()
+      expect(screen.queryByText('Robert Example')).toBeNull()
+    } finally { items.shift() }
+  })
+
   it('a seller who called us and was not reached comes first, with their voicemail and the returning-your-call opener (0117)', async () => {
     const missed = { ...items[0], lead_id: 'L4', task_id: null, source: 'missed_call', missed_at: '2026-10-28T20:22:00Z', voicemail: true,
       voicemail_words: 'I wanna move out of the state, call me back soon', owner_name: 'SAMPLE FAMILY TRUST', address: '400 CALLER RD', phone: '4145550144' }
@@ -112,7 +129,7 @@ describe('Power hour', () => {
     try {
       wrap()
       expect(await screen.findByText('Sample Family Trust')).toBeTruthy()
-      expect(screen.getByText('Called us: call back now')).toBeTruthy()
+      expect(screen.getByText('Missed call: call back now')).toBeTruthy()
       expect(screen.getByText(/I wanna move out of the state/)).toBeTruthy()
       expect(screen.getByText(/Hi, this is Thalia, returning your call about 400 Caller Rd/)).toBeTruthy()
     } finally { items.shift() }
