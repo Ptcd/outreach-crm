@@ -68,7 +68,7 @@ export const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05']
 export const TEXTING_RULES = [
   'You write texts as Colin Merrill himself, first person ("I"). He is one local person who buys houses; never name a business, company, team or "investors".',
   'Never mention a price, a number of dollars, an offer, "cash" or "as-is" (carriers flag it). No $ anywhere.',
-  'Every text ends with a way out that contains the word STOP, for example "Reply STOP if you\'d rather not hear from me."',
+  'A first text ends with a way out that contains the word STOP, for example "Reply STOP if you\'d rather not hear from me." A follow-up (steps 2-5) may leave the STOP line out (Colin 2026-10-29); a reply never needs one. Tag each arm of a follow-up test with its own variant code so test_results can tell them apart.',
   'A first text only asks a simple question about the property (is it still yours / are you the right person to ask about <address>). No pitch until they answer.',
   'Keep it under 160 characters when you can (320 is the hard limit). No links, no emojis, no ALL CAPS.',
   'Never pressure an older or grieving owner. STOP is final: an opted-out phone can never be texted again.',
@@ -270,10 +270,13 @@ export function replyProblem(body: string): string | null {
 }
 
 /** The wording check before a text is queued (the database checks STOP, $, length and the business name again). */
-export function textProblem(body: string): string | null {
+/** The wording check for a queued text. The STOP way out is required on a first text (step 1), where the opt-out
+ * notice belongs; a follow-up (steps 2-5) may leave it out (Colin 2026-10-29: the step-2 test arm, after 10 of 11
+ * traced STOPs followed a step 2 that ended "just reply STOP"). Everything else applies to every step. */
+export function textProblem(body: string, step = 1): string | null {
   const b = (body ?? '').trim()
   if (!b) return 'empty text'
-  if (!/\bSTOP\b/.test(b)) return 'needs a STOP line (e.g. "Reply STOP if you\'d rather not hear from me.")'
+  if (step <= 1 && !/\bSTOP\b/.test(b)) return 'a first text needs a STOP line (e.g. "Reply STOP if you\'d rather not hear from me.")'
   if (b.length > 320) return 'over 320 characters'
   if (b.includes('$')) return 'no $ or prices'
   if (findPriceOrOffer(b).length) return 'mentions a price or an offer'
@@ -346,7 +349,7 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       const results = []
       for (const t of list) {
         const body = String(t.body ?? '').replace(/\s+/g, ' ').trim()
-        const why = textProblem(body)
+        const why = textProblem(body, int(t.step, 1, 5))
         if (why) { results.push({ lead_id: t.lead_id, status: 'refused', reason: why }); continue }
         const r = await db.queueText({ lead_id: String(t.lead_id ?? ''), phone: String(t.phone ?? ''), body,
           step: int(t.step, 1, 5), send_after: t.send_after ? String(t.send_after) : null,

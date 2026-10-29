@@ -127,6 +127,10 @@ describe('the wording check (Colin\'s rules for every text)', () => {
   it('passes a plain first text and refuses what may never go out', () => {
     expect(textProblem(OPENER)).toBeNull()
     expect(textProblem('Hi Pat, is 12 Maple St still yours?')).toMatch(/STOP/)
+    // a follow-up may leave the STOP line out (Colin 2026-10-29); the other rules still hold on every step
+    expect(textProblem('Hi Pat, Thalia again about 12 Maple St. Still the owner there? Just checking I have the right place.', 2)).toBeNull()
+    expect(textProblem('Hi Pat, Thalia again about 12 Maple St. Still the owner there?', 1)).toMatch(/first text needs a STOP/)
+    expect(textProblem('Thalia again. We buy for cash.', 2)).toMatch(/cash/)
     expect(textProblem("I'd pay $90k for it. Reply STOP to opt out.")).toMatch(/\$/)
     expect(textProblem('I buy houses for cash. Reply STOP to opt out.')).toMatch(/cash/)
     expect(textProblem('I buy them as-is. Reply STOP to opt out.')).toMatch(/as-is/)
