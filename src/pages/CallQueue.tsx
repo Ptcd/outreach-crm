@@ -4,7 +4,7 @@
 // the booking verdict and Log this call. Logging the call finishes the task and brings the next one; Skip
 // moves it to the end of this sitting; Hand to Colin gives him the card with one line and pings him.
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge, Empty, ErrorNote, Textarea } from '@/components/ui/form'
 import { CallButton, PersonalCallButton } from '@/components/CallButton'
@@ -54,9 +54,17 @@ export default function CallQueue() {
   // which the belt would read as a plain Done and route again.
   const refresh = useWrite(async () => ({ data: null, error: null }), [['tasks'], ['lead'], ['leads'], ['pipeline_counts']])
   const total = queue.length + done.length
-  // Power hour: the fast cold-call mode (Colin 2026-10-28); remembered per device
-  const [mode, setModeState] = useState<'list' | 'power'>(() => { try { return localStorage.getItem('calls:mode') === 'power' ? 'power' : 'list' } catch { return 'list' } })
-  const setMode = (m: 'list' | 'power') => { setModeState(m); try { localStorage.setItem('calls:mode', m) } catch { /* fine */ } }
+  // Power hour: the fast cold-call mode (Colin 2026-10-28); remembered per device. Today's Power hour button opens
+  // it directly with ?mode=power (Colin 2026-10-29).
+  const [params, setParams] = useSearchParams()
+  const [mode, setModeState] = useState<'list' | 'power'>(() => {
+    if (params.get('mode') === 'power') { try { localStorage.setItem('calls:mode', 'power') } catch { /* fine */ } return 'power' }
+    try { return localStorage.getItem('calls:mode') === 'power' ? 'power' : 'list' } catch { return 'list' }
+  })
+  const setMode = (m: 'list' | 'power') => {
+    setModeState(m); try { localStorage.setItem('calls:mode', m) } catch { /* fine */ }
+    if (params.has('mode')) setParams({}, { replace: true })
+  }
   const tabs = (
     <div className="flex gap-2" role="tablist">
       <Button role="tab" aria-selected={mode === 'list'} variant={mode === 'list' ? 'default' : 'outline'} className="h-10" onClick={() => setMode('list')}>Today&apos;s list</Button>

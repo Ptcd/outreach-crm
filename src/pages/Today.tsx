@@ -14,7 +14,7 @@ import { MissedCalls } from '@/components/MissedCalls'
 import { ownerFilterFor, useOnPhone, workerFor, type TaskOwner } from '@/lib/onPhone'
 import { OnPhonePrompt, useColinHere } from '@/components/OnPhonePicker'
 import { StatTiles } from '@/components/StatTiles'
-import { ClipboardList, MessageCircle, PhoneCall, Sparkles } from 'lucide-react'
+import { ClipboardList, MessageCircle, PhoneCall, Sparkles, Zap } from 'lucide-react'
 
 export default function Today() {
   const { member, user } = useAuth()
@@ -44,9 +44,15 @@ export default function Today() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Today</h1>
-        <p className="text-sm text-muted-foreground">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Today</h1>
+          <p className="text-sm text-muted-foreground">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+        </div>
+        {/* straight into Power hour from the day's front page (Colin 2026-10-29) */}
+        <Button asChild size="lg" className="h-12 px-5 text-base">
+          <Link to="/calls?mode=power"><Zap className="mr-2 h-5 w-5" aria-hidden />Power hour</Link>
+        </Button>
       </div>
       <OnPhonePrompt />
       <StatTiles tiles={[

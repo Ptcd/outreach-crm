@@ -26,6 +26,7 @@ const beginHumanCall = vi.fn(async () => ({ data: { ok: true, paused: true, key:
 const resumeHumanCall = vi.fn(async () => ({ data: { ok: true, paused: false }, error: null }))
 const ok = <T,>(data: T) => ({ data, error: null, isLoading: false, isPending: false, isSuccess: false })
 
+vi.mock('@/components/PowerDial', () => ({ PowerDial: () => <div data-testid="power-dial">power</div> }))
 vi.mock('@/lib/supabaseClient', () => ({ supabase: {}, supabaseConfigured: true }))
 vi.mock('@/providers/AuthProvider', () => ({
   useAuth: () => ({ user: { id: 'u2', email: 'thalia@example.com' }, member: { email: 'thalia@example.com', role: 'caller', person: 'thalia', display_name: 'Thalia' },
@@ -78,6 +79,17 @@ describe('the call queue', () => {
     expect(await screen.findByRole('heading', { name: 'BO KIM' })).toBeTruthy()
     expect(screen.getByTestId('queue-count').textContent).toBe('2 of 2')
     expect(screen.queryByRole('button', { name: 'Call' })).toBeNull()               // vendor DNC: never expose the dial button
+  })
+
+  it("Today's Power hour button lands on /calls?mode=power and opens Power hour; switching back clears it", async () => {
+    try { localStorage.removeItem('calls:mode') } catch { /* fine */ }
+    render(<QueryClientProvider client={new QueryClient()}><MemoryRouter initialEntries={['/calls?mode=power']}><CallQueue /></MemoryRouter></QueryClientProvider>)
+    expect(screen.getByRole('tab', { name: 'Power hour' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByTestId('power-dial')).toBeTruthy()
+    expect(localStorage.getItem('calls:mode')).toBe('power')
+    fireEvent.click(screen.getByRole('tab', { name: "Today's list" }))
+    expect(screen.getByRole('tab', { name: "Today's list" }).getAttribute('aria-selected')).toBe('true')
+    expect(localStorage.getItem('calls:mode')).toBe('list')
   })
 
   it('skip moves the card to the end; hand to Colin needs a line, then finishes the task', async () => {
