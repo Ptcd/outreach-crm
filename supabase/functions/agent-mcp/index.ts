@@ -3,7 +3,7 @@
 // or "x-api-key". The key's scopes (prospects, texting, calendar, records, marks) decide which tools it sees; every call
 // is logged in agent_calls with its scope. Tools and checks: _shared/agentDoor.ts.
 import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
-import { handleMessage, keyFrom, SCOPES, type Agent, type DoorDb, type Scope } from '../_shared/agentDoor.ts'
+import { handleMessage, keyFrom, keyFromUrl, SCOPES, type Agent, type DoorDb, type Scope } from '../_shared/agentDoor.ts'
 import { approveReply } from '../_shared/replyAgent.ts'
 import { senderEnv, twilioPort, type Rpc } from '../_shared/sending.ts'
 import { bookSlot, cancelBooking, connect, findSlots, type Cal } from '../_shared/calendar.ts'
@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return new Response('POST JSON-RPC to this URL (MCP streamable HTTP, no event stream)', { status: 405, headers: CORS })
   const sb = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', { auth: { persistSession: false } })
-  const key = keyFrom(req.headers)
+  const key = keyFrom(req.headers) ?? keyFromUrl(req.url)
   const check = key ? await sb.rpc('agent_key_check', { p_key: key }) : null
   const k = check?.data as { ok?: boolean; id?: string; name?: string; role?: string; scopes?: string[] } | null
   if (!k?.ok) return Response.json({ jsonrpc: '2.0', id: null, error: { code: -32001, message: 'missing or turned-off agent key' } }, { status: 401, headers: CORS })

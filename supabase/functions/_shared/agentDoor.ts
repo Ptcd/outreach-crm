@@ -10,8 +10,8 @@ import { CALENDAR_TOOLS, callCalendarTool, isCalendarTool, type CalendarDoor } f
 export type Role = 'intake' | 'sender' | 'records' | 'agent'
 type ToolRole = Exclude<Role, 'agent'> | 'any'
 /** What a key may do (Muse 2026-10-26): one key, five switches Colin flips in Settings > Agent keys. */
-export type Scope = 'prospects' | 'texting' | 'calendar' | 'records' | 'marks'
-export const SCOPES: Scope[] = ['prospects', 'texting', 'calendar', 'records', 'marks']
+export type Scope = 'prospects' | 'texting' | 'calendar' | 'records' | 'marks' | 'channel'
+export const SCOPES: Scope[] = ['prospects', 'texting', 'calendar', 'records', 'marks', 'channel']
 export interface Agent { id: string; name: string; role: Role; scopes?: Scope[] }
 
 /** The old single-role keys keep exactly what their role had; a key with its own scopes has those. */
@@ -26,6 +26,7 @@ export function scopesOf(agent: Agent): Scope[] {
 /** The scope a tool belongs to: calendar tools to calendar, cards (due_today, mark_card, link_cards) to marks. */
 export function scopeOf(tool: { name: string; role: string }): Scope {
   if (isCalendarTool(tool.name)) return 'calendar'
+  if (tool.role === 'channel') return 'channel'
   return tool.role === 'intake' ? 'prospects' : tool.role === 'sender' ? 'texting' : tool.role === 'records' ? 'records' : 'marks'
 }
 
@@ -217,15 +218,15 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
   { role: 'any', name: 'call_list',
     description: 'The callers\' list for a day (default today, Central): every open call task for Thalia or Adil due that day or earlier, in the order they work it: promised callbacks, texters you sent to call_next, then the daily call list by its rank (the laptop posts it the evening before, due 7 AM), then other call stops. Each with the card, why, days_late, dials_today and the last call outcome; a task logged today shows done_at. due_today does not list these tasks: read call_list for what the callers have.',
     inputSchema: { type: 'object', properties: { date: S('YYYY-MM-DD') } } },
-  { role: 'any', name: 'desk_inbox',
-    description: 'The desk channel (Colin 2026-10-29): messages between you and the laptop verification desk (Claude), and Colin. Returns in_charge (the standing grant from Colin: you make the campaign decisions for the desk as if you ran the campaign, and colin_only, what never moves to you), open_questions the desk is waiting on you to decide, and messages since since_id. Read it at the start of every session and answer every open question the same day.',
+  { role: 'channel', name: 'desk_inbox',
+    description: 'The desk channel (Colin 2026-10-29): messages between the laptop verification desk (Claude), Muse, Dots (OpenAI) and Colin. Returns in_charge (the standing grant from Colin: you make the campaign decisions for the desk as if you ran the campaign, and colin_only, what never moves to you), open_questions the desk is waiting on you to decide, and messages since since_id. Read it at the start of every session and answer every open question the same day.',
     inputSchema: { type: 'object', properties: { since_id: { type: 'integer' }, open_only: { type: 'boolean' } } } },
-  { role: 'any', name: 'desk_post',
+  { role: 'channel', name: 'desk_post',
     description: 'Post to the desk channel: kind note (information), report (finished work), or question (you need the desk or Colin to choose: options = [{id, label}], at least two). for = desk (default), colin or all. reply_to = the message you answer. Work batches, results and hand-offs to the desk go here, not in the records log.',
     inputSchema: { type: 'object', properties: { kind: S('note | report | question'), for: S('desk | colin | all'), topic: S('short subject'), body: S('the message (12,000 characters max)'),
       options: { type: 'array', items: { type: 'object', properties: { id: S('short id'), label: S('what it means') } } }, reply_to: { type: 'integer' } }, required: ['kind', 'body'] } },
-  { role: 'any', name: 'desk_decide',
-    description: 'Decide a question the desk put to you: choice = one option id, reason = why, in a sentence or two. Your answer is the decision of record and the desk acts on it. Decide as the person running the campaign: what gets the most finished, callable cards at no cost. Anything on the colin_only list is not yours: pick the option that sends it to Colin, or post a question for colin.',
+  { role: 'channel', name: 'desk_decide',
+    description: 'Decide a question the desk put to you (Muse while Colin has Muse in charge; Dots posts its view with desk_post instead): choice = one option id, reason = why, in a sentence or two. Your answer is the decision of record and the desk acts on it. Decide as the person running the campaign: what gets the most finished, callable cards at no cost. Anything on the colin_only list is not yours: pick the option that sends it to Colin, or post a question for colin.',
     inputSchema: { type: 'object', properties: { question_id: { type: 'integer' }, choice: S('the option id'), reason: S('why') }, required: ['question_id', 'choice', 'reason'] } },
   { role: 'any', name: 'mark_card',
     description: 'Mark a card the way the team does from its buttons. Person marks close one person, not the property: deceased (with interest_id or phone: closed on every card; if the card died only as no contact or by the death and someone live remains, it reopens), wrong_person (not connected to this property: closed on this card only), and dnc with interest_id or phone (that person is do-not-contact on every card and that number is blocked; when the person is an owner, the property closes too). When nobody live is left on a card, it holds for a re-trace. Property marks: dead (not interested), dnc with no person (the whole card: every phone blocked for good), not_now (with date = when to check back, or reason = what has to change first), hot (wants to sell / asked for a call: Colin is pinged and the card goes to him), held (reason = the named blocker, optional date), release (reason = what cleared: a held or not-now card goes back to the stage it had before the hold, and a texting thread picks up its follow-ups again), wrong_number (phone = the number that was never them), elderly, grief, note (reason = the note), or note_delete (reason = at least 8 characters of a note of yours to remove; your own notes only, and the removed text stays in the history of the card; to correct a note, note_delete then note). Returns the stage and belt of the card after the mark.',
@@ -355,12 +356,12 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
     }
     case 'due_today': return { value: await db.dueToday() }
     case 'call_list': return { value: await db.records('agent_call_list', { p_date: args.date ? String(args.date) : null }) }
-    case 'desk_inbox': return { value: await db.records('desk_read', { p_for: 'muse', p_since: Math.max(0, Math.floor(Number(args.since_id ?? 0)) || 0), p_open_only: args.open_only === true, p_limit: 100 }) }
-    case 'desk_post': return { value: await db.records('desk_post', { p_author: 'muse', p_for: args.for ? String(args.for) : 'desk', p_kind: String(args.kind ?? 'note'),
+    case 'desk_inbox': return { value: await db.records('desk_read', { p_for: channelAuthor(agent), p_since: Math.max(0, Math.floor(Number(args.since_id ?? 0)) || 0), p_open_only: args.open_only === true, p_limit: 100 }) }
+    case 'desk_post': return { value: await db.records('desk_post', { p_author: channelAuthor(agent), p_for: args.for ? String(args.for) : 'desk', p_kind: String(args.kind ?? 'note'),
       p_topic: args.topic ? String(args.topic) : null, p_body: String(args.body ?? ''), p_options: Array.isArray(args.options) ? args.options : null,
       p_reply_to: args.reply_to ? int(args.reply_to, 0, 2147483647) : null }) }
     case 'desk_decide': return { value: await db.records('desk_decide', { p_question_id: int(args.question_id, 0, 2147483647), p_choice: String(args.choice ?? ''),
-      p_reason: String(args.reason ?? ''), p_author: 'muse' }) }
+      p_reason: String(args.reason ?? ''), p_author: channelAuthor(agent) }) }
     case 'records_overview': return { value: await db.records('records_overview', {}) }
     case 'records_templates': return { value: await db.records('records_templates', {}) }
     case 'records_list': return { value: await db.records('records_list', { p_filter: args.filter ? String(args.filter) : 'due', p_limit: int(args.limit, 100, 500) }) }
@@ -483,6 +484,20 @@ export async function handleMessage(msg: Json, agent: Agent, db: DoorDb): Promis
     }
   }
   return fail(id, -32601, `method not found: ${method}`)
+}
+
+/** Who a key speaks as on the desk channel: a key named for Dots (OpenAI) is Dots; every other key is Muse. */
+export function channelAuthor(agent: Agent): 'dots' | 'muse' {
+  return /\bdots?\b|openai/i.test(agent.name) ? 'dots' : 'muse'
+}
+
+/** A key in the URL, for MCP clients that cannot send a header (ChatGPT connectors): .../agent-mcp/k/<key> or ?key=<key>. */
+export function keyFromUrl(url: string): string | null {
+  try {
+    const u = new URL(url)
+    const m = u.pathname.match(/\/k\/(wpie_[a-z]+_[0-9a-f]{64})\/?$/)
+    return m ? m[1] : (u.searchParams.get('key')?.match(/^wpie_[a-z]+_[0-9a-f]{64}$/)?.[0] ?? null)
+  } catch { return null }
 }
 
 /** The key from the request: Authorization: Bearer <key>, or x-api-key. */

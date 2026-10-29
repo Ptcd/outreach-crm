@@ -6,7 +6,7 @@ import path from 'node:path'
 import { PGlite } from '@electric-sql/pglite'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { SUPABASE_STUB } from './supabaseStub'
-import { TOOLS, handleMessage, keyFrom, textProblem, type Agent, type DoorDb } from '../supabase/functions/_shared/agentDoor'
+import { TOOLS, channelAuthor, handleMessage, keyFrom, keyFromUrl, textProblem, type Agent, type DoorDb } from '../supabase/functions/_shared/agentDoor'
 
 const MIGRATIONS_DIR = path.resolve(__dirname, '../supabase/migrations')
 const MIGRATION = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort()
@@ -44,6 +44,25 @@ describe('the MCP routing', () => {
     expect(await list(intake)).not.toContain('queue_texts')
     expect((await call(intake, 'queue_texts', { texts: [] })).isError).toBe(true)
     expect((await call(sender, 'add_prospects', { prospects: [] })).isError).toBe(true)
+  })
+  it('a Dots key with only the channel scope: the desk channel tools and nothing else, posting as Dots; the key may ride in the URL', async () => {
+    const dots: Agent = { id: 'k10', name: 'Dots', role: 'agent', scopes: ['channel'] }
+    const names = ((await handleMessage({ jsonrpc: '2.0', id: 4, method: 'tools/list' }, dots, fakeDb())) as
+      { result: { tools: { name: string }[] } }).result.tools.map((t) => t.name)
+    expect(names.sort()).toEqual(['desk_decide', 'desk_inbox', 'desk_post'])
+    expect((await call(dots, 'mark_card', { lead_id: 'x', mark: 'note', reason: 'r' })).isError).toBe(true)
+    const seen: { fn: string; args: Record<string, unknown> }[] = []
+    const db = fakeDb({ records: async (fn: string, args: Record<string, unknown>) => { seen.push({ fn, args }); return { ok: true } } })
+    await call(dots, 'desk_post', { kind: 'note', body: 'hello from Dots' }, db)
+    await call({ id: 'k9', name: 'Muse', role: 'agent' }, 'desk_inbox', {}, db)
+    expect(seen.map((s) => [s.fn, s.args.p_author ?? s.args.p_for])).toEqual([['desk_post', 'dots'], ['desk_read', 'muse']])
+    expect([channelAuthor(dots), channelAuthor({ ...dots, name: 'OpenAI dot' }), channelAuthor({ ...dots, name: 'Muse' }), channelAuthor({ ...dots, name: 'Anecdotes' })])
+      .toEqual(['dots', 'dots', 'muse', 'muse'])
+    const k = 'wpie_agent_' + 'a'.repeat(64)
+    expect(keyFromUrl(`https://x.supabase.co/functions/v1/agent-mcp/k/${k}`)).toBe(k)
+    expect(keyFromUrl(`https://x.supabase.co/functions/v1/agent-mcp?key=${k}`)).toBe(k)
+    expect(keyFromUrl('https://x.supabase.co/functions/v1/agent-mcp/k/not-a-key')).toBeNull()
+    expect(keyFrom(new Headers())).toBeNull()
   })
   it('one key with scopes: it sees and calls only what its scopes allow, and every call is logged with its scope', async () => {
     const muse: Agent = { id: 'k9', name: 'Muse', role: 'agent', scopes: ['texting', 'records'] }
@@ -373,14 +392,14 @@ describe('on the real migrations', () => {
     await db.exec(`update public.campaign_control set window_start = '10:00'`)
   })
 
-  it('one agent key: all five scopes by default, Colin switches one off, the switch holds, calls are counted', async () => {
+  it('one agent key: all six scopes by default, Colin switches one off, the switch holds, calls are counted', async () => {
     await db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify(COLIN)])
     await db.exec('set role authenticated')
     const key = (await one<{ k: string }>(`select public.create_agent_key('Muse', 'agent') as k`)).k
     const id = (await one<{ id: string }>(`select id from public.list_agent_keys() where name = 'Muse' and revoked_at is null`)).id
     await db.exec('reset role')
     expect(key).toMatch(/^wpie_agent_/)
-    expect(await r(`public.agent_key_check($1)`, [key])).toMatchObject({ ok: true, role: 'agent', scopes: ['prospects', 'texting', 'calendar', 'records', 'marks'] })
+    expect(await r(`public.agent_key_check($1)`, [key])).toMatchObject({ ok: true, role: 'agent', scopes: ['prospects', 'texting', 'calendar', 'records', 'marks', 'channel'] })
     await db.query(`select set_config('request.jwt.claims', '', false)`)
     await expect(db.query(`select public.set_agent_key_scopes($1, array['texting'])`, [id])).rejects.toThrow(/only Colin/)
     await db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify(COLIN)])
@@ -554,6 +573,10 @@ describe('on the real migrations', () => {
     const q2 = await r(`public.desk_post('desk', 'muse', 'question', 't', 'b', '[{"id":"a","label":"A"},{"id":"b","label":"B"}]'::jsonb)`)
     expect(await r(`public.desk_decide($1, 'a', 'why', 'muse')`, [q2.id])).toMatchObject({ ok: false, reason: expect.stringContaining('waits for him') })
     await db.exec(`update public.campaign_delegation set muse_in_charge = true`)
+    const q3 = await r(`public.desk_post('desk', 'all', 'question', 't', 'b', '[{"id":"a","label":"A"},{"id":"b","label":"B"}]'::jsonb)`)
+    expect(await r(`public.desk_post('dots', 'desk', 'note', 't', 'my view: a', null, $1)`, [q3.id])).toMatchObject({ ok: true })
+    expect(await r(`public.desk_decide($1, 'a', 'why', 'dots')`, [q3.id])).toMatchObject({ ok: false, reason: expect.stringContaining("Muse's") })
+    expect(await r(`public.desk_decide($1, 'a', 'Dots agrees', 'muse')`, [q3.id])).toMatchObject({ ok: true })
   })
 
   it('the agent can lift only its own pause', async () => {

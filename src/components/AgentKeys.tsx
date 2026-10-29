@@ -16,10 +16,10 @@ const BASE = ((import.meta.env.NEXT_PUBLIC_SUPABASE_URL ?? import.meta.env.VITE_
 export const AGENT_DOOR_URL = `${BASE.replace(/\/+$/, '')}/functions/v1/agent-mcp`
 
 type Role = 'agent' | 'intake' | 'sender' | 'records'
-type Scope = 'prospects' | 'texting' | 'calendar' | 'records' | 'marks'
+type Scope = 'prospects' | 'texting' | 'calendar' | 'records' | 'marks' | 'channel'
 export const SCOPES: { id: Scope; label: string }[] = [
   { id: 'prospects', label: 'Prospects' }, { id: 'texting', label: 'Texting' }, { id: 'calendar', label: 'Calendar' },
-  { id: 'records', label: 'Records' }, { id: 'marks', label: 'Cards' },
+  { id: 'records', label: 'Records' }, { id: 'marks', label: 'Cards' }, { id: 'channel', label: 'Desk channel' },
 ]
 type Key = { id: string; name: string; role: Role; key_hint: string; created_at: string; last_used_at: string | null; revoked_at: string | null
   scopes: Scope[] | null; calls_24h: number | null; refused_24h: number | null }
