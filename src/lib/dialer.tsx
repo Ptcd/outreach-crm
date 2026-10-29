@@ -23,7 +23,7 @@ import { supabase } from './supabaseClient'
 import { fmtPhone } from './format'
 import { useAuth } from '@/providers/AuthProvider'
 import type { PhoneMatch } from './queries'
-import { callAttemptKey, callerLineFor, humanCallAuthorized, humanCallProviderParams } from './callAttempt'
+import { callAttemptKey, callerLineFor, humanCallAuthorized, humanCallProviderParams, poolLineFor } from './callAttempt'
 
 // The seller line the call shows (the pool's main texting number). Any number in the seller pool works;
 // pm-phone refuses one that is not ours.
@@ -243,7 +243,10 @@ export function DialerProvider({ children }: { children: ReactNode }) {
       void contactId
       const thread = await supabase.from('messages').select('direction, channel, from_number, to_number, sent_at')
         .eq('lead_id', leadId).eq('channel', 'sms').order('sent_at', { ascending: false }).limit(50)
-      const line = callerLineFor(to, (thread.data ?? []) as Parameters<typeof callerLineFor>[1], CALLER_ID)
+      // never texted: one of the seller numbers, picked by phone (0 texts = no number of its own yet)
+      const pool = await supabase.from('campaign_control').select('reply_numbers').maybeSingle()
+      const cold = poolLineFor(((pool.data as { reply_numbers?: string[] } | null)?.reply_numbers) ?? [], to, CALLER_ID)
+      const line = callerLineFor(to, (thread.data ?? []) as Parameters<typeof callerLineFor>[1], cold)
       const call = await dev.connect({ params: humanCallProviderParams(to, line, leadId, takeoverKey) })
       callRef.current = call
       call.on('ringing', () => setActive((a) => (a ? { ...a, status: 'ringing' } : a)))

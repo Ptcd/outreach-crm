@@ -31,6 +31,17 @@ export function humanCallProviderParams(to: string, line: string, leadId: string
 type ThreadRow = { direction: string; channel: string; from_number: string | null; to_number: string | null; sent_at: string }
 const last10 = (n: string | null | undefined) => (n ?? '').replace(/[^0-9]/g, '').slice(-10)
 
+/** A never-texted phone's number to call from (Colin 2026-10-28, two callers at 200 dials a day): spread across the
+ *  seller numbers so no one number carries every cold dial (that is how a number gets labeled spam), and the same
+ *  phone always sees the same number. Same spread as a first text's (sending.ts openerFromFor). */
+export function poolLineFor(pool: string[], phone: string, fallback: string): string {
+  const list = pool.filter((n) => /^\+1\d{10}$/.test(n))
+  if (!list.length) return fallback
+  let h = 0
+  for (const ch of phone.replace(/\D/g, '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return list[h % list.length]
+}
+
 /** The number to call from (Colin 2026-10-24: "it should call from the same number"): our side of the latest text
  *  with this phone, so the seller sees the number that texted them. Else the latest number we texted the card from,
  *  else the fallback. pm-phone still refuses any number outside the seller pool. */
