@@ -617,6 +617,24 @@ describe('on the real migrations', () => {
     expect(await r(`public.inbound_call_ring('+14145550777', '2026-10-29T00:00:00Z'::timestamptz)`)).toMatchObject({ return_call: false })   // two hours later it is no longer a return call
   })
 
+  it('a missed seller call for a caller is listed for an email once, at their alert email or sign-in email (0139)', async () => {
+    const a = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'Missed Caller', address: '7 Ring Rd', city: 'Waukesha', zip: '53186', county: 'Waukesha', mailing_state: 'WI', phones: ['4145550778'] })])
+    await db.exec(`insert into public.team_members (email, role, person, display_name) values ('thalia@example.com', 'caller', 'thalia', 'Thalia') on conflict do nothing`)
+    const tid = (await one<{ id: string }>(`insert into public.tasks (lead_id, due_at, kind, owner, title, source) values ($1, now(), 'call', 'thalia', 'They called us: call back', 'belt') returning id`, [a.lead_id])).id
+    await db.query(`insert into public.inbound_calls (call_sid, lead_id, from10, to_number, status, voicemail, task_id) values ('CAtest1', $1, '4145550778', '+12624180202', 'missed', false, $2)`, [a.lead_id, tid])
+    const rows = await r(`public.missed_calls_to_alert()`) as { call_sid: string; person: string; email: string; owner_name: string }[]
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ call_sid: 'CAtest1', person: 'thalia', email: 'thalia@example.com', owner_name: 'Missed Caller' })
+    await db.exec(`update public.team_members set alert_email = 'thalia.alerts@example.com' where person = 'thalia'`)
+    expect(((await r(`public.missed_calls_to_alert()`)) as { email: string }[])[0].email).toBe('thalia.alerts@example.com')
+    await db.exec(`select public.missed_call_alerted('CAtest1')`)
+    expect(await r(`public.missed_calls_to_alert()`)).toEqual([])
+    // Colin's own missed calls are not emailed here: his cell already gets the forwarding app's text
+    await db.query(`update public.tasks set owner = 'colin' where id = $1`, [tid])
+    await db.query(`update public.inbound_calls set alerted_at = null where call_sid = 'CAtest1'`)
+    expect(await r(`public.missed_calls_to_alert()`)).toEqual([])
+  })
+
   it('the agent can lift only its own pause', async () => {
     expect(await r(`public.agent_pause('carrier errors', 'Muse sender')`)).toEqual({ paused: true })
     expect(await r(`public.agent_resume('Muse sender')`)).toEqual({ paused: false })

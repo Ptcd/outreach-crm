@@ -1,49 +1,34 @@
-// Missed calls and voicemails on Today, and a voicemail on the card (Colin 2026-10-27): a missed call shows with the
-// voicemail's words, a closed card's call still shows (marked, never dialed), and the card's history titles a voicemail
-// as one, its words first.
-import { readdirSync, readFileSync } from 'node:fs'
-import path from 'node:path'
-import { PGlite } from '@electric-sql/pglite'
-import { beforeAll, describe, expect, it } from 'vitest'
-import { SUPABASE_STUB } from './supabaseStub'
-import { timelineOf } from '../src/lib/inbox'
-import type { Message } from '../src/lib/types'
+// A missed call emails the caller it is for (migration 0139), once; a caller with no email is marked, not retried every minute.
+import { describe, expect, it } from 'vitest'
+import { missedCallEmail, runMissedCallAlerts, type MissedCall } from '../supabase/functions/_shared/missedCalls'
 
-const MIGRATIONS_DIR = path.resolve(__dirname, '../supabase/migrations')
-const MIGRATION = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort()
-  .map((f) => readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8')).join('\n')
-let db: PGlite
+const call = (over: Partial<MissedCall> = {}): MissedCall => ({ call_sid: 'CA1', lead_id: 'L1', from10: '4145550101', at: '2026-10-29T22:42:25Z', voicemail: false, vm_verdict: null,
+  owner_name: 'DAVID R LASCELLE', address: '646 W PIERCE ST', municipality: 'Milwaukee', person: 'adil', email: 'adil@example.com', display_name: 'Adil', ...over })
 
-beforeAll(async () => {
-  db = new PGlite()
-  await db.exec(SUPABASE_STUB)
-  await db.exec(MIGRATION)
-})
-
-describe('missed calls and voicemails', () => {
-  it('lists missed calls with the voicemail words; a closed card is marked, not hidden', async () => {
-    const lead = ((await db.query<{ r: { lead_id: string } }>(`select public.agent_add_prospect($1::jsonb, 'Muse') as r`,
-      [JSON.stringify({ owner_name: 'DAVE VOICEMAIL', address: '30 Missed Test Ln', phones: ['7155553001'] })])).rows[0].r).lead_id
-    const m = (await db.query<{ id: string }>(`insert into public.messages (lead_id, direction, channel, body, from_number, status, sent_at)
-      values ($1, 'in', 'call', $2, '+17155553001', 'inbound_missed', now() - interval '1 hour') returning id`,
-      [lead, 'Missed call: (715) 555-3001 called our (262) 418-0202. Call them back.\nLeft a voicemail (21 s).\nVoicemail: "Call me back about the house."'])).rows[0].id
-    await db.query(`insert into public.inbound_calls (call_sid, lead_id, from10, to_number, status, voicemail, message_id, created_at)
-      values ('CA1', $1, '7155553001', '+12624180202', 'missed', true, $2, now() - interval '1 hour')`, [lead, m])
-    await db.query(`insert into public.inbound_calls (call_sid, lead_id, from10, to_number, status, voicemail, created_at)
-      values ('CA0', $1, '7155553001', '+12624180202', 'answered', false, now() - interval '2 hours')`, [lead])
-    let rows = (await db.query<{ r: { call_sid: string; words: string; closed: boolean; called_back: boolean }[] }>(`select public.missed_calls_recent(48) as r`)).rows[0].r
-    expect(rows.map((x) => [x.call_sid, x.words, x.closed, x.called_back])).toEqual([['CA1', 'Call me back about the house.', false, false]])
-    await db.query(`update public.leads set stage = 'dnc' where id = $1`, [lead])
-    rows = (await db.query<{ r: { closed: boolean }[] }>(`select public.missed_calls_recent(48) as r`)).rows[0].r
-    expect(rows[0].closed).toBe(true)
+describe('missed-call emails', () => {
+  it('says who called, when, the voicemail verdict, and links the card', () => {
+    const m = missedCallEmail(call({ voicemail: true, vm_verdict: 'seller' }), 'https://deals.example/')
+    expect(m.subject).toBe('Missed call: DAVID R LASCELLE (646 W PIERCE ST, Milwaukee)')
+    expect(m.text).toContain('called (414) 555-0101 back at 5:42 PM CT')
+    expect(m.text).toContain('left a voicemail')
+    expect(m.text).toContain('https://deals.example/lead/L1')
+    expect(missedCallEmail(call({ vm_verdict: 'stop', voicemail: true }), 'x').text).toContain('do not call back')
   })
-
-  it('the card history shows a voicemail as a voicemail, the words first', () => {
-    const items = timelineOf({ ownerName: 'DAVE VOICEMAIL', messages: [{ id: 'm1', lead_id: 'L', direction: 'in', channel: 'call', status: 'inbound_missed',
-      sent_at: '2026-10-27T18:04:32Z', is_opener: false, is_opt_out: false,
-      body: 'Missed call: (715) 555-3001 called our (262) 418-0202. Call them back.\nLeft a voicemail (21 s).\nVoicemail: "Call me back about the house."' } as unknown as Message] })
-    expect(items[0]).toMatchObject({ title: 'Voicemail from Dave', badges: expect.arrayContaining(['voicemail']) })
-    expect(items[0].body.startsWith('"Call me back about the house."')).toBe(true)
-    expect(items[0].body).toContain('Left a voicemail (21 s).')
+  it('emails each caller once and marks the call; no email on file is marked too; a failed send is left for next minute', async () => {
+    const sent: { to: string; subject: string }[] = []
+    const marked: string[] = []
+    const rows = [call(), call({ call_sid: 'CA2', person: 'thalia', email: null }), call({ call_sid: 'CA3', email: 'boom@example.com' })]
+    const rpc = async (fn: string, args: Record<string, unknown>) => {
+      if (fn === 'missed_calls_to_alert') return { data: rows, error: null }
+      if (fn === 'missed_call_alerted') { marked.push(String(args.p_call_sid)); return { data: null, error: null } }
+      return { data: null, error: { message: 'no such rpc ' + fn } }
+    }
+    const email = async (m: { to: string; subject: string }) => { if (m.to.startsWith('boom')) throw new Error('smtp down'); sent.push({ to: m.to, subject: m.subject }) }
+    const s = await runMissedCallAlerts({ rpc, email, appUrl: 'https://deals.example' })
+    expect(sent).toEqual([{ to: 'adil@example.com', subject: 'Missed call: DAVID R LASCELLE (646 W PIERCE ST, Milwaukee)' }])
+    expect(marked).toEqual(['CA1', 'CA2'])
+    expect(s).toMatchObject({ emails: 1, no_email: 1 })
+    expect(s.errors[0]).toContain('smtp down')
+    expect(await runMissedCallAlerts({ rpc, email: null, appUrl: 'x' })).toMatchObject({ off: expect.stringContaining('email') })
   })
 })
