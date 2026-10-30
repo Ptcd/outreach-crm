@@ -202,6 +202,23 @@ describe('on the real migrations', () => {
       .toMatchObject({ status: 'queued' })
   })
 
+  it('a withdrawn text can be queued again with new wording and time (0147: Muse\'s withdraw-and-requeue)', async () => {
+    const p = { owner_name: 'Re Queue', address: '3 Oak Ct', city: 'Waukesha', zip: '53186', county: 'Waukesha', mailing_state: 'WI', phones: ['4145550999'] }
+    const a = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify(p)])
+    const tue = '2026-10-27T15:00:00Z'
+    const first = await r(`public.agent_queue_text($1, '4145550999', $2, 1, null, 'Muse sender', $3::timestamptz, 'Z', 'requeue_q', 'pm')`, [a.lead_id, OPENER, tue]) as { status: string; text_id: string }
+    expect(first.status).toBe('queued')
+    // a second one for the same step is refused while the first waits
+    expect(await r(`public.agent_queue_text($1, '4145550999', $2, 1, null, 'Muse sender', $3::timestamptz)`, [a.lead_id, OPENER, tue])).toMatchObject({ status: 'refused', reason: expect.stringContaining('already waiting') })
+    expect(await one<{ ok: boolean }>(`select public.agent_withdraw_text($1, 'Muse sender', 'moving to 3:30') ok`, [first.text_id])).toEqual({ ok: true })
+    // re-queued slotless at a new time: the withdrawn row is reused, not refused
+    const again = await r(`public.agent_queue_text($1, '4145550999', $2, 1, '2026-10-27T20:30:00Z', 'Muse sender', $3::timestamptz, 'Z', 'requeue_q')`, [a.lead_id, OPENER + ' Thanks.', tue]) as { status: string; text_id: string }
+    expect(again.status).toBe('queued')
+    expect(again.text_id).toBe(first.text_id)
+    expect(await one(`select send_status, send_slot, body from public.planned_openers where id = $1`, [first.text_id])).toEqual({ send_status: 'planned', send_slot: null, body: OPENER + ' Thanks.' })
+    await db.exec(`update public.planned_openers set send_status = 'withdrawn', send_reason = 'test done' where id = '${first.text_id}'`)   // out of the way of the A/B counts below
+  })
+
   it('a sender text is queued inside the window, then claimed by the normal send check; refusals say why', async () => {
     const lid = (await one<{ id: string }>(`select id from public.leads where owner_name = 'Pat Sample'`)).id
     const sat = '2026-10-24T20:30:00Z'          // Saturday 3:30 PM Central
