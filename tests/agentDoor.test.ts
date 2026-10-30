@@ -694,6 +694,27 @@ describe('on the real migrations', () => {
     expect(await r(`public.meta_wa_template_get('missed_call_alert')`)).toMatchObject({ status: 'PENDING' })
   })
 
+  it('a caller takes a text thread: Muse\'s send_reply and the belt are refused, texts_live shows who has it (0146)', async () => {
+    const p = { owner_name: 'Live Thread', address: '5 Birch Ln', city: 'Waukesha', zip: '53186', county: 'Waukesha', mailing_state: 'WI', phones: ['4145550888'] }
+    const a = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify(p)])
+    await db.query(`insert into public.twilio_inbound (sid, from10, to_number, body, lead_id, received_at) values ('SMlive1', '4145550888', '+12624180202', 'Yes still mine, why?', $1, now() - interval '10 minutes')`, [a.lead_id])
+    let live = (await r(`public.texts_live(48, 80)`)) as { phone10: string; unanswered: boolean; owner: string | null; owner_name: string; last_in: { body: string } }[]
+    let row = live.find((x) => x.phone10 === '4145550888')!
+    expect(row).toMatchObject({ unanswered: true, owner: null, owner_name: 'Live Thread', last_in: { body: 'Yes still mine, why?' } })
+    // Muse may answer an unowned thread
+    expect(typeof (await one<{ id: string }>(`select public.agent_start_reply($1, '4145550888', 'Muse sender') id`, [a.lead_id])).id).toBe('string')
+    // Thalia takes it
+    await db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify({ sub: '00000000-0000-0000-0000-00000000000c', email: 'thalia@example.com' })])
+    expect(await r(`public.thread_take($1, '(414) 555-0888', null)`, [a.lead_id])).toMatchObject({ ok: true, person: 'thalia', withdrawn: 1 })   // Muse's waiting draft is withdrawn
+    live = (await r(`public.texts_live(48, 80)`)) as typeof live
+    expect(live.find((x) => x.phone10 === '4145550888')).toMatchObject({ owner: 'thalia' })
+    await expect(db.query(`select public.agent_start_reply($1, '4145550888', 'Muse sender')`, [a.lead_id])).rejects.toThrow(/Thalia has this thread/)
+    expect(await r(`public.belt_claim_text_guarded($1, true)`, [a.lead_id])).toMatchObject({ outcome: 'refused', reason: 'a person has this thread' })
+    // handed back: Muse may answer again
+    expect(await r(`public.thread_release('4145550888')`)).toEqual({ ok: true, released: true })
+    expect(typeof (await one<{ id: string }>(`select public.agent_start_reply($1, '4145550888', 'Muse sender') id`, [a.lead_id])).id).toBe('string')
+  })
+
   it('the agent can lift only its own pause', async () => {
     expect(await r(`public.agent_pause('carrier errors', 'Muse sender')`)).toEqual({ paused: true })
     expect(await r(`public.agent_resume('Muse sender')`)).toEqual({ paused: false })

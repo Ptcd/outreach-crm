@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
-import { BarChart3, CalendarCheck, Flame, Home, Inbox, ListChecks, LogOut, MessageSquareText, Moon, PhoneCall, Settings as SettingsIcon, Sun } from 'lucide-react'
+import { BarChart3, CalendarCheck, CheckCheck, Flame, Home, Inbox, ListChecks, LogOut, MessageSquareText, Moon, PhoneCall, Settings as SettingsIcon, Sun } from 'lucide-react'
 import { useTheme } from '@/lib/theme'
 import { useAuth } from '@/providers/AuthProvider'
 import { useRepliesWaiting } from '@/lib/queries'
@@ -15,9 +15,10 @@ const NAV: { to: string; label: string; short?: string; icon: typeof CalendarChe
   { to: '/today', label: 'Today', icon: CalendarCheck },
   { to: '/calls', label: 'Calls', icon: PhoneCall },
   { to: '/inbox', label: 'Inbox', icon: Inbox },
+  { to: '/texts', label: 'Texts', icon: MessageSquareText },
   { to: '/warm', label: 'Warm', icon: Flame },
   { to: '/pipeline', label: 'Pipeline', short: 'Pipe', icon: ListChecks },
-  { to: '/approvals', label: 'Approve', short: 'Texts', icon: MessageSquareText },
+  { to: '/approvals', label: 'Approve', short: 'Approve', icon: CheckCheck },
   { to: '/scoreboard', label: 'Scoreboard', short: 'Score', icon: BarChart3 },
 ]
 

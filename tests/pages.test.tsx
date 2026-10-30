@@ -99,6 +99,14 @@ vi.mock('@/lib/queries', () => ({
       lead: { id: 'L3', owner_name: 'BO KIM', property_address: '400 N PINE ST', stage: 'dnc', next_action_at: null, next_action: null, assigned_to: null, dead_reason: null },
       messages: [], thread: null, drafts: [], inbound: [{ sid: 'SMx', from10: '4145550400', body: 'STOP', is_opt_out: true, lead_id: 'L3', received_at: '2026-10-21T14:00:00Z' }] },
   ]),
+  useTextsLive: () => ok([
+    { phone10: '4145550300', lead_id: 'L2', owner_name: 'ANN LEE', address: '300 W ELM ST', municipality: 'Milwaukee', stage: 'reply_received', hot: false,
+      last_in: { body: 'Maybe, who is buying?', at: '2026-10-21T16:00:00Z', opt_out: false }, last_out: { body: 'Hi Ann, Colin Merrill here.', at: '2026-10-21T15:00:00Z', by: 'first text' },
+      unanswered: true, owner: null, owned_at: null, intent: 'buyer_check', outcome: null, agent_stage: 'interest', callback_slot: null },
+    { phone10: '4145550400', lead_id: 'L3', owner_name: 'BO KIM', address: '400 N PINE ST', municipality: 'Milwaukee', stage: 'colin_call', hot: true,
+      last_in: { body: 'Call me after 5', at: '2026-10-21T17:00:00Z', opt_out: false }, last_out: { body: 'Will do, talk then.', at: '2026-10-21T17:02:00Z', by: 'Muse (Muse)' },
+      unanswered: false, owner: 'thalia', owned_at: '2026-10-21T17:05:00Z', intent: 'interested', outcome: null, agent_stage: 'book', callback_slot: 'after 5' },
+  ]),
   useScoreboard: () => ok([{ week_start: '2026-10-19', lane: 'all', openers_sent: 100, delivered: 92, replies: 7, opt_outs: 2, connects: 6, contacts: 5, leads: 2, handoffs: 1, handoffs_held: 1, qualifying_calls: 1, walks: 1, contracts: 0, closes: 0, delivery_rate: 0.92, reply_rate: 0.0761, opt_out_rate: 0.0217, contact_rate: 0.8333, leads_per_delivered: 0.0217, handoffs_held_rate: 1, walk_rate: 1, walks_per_contract: null }]),
   useSignalScoreboard: () => ok([{ week_start: '2026-10-19', signal: 'tired landlord', openers_sent: 40, delivered: 37, replies: 3, opt_outs: 1, leads: 1, walks: 0, contracts: 0 }]),
 }))
@@ -108,6 +116,7 @@ import Pipeline from '@/pages/Pipeline'
 import LeadDetail from '@/pages/LeadDetail'
 import Approvals from '@/pages/Approvals'
 import Inbox from '@/pages/Inbox'
+import Texts from '@/pages/Texts'
 import Scoreboard from '@/pages/Scoreboard'
 import SignContract from '@/pages/SignContract'
 
@@ -261,6 +270,21 @@ describe('pages render', () => {
     expect(screen.getByRole('button', { name: 'Send a test notification' })).toBeTruthy()
     expect(screen.getByText(/Add to Home screen/)).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'Dead 1' })).toBeTruthy()
+  })
+
+  it('Texts shows the live threads: who is waiting on us, who answered last, who has the thread, and Take over (0146)', () => {
+    at('/texts', '/texts', <Texts />)
+    // the default chip is the threads waiting on an answer: Ann, not Bo (Muse already answered Bo and Thalia has him)
+    expect(screen.getByText('ANN LEE')).toBeTruthy()
+    expect(screen.getByText('Maybe, who is buying?')).toBeTruthy()
+    expect(screen.getByText('waiting on us')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Take over' })).toBeTruthy()
+    expect(screen.queryByText('BO KIM')).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: /All/ }))
+    expect(screen.getByText('BO KIM')).toBeTruthy()
+    expect(screen.getByText('Thalia has it')).toBeTruthy()
+    expect(screen.getByText(/Muse · /)).toBeTruthy()
+    expect(screen.getByText('Thalia is on this one.')).toBeTruthy()   // Colin is signed in: not his to take
   })
 
   it('Scoreboard shows the weekly numbers', () => {

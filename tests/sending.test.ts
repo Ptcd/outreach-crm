@@ -213,6 +213,8 @@ describe('follow-ups (texts 2 and 3)', () => {
       ['phone_marked_bad', async (l) => { await sentBefore(l, 4); await db.query(`update public.contacts set status = 'bad' where value_normalized = $1`, [l.phone]) }, 2],
       // a STOP closes the whole card (migration 0046), so the card is what the send refuses on first
       ['lead_stage_dnc', async (l) => { await sentBefore(l, 4); await db.query(`insert into public.suppressed_phones (phone10, reason) values ($1, 'stop_reply')`, [l.phone]) }, 2],
+      // a caller took the thread (0146): the automated follow-up stays out of it
+      ['human_owned', async (l) => { await sentBefore(l, 4); await db.query(`insert into public.thread_owners (phone10, lead_id, person) values ($1, $2, 'thalia')`, [l.phone, l.id]) }, 2],
     ]
     for (const [reason, setup, step] of cases) {
       const l = await lead({ stage: 'opener_sent' })

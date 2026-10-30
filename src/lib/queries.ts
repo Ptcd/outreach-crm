@@ -1,5 +1,6 @@
 // Data access: thin React Query hooks over supabase-js. RLS on the database decides
 // what each person may read and write; these hooks just ask.
+import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabaseClient'
 import type {
@@ -350,6 +351,16 @@ export const api = {
     return { error: d.outcome === 'refused' ? { message: d.reason ?? 'not sent' } : null, data: d }
   },
   setRoutine: (on: boolean) => supabase.rpc('set_routine_replies', { p_on: on }),
+  // A caller takes a seller's text thread (0146): Muse, the belt and the follow-ups leave that phone alone until it is handed back
+  threadTake: async (leadId: string | null, phone: string, note: string | null) => {
+    const r = await supabase.rpc('thread_take', { p_lead_id: leadId, p_phone: phone, p_note: note })
+    const d = r.data as { ok: boolean; reason?: string } | null
+    return { error: r.error ? { message: r.error.message } : d && !d.ok ? { message: d.reason ?? 'not taken' } : null, data: d }
+  },
+  threadRelease: async (phone: string) => {
+    const r = await supabase.rpc('thread_release', { p_phone: phone })
+    return { error: r.error ? { message: r.error.message } : null, data: r.data }
+  },
   // A tap-sent email (never AI-sent), from the Gmail sender, logged on the lead
   sendEmail: async (x: { lead_id: string | null; task_id: string | null; to: string; subject: string; body: string }) => {
     const r = await supabase.functions.invoke('reply-send', { body: { action: 'send_email', ...x } })
@@ -443,6 +454,33 @@ export function useInbox(fromDay: string, toDay: string, enabled = true) {
 }
 
 // ------------------------------------------------------------- Approvals
+// ------------------------------------------------------------------ Texts, live (0146)
+export interface LiveThread {
+  phone10: string; lead_id: string | null; owner_name: string | null; address: string | null; municipality: string | null; stage: string | null; hot: boolean
+  last_in: { body: string | null; at: string; opt_out: boolean }
+  last_out: { body: string | null; at: string; by: string | null } | null
+  unanswered: boolean; owner: string | null; owned_at: string | null
+  intent: string | null; outcome: string | null; agent_stage: string | null; callback_slot: string | null
+}
+/** Seller text threads from the last `hours`, newest first; polled every 15 s while the tab is in front, and refreshed
+ * the moment a seller's text lands (realtime on twilio_inbound). */
+export function useTextsLive(hours = 48) {
+  const qc = useQueryClient()
+  useEffect(() => {
+    const client = supabase as unknown as { channel?: (name: string) => { on: (...a: unknown[]) => unknown; subscribe: () => unknown }; removeChannel?: (c: unknown) => void }
+    if (typeof client.channel !== 'function') return
+    const ch = client.channel('texts-live')
+    ;(ch.on as (t: string, f: Record<string, string>, cb: () => void) => { subscribe: () => unknown })('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'twilio_inbound' }, () => void qc.invalidateQueries({ queryKey: ['texts_live'] })).subscribe()
+    return () => { client.removeChannel?.(ch) }
+  }, [qc])
+  return useQuery({
+    queryKey: ['texts_live', hours],
+    refetchInterval: 15_000, refetchIntervalInBackground: false, refetchOnWindowFocus: true,
+    queryFn: async () => check(await supabase.rpc('texts_live', { p_hours: hours, p_limit: 80 })) as LiveThread[],
+  })
+}
+
 export function usePlannedOpeners(planDate: string) {
   return useQuery({
     queryKey: ['planned_openers', planDate],

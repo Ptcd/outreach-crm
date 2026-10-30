@@ -11,6 +11,7 @@ import Pipeline from '@/pages/Pipeline'
 import LeadDetail from '@/pages/LeadDetail'
 import Approvals from '@/pages/Approvals'
 import Inbox from '@/pages/Inbox'
+import Texts from '@/pages/Texts'
 import Scoreboard from '@/pages/Scoreboard'
 import SignContract from '@/pages/SignContract'
 import CallQueue from '@/pages/CallQueue'
@@ -84,6 +85,7 @@ export default function App() {
         <Route path="/pipeline" element={<Pipeline />} />
         <Route path="/lead/:id" element={<LeadDetail />} />
         <Route path="/inbox" element={<Inbox />} />
+        <Route path="/texts" element={<Texts />} />
         <Route path="/warm" element={<Warm />} />
         <Route path="/approvals" element={<Approvals />} />
         <Route path="/scoreboard" element={<Scoreboard />} />
