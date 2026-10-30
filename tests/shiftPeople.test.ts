@@ -51,7 +51,7 @@ describe('who is on shift, on the shared login', () => {
     expect((await db.query(`select alert_phone, alert_email from public.team_members`)).rows)
       .toEqual([{ alert_phone: '2625550100', alert_email: 'colin@example.com' }])
     expect(await as(APP, () => rpc('person_alerts', { p_person: 'thalia' })))
-      .toEqual({ ok: true, person: 'thalia', name: 'Thalia', alert_phone: '4145550199', alert_email: 'thalia@example.com' })
+      .toEqual({ ok: true, person: 'thalia', name: 'Thalia', alert_phone: '4145550199', alert_email: 'thalia@example.com', alert_whatsapp: null })
     expect(await as(APP, () => rpc('person_alerts', { p_person: 'colin' })))
       .toMatchObject({ ok: true, name: 'Colin', alert_phone: '2625550100', alert_email: 'colin@example.com' })
   })
