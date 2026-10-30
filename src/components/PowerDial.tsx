@@ -60,12 +60,13 @@ export function PowerDial({ caller }: { caller: string }) {
   const { active, incoming, start, dismiss, hangUp, supported } = useDialer()
   const q = useQuery({
     // a missed call has to reach the screen fast (Colin 2026-10-29: Adil could not see a seller who called back during
-    // Power hour): poll every 10 s, keep polling while the phone's dialer has the browser in the background, and
-    // refresh on coming back to the tab
-    queryKey: ['power_dial'], staleTime: Infinity, refetchOnWindowFocus: true, refetchInterval: 10_000, refetchIntervalInBackground: true,
+    // Power hour): refresh on coming back to the tab and right after a call is logged. The poll stays at 30 s and
+    // only while the tab is in front: polling every 10 s in the background from three phones saturated the database
+    // the same evening (power_dial_queue is not a cheap query) and the app hung at "Loading...".
+    queryKey: ['power_dial'], staleTime: Infinity, refetchOnWindowFocus: true, refetchInterval: 30_000,
     queryFn: async () => {
       const test = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('test') === '1'
-      const r = await supabase.rpc('power_dial_queue', test ? { p_limit: 150, p_test: true } : { p_limit: 150 })
+      const r = await supabase.rpc('power_dial_queue', test ? { p_limit: 40, p_test: true } : { p_limit: 40 })   // one card at a time: 40 is plenty, 150 cost minutes
       if (r.error) throw new Error(r.error.message)
       return (r.data ?? []) as Item[]
     },
