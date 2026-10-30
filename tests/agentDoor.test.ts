@@ -641,14 +641,14 @@ describe('on the real migrations', () => {
   it('a seller calling back rings only the caller who dialed them; otherwise the shift (inbound_call_ring, 2026-10-29)', async () => {
     const a = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'Ring Test', address: '9 Ring Rd', city: 'Waukesha', zip: '53186', county: 'Waukesha', mailing_state: 'WI', phones: ['4145550777'] })])
     const wk = '2026-10-28T19:30:00Z'   // Wednesday 2:30 PM CT: Thalia's shift
-    expect(await r(`public.inbound_call_ring('+1 (414) 555-0777', $1::timestamptz)`, [wk])).toEqual({ ring: ['thalia'], return_call: false, dialed_by: null })
+    expect(await r(`public.inbound_call_ring('+1 (414) 555-0777', $1::timestamptz)`, [wk])).toMatchObject({ ring: ['thalia'], return_call: false, dialed_by: null, locked_to: null })
     expect(await r(`public.inbound_call_ring('4145550777', '2026-10-28T22:00:00Z'::timestamptz)`)).toMatchObject({ ring: ['thalia', 'adil'], return_call: false })   // weekday 5 PM: both in Power hour
     expect(await one(`select public.on_shift_person('2026-10-28T22:30:00Z'::timestamptz)::text s`)).toEqual({ s: 'adil' })   // weekday 5:30 PM is Adil's hour (0140)
     expect(await one(`select public.on_shift_person('2026-10-28T21:30:00Z'::timestamptz)::text s`)).toEqual({ s: 'thalia' })
     expect(await r(`public.inbound_call_ring('4145550777', '2026-10-25T15:00:00Z'::timestamptz)`)).toMatchObject({ ring: ['adil'] })   // Saturday
     expect(await r(`public.inbound_call_ring('4145550777', '2026-10-28T04:00:00Z'::timestamptz)`)).toMatchObject({ ring: ['colin', 'thalia', 'adil'] })   // 11 PM
     await db.query(`insert into public.belt_events (lead_id, event, payload, at, by) values ($1, 'human_call_started', '{"phone": "4145550777", "source": "app"}', '2026-10-28T22:05:00Z', 'Adil')`, [a.lead_id])
-    expect(await r(`public.inbound_call_ring('+14145550777', '2026-10-28T22:06:00Z'::timestamptz)`)).toEqual({ ring: ['adil'], return_call: true, dialed_by: 'adil' })
+    expect(await r(`public.inbound_call_ring('+14145550777', '2026-10-28T22:06:00Z'::timestamptz)`)).toMatchObject({ ring: ['adil'], return_call: true, dialed_by: 'adil' })
     expect(await r(`public.inbound_call_ring('+14145550777', '2026-10-29T00:00:00Z'::timestamptz)`)).toMatchObject({ return_call: false })   // two hours later it is no longer a return call
   })
 
@@ -730,6 +730,37 @@ describe('on the real migrations', () => {
     // handed back: Muse may answer again
     expect(await r(`public.thread_release('4145550888')`)).toEqual({ ok: true, released: true })
     expect(typeof (await one<{ id: string }>(`select public.agent_start_reply($1, '4145550888', 'Muse sender') id`, [a.lead_id])).id).toBe('string')
+  })
+
+  it('a promised callback is its caller\'s: the card is off the other caller\'s Power hour list (0148)', async () => {
+    const p = { owner_name: 'Callback Owner', address: '8 Cedar Dr', city: 'Waukesha', zip: '53186', county: 'Waukesha', mailing_state: 'WI', phones: ['4145550555'] }
+    const a = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify(p)])
+    await db.exec(`insert into public.team_members (email, role, person, display_name) values ('adil@example.com', 'caller', 'adil', 'Adil') on conflict do nothing`)
+    await db.exec(`insert into public.team_members (email, role, person, display_name) values ('thalia@example.com', 'caller', 'thalia', 'Thalia') on conflict do nothing`)
+    await db.query(`insert into public.tasks (lead_id, due_at, kind, owner, note) values ($1, '2026-10-27T21:30:00Z', 'callback', 'adil', 'Callback promised')`, [a.lead_id])
+    const tue430 = '2026-10-27T21:25:00Z'   // Tuesday 4:25 PM CT, five minutes before the promised callback
+    const queueFor = async (email: string) => {
+      await db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify({ sub: '00000000-0000-0000-0000-00000000000c', email })])
+      const q = (await r(`public.power_dial_queue(40, $1::timestamptz)`, [tue430])) as { lead_id: string; source: string }[]
+      return q.filter((c) => c.lead_id === a.lead_id).map((c) => c.source)
+    }
+    expect(await queueFor('adil@example.com')).toEqual(['callback'])     // Adil sees his callback first
+    expect(await queueFor('thalia@example.com')).toEqual([])             // Thalia does not see the card at all
+    expect(await queueFor('colin@example.com')).toEqual(['callback'])    // the shared owner login sees everything
+    // contact locks the card for good: Adil reaches the seller, the card is his even after the callback is done
+    await db.query(`update public.tasks set done_at = now() where lead_id = $1 and kind = 'callback'`, [a.lead_id])
+    await db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify({ sub: '00000000-0000-0000-0000-00000000000c', email: 'adil@example.com' })])
+    expect(await r(`public.log_call($1, '4145550555', 'reached_no_decision', 'talked, thinking it over')`, [a.lead_id])).toMatchObject({ ok: true })
+    expect(await one(`select locked_to::text from public.leads where id = $1`, [a.lead_id])).toEqual({ locked_to: 'adil' })
+    expect(await queueFor('thalia@example.com')).toEqual([])             // still not Thalia's (the card is in Colin's call stage now, so nobody's Power hour)
+    // a later contact by Thalia does not move the lock
+    await db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify({ sub: '00000000-0000-0000-0000-00000000000c', email: 'thalia@example.com' })])
+    await r(`public.log_call($1, '4145550555', 'not_now', 'said call in spring', '2027-03-01T18:00:00Z')`, [a.lead_id])
+    expect(await one(`select locked_to::text from public.leads where id = $1`, [a.lead_id])).toEqual({ locked_to: 'adil' })
+    // the seller calling in rings Adil, not the shift; a missed call is Adil's
+    expect(await r(`public.inbound_call_ring('4145550555', '2026-10-27T15:00:00Z'::timestamptz)`)).toMatchObject({ ring: ['adil'], locked_to: 'adil', return_call: false })   // Tuesday 10 AM would be Thalia's shift
+    expect(await one(`select public.missed_call_person('4145550555', '2026-10-27T15:00:00Z'::timestamptz)::text p`)).toEqual({ p: 'adil' })
+    await db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify(COLIN)])
   })
 
   it('the agent can lift only its own pause', async () => {
