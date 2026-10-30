@@ -47,7 +47,7 @@ describe('who is on shift, on the shared login', () => {
   it("Thalia's email and phone go on her shift row; Colin's stay as they were", async () => {
     await as(APP, () => rpc('set_person_alerts', { p_person: 'colin', p_phone: '2625550100', p_email: 'colin@example.com' }))
     const r = await as(APP, () => rpc('set_person_alerts', { p_person: 'thalia', p_phone: '(414) 555-0199', p_email: 'Thalia@Example.com ' }))
-    expect(r).toEqual({ ok: true, person: 'thalia', phone: '4145550199', email: 'thalia@example.com' })
+    expect(r).toEqual({ ok: true, person: 'thalia', phone: '4145550199', email: 'thalia@example.com', whatsapp: null })   // whatsapp since 0141
     expect((await db.query(`select alert_phone, alert_email from public.team_members`)).rows)
       .toEqual([{ alert_phone: '2625550100', alert_email: 'colin@example.com' }])
     expect(await as(APP, () => rpc('person_alerts', { p_person: 'thalia' })))
