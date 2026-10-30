@@ -165,10 +165,14 @@ describe('they called us', () => {
     expect(await one(`select source, title from public.tasks where lead_id = $1`, [LEAD])).toEqual({ source: 'inbound_call', title: 'They called us: call back' })
   })
 
-  it('an unknown caller writes nothing', async () => {
-    expect(await log(SID(11), 'missed', TUE_10AM, { from: '+14145559999' })).toEqual({ ok: true, matched: false })
+  it('an unknown caller is stored as a bare missed call and nothing else (0145: the shift still gets the alert)', async () => {
+    expect(await log(SID(11), 'missed', TUE_10AM, { from: '+14145559999' })).toEqual({ ok: true, matched: false, stored: true })
     expect(await one(`select (select count(*) from public.messages)::int m, (select count(*) from public.tasks)::int t,
-                             (select count(*) from public.inbound_calls)::int c`)).toEqual({ m: 0, t: 0, c: 0 })
+                             (select count(*) from public.inbound_calls)::int c`)).toEqual({ m: 0, t: 0, c: 1 })
+    expect(await one(`select lead_id, from10, status from public.inbound_calls where call_sid = $1`, [SID(11)])).toEqual({ lead_id: null, from10: '4145559999', status: 'missed' })
+    // the same call's voicemail event only flags the row
+    expect(await log(SID(11), 'voicemail', TUE_10AM, { from: '+14145559999' })).toMatchObject({ matched: false, stored: true })
+    expect(await one(`select voicemail, status from public.inbound_calls where call_sid = $1`, [SID(11)])).toEqual({ voicemail: true, status: 'missed' })
   })
 
   it('refuses a bad call id and is not callable from the app login', async () => {

@@ -674,6 +674,26 @@ describe('on the real migrations', () => {
     expect(await r(`public.missed_calls_to_alert()`)).toEqual([])
   })
 
+  it('an unknown caller\'s missed call alerts the shift with no card; WhatsApp alerts are logged and deduped 15 minutes (0145)', async () => {
+    await db.exec(`insert into public.team_members (email, role, person, display_name) values ('thalia@example.com', 'caller', 'thalia', 'Thalia') on conflict do nothing`)
+    await db.exec(`update public.team_members set alert_email = 'thalia.alerts@example.com', alert_whatsapp = '+639753125183' where person = 'thalia'`)
+    await db.query(`insert into public.inbound_calls (call_sid, lead_id, from10, to_number, status, voicemail, created_at) values ('CAunknown1', null, '4145550666', '+12624180202', 'missed', false, '2026-10-27T15:00:00Z')`)
+    const rows = await r(`public.missed_calls_to_alert('2026-10-27T16:00:00Z'::timestamptz)`) as { call_sid: string; person: string; lead_id: string | null; owner_name: string | null; email: string; whatsapp: string }[]
+    const u = rows.find((x) => x.call_sid === 'CAunknown1')!
+    expect(u).toMatchObject({ person: 'thalia', lead_id: null, owner_name: null, email: 'thalia.alerts@example.com', whatsapp: '+639753125183' })   // Tuesday 10 AM: Thalia's shift
+    // the alert log: one per caller per unknown number per 15 minutes
+    const b1 = await r(`public.whatsapp_alert_begin('CAunknown1', null, '4145550666', 'thalia', '+639753125183', '{"1": "(414) 555-0666", "2": "unknown property", "3": "10:00 AM"}'::jsonb)`) as { ok: boolean; id: string }
+    expect(b1.ok).toBe(true)
+    await db.exec(`select public.whatsapp_alert_finish('${b1.id}', 'sent', 'wamid.TEST1', null)`)
+    expect(await r(`public.whatsapp_alert_begin('CAunknown2', null, '4145550666', 'thalia', '+639753125183', null)`)).toMatchObject({ ok: false, reason: 'duplicate' })
+    expect(await r(`public.whatsapp_alert_begin('CAunknown2', null, '4145550667', 'thalia', '+639753125183', null)`)).toMatchObject({ ok: true })   // another number: its own alert
+    expect(await one(`select status, message_id from public.whatsapp_alerts where id = $1`, [b1.id])).toEqual({ status: 'sent', message_id: 'wamid.TEST1' })
+    // the template status cache
+    expect(await r(`public.meta_wa_template_get('missed_call_alert')`)).toBeNull()
+    await db.exec(`select public.meta_wa_template_set('missed_call_alert', 'PENDING')`)
+    expect(await r(`public.meta_wa_template_get('missed_call_alert')`)).toMatchObject({ status: 'PENDING' })
+  })
+
   it('the agent can lift only its own pause', async () => {
     expect(await r(`public.agent_pause('carrier errors', 'Muse sender')`)).toEqual({ paused: true })
     expect(await r(`public.agent_resume('Muse sender')`)).toEqual({ paused: false })

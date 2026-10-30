@@ -11,6 +11,7 @@ import { runPackageMail } from '../_shared/packages.ts'
 import { runVoicemailRead } from '../_shared/voicemailRead.ts'
 import { pmPhoneSender, pmPhoneWhatsApp, runHotAlerts } from '../_shared/hotLeads.ts'
 import { runMissedCallAlerts } from '../_shared/missedCalls.ts'
+import { metaWhatsAppSender } from '../_shared/metaWhatsApp.ts'
 import { hotPush, notifyDeps } from '../_shared/notifyDeno.ts'
 import { senderEnv, twilioPort, type Rpc } from '../_shared/sending.ts'
 import type { RedteamRow } from '../_shared/replyBrain.ts'
@@ -60,8 +61,10 @@ Deno.serve(async (req) => {
     // voicemails (migration 0118): who gets a call back, and who doesn't (upset, not a seller, a stop, the wrong person)
     const voicemails = await runVoicemailRead(rpc, { apiKey: key, fetchFn: fetch, model: Deno.env.get('VOICEMAIL_MODEL') || undefined })
       .catch((e) => ({ error: String(e).slice(0, 200) }))
-    // missed calls (migration 0139): the caller the call-back belongs to gets an email, once per call
-    const missed = await runMissedCallAlerts({ rpc, email: deps.email, whatsapp: pmPhoneWhatsApp((n) => Deno.env.get(n), fetch), appUrl: Deno.env.get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com' })
+    // missed calls (0139/0145): the caller the call-back belongs to gets an email and a WhatsApp, once per call.
+    // WhatsApp goes through Meta's Cloud API when META_WHATSAPP_TOKEN is set, else the forwarding app's sandbox route.
+    const whatsapp = metaWhatsAppSender((n) => Deno.env.get(n), fetch, rpc) ?? pmPhoneWhatsApp((n) => Deno.env.get(n), fetch)
+    const missed = await runMissedCallAlerts({ rpc, email: deps.email, whatsapp, appUrl: Deno.env.get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com' })
       .catch((e) => ({ error: String(e).slice(0, 200) }))
     await rpc('note_agent_run', { p_summary: { ...summary, notified, hot_alerts: hot, packages, voicemails, missed_calls: missed, drafter: key ? 'claude' : 'none (ANTHROPIC_API_KEY not set)' } })
     return Response.json({ ...summary, notified, hot_alerts: hot, packages, voicemails, missed_calls: missed })
