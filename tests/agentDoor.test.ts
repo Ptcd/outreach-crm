@@ -635,14 +635,30 @@ describe('on the real migrations', () => {
     expect(await r(`public.inbound_call_ring('+14145550777', '2026-10-29T00:00:00Z'::timestamptz)`)).toMatchObject({ return_call: false })   // two hours later it is no longer a return call
   })
 
+  it('a missed call belongs to the caller who dialed that number out (7 days), else the shift (missed_call_person, 0144)', async () => {
+    const tue10 = '2026-10-27T15:00:00Z'      // Tuesday 10 AM CT: Thalia's shift
+    expect(await one(`select public.missed_call_person('4145550991', $1::timestamptz)::text p`, [tue10])).toEqual({ p: 'thalia' })
+    expect(await one(`select public.missed_call_person('4145550991', '2026-10-25T15:00:00Z'::timestamptz)::text p`)).toEqual({ p: 'adil' })   // Saturday
+    const lid = (await one<{ id: string }>(`select id from public.leads where owner_name = 'Pat Sample'`)).id
+    await db.query(`insert into public.belt_events (lead_id, event, payload, at, by) values ($1, 'human_call_started', '{"phone": "+14145550991"}', '2026-10-24T21:00:00Z', 'Adil')`, [lid])
+    // Adil dialed it Friday 4 PM: his call-back on Tuesday morning too, not Thalia's
+    expect(await one(`select public.missed_call_person('(414) 555-0991', $1::timestamptz)::text p`, [tue10])).toEqual({ p: 'adil' })
+    // eight days on, the dial is forgotten and the shift decides again
+    expect(await one(`select public.missed_call_person('4145550991', '2026-11-03T15:00:00Z'::timestamptz)::text p`)).toEqual({ p: 'thalia' })
+    // a later dial by Thalia takes it over
+    await db.query(`insert into public.belt_events (lead_id, event, payload, at, by) values ($1, 'human_call_started', '{"phone": "4145550991"}', '2026-10-26T20:00:00Z', 'Thalia')`, [lid])
+    expect(await one(`select public.missed_call_person('4145550991', $1::timestamptz)::text p`, [tue10])).toEqual({ p: 'thalia' })
+  })
+
   it('a missed seller call for a caller is listed for an email once, at their alert email or sign-in email (0139)', async () => {
     const a = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'Missed Caller', address: '7 Ring Rd', city: 'Waukesha', zip: '53186', county: 'Waukesha', mailing_state: 'WI', phones: ['4145550778'] })])
     await db.exec(`insert into public.team_members (email, role, person, display_name) values ('thalia@example.com', 'caller', 'thalia', 'Thalia') on conflict do nothing`)
     const tid = (await one<{ id: string }>(`insert into public.tasks (lead_id, due_at, kind, owner, title, source) values ($1, now(), 'call', 'thalia', 'They called us: call back', 'belt') returning id`, [a.lead_id])).id
     await db.query(`insert into public.inbound_calls (call_sid, lead_id, from10, to_number, status, voicemail, task_id) values ('CAtest1', $1, '4145550778', '+12624180202', 'missed', false, $2)`, [a.lead_id, tid])
-    const rows = await r(`public.missed_calls_to_alert()`) as { call_sid: string; person: string; email: string; owner_name: string }[]
+    const rows = await r(`public.missed_calls_to_alert()`) as { call_sid: string; person: string; email: string | null; owner_name: string }[]
     expect(rows).toHaveLength(1)
-    expect(rows[0]).toMatchObject({ call_sid: 'CAtest1', person: 'thalia', email: 'thalia@example.com', owner_name: 'Missed Caller' })
+    // the sign-in address is not a mailbox: with no alert_email the row says so (0144), it does not fall back
+    expect(rows[0]).toMatchObject({ call_sid: 'CAtest1', person: 'thalia', email: null, owner_name: 'Missed Caller' })
     await db.exec(`update public.team_members set alert_email = 'thalia.alerts@example.com' where person = 'thalia'`)
     expect(((await r(`public.missed_calls_to_alert()`)) as { email: string }[])[0].email).toBe('thalia.alerts@example.com')
     await db.exec(`update public.team_members set alert_whatsapp = '+923246343665' where person = 'thalia'`)
