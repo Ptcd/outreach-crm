@@ -190,6 +190,18 @@ describe('on the real migrations', () => {
     expect((ready.new_cards as { lead_id: string }[]).map((c) => c.lead_id)).toEqual([a.lead_id])
   })
 
+  it('the queue takes a follow-up without a STOP line and refuses a first text without one (0143, Colin 2026-10-30)', async () => {
+    const p = { owner_name: 'Sam Follow', address: '9 Elm Ct', city: 'Waukesha', zip: '53186', county: 'Waukesha', mailing_state: 'WI',
+      phones: [{ number: '4145550777', type: 'mobile', name: 'Sam Follow' }] }
+    const a = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify(p)])
+    const noStop = 'Hi Sam, Colin again about 9 Elm Ct. Still the owner there? Just making sure I have the right person.'
+    const tue = '2026-10-27T17:00:00Z'
+    expect(await r(`public.agent_queue_text($1, '4145550777', $2, 1, null, 'Muse sender', $3::timestamptz)`, [a.lead_id, noStop, tue]))
+      .toMatchObject({ status: 'refused', reason: expect.stringContaining('needs a STOP line') })
+    expect(await r(`public.agent_queue_text($1, '4145550777', $2, 2, null, 'Muse sender', $3::timestamptz, 'G')`, [a.lead_id, noStop, tue]))
+      .toMatchObject({ status: 'queued' })
+  })
+
   it('a sender text is queued inside the window, then claimed by the normal send check; refusals say why', async () => {
     const lid = (await one<{ id: string }>(`select id from public.leads where owner_name = 'Pat Sample'`)).id
     const sat = '2026-10-24T20:30:00Z'          // Saturday 3:30 PM Central

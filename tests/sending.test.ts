@@ -223,6 +223,18 @@ describe('follow-ups (texts 2 and 3)', () => {
     }
   })
 
+  it('a follow-up may leave the STOP line out; a first text still needs it (0143, Colin 2026-10-30)', async () => {
+    const l = await lead({ stage: 'opener_sent' })
+    await sentBefore(l, 4)
+    const fu = await opener(l, { body: 'Hi John, Colin again about the house on Maple. Still the owner there?' })
+    await db.query(`update public.planned_openers set attempt = 12 where id = $1`, [fu])
+    expect(await claim(T('15:05'))).toMatchObject({ outcome: 'send', opener: { id: fu, step: 2 } })
+    // the same wording as a first text is still refused
+    const first = await opener(await lead(), { body: 'Hi John, Colin again about the house on Maple. Still the owner there?' })
+    expect(await claim(T('15:06'))).toMatchObject({ outcome: 'skipped', reason: 'template:no_stop_line' })
+    expect((await status(first)).send_status).toBe('skipped')
+  })
+
   it('text 3 goes after a delivered text 2, and never a fourth text', async () => {
     const l = await lead({ stage: 'opener_sent' })
     await sentBefore(l, 8)
