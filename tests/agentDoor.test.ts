@@ -532,6 +532,37 @@ describe('on the real migrations', () => {
     await db.exec(`update public.planned_openers set send_status = 'withdrawn' where send_status in ('planned', 'would_send')`)
   })
 
+  it('the next number after a closed conversation: a wrong person answered, that phone is closed, the next phone may have its first text (0152)', async () => {
+    const lid = (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`,
+      [JSON.stringify({ owner_name: 'Pat Prank', address: '7 Wrong Way', phones: ['4145550911', '4145550912', '4145550913'], mailing_state: 'WI' })])).lead_id as string
+    const sat = '2026-10-31T19:00:00Z'
+    await db.exec(`update public.planned_openers set send_status = 'withdrawn' where send_status in ('planned', 'would_send')`)
+    const q1 = await r(`public.agent_queue_text($1, '4145550911', $2, 1, null, 'Muse sender', $3::timestamptz, 'A', 'own_q')`, [lid, OPENER, sat])
+    expect(q1.status).toBe('queued')
+    // delivered, a kid answers and the card goes to the AI qualifier
+    await db.query(`update public.planned_openers set send_status = 'delivered', claim_mode = 'live', claimed_at = $2::timestamptz, sent_at = $2::timestamptz where id = $1`, [q1.text_id, sat])
+    await db.exec(`insert into public.twilio_inbound (sid, from10, to_number, body, is_opt_out, received_at) values ('SMpr1', '4145550911', '+12624180202', 'cheeseburger', false, '2026-10-31T19:05:00Z')`)
+    await db.query(`update public.leads set stage = 'ai_qualifying' where id = $1`, [lid])
+    expect(await r(`public.next_phone_problem($1, '4145550912')`, [lid])).toBe('an earlier first text may have arrived (wait for its delivery result, or mark that phone wrong_number)')
+    // the prank number is closed: the next phone is open, though the card is still "talking"
+    await db.query(`update public.contacts set status = 'bad' where lead_id = $1 and value_normalized = '4145550911'`, [lid])
+    expect(await r(`public.next_phone_problem($1, '4145550912')`, [lid])).toBeNull()
+    const q2 = await r(`public.agent_queue_text($1, '4145550912', $2, 1, null, 'Muse sender', $3::timestamptz, 'A', 'own_q')`, [lid, OPENER, sat])
+    expect(q2).toMatchObject({ status: 'queued', next_phone: true })
+    await db.query(`update public.planned_openers set send_status = 'withdrawn' where id = $1`, [q2.text_id])
+    // but a call that reached someone on a good phone needs a person's decision first
+    await db.query(`insert into public.messages (lead_id, channel, direction, status, from_number, body, sent_at)
+                    values ($1, 'call', 'in', 'not_interested', '+14145550913', 'Call (Adil) from 4145550913: Not interested', '2026-10-31T19:10:00Z')`, [lid])
+    const after = await one<{ stage: string }>(`select stage::text from public.leads where id = $1`, [lid])
+    expect(await r(`public.next_phone_problem($1, '4145550912')`, [lid])).toBeTruthy()      // refused either way
+    await db.query(`update public.leads set stage = 'ai_qualifying' where id = $1`, [lid])  // isolate the call rule (was ${after.stage})
+    expect(await r(`public.next_phone_problem($1, '4145550912')`, [lid])).toBe('someone on a good phone was reached by a call: decide on the card first')
+    // a closed card never reopens this way
+    await db.query(`update public.leads set stage = 'dnc' where id = $1`, [lid])
+    expect(await r(`public.next_phone_problem($1, '4145550912')`, [lid])).toBe('a first text is for a new card')
+    await db.exec(`update public.planned_openers set send_status = 'withdrawn' where send_status in ('planned', 'would_send')`)
+  })
+
   it('a dead card the laptop closed only because its phones bounced reopens for the next phone; a real close stays closed', async () => {
     const tue = '2026-10-27T20:00:00Z'
     await db.query(`select set_config('request.jwt.claims', '', false)`)     // the laptop sync, not a person in the app
