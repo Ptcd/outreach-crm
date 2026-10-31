@@ -19,14 +19,14 @@ export function OfferSettings() {
   const q = useOfferSettings()
   const qc = useQueryClient()
   const [f, setF] = useState<Record<string, string>>({})
-  const [bands, setBands] = useState<{ upto: string; pct: string }[]>([])
+  const [bands, setBands] = useState<{ upto: string; pct: string; off: string }[]>([])
   const [msg, setMsg] = useState<string | null>(null)
   useEffect(() => {
     if (!q.data) return
     const d = q.data
     setF({ mode: d.mode, repair_light: String(d.repair_light), repair_medium: String(d.repair_medium), repair_heavy: String(d.repair_heavy),
       lao_discount: String(Math.round(d.lao_discount * 100)), default_sqft: String(d.default_sqft), min_number: String(d.min_number), round_to: String(d.round_to) })
-    setBands((d.bands ?? []).map((b) => ({ upto: b.upto == null ? '' : String(b.upto), pct: String(Math.round(b.pct * 100)) })))
+    setBands((d.bands ?? []).map((b) => ({ upto: b.upto == null ? '' : String(b.upto), pct: String(Math.round(b.pct * 100)), off: b.off == null ? '' : String(Math.round(b.off * 100)) })))
   }, [q.data])
   if (q.isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>
   if (!q.data) return <p className="text-sm text-muted-foreground">The app has no offer rules yet (migration 0149).</p>
@@ -36,7 +36,7 @@ export function OfferSettings() {
     setMsg(null)
     const p: Record<string, unknown> = { mode: f.mode, repair_light: num('repair_light'), repair_medium: num('repair_medium'), repair_heavy: num('repair_heavy'),
       lao_discount: num('lao_discount') == null ? null : (num('lao_discount') as number) / 100, default_sqft: num('default_sqft'), min_number: num('min_number'), round_to: num('round_to'),
-      bands: bands.filter((b) => b.pct.trim()).map((b) => ({ upto: b.upto.trim() ? Number(b.upto) : null, pct: Number(b.pct) / 100 })) }
+      bands: bands.filter((b) => b.pct.trim()).map((b) => ({ upto: b.upto.trim() ? Number(b.upto) : null, pct: Number(b.pct) / 100, ...(b.off.trim() ? { off: Number(b.off) / 100 } : {}) })) }
     const r = await api.offerSettingsSet(p)
     const d = r.data as { ok?: boolean; reason?: string } | null
     if (r.error || d?.ok === false) { setMsg(r.error?.message ?? d?.reason ?? 'not saved'); return }
@@ -58,21 +58,22 @@ export function OfferSettings() {
         <label className="block">Repairs, roof / structure / damage ($ per sq ft)<Input className="mt-1" inputMode="decimal" value={f.repair_heavy ?? ''} onChange={set('repair_heavy')} /></label>
       </div>
       <div>
-        <p className="font-medium">Percent of value minus repairs, by value</p>
-        <p className="text-xs text-muted-foreground">Rick: 70% under $120K; 75 to 80% above. The last row (no &quot;up to&quot;) covers everything higher.</p>
+        <p className="font-medium">By value: the buyer&apos;s percent, and how far under it the anchor opens</p>
+        <p className="text-xs text-muted-foreground">Rick 2026: 70% under $120K, 75% to $200K, 78% to $250K, 80% to $350K, 83% above; open 35% under on cheap houses, 30% above. The last row (no &quot;up to&quot;) covers everything higher. A blank anchor uses the default below.</p>
         <div className="mt-1 space-y-1">
           {bands.map((b, i) => (
-            <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
+            <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2">
               <Input placeholder="Up to ($), blank = and above" inputMode="decimal" value={b.upto} onChange={(e) => setBands((x) => x.map((y, j) => j === i ? { ...y, upto: e.target.value } : y))} />
-              <Input placeholder="%" inputMode="decimal" value={b.pct} onChange={(e) => setBands((x) => x.map((y, j) => j === i ? { ...y, pct: e.target.value } : y))} />
+              <Input placeholder="Buyer %" aria-label="Buyer percent" inputMode="decimal" value={b.pct} onChange={(e) => setBands((x) => x.map((y, j) => j === i ? { ...y, pct: e.target.value } : y))} />
+              <Input placeholder="Anchor under %" aria-label="Anchor under the MAO, percent" inputMode="decimal" value={b.off} onChange={(e) => setBands((x) => x.map((y, j) => j === i ? { ...y, off: e.target.value } : y))} />
               <Button variant="ghost" size="sm" onClick={() => setBands((x) => x.filter((_, j) => j !== i))}>Remove</Button>
             </div>
           ))}
-          <Button variant="outline" size="sm" onClick={() => setBands((x) => [...x, { upto: '', pct: '' }])}>Add a band</Button>
+          <Button variant="outline" size="sm" onClick={() => setBands((x) => [...x, { upto: '', pct: '', off: '' }])}>Add a band</Button>
         </div>
       </div>
       <div className="grid gap-2 sm:grid-cols-4">
-        <label className="block">Anchor under that (%)<Input className="mt-1" inputMode="decimal" value={f.lao_discount ?? ''} onChange={set('lao_discount')} /></label>
+        <label className="block">Default anchor under the MAO (%)<Input className="mt-1" inputMode="decimal" value={f.lao_discount ?? ''} onChange={set('lao_discount')} /></label>
         <label className="block">Size when unknown (sq ft)<Input className="mt-1" inputMode="decimal" value={f.default_sqft ?? ''} onChange={set('default_sqft')} /></label>
         <label className="block">Too thin to say, under ($)<Input className="mt-1" inputMode="decimal" value={f.min_number ?? ''} onChange={set('min_number')} /></label>
         <label className="block">Round down to ($)<Input className="mt-1" inputMode="decimal" value={f.round_to ?? ''} onChange={set('round_to')} /></label>

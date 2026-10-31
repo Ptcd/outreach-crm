@@ -422,7 +422,7 @@ export function useCampaignControl() {
 // ---------------------------------------------------------------- Inbox
 /** Every planned text in [fromDay, toDay] with its lead, thread, reply-agent view and server-seen replies. */
 export type OfferSettings = {
-  id: number; mode: 'off' | 'exit_only' | 'live'; bands: { upto: number | null; pct: number }[]
+  id: number; mode: 'off' | 'exit_only' | 'live'; bands: { upto: number | null; pct: number; off?: number | null }[]
   repair_light: number; repair_medium: number; repair_heavy: number; lao_discount: number; default_sqft: number; min_number: number; round_to: number
   updated_at: string; updated_by: string | null
 }

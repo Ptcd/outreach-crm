@@ -74,6 +74,24 @@ describe('the exit anchor', () => {
     expect(s).toMatchObject({ ok: true, sqft: 1250, sqft_basis: expect.stringContaining('3 bedrooms'), tier: 'light', repairs: 18750, pct: 0.75, number: 115000 })
   })
 
+  it("a band may carry its own discount: Rick's 2026 bands, 35% under $120K, 30% above (0153)", async () => {
+    const rick = [{ upto: 120000, pct: 0.70, off: 0.35 }, { upto: 200000, pct: 0.75, off: 0.30 }, { upto: 250000, pct: 0.78, off: 0.30 },
+      { upto: 350000, pct: 0.80, off: 0.30 }, { upto: null, pct: 0.83, off: 0.30 }]
+    expect(await as(COLIN, () => r(`public.offer_settings_set($1::jsonb)`, [JSON.stringify({ bands: rick, lao_discount: 0.30 })]))).toMatchObject({ ok: true })
+    const cheap = await card('HAL BAND', '48 Anchor Test St', 9008)
+    await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9008, 105000, 1000)`)
+    await answer(cheap, 'condition', { choices: ['roof'] })
+    // (105,000 - 50,000) x 0.70 = 38,500; x 0.65 = 25,025 -> 25,000
+    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [cheap]))).toMatchObject({ ok: true, pct: 0.7, off: 0.35, mao: 38500, number: 25000 })
+    const mid = await card('IDA BAND', '49 Anchor Test St', 9009)
+    await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9009, 150000, 1000)`)
+    await answer(mid, 'condition', { choices: ['furnace'] })
+    // (150,000 - 30,000) x 0.75 = 90,000; x 0.70 = 63,000
+    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [mid]))).toMatchObject({ ok: true, pct: 0.75, off: 0.3, mao: 90000, number: 63000 })
+    // back to the defaults so the other tests keep their numbers
+    await as(COLIN, () => r(`public.offer_settings_set($1::jsonb)`, [JSON.stringify({ bands: [{ upto: 120000, pct: 0.70 }, { upto: 250000, pct: 0.75 }, { upto: null, pct: 0.80 }], lao_discount: 0.15 })]))
+  })
+
   it('nothing on file for the parcel: no number, ask for theirs; too thin: no number, book Colin', async () => {
     const none = await card('DI ANCHOR', '44 Anchor Test St', null)
     expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [none]))).toMatchObject({ ok: false, reason: expect.stringContaining('no value on file') })
