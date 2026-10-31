@@ -40,7 +40,7 @@ describe('the exit anchor', () => {
   it('ships off: no number to say, and nothing can be logged as said', async () => {
     expect((await db.query(`select mode from public.offer_settings`)).rows).toEqual([{ mode: 'off' }])
     const lead = await card('ANN ANCHOR', '41 Anchor Test St', 9001)
-    await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9001, 105000, 1000)`)
+    await db.exec(`insert into public.property_values (wpie_property_id, building_sqft) values (9001, 1000); insert into public.property_comps (wpie_property_id, median_ppsf, n_comps, confidence, tier, window_months) values (9001, 105.000000, 6, 'high', 'radius', 12)`)
     const shot = await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))
     expect(shot).toMatchObject({ ok: true, mode: 'off' })
     expect(await as(THALIA, () => r(`public.offer_said($1, $2, 'open')`, [lead, shot.number]))).toMatchObject({ ok: false, reason: expect.stringContaining('off') })
@@ -55,11 +55,11 @@ describe('the exit anchor', () => {
   it("Rick's repairs by the square foot: something old means medium, $30 a sq ft (0156)", async () => {
     const lead = await card('BO ANCHOR', '42 Anchor Test St', 9002)
     // Hayes-shaped: $105K value, 1,000 sq ft, roof and furnace gone
-    await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9002, 105000, 1000)`)
+    await db.exec(`insert into public.property_values (wpie_property_id, building_sqft) values (9002, 1000); insert into public.property_comps (wpie_property_id, median_ppsf, n_comps, confidence, tier, window_months) values (9002, 105.000000, 6, 'high', 'radius', 12)`)
     await answer(lead, 'condition', { choices: ['roof', 'furnace'] })
     const s = await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))
     // roof and furnace old: medium, 1,000 sq ft x $30 = 30,000; (105,000 - 30,000) x 0.70 = 52,500; x 0.85 = 44,625 -> 44,000
-    expect(s).toMatchObject({ ok: true, tier: 'medium', repairs: 30000, number: 44000, value_basis: expect.stringContaining('county') })
+    expect(s).toMatchObject({ ok: true, tier: 'medium', repairs: 30000, number: 44000, value_basis: expect.stringContaining('sold comps') })
     // the buyer's price is Colin's alone (0157): a caller's answer has none of it
     expect(s.mao).toBeUndefined(); expect(s.lao).toBeUndefined(); expect(s.pct).toBeUndefined()
     // (105,000 - 30,000) x 0.70 = 52,500 for Colin
@@ -71,7 +71,7 @@ describe('the exit anchor', () => {
 
   it('no county size: the bedrooms they named set it; cosmetic only leaves just the base refresh; the 75% band above $120K', async () => {
     const lead = await card('CY ANCHOR', '43 Anchor Test St', 9003)
-    await db.query(`insert into public.property_values (wpie_property_id, est_market_value) values (9003, 200000)`)
+    await db.exec(`insert into public.property_comps (wpie_property_id, median_ppsf, n_comps, confidence, tier, window_months) values (9003, 160, 6, 'high', 'zip', 12)`)
     await answer(lead, 'layout', { text: '3 bed 1 bath ranch, two car garage' })
     await answer(lead, 'condition', { choices: ['cosmetic'] })
     const s = await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))
@@ -84,12 +84,12 @@ describe('the exit anchor', () => {
       { upto: 350000, pct: 0.80, off: 0.30 }, { upto: null, pct: 0.83, off: 0.30 }]
     expect(await as(COLIN, () => r(`public.offer_settings_set($1::jsonb)`, [JSON.stringify({ bands: rick, lao_discount: 0.30 })]))).toMatchObject({ ok: true })
     const cheap = await card('HAL BAND', '48 Anchor Test St', 9008)
-    await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9008, 105000, 1000)`)
+    await db.exec(`insert into public.property_values (wpie_property_id, building_sqft) values (9008, 1000); insert into public.property_comps (wpie_property_id, median_ppsf, n_comps, confidence, tier, window_months) values (9008, 105.000000, 6, 'high', 'radius', 12)`)
     await answer(cheap, 'condition', { choices: ['roof'] })
     // medium 30,000; (105,000 - 30,000) x 0.70 = 52,500; x 0.65 = 34,125 -> 34,000
     expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [cheap]))).toMatchObject({ ok: true, off: 0.35, number: 34000 })
     const mid = await card('IDA BAND', '49 Anchor Test St', 9009)
-    await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9009, 150000, 1000)`)
+    await db.exec(`insert into public.property_values (wpie_property_id, building_sqft) values (9009, 1000); insert into public.property_comps (wpie_property_id, median_ppsf, n_comps, confidence, tier, window_months) values (9009, 150.000000, 6, 'high', 'radius', 12)`)
     await answer(mid, 'condition', { choices: ['furnace'] })
     // medium 30,000; (150,000 - 30,000) x 0.75 = 90,000; x 0.70 = 63,000
     expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [mid]))).toMatchObject({ ok: true, off: 0.3, number: 63000 })
@@ -99,9 +99,9 @@ describe('the exit anchor', () => {
 
   it('nothing on file: no number, ask for theirs; water or foundation: walk first; too thin: book Colin', async () => {
     const none = await card('DI ANCHOR', '44 Anchor Test St', null)
-    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [none]))).toMatchObject({ ok: false, reason: expect.stringContaining('no value on file') })
+    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [none]))).toMatchObject({ ok: false, reason: expect.stringContaining('no sold comps') })
     const thin = await card('ED ANCHOR', '45 Anchor Test St', 9005)
-    await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9005, 60000, 1400)`)
+    await db.exec(`insert into public.property_values (wpie_property_id, building_sqft) values (9005, 1400); insert into public.property_comps (wpie_property_id, median_ppsf, n_comps, confidence, tier, window_months) values (9005, 42.857143, 6, 'high', 'radius', 12)`)
     await answer(thin, 'condition', { choices: ['foundation'] })
     expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [thin]))).toMatchObject({ ok: false, walk_first: true, reason: expect.stringContaining('walks it first') })
     await answer(thin, 'condition', { choices: [] })
@@ -111,7 +111,7 @@ describe('the exit anchor', () => {
 
   it("the package's own value wins over the county's; Colin's number on the package is back on", async () => {
     const lead = await card('FAY ANCHOR', '46 Anchor Test St', 9006)
-    await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9006, 100000, 1000)`)
+    await db.exec(`insert into public.property_values (wpie_property_id, building_sqft) values (9006, 1000); insert into public.property_comps (wpie_property_id, median_ppsf, n_comps, confidence, tier, window_months) values (9006, 100.000000, 6, 'high', 'radius', 12)`)
     const sent = await as(THALIA, () => r(`public.package_submit($1::jsonb)`, [JSON.stringify({ lead_id: lead, need: 'moving', callback_at: '2026-11-02T22:00:00Z' })]))
     expect(sent).toMatchObject({ ok: true })
     expect(await r(`public.package_set_value($1, 150000, 'three sales nearby', null, 'Muse')`, [sent.package_id])).toMatchObject({ ok: true })
@@ -122,7 +122,7 @@ describe('the exit anchor', () => {
 
   it("said it: only the card's own number logs; their counter becomes Their number; the package sent after carries it", async () => {
     const lead = await card('GUS ANCHOR', '47 Anchor Test St', 9007)
-    await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9007, 105000, 1000)`)
+    await db.exec(`insert into public.property_values (wpie_property_id, building_sqft) values (9007, 1000); insert into public.property_comps (wpie_property_id, median_ppsf, n_comps, confidence, tier, window_months) values (9007, 105.000000, 6, 'high', 'radius', 12)`)
     await answer(lead, 'condition', { choices: ['roof'] })
     await answer(lead, 'price', { choices: ['refused'] })
     const s = await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))
@@ -142,7 +142,7 @@ describe('the exit anchor', () => {
   })
   it('the four quick answers on a Power hour call: all good leaves the base refresh; anything big means walk first', async () => {
     const lead = await card('JO QUICK', '50 Anchor Test St', 9010)
-    await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9010, 150000, 1000)`)
+    await db.exec(`insert into public.property_values (wpie_property_id, building_sqft) values (9010, 1000); insert into public.property_comps (wpie_property_id, median_ppsf, n_comps, confidence, tier, window_months) values (9010, 150.000000, 6, 'high', 'radius', 12)`)
     for (const [k, v] of [['quick_roof', 'new'], ['quick_hvac', 'new'], ['quick_kb', 'updated'], ['quick_big', 'no']]) await answer(lead, k, { choices: [v] })
     // light 1,000 x $10 = 10,000; (150,000 - 10,000) x 0.75 = 105,000; x 0.85 = 89,250 -> 89,000
     expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))).toMatchObject({ ok: true, asked: 4, tier: 'light', repairs: 10000, number: 89000 })
@@ -162,7 +162,7 @@ describe('the exit anchor', () => {
 
   it('nothing asked yet: heavy, $60 a sq ft (0156)', async () => {
     const lead = await card('KAY HEAVY', '51 Anchor Test St', 9011)
-    await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9011, 150000, 1000)`)
+    await db.exec(`insert into public.property_values (wpie_property_id, building_sqft) values (9011, 1000); insert into public.property_comps (wpie_property_id, median_ppsf, n_comps, confidence, tier, window_months) values (9011, 150.000000, 6, 'high', 'radius', 12)`)
     // heavy 1,000 x $60 = 60,000; (150,000 - 60,000) x 0.75 = 67,500; x 0.85 = 57,375 -> 57,000
     expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))).toMatchObject({ ok: true, asked: 0, tier: 'heavy', repairs: 60000, number: 57000 })
   })
@@ -171,7 +171,7 @@ describe('the exit anchor', () => {
     await db.exec(`insert into public.team_members (email, role, person, display_name) values ('adil@example.com', 'caller', 'adil', 'Adil') on conflict do nothing`)
     const ADIL = { sub: '00000000-0000-0000-0000-0000000000a2', email: 'adil@example.com' }
     const lead = await card('LEE LOCKED', '52 Anchor Test St', 9012)
-    await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9012, 150000, 1000)`)
+    await db.exec(`insert into public.property_values (wpie_property_id, building_sqft) values (9012, 1000); insert into public.property_comps (wpie_property_id, median_ppsf, n_comps, confidence, tier, window_months) values (9012, 150.000000, 6, 'high', 'radius', 12)`)
     for (const [k, v] of [['quick_roof', 'old'], ['quick_hvac', 'new'], ['quick_kb', 'original'], ['quick_big', 'no']])
       await as(ADIL, () => r(`public.call_answer($1, $2, $3::jsonb)`, [lead, k, JSON.stringify({ choices: [v] })]))
     const sent = await as(ADIL, () => r(`public.package_submit($1::jsonb)`, [JSON.stringify({ lead_id: lead, need: 'moving', condition: { roof: 'leaks over the kitchen' }, callback_at: '2026-11-02T22:00:00Z' })]))
@@ -186,6 +186,22 @@ describe('the exit anchor', () => {
       expect(row.next_action).toBe('Adil calls')
       expect((await db.query<{ owner: string }>(`select owner::text from public.tasks where lead_id = $1 and source = 'belt' and done_at is null order by created_at desc limit 1`, [lead])).rows[0]?.owner).toBe('adil')
     }
+  })
+
+  it("the value is the sold comps' price per sq ft x the size, never the county (0158)", async () => {
+    // a county value alone gives no number now
+    const county = await card('MO COUNTY', '53 Anchor Test St', 9013)
+    await db.query(`insert into public.property_values (wpie_property_id, est_market_value, assessed_total, building_sqft) values (9013, 150000, 140000, 1000)`)
+    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [county]))).toMatchObject({ ok: false, reason: expect.stringContaining('no sold comps') })
+    // comps arrive: $150 a sq ft x 1,000 sq ft (county records) = $150,000
+    await db.exec(`insert into public.property_comps (wpie_property_id, median_ppsf, n_comps, confidence, tier, window_months) values (9013, 150, 8, 'high', 'radius', 12)`)
+    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [county]))).toMatchObject({ ok: true, value: 150000, size_known: true, value_basis: expect.stringContaining('8 sold comps') })
+    // no county size: assumed until the seller says the bedrooms; 2 bedrooms = 950 sq ft x $150 = $143,000 (rounded to $1,000)
+    const nosize = await card('NED SIZE', '54 Anchor Test St', 9014)
+    await db.exec(`insert into public.property_comps (wpie_property_id, median_ppsf, n_comps, confidence, tier, window_months) values (9014, 150, 8, 'high', 'radius', 12)`)
+    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [nosize]))).toMatchObject({ ok: true, size_known: false, sqft: 1200, value: 180000 })
+    await answer(nosize, 'quick_beds', { choices: ['2'] })
+    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [nosize]))).toMatchObject({ ok: true, size_known: true, sqft: 950, value: 143000 })
   })
 
 })

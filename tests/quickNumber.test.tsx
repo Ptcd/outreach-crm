@@ -57,6 +57,20 @@ describe('the quick number in Power hour', () => {
     await screen.findByText(/Said \$63,000; they: Said a number \$80,000/)
   })
 
+  it('no size on file: a bedrooms tap appears and saves; with a size on file it does not (0158)', async () => {
+    mode = 'live'
+    shot = { ...shot, ok: true, number: 63000, size_known: false }
+    show()
+    await screen.findByText(/How many bedrooms/)
+    fireEvent.click(screen.getByRole('button', { name: '2 beds' }))
+    await waitFor(() => expect(callAnswer).toHaveBeenCalledWith('L1', 'quick_beds', { choices: ['2'] }))
+    cleanup()
+    shot = { ...shot, size_known: true }
+    show()
+    await screen.findByText('$63,000')
+    expect(screen.queryByText(/How many bedrooms/)).toBeNull()
+  })
+
   it('water, foundation or fire: no number, Colin walks it first', async () => {
     mode = 'live'
     shot = { ok: false, walk_first: true, reason: 'water, foundation, fire or a code order: no number on the phone, Colin walks it first' }

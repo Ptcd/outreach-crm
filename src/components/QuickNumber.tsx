@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 
 type Line = { item: string; amount: number; why: string }
 type Shot = {
-  ok: boolean; reason?: string; walk_first?: boolean; number?: number; say?: string; value?: number; value_basis?: string
+  ok: boolean; reason?: string; walk_first?: boolean; number?: number; say?: string; value?: number; value_basis?: string; size_known?: boolean; sqft_basis?: string
   repairs?: number; lines?: Line[]; pct?: number; off?: number; mao?: number; asked?: number
 }
 const QUESTIONS: { key: string; ask: string; options: [string, string][] }[] = [
@@ -24,6 +24,8 @@ const QUESTIONS: { key: string; ask: string; options: [string, string][] }[] = [
   { key: 'quick_kb', ask: 'Kitchen & baths', options: [['updated', 'Updated'], ['original', 'Original']] },
   { key: 'quick_big', ask: 'Water, foundation, fire?', options: [['no', 'No'], ['yes', 'Yes']] },
 ]
+// the house's size sets the value (sold comps' price per sq ft x the size, 0158): asked only when the county has no size
+const BEDS: [string, string][] = [['1', '1 bed'], ['2', '2 beds'], ['3', '3 beds'], ['4', '4+ beds']]
 const REACTIONS: [string, string][] = [['gave_number', 'Said a number'], ['open', 'Open to it'], ['no', 'No / hung up'], ['later', 'Later']]
 const dollars = (n: number) => '$' + Math.round(n).toLocaleString('en-US')
 
@@ -57,6 +59,7 @@ export function QuickNumber({ leadId }: { leadId: string }) {
     enabled: mode !== 'off' && show,
     placeholderData: (prev) => prev,      // the last number stays up while a tap is worked out: no flicker mid-call
   })
+  const d = shot.data
   if (mode === 'off') return null
   if (!show) return (
     <Button variant="outline" className="h-11 w-full" onClick={() => setOpen(true)}>Won&apos;t name a number, or leaving? Quick number</Button>
@@ -70,7 +73,6 @@ export function QuickNumber({ leadId }: { leadId: string }) {
     if (r.error || !d?.ok) setErr(r.error?.message ?? d?.reason ?? 'not saved')
     void qc.invalidateQueries({ queryKey: ['quick_number', leadId] })
   }
-  const d = shot.data
   const logSaid = async () => {
     if (!d?.ok || d.number == null || !reaction) return
     setErr(null)
@@ -104,6 +106,22 @@ export function QuickNumber({ leadId }: { leadId: string }) {
           </div>
         ))}
       </div>
+      {(d?.size_known === false || !!picked.quick_beds) && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-muted-foreground">How many bedrooms? (sets the size, so the value)</p>
+          <div className="grid grid-cols-4 gap-1">
+            {BEDS.map(([v, label]) => {
+              const on = picked.quick_beds === v
+              return (
+                <button key={v} type="button" aria-pressed={on} onClick={() => void tap('quick_beds', v)}
+                  className={cn('min-h-11 rounded-md border px-2 text-sm font-medium', on ? 'border-primary bg-primary text-primary-foreground' : 'bg-background')}>
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
       {shot.isLoading && !shot.data && <p className="text-sm text-muted-foreground">Working it out...</p>}
       {d && !d.ok && (
         <p className={cn('rounded-md p-2 text-sm', d.walk_first ? 'bg-red-50 font-medium text-red-800 dark:bg-red-950/30 dark:text-red-200' : 'bg-muted')}>
