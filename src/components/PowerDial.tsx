@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Badge, Empty, ErrorNote } from '@/components/ui/form'
 import { CallScript, pickupLine } from '@/components/CallScript'
 import { QuickNumber } from '@/components/QuickNumber'
+import { DealPackage } from '@/components/DealPackage'
 import { PHONE_SCRIPT } from '@/lib/callScript'
 import { supabase } from '@/lib/supabaseClient'
 import { api, useLead } from '@/lib/queries'
@@ -467,8 +468,13 @@ function TalkPanel({ leadId, phone, onLogged }: { leadId: string; phone: string;
   if (q.error) return <ErrorNote error={q.error} />
   if (!q.data) return <Empty>That card is gone.</Empty>
   const { lead, contacts, messages, gates } = q.data
+  // the package goes out from the call itself (Colin's Adil walkthrough 2026-10-31: the script's "send the package"
+  // pointed at a form that only lived on the card page, so in Power hour it did nothing)
   return (
-    <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={q.data.facts ?? {}} latestGate={gates[0] ?? null}
-      phone={phone} startOpen canOverride={false} onLogged={onLogged} />
+    <div className="space-y-3">
+      <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={q.data.facts ?? {}} latestGate={gates[0] ?? null}
+        phone={phone} startOpen canOverride={false} onLogged={onLogged} />
+      <div id="package"><DealPackage lead={lead} /></div>
+    </div>
   )
 }

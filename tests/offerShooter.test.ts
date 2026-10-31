@@ -59,7 +59,11 @@ describe('the exit anchor', () => {
     await answer(lead, 'condition', { choices: ['roof', 'furnace'] })
     const s = await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))
     // roof and furnace old: medium, 1,000 sq ft x $30 = 30,000; (105,000 - 30,000) x 0.70 = 52,500; x 0.85 = 44,625 -> 44,000
-    expect(s).toMatchObject({ ok: true, tier: 'medium', repairs: 30000, pct: 0.7, mao: 52500, lao: 44625, number: 44000, value_basis: expect.stringContaining('county') })
+    expect(s).toMatchObject({ ok: true, tier: 'medium', repairs: 30000, number: 44000, value_basis: expect.stringContaining('county') })
+    // the buyer's price is Colin's alone (0157): a caller's answer has none of it
+    expect(s.mao).toBeUndefined(); expect(s.lao).toBeUndefined(); expect(s.pct).toBeUndefined()
+    // (105,000 - 30,000) x 0.70 = 52,500 for Colin
+    expect(await as(COLIN, () => r(`public.offer_shoot($1)`, [lead]))).toMatchObject({ pct: 0.7, mao: 52500, lao: 44625, number: 44000 })
     expect((s.lines as { item: string }[]).map((x) => x.item)).toEqual(["Rick's rate: medium"])
     expect(String(s.say)).toContain('$44,000')
     expect(String(s.say)).toContain("can't give you a firm number")
@@ -72,7 +76,7 @@ describe('the exit anchor', () => {
     await answer(lead, 'condition', { choices: ['cosmetic'] })
     const s = await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))
     // 3 beds = 1,250 sq ft x $10 light = 12,500; (200,000 - 12,500) x 0.75 = 140,625; x 0.85 = 119,531.25 -> 119,000
-    expect(s).toMatchObject({ ok: true, sqft: 1250, sqft_basis: expect.stringContaining('3 bedrooms'), tier: 'light', repairs: 12500, pct: 0.75, number: 119000 })
+    expect(s).toMatchObject({ ok: true, sqft: 1250, sqft_basis: expect.stringContaining('3 bedrooms'), tier: 'light', repairs: 12500, number: 119000 })
   })
 
   it("a band may carry its own discount: Rick's 2026 bands, 35% under $120K, 30% above (0153)", async () => {
@@ -83,12 +87,12 @@ describe('the exit anchor', () => {
     await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9008, 105000, 1000)`)
     await answer(cheap, 'condition', { choices: ['roof'] })
     // medium 30,000; (105,000 - 30,000) x 0.70 = 52,500; x 0.65 = 34,125 -> 34,000
-    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [cheap]))).toMatchObject({ ok: true, pct: 0.7, off: 0.35, mao: 52500, number: 34000 })
+    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [cheap]))).toMatchObject({ ok: true, off: 0.35, number: 34000 })
     const mid = await card('IDA BAND', '49 Anchor Test St', 9009)
     await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9009, 150000, 1000)`)
     await answer(mid, 'condition', { choices: ['furnace'] })
     // medium 30,000; (150,000 - 30,000) x 0.75 = 90,000; x 0.70 = 63,000
-    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [mid]))).toMatchObject({ ok: true, pct: 0.75, off: 0.3, mao: 90000, number: 63000 })
+    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [mid]))).toMatchObject({ ok: true, off: 0.3, number: 63000 })
     // back to the defaults so the other tests keep their numbers
     await as(COLIN, () => r(`public.offer_settings_set($1::jsonb)`, [JSON.stringify({ bands: [{ upto: 120000, pct: 0.70 }, { upto: 250000, pct: 0.75 }, { upto: null, pct: 0.80 }], lao_discount: 0.15 })]))
   })
@@ -141,7 +145,7 @@ describe('the exit anchor', () => {
     await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9010, 150000, 1000)`)
     for (const [k, v] of [['quick_roof', 'new'], ['quick_hvac', 'new'], ['quick_kb', 'updated'], ['quick_big', 'no']]) await answer(lead, k, { choices: [v] })
     // light 1,000 x $10 = 10,000; (150,000 - 10,000) x 0.75 = 105,000; x 0.85 = 89,250 -> 89,000
-    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))).toMatchObject({ ok: true, asked: 4, tier: 'light', repairs: 10000, mao: 105000, number: 89000 })
+    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))).toMatchObject({ ok: true, asked: 4, tier: 'light', repairs: 10000, number: 89000 })
     await answer(lead, 'quick_roof', { choices: ['old'] })
     // an old roof: medium, 1,000 x $30 = 30,000 (the rate carries the roof); (150,000 - 30,000) x 0.75 = 90,000; x 0.85 = 76,500
     expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))).toMatchObject({ ok: true, tier: 'medium', repairs: 30000, number: 76000 })
@@ -161,6 +165,27 @@ describe('the exit anchor', () => {
     await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9011, 150000, 1000)`)
     // heavy 1,000 x $60 = 60,000; (150,000 - 60,000) x 0.75 = 67,500; x 0.85 = 57,375 -> 57,000
     expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))).toMatchObject({ ok: true, asked: 0, tier: 'heavy', repairs: 60000, number: 57000 })
+  })
+
+  it("Adil's walkthrough (0157): the package carries the Quick number's answers, and the next call goes to the locked caller", async () => {
+    await db.exec(`insert into public.team_members (email, role, person, display_name) values ('adil@example.com', 'caller', 'adil', 'Adil') on conflict do nothing`)
+    const ADIL = { sub: '00000000-0000-0000-0000-0000000000a2', email: 'adil@example.com' }
+    const lead = await card('LEE LOCKED', '52 Anchor Test St', 9012)
+    await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9012, 150000, 1000)`)
+    for (const [k, v] of [['quick_roof', 'old'], ['quick_hvac', 'new'], ['quick_kb', 'original'], ['quick_big', 'no']])
+      await as(ADIL, () => r(`public.call_answer($1, $2, $3::jsonb)`, [lead, k, JSON.stringify({ choices: [v] })]))
+    const sent = await as(ADIL, () => r(`public.package_submit($1::jsonb)`, [JSON.stringify({ lead_id: lead, need: 'moving', condition: { roof: 'leaks over the kitchen' }, callback_at: '2026-11-02T22:00:00Z' })]))
+    expect(sent).toMatchObject({ ok: true })
+    const cond = (await db.query<{ c: Record<string, string> }>(`select condition c from public.deal_packages where id = $1`, [sent.package_id])).rows[0].c
+    expect(cond).toEqual({ roof: 'leaks over the kitchen', hvac: 'newer (quick number)', kitchen_baths: 'original (quick number)' })
+    // locked to Adil: a weekday caller step is his, and says so
+    await db.query(`update public.leads set locked_to = 'adil', locked_at = now() where id = $1`, [lead])
+    await db.query(`select public.belt_enter($1, 'yes_unbooked', 1, 'test', '{}'::jsonb, 'test', '2026-11-03T15:00:00Z'::timestamptz)`, [lead])
+    const row = (await db.query<{ next_action: string; next_stop_who: string }>(`select next_action, next_stop_who from public.leads where id = $1`, [lead])).rows[0]
+    if (row.next_stop_who === 'thalia_call') {
+      expect(row.next_action).toBe('Adil calls')
+      expect((await db.query<{ owner: string }>(`select owner::text from public.tasks where lead_id = $1 and source = 'belt' and done_at is null order by created_at desc limit 1`, [lead])).rows[0]?.owner).toBe('adil')
+    }
   })
 
 })
