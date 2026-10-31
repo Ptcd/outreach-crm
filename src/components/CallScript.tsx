@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge, Select, Textarea } from '@/components/ui/form'
 import { ConfirmButton } from '@/components/ui/confirm'
-import { api } from '@/lib/queries'
+import { api, useOfferSettings } from '@/lib/queries'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso, todayLocal } from '@/lib/format'
 import { CALL_OUTCOMES, NEXT_STEP, PHONE_SCRIPT, callScript, clearlyHot, scriptLine, type CallQuestion } from '@/lib/callScript'
 import { answerOf, answerText, gateFromCall, stopsFromCall, type CallFacts, type CallValue } from '@/lib/callGate'
@@ -80,6 +80,9 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
   const hot = clearlyHot(facts as never)
   const questions = callScript(vars)
   const answered = questions.filter((q) => answerOf(facts, q.id)).length
+  // the exit anchor (0149): off unless Colin turned it on in Settings
+  const offer = useOfferSettings()
+  const anchorMode = offer.data?.mode ?? 'off'
 
   if (!open) {
     return (
@@ -142,7 +145,15 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
 
       <ol className="space-y-3">
         {questions.map((q, i) => (
-          <QuestionCard key={q.qid} n={i + 1} q={q} facts={facts} replyFacts={replyFacts} onSave={save} showGates={caller === 'colin'} />
+          <Fragment key={q.qid}>
+            <QuestionCard n={i + 1} q={q} facts={facts} replyFacts={replyFacts} onSave={save} showGates={caller === 'colin'} />
+            {q.id === 'price' && anchorMode !== 'off' && (
+              <AnchorCard lead={lead} facts={facts} mode={anchorMode} onSaid={(v) => {
+                setFacts((f) => ({ ...f, our_number: { value: v, at: new Date().toISOString() } }))
+                void qc.invalidateQueries({ queryKey: ['lead', lead.id] })
+              }} />
+            )}
+          </Fragment>
         ))}
       </ol>
       {err && <p className="rounded bg-red-50 p-2 text-sm text-red-800">Not saved: {err}</p>}
@@ -190,6 +201,97 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
 }
 
 const LABEL_OUTCOME: Record<string, string> = Object.fromEntries(CALL_OUTCOMES.map((o) => [o.id, o.label]))
+
+type Shot = {
+  ok: boolean; reason?: string; mode: string; number?: number; say?: string; value?: number; value_basis?: string
+  sqft?: number; sqft_basis?: string; tier?: string; tier_basis?: string; repairs?: number; pct?: number; mao?: number; lao?: number; their_number?: string | null
+}
+const REACTIONS = [
+  { id: 'gave_number', label: 'They said a number' }, { id: 'open', label: 'Open to it' }, { id: 'no', label: 'No / hung up' }, { id: 'later', label: 'Later' },
+]
+const REACTION_LABEL: Record<string, string> = Object.fromEntries(REACTIONS.map((r) => [r.id, r.label]))
+const dollars = (n: number) => '$' + Math.round(n).toLocaleString('en-US')
+
+/** The exit anchor (migration 0149; Colin 2026-10-30). For a seller who has refused a number twice, said "make me an
+ *  offer", or is leaving, the one low, non-firm figure the caller may say so the seller names their own. The figure is
+ *  the database's arithmetic on the county's value and the condition answers, never the caller's guess; the caller
+ *  logs what the seller said back. In exit-only mode the card stays folded until the seller has refused or is going. */
+function AnchorCard({ lead, facts, mode, onSaid }: { lead: Lead; facts: CallFacts; mode: string; onSaid: (v: CallValue) => void }) {
+  const theirs = answerOf(facts, 'price')
+  const leaving = !!theirs?.choices?.some((c) => ['refused', 'refused_once', 'make_offer'].includes(c))
+  const said = facts.our_number?.value as (CallValue & { counter?: number | null }) | undefined
+  const [open, setOpen] = useState(mode === 'live' || leaving)
+  useEffect(() => { if (leaving) setOpen(true) }, [leaving])
+  const inputs = JSON.stringify([facts.condition?.value, facts.happened?.value, facts.layout?.value])
+  const shot = useQuery({
+    queryKey: ['offer_shot', lead.id, inputs],
+    queryFn: async () => { const r = await api.offerShoot(lead.id); if (r.error) throw r.error; return r.data as Shot },
+    enabled: open && !said,
+  })
+  const [reaction, setReaction] = useState('')
+  const [counter, setCounter] = useState('')
+  const [note, setNote] = useState('')
+  const [err, setErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  if (said) return (
+    <li className="rounded-md border border-emerald-300 bg-emerald-50/40 p-3">
+      <p className="font-semibold">The anchor <Badge tone="good">Said</Badge></p>
+      <p className="text-sm">Around {dollars(Number(said.number))}, non-firm. They: {REACTION_LABEL[said.choices?.[0] ?? ''] ?? said.choices?.[0]}
+        {said.counter ? `, ${dollars(Number(said.counter))}` : ''}{said.text ? ` (${said.text})` : ''}.</p>
+    </li>
+  )
+  if (!open) return (
+    <li className="rounded-md border border-dashed p-3">
+      <Button variant="outline" className="h-auto min-h-11 w-full whitespace-normal py-2" onClick={() => setOpen(true)}>
+        They won&apos;t say a number, or they&apos;re leaving? Open the anchor
+      </Button>
+    </li>
+  )
+  const d = shot.data
+  const sayIt = async () => {
+    if (!d?.ok || d.number == null || !reaction) return
+    setBusy(true); setErr(null)
+    const c = reaction === 'gave_number' ? Number(counter.replace(/[^0-9.]/g, '')) : null
+    const r = await api.offerSaid(lead.id, d.number, reaction, c, note.trim() || null)
+    const res = r.data as { ok?: boolean; reason?: string } | null
+    setBusy(false)
+    if (r.error || !res?.ok) { setErr(r.error?.message ?? res?.reason ?? 'Not saved'); return }
+    onSaid({ number: String(d.number), choices: [reaction], text: note.trim() || undefined, ...(c ? { counter: c } : {}) } as CallValue)
+  }
+  return (
+    <li className="rounded-md border-2 border-amber-400 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-semibold">The anchor: one low number, non-firm, so they say theirs</p>
+        <Badge tone="warn">Only if they won&apos;t</Badge>
+      </div>
+      {shot.isLoading && <p className="mt-1 text-sm text-muted-foreground">Working it out from the county&apos;s value and what they said…</p>}
+      {shot.error && <p className="mt-1 text-sm text-red-700">Could not work it out: {String((shot.error as Error).message)}</p>}
+      {d && !d.ok && <p className="mt-1 text-sm text-muted-foreground">No number to say: {d.reason}. Ask for theirs once more, then book Colin.</p>}
+      {d?.ok && (
+        <div className="mt-2 space-y-2">
+          <p className="rounded-md bg-muted p-2 text-base leading-snug">&ldquo;{d.say}&rdquo;</p>
+          <p className="text-xs text-muted-foreground">
+            {dollars(d.value ?? 0)} ({d.value_basis}), {d.tier} repairs about {dollars(d.repairs ?? 0)} ({d.sqft} sq ft, {d.sqft_basis}; {d.tier_basis}),
+            times {Math.round((d.pct ?? 0) * 100)}% = {dollars(d.mao ?? 0)}; the anchor sits under that. Say only {dollars(d.number ?? 0)}, and say it is rough.
+          </p>
+          <p className="text-sm font-medium">What they said back</p>
+          <div className="grid grid-cols-2 gap-2">
+            {REACTIONS.map((r) => (
+              <button key={r.id} type="button" aria-pressed={reaction === r.id} onClick={() => setReaction(r.id)}
+                className={cn('min-h-11 rounded-md border px-2 py-2 text-sm font-medium', reaction === r.id ? 'border-primary bg-primary text-primary-foreground' : 'bg-background')}>
+                {r.label}
+              </button>
+            ))}
+          </div>
+          {reaction === 'gave_number' && <Input className="h-11" inputMode="decimal" placeholder="Their number ($), as said" value={counter} onChange={(e) => setCounter(e.target.value)} />}
+          <Input className="h-11" placeholder="Their words (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
+          <Button disabled={busy || !reaction || (reaction === 'gave_number' && !counter.trim())} onClick={() => void sayIt()}>I said it: log what they said</Button>
+          {err && <p className="text-sm text-red-700">{err}</p>}
+        </div>
+      )}
+    </li>
+  )
+}
 
 /** The close (docs/THALIA_TRAINING.md): every good call ends in a package for Colin. A clearly hot seller (a need and a
  *  rough house, or a sale or move date) gets Colin's walk booked now; everyone else a callback at a set time, when the

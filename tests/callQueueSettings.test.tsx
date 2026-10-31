@@ -42,6 +42,7 @@ vi.mock('@/lib/queries', () => ({
     beginHumanCall: (...a: unknown[]) => beginHumanCall(...a), resumeHumanCall: (...a: unknown[]) => resumeHumanCall(...a) },
   useWrite: (fn: (x: unknown) => Promise<unknown>) => ({ mutate: (x: unknown) => { void fn(x) }, isPending: false, isSuccess: false, error: null }),
   useDueTasks: () => ok(tasks),
+  useOfferSettings: () => ({ data: null }),
   useLead: (id: string) => ok({
     lead: LEADS[id], gates: [], milestones: [], tasks: [], facts: {},
     contacts: id === 'L1'

@@ -61,7 +61,9 @@ describe('the package', () => {
     expect(await r(`public.package_set_value($1, 265000, '3 sales within half a mile, last 6 months', $2::jsonb, 'Muse')`,
       [id, JSON.stringify([{ address: '30 Near St', sold_price: 270000, sold_date: '2026-08-01', sqft: 1400 }])])).toMatchObject({ ok: true, status: 'waiting_number' })
     await expect(as(THALIA, () => r(`public.package_decide($1, true, null, 'A')`, [id]))).rejects.toThrow(/only Colin/)
-    expect(await as(COLIN, () => r(`public.package_price($1, 150000, null, 'A')`, [id]))).toMatchObject({ ok: false, reason: expect.stringContaining('no number on the phone') })
+    // 0149: Colin may set a non-firm number from his desk again; a caller still cannot
+    await expect(as(THALIA, () => r(`public.package_price($1, 150000, null, 'A')`, [id]))).rejects.toThrow(/only Colin/)
+    expect(await as(COLIN, () => r(`public.package_price($1, 0, null, 'A')`, [id]))).toMatchObject({ ok: false, reason: expect.stringContaining('dollars') })
     expect(await as(COLIN, () => r(`public.package_decide($1, true, 'roof and the oak', 'A')`, [id]))).toMatchObject({ ok: true, status: 'go_walk' })
     expect((await db.query(`select note from public.tasks where lead_id = $1 and kind = 'callback' and done_at is null`, [lead])).rows[0].note)
       .toContain('Colin wants to walk it')

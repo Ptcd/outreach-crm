@@ -34,6 +34,7 @@ vi.mock('@/lib/queries', () => ({
     terms: { street: '100 N Main St', muniName: 'Milwaukee', county: 'Milwaukee', price: 182500, earnestMoney: 1000, earnestHolder: 'Knight Barry Title',
       closing: 'November 20, 2026', bindingDeadline: 'October 24, 2026 at 11:59 p.m.', inspection: true, inspectionDays: 10, proofOfFundsDays: 5 } } })) },
   useWrite: () => mutation,
+  useOfferSettings: () => ({ data: null }),
   usePhoneLookup: (d: string) => ok(d.replace(/\D/g, '').length >= 3 ? [
     { lead_id: 'L1', owner_name: 'JANE ROE', property_address: '100 N MAIN ST', municipality: 'Milwaukee', lane: 'hold', stage: 'colin_call', phone: '4145550101', person_name: null, blocked: false, exact: false },
     { lead_id: 'L9', owner_name: 'BO KIM', property_address: '400 N PINE ST', municipality: 'Milwaukee', lane: 'flip', stage: 'dnc', phone: '2625550101', person_name: null, blocked: true, exact: false }] : []),

@@ -10,6 +10,7 @@ vi.mock('@/lib/supabaseClient', () => ({ supabase: {}, supabaseConfigured: true 
 vi.mock('@/providers/AuthProvider', () => ({ useAuth: () => ({ user: { id: 'u2' }, member: { person: 'thalia', role: 'caller', display_name: 'Thalia', email: 't@example.com' }, isOwner: false }) }))
 vi.mock('@/lib/queries', () => ({
   api: { logCall: (...a: unknown[]) => logCall(...a), callAnswer: vi.fn(async () => ({ data: { ok: true }, error: null })) },
+  useOfferSettings: () => ({ data: null }),
   useWrite: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }))
 

@@ -335,6 +335,11 @@ export const api = {
       p_named_event: x.named_event ?? null, p_elderly: x.elderly ?? null, p_grief: x.grief ?? null, p_assigned_to: x.assigned_to ?? null,
       p_notes: x.notes ?? null, p_stage: x.stage ?? null }),
   verdictNo: (leadId: string, reason: string, note: string | null) => supabase.rpc('verdict_no', { p_lead_id: leadId, p_reason: reason, p_note: note }),
+  // the exit anchor (0149): the one low, non-firm figure for a seller who will not name a number or is leaving
+  offerShoot: (leadId: string) => supabase.rpc('offer_shoot', { p_lead_id: leadId }),
+  offerSaid: (leadId: string, number: number, reaction: string, counter: number | null, note: string | null) =>
+    supabase.rpc('offer_said', { p_lead_id: leadId, p_number: number, p_reaction: reaction, p_counter: counter, p_note: note }),
+  offerSettingsSet: (p: Record<string, unknown>) => supabase.rpc('offer_settings_set', { p }),
   setTouchTemplate: (key: string, on: boolean) => supabase.rpc('set_touch_template', { p_key: key, p_on: on }),
   // drafted replies: Approve (with Colin's final words) or Skip, through the reply-send Edge Function
   replyAction: async (id: string, action: 'approve' | 'skip', text?: string) => {
@@ -416,6 +421,24 @@ export function useCampaignControl() {
 
 // ---------------------------------------------------------------- Inbox
 /** Every planned text in [fromDay, toDay] with its lead, thread, reply-agent view and server-seen replies. */
+export type OfferSettings = {
+  id: number; mode: 'off' | 'exit_only' | 'live'; bands: { upto: number | null; pct: number }[]
+  repair_light: number; repair_medium: number; repair_heavy: number; lao_discount: number; default_sqft: number; min_number: number; round_to: number
+  updated_at: string; updated_by: string | null
+}
+/** Colin's rules for the exit anchor (0149). Off until he turns it on in Settings. */
+export function useOfferSettings() {
+  return useQuery({
+    queryKey: ['offer_settings'],
+    queryFn: async () => {
+      const r = await supabase.from('offer_settings').select('*').eq('id', 1).maybeSingle()
+      if (r.error) throw r.error
+      return (r.data ?? null) as OfferSettings | null
+    },
+    staleTime: 60_000,
+  })
+}
+
 export function useInbox(fromDay: string, toDay: string, enabled = true) {
   return useQuery({
     queryKey: ['inbox', fromDay, toDay],

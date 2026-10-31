@@ -263,7 +263,7 @@
       "id": "obj_give_me_a_number",
       "trigger": "Just give me a number / what's your offer?",
       "say": "I can't put a number on a place we haven't seen, any more than you'd buy a car without driving it. My partner gives his number in person, once he's walked it, so it's a real number and not a guess.",
-      "note": "Never a number, range or percentage on the phone, first call or callback."
+      "note": "No number from you. If they still won't name one, or are leaving: the anchor card under Their number, when Colin has it on (it says the one figure you may say)."
     },
     {
       "id": "obj_lowball",

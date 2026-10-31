@@ -16,6 +16,7 @@ vi.mock('@/lib/supabaseClient', () => ({ supabase: {}, supabaseConfigured: true 
 vi.mock('@/providers/AuthProvider', () => ({ useAuth: () => ({ member: { display_name: 'Colin' }, signOut: vi.fn() }) }))
 vi.mock('@/lib/queries', () => ({
   useRepliesWaiting: () => ({ data: { drafts_waiting: 0, tasks_open: 0 } }),
+  useOfferSettings: () => ({ data: null }),
   api: { newCaller: vi.fn(async () => ({ data: { ok: true, lead_id: 'NEW1' }, error: null })), logCall: vi.fn(async () => ({ error: null })) },
 }))
 vi.mock('@/lib/dialer', async (orig) => ({ ...(await orig<typeof import('../src/lib/dialer')>()), useDialer: () => dialer }))

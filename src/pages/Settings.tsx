@@ -12,6 +12,7 @@ import { OnPhonePrompt, useColinHere } from '@/components/OnPhonePicker'
 import { AgentKeys } from '@/components/AgentKeys'
 import { MyCode, TeamCodes } from '@/components/TeamCodes'
 import { CalendarPanel } from '@/components/CalendarPanel'
+import { OfferSettings } from '@/components/OfferSettings'
 import { useOnPhone, workerFor } from '@/lib/onPhone'
 import { personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
@@ -107,6 +108,11 @@ export default function Settings() {
       {isOwner && colinHere && (
         <Section title="Team codes (Thalia and Adil)">
           <TeamCodes />
+        </Section>
+      )}
+      {isOwner && colinHere && (
+        <Section title="A number on the phone (the exit anchor)">
+          <OfferSettings />
         </Section>
       )}
       <Section title="Your sign-in code">

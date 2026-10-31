@@ -176,6 +176,8 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
   const [err, setErr] = useState<string | null>(null)
   const [grade, setGrade] = useState('')
   const [note, setNote] = useState('')
+  const [num, setNum] = useState('')          // Colin's non-firm number for the callback (0149)
+  const [counter, setCounter] = useState('')  // what the seller said back to it
   const [walkAt, setWalkAt] = useState('')
   const [newCb, setNewCb] = useState(() => isoToLocalInput(new Date(Date.now() + 24 * 3600_000).toISOString()))
   const [answers, setAnswers] = useState('')
@@ -233,16 +235,19 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
           )}
         </div>
       )}
-      {p.number_note != null && <p><span className="font-medium">Colin&apos;s note:</span> {String(p.number_note)}</p>}
+      {p.said_number != null && p.status !== 'number_ready' && (
+        <p><span className="font-medium">Said on the call, non-firm:</span> {money(p.said_number)}{p.number_note != null ? ` (${String(p.number_note)})` : ''}</p>
+      )}
+      {p.number_note != null && (p.said_number == null || p.status === 'number_ready') && <p><span className="font-medium">Colin&apos;s note:</span> {String(p.number_note)}</p>}
 
-      {isOwner && ['waiting_value', 'waiting_number', 'go_walk'].includes(p.status) && (
+      {isOwner && ['waiting_value', 'waiting_number', 'go_walk', 'counter'].includes(p.status) && (
         <div className="space-y-2 rounded-lg border p-3">
-          <p className="font-medium">{p.status === 'go_walk' ? 'You said walk it (change your mind?)' : 'Walk it or pass?'}</p>
+          <p className="font-medium">{p.status === 'go_walk' ? 'You said walk it (change your mind?)' : p.status === 'counter' ? `They countered at ${money(p.counter_number)}: a new number, walk it, or pass?` : 'Walk it or pass?'}</p>
           <div className="grid gap-2 sm:grid-cols-[7rem_1fr_auto_auto]">
             <Select value={grade} onChange={(e) => setGrade(e.target.value)} aria-label="Grade the package">
               <option value="">Grade</option><option value="A">A</option><option value="B">B</option><option value="C">C</option>
             </Select>
-            <Input placeholder="Note for the caller, or what you need to know first (never a number)" value={note} onChange={(e) => setNote(e.target.value)} />
+            <Input placeholder="Note for the caller, or what you need to know first" value={note} onChange={(e) => setNote(e.target.value)} />
             {p.status !== 'go_walk' && <Button onClick={() => void run('package_decide', { p_id: p.id, p_walk: true, p_note: note || null, p_grade: grade || null })}>Walk it</Button>}
             <Button variant="outline" onClick={() => void run('package_decide', { p_id: p.id, p_walk: false, p_note: note || null, p_grade: grade || null })}>Pass</Button>
           </div>
@@ -252,7 +257,35 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
               <span className="text-xs text-muted-foreground">Not sure yet? Type what you need to know in the box (for example: their timeline, what their number means, how many units and the rents) and tap Ask first. The caller gets the answers on the callback and you decide then.</span>
             </div>
           )}
-          <p className="text-xs text-muted-foreground">No number goes out on the phone. The caller books your walk with everyone on the title there, and you give your number at the house.</p>
+          {/* 0149: a non-firm number from Colin's desk, read on the callback exactly as typed; firm numbers still at the house */}
+          <div className="grid gap-2 sm:grid-cols-[14rem_auto]">
+            <Input inputMode="decimal" placeholder="Or your non-firm number ($)" value={num} onChange={(e) => setNum(e.target.value)} aria-label="Your non-firm number" />
+            <Button variant="secondary" disabled={!Number(num.replace(/[^0-9.]/g, ''))}
+              onClick={() => void run('package_price', { p_id: p.id, p_number: Number(num.replace(/[^0-9.]/g, '')), p_note: note || null, p_grade: grade || null })}>
+              Set the number for the callback
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">Walk it: the caller books your walk with everyone on the title there, and you give your number at the house. A number here is non-firm, pending the walk, and the only one the caller may say.</p>
+        </div>
+      )}
+
+      {p.status === 'number_ready' && p.our_number != null && (
+        <div className="space-y-2 rounded-lg border-2 border-emerald-400 p-3">
+          <p className="font-medium">The callback: Colin&apos;s non-firm number, {money(p.our_number)}</p>
+          <blockquote className={say}>
+            &quot;Hi, it&apos;s [your name]. My partner went over everything you told me. Rough, and pending him walking it, he&apos;d be somewhere around {money(p.our_number)}. Is that in the conversation?&quot;
+          </blockquote>
+          <p className="text-xs text-muted-foreground">Say only that number, and say it is rough. A yes books his walk. A counter goes back to Colin. Never a second number of your own.</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Input inputMode="decimal" placeholder="Their counter ($), if they named one" value={counter} onChange={(e) => setCounter(e.target.value)} aria-label="Their counter" />
+            <Input placeholder="What they said, their words" value={note} onChange={(e) => setNote(e.target.value)} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => void run('package_delivered', { p_id: p.id, p_said: Number(p.our_number), p_response: 'yes', p_counter: null, p_note: note || null })}>Yes: book the walk</Button>
+            <Button variant="secondary" disabled={!Number(counter.replace(/[^0-9.]/g, ''))}
+              onClick={() => void run('package_delivered', { p_id: p.id, p_said: Number(p.our_number), p_response: 'counter', p_counter: Number(counter.replace(/[^0-9.]/g, '')), p_note: note || null })}>Countered</Button>
+            <Button variant="outline" onClick={() => void run('package_delivered', { p_id: p.id, p_said: Number(p.our_number), p_response: 'no', p_counter: null, p_note: note || null })}>No</Button>
+          </div>
         </div>
       )}
 
@@ -286,9 +319,9 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
         </div>
       )}
 
-      {p.status === 'go_walk' && (
+      {(p.status === 'go_walk' || p.status === 'agreed') && (
         <div className="space-y-2 rounded-lg border p-3">
-          <p className="font-medium">The callback: book Colin&apos;s walk (no number on the phone)</p>
+          <p className="font-medium">{p.status === 'agreed' ? `They said yes to ${money(p.our_number ?? p.said_number)}: book Colin's walk` : 'The callback: book Colin’s walk (no number on the phone)'}</p>
           <blockquote className={say}>
             &quot;Hi, it&apos;s [your name]. My partner and I went over everything you told me. {mentioned(p.condition)}, he&apos;d like to come see it himself. He only puts a number on a place once he&apos;s walked it, so it&apos;s a real number and not a guess.&quot;
           </blockquote>

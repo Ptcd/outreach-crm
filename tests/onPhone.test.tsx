@@ -19,6 +19,7 @@ vi.mock('@/lib/queries', () => ({
   useWrite: () => ({ mutate: vi.fn(), isPending: false, isSuccess: false, error: null }),
   useDueTasks: (...a: unknown[]) => useDueTasks(...a),
   useLead: () => ({ data: null, error: null, isLoading: false }),
+  useOfferSettings: () => ({ data: null }),
 }))
 
 import CallQueue from '@/pages/CallQueue'
