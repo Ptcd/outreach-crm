@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge, Empty, ErrorNote } from '@/components/ui/form'
 import { CallScript, pickupLine } from '@/components/CallScript'
+import { QuickNumber } from '@/components/QuickNumber'
 import { PHONE_SCRIPT } from '@/lib/callScript'
 import { supabase } from '@/lib/supabaseClient'
 import { api, useLead } from '@/lib/queries'
@@ -330,6 +331,9 @@ export function PowerDial({ caller }: { caller: string }) {
             {onThis && active?.status ? ` · ${active.status === 'in_call' ? 'in call' : active.status}` : ''}{onThis && active?.error ? ` - ${active.error}` : ''}
           </p>
 
+
+          {/* the quick number (0154): four taps, the anchor, while she is on the call; hidden while the anchor is off */}
+          <QuickNumber key={cur.lead_id} leadId={cur.lead_id} />
 
           {talking === cur.lead_id ? (
             <TalkPanel leadId={cur.lead_id} phone={cur.phone} onLogged={(o) => {

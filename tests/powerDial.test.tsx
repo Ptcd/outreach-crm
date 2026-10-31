@@ -21,7 +21,7 @@ const history = [{ id: 'm1', direction: 'out', channel: 'sms', body: 'Hi, is thi
   { id: 'm2', direction: 'in', channel: 'sms', body: 'who is this', status: null, sent_at: '2026-10-21T15:00:00Z' }]
 const chain = { select: () => chain, eq: () => chain, in: () => chain, order: () => chain, limit: async () => ({ data: [...history].reverse(), error: null }) }
 vi.mock('@/lib/supabaseClient', () => ({ supabase: { rpc: vi.fn(async () => ({ data: [...items], error: null })), from: () => chain }, supabaseConfigured: true }))
-vi.mock('@/lib/queries', () => ({ api: { logCall: (...a: unknown[]) => logCall(...(a as [])) }, useLead: () => ({ isLoading: true }) }))
+vi.mock('@/lib/queries', () => ({ api: { logCall: (...a: unknown[]) => logCall(...(a as [])) }, useLead: () => ({ isLoading: true }), useOfferSettings: () => ({ data: null }) }))
 vi.mock('@/lib/dialer', () => ({ useDialer: () => ({ active: dialer.active, incoming: dialer.incoming, start, dismiss: vi.fn(), hangUp, supported: true }) }))
 vi.mock('@/components/CallScript', () => ({ CallScript: () => null, pickupLine: (c: string, k?: string) => `Hi, this is ${c} (${k ?? "cold"})` }))
 
