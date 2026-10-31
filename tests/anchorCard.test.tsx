@@ -54,6 +54,8 @@ describe('the exit anchor on the call script', () => {
     await waitFor(() => expect(offerShoot).toHaveBeenCalledWith('L1'))
     await screen.findByText(/somewhere around \$32,000/)
     expect(screen.getByText(/Say only \$32,000, and say it is rough/)).toBeTruthy()
+    // the buyer's price never shows to a caller (Colin 2026-10-31)
+    expect(document.body.textContent).not.toContain('38,500')
     // logging needs what they said back; a counter needs their number
     const log = screen.getByRole('button', { name: /I said it/ }) as HTMLButtonElement
     expect(log.disabled).toBe(true)

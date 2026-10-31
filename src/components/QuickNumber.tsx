@@ -115,7 +115,7 @@ export function QuickNumber({ leadId }: { leadId: string }) {
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <p className="text-3xl font-bold text-amber-800 dark:text-amber-300">{dollars(d.number ?? 0)}</p>
             <p className="text-xs text-muted-foreground">
-              {dollars(d.value ?? 0)} value · {dollars(d.repairs ?? 0)} repairs · buyer {dollars(d.mao ?? 0)} · opens {Math.round((d.off ?? 0) * 100)}% under
+              {dollars(d.value ?? 0)} value · {dollars(d.repairs ?? 0)} repairs
             </p>
           </div>
           <p className="rounded-md bg-amber-50 p-2 text-base leading-snug dark:bg-amber-950/30">&ldquo;{d.say}&rdquo;</p>

@@ -52,17 +52,16 @@ describe('the exit anchor', () => {
     expect(await as(COLIN, () => r(`public.offer_settings_set('{"mode":"exit_only"}'::jsonb)`))).toMatchObject({ ok: true, mode: 'exit_only' })
   })
 
-  it("line-item repairs from what the seller said, unasked items counted, a base refresh always, 20% unseen buffer (0154)", async () => {
+  it("Rick's repair chart: kitchen and baths not asked means heavy, which covers everything (0155)", async () => {
     const lead = await card('BO ANCHOR', '42 Anchor Test St', 9002)
     // Hayes-shaped: $105K value, 1,000 sq ft, roof and furnace gone
     await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9002, 105000, 1000)`)
     await answer(lead, 'condition', { choices: ['roof', 'furnace'] })
     const s = await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))
-    // base 12,000 + roof 12,000 + furnace 8,000 + kitchen 10,000 (unasked: counted) + bath 7,000 = 49,000; +20% = 58,800
-    // (105,000 - 58,800) x 0.70 = 32,340; x 0.85 = 27,489; rounded down to 27,000
-    expect(s).toMatchObject({ ok: true, tier: 'itemized', repairs: 58800, pct: 0.7, mao: 32340, lao: 27489, number: 27000, value_basis: expect.stringContaining('county') })
-    expect((s.lines as { item: string }[]).map((x) => x.item)).toEqual(['Base refresh (paint, floors, fixtures)', 'Roof', 'Furnace / AC', 'Kitchen', 'Bath', 'Buffer, unseen'])
-    expect(String(s.say)).toContain('$27,000')
+    // 1,000 sq ft, heavy 60,000; (105,000 - 60,000) x 0.70 = 31,500; x 0.85 = 26,775; rounded down to 26,000
+    expect(s).toMatchObject({ ok: true, tier: 'heavy', repairs: 60000, pct: 0.7, mao: 31500, lao: 26775, number: 26000, value_basis: expect.stringContaining('county') })
+    expect((s.lines as { item: string }[]).map((x) => x.item)).toEqual(["Rick's chart: heavy"])
+    expect(String(s.say)).toContain('$26,000')
     expect(String(s.say)).toContain("can't give you a firm number")
   })
 
@@ -72,8 +71,8 @@ describe('the exit anchor', () => {
     await answer(lead, 'layout', { text: '3 bed 1 bath ranch, two car garage' })
     await answer(lead, 'condition', { choices: ['cosmetic'] })
     const s = await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))
-    // 3 beds = 1,250 sq ft; base 15,000 + 20% = 18,000; (200,000 - 18,000) x 0.75 = 136,500; x 0.85 = 116,025 -> 116,000
-    expect(s).toMatchObject({ ok: true, sqft: 1250, sqft_basis: expect.stringContaining('3 bedrooms'), repairs: 18000, pct: 0.75, number: 116000 })
+    // 3 beds = 1,250 sq ft; light 15,000; (200,000 - 15,000) x 0.75 = 138,750; x 0.85 = 117,937.5 -> 117,000
+    expect(s).toMatchObject({ ok: true, sqft: 1250, sqft_basis: expect.stringContaining('3 bedrooms'), tier: 'light', repairs: 15000, pct: 0.75, number: 117000 })
   })
 
   it("a band may carry its own discount: Rick's 2026 bands, 35% under $120K, 30% above (0153)", async () => {
@@ -83,14 +82,13 @@ describe('the exit anchor', () => {
     const cheap = await card('HAL BAND', '48 Anchor Test St', 9008)
     await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9008, 105000, 1000)`)
     await answer(cheap, 'condition', { choices: ['roof'] })
-    // repairs 58,800; (105,000 - 58,800) x 0.70 = 32,340; x 0.65 = 21,021 -> 21,000
-    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [cheap]))).toMatchObject({ ok: true, pct: 0.7, off: 0.35, mao: 32340, number: 21000 })
+    // heavy 60,000; (105,000 - 60,000) x 0.70 = 31,500; x 0.65 = 20,475 -> 20,000
+    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [cheap]))).toMatchObject({ ok: true, pct: 0.7, off: 0.35, mao: 31500, number: 20000 })
     const mid = await card('IDA BAND', '49 Anchor Test St', 9009)
     await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9009, 150000, 1000)`)
     await answer(mid, 'condition', { choices: ['furnace'] })
-    // base 12,000 + roof 12,000 + furnace 8,000 + kitchen 12,000 (8% of value) + bath 7,000 = 51,000; +20% = 61,200
-    // (150,000 - 61,200) x 0.75 = 66,600; x 0.70 = 46,620 -> 46,000
-    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [mid]))).toMatchObject({ ok: true, pct: 0.75, off: 0.3, mao: 66600, number: 46000 })
+    // heavy 60,000; (150,000 - 60,000) x 0.75 = 67,500; x 0.70 = 47,250 -> 47,000
+    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [mid]))).toMatchObject({ ok: true, pct: 0.75, off: 0.3, mao: 67500, number: 47000 })
     // back to the defaults so the other tests keep their numbers
     await as(COLIN, () => r(`public.offer_settings_set($1::jsonb)`, [JSON.stringify({ bands: [{ upto: 120000, pct: 0.70 }, { upto: 250000, pct: 0.75 }, { upto: null, pct: 0.80 }], lao_discount: 0.15 })]))
   })
@@ -103,7 +101,7 @@ describe('the exit anchor', () => {
     await answer(thin, 'condition', { choices: ['foundation'] })
     expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [thin]))).toMatchObject({ ok: false, walk_first: true, reason: expect.stringContaining('walks it first') })
     await answer(thin, 'condition', { choices: [] })
-    // 1,400 sq ft at $60,000: base 16,800 + roof 12,000 + furnace 8,000 + kitchen 10,000 + bath 7,000, +20% = 64,560 > value
+    // 1,400 sq ft at $60,000, nothing asked: heavy 60,000 leaves nothing
     expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [thin]))).toMatchObject({ ok: false, reason: expect.stringContaining('too thin') })
   })
 
@@ -124,38 +122,42 @@ describe('the exit anchor', () => {
     await answer(lead, 'condition', { choices: ['roof'] })
     await answer(lead, 'price', { choices: ['refused'] })
     const s = await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))
-    expect(s.number).toBe(27000)
-    expect(await as(THALIA, () => r(`public.offer_said($1, 40000, 'open')`, [lead]))).toMatchObject({ ok: false, reason: expect.stringContaining('27000') })
-    expect(await as(THALIA, () => r(`public.offer_said($1, 27000, 'gave_number', null)`, [lead]))).toMatchObject({ ok: false, reason: expect.stringContaining('number they said') })
-    expect(await as(THALIA, () => r(`public.offer_said($1, 27000, 'gave_number', 60000, 'said he needs sixty')`, [lead]))).toMatchObject({ ok: true })
+    expect(s.number).toBe(26000)
+    expect(await as(THALIA, () => r(`public.offer_said($1, 40000, 'open')`, [lead]))).toMatchObject({ ok: false, reason: expect.stringContaining('26000') })
+    expect(await as(THALIA, () => r(`public.offer_said($1, 26000, 'gave_number', null)`, [lead]))).toMatchObject({ ok: false, reason: expect.stringContaining('number they said') })
+    expect(await as(THALIA, () => r(`public.offer_said($1, 26000, 'gave_number', 60000, 'said he needs sixty')`, [lead]))).toMatchObject({ ok: true })
     const l = (await db.query<{ facts: Record<string, { value: Record<string, unknown>; by: string }>; notes: string }>(
       `select call_facts as facts, notes from public.leads where id = $1`, [lead])).rows[0]
-    expect(l.facts.our_number.value).toMatchObject({ number: 27000, choices: ['gave_number'], counter: 60000 })
+    expect(l.facts.our_number.value).toMatchObject({ number: 26000, choices: ['gave_number'], counter: 60000 })
     expect(l.facts.our_number.by).toBe('Thalia')
     expect(l.facts.price.value).toMatchObject({ number: '60000' })
-    expect(l.notes).toContain('anchor said by Thalia: around 27000, they said 60000')
+    expect(l.notes).toContain('anchor said by Thalia: around 26000, they said 60000')
     const sent = await as(THALIA, () => r(`public.package_submit($1::jsonb)`, [JSON.stringify({ lead_id: lead, need: 'moving', callback_at: '2026-11-02T22:00:00Z' })]))
     expect((await db.query(`select said_number, number_note from public.deal_packages where id = $1`, [sent.package_id])).rows)
-      .toEqual([{ said_number: '27000', number_note: 'non-firm anchor said on the first call, they gave_number 60000' }])
+      .toEqual([{ said_number: '26000', number_note: 'non-firm anchor said on the first call, they gave_number 60000' }])
   })
   it('the four quick answers on a Power hour call: all good leaves the base refresh; anything big means walk first', async () => {
     const lead = await card('JO QUICK', '50 Anchor Test St', 9010)
     await db.query(`insert into public.property_values (wpie_property_id, est_market_value, building_sqft) values (9010, 150000, 1000)`)
     for (const [k, v] of [['quick_roof', 'new'], ['quick_hvac', 'new'], ['quick_kb', 'updated'], ['quick_big', 'no']]) await answer(lead, k, { choices: [v] })
-    // base 12,000 + 20% = 14,400; (150,000 - 14,400) x 0.75 = 101,700; x 0.85 = 86,445 -> 86,000
-    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))).toMatchObject({ ok: true, asked: 4, repairs: 14400, mao: 101700, number: 86000 })
+    // light 15,000; (150,000 - 15,000) x 0.75 = 101,250; x 0.85 = 86,062.5 -> 86,000
+    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))).toMatchObject({ ok: true, asked: 4, tier: 'light', repairs: 15000, mao: 101250, number: 86000 })
     await answer(lead, 'quick_roof', { choices: ['old'] })
-    // + roof 12,000: 24,000 + 20% = 28,800; (150,000 - 28,800) x 0.75 = 90,900; x 0.85 = 77,265 -> 77,000
-    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))).toMatchObject({ ok: true, repairs: 28800, number: 77000 })
+    // light 15,000 + roof 12,000 = 27,000; (150,000 - 27,000) x 0.75 = 92,250; x 0.85 = 78,412.5 -> 78,000
+    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))).toMatchObject({ ok: true, repairs: 27000, number: 78000 })
+    await answer(lead, 'quick_kb', { choices: ['original'] })
+    // medium 25,000 + roof 12,000 = 37,000; (150,000 - 37,000) x 0.75 = 84,750; x 0.85 = 72,037.5 -> 72,000
+    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))).toMatchObject({ ok: true, tier: 'medium', repairs: 37000, number: 72000 })
+    await answer(lead, 'quick_kb', { choices: ['updated'] })
     await answer(lead, 'quick_big', { choices: ['yes'] })
     expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))).toMatchObject({ ok: false, walk_first: true })
     // Colin edits one rehab figure: only that figure changes
     await answer(lead, 'quick_big', { choices: ['no'] })
-    expect(await as(COLIN, () => r(`public.offer_settings_set('{"rehab":{"roof_small":20000}}'::jsonb)`))).toMatchObject({ ok: true })
-    expect((await db.query<{ h: number }>(`select (rehab->>'hvac')::int h from public.offer_settings`)).rows[0].h).toBe(8000)
-    // roof 20,000: 32,000 + 20% = 38,400; (150,000 - 38,400) x 0.75 = 83,700; x 0.85 = 71,145 -> 71,000
-    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))).toMatchObject({ ok: true, repairs: 38400, number: 71000 })
-    await as(COLIN, () => r(`public.offer_settings_set('{"rehab":{"roof_small":12000}}'::jsonb)`))
+    expect(await as(COLIN, () => r(`public.offer_settings_set('{"rehab":{"roof_1500":20000}}'::jsonb)`))).toMatchObject({ ok: true })
+    expect((await db.query<{ h: number }>(`select (rehab->>'ac')::int h from public.offer_settings`)).rows[0].h).toBe(6000)
+    // light 15,000 + roof 20,000 = 35,000; (150,000 - 35,000) x 0.75 = 86,250; x 0.85 = 73,312.5 -> 73,000
+    expect(await as(THALIA, () => r(`public.offer_shoot($1)`, [lead]))).toMatchObject({ ok: true, repairs: 35000, number: 73000 })
+    await as(COLIN, () => r(`public.offer_settings_set('{"rehab":{"roof_1500":12000}}'::jsonb)`))
   })
 
 })

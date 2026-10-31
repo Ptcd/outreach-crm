@@ -271,8 +271,8 @@ function AnchorCard({ lead, facts, mode, onSaid }: { lead: Lead; facts: CallFact
         <div className="mt-2 space-y-2">
           <p className="rounded-md bg-muted p-2 text-base leading-snug">&ldquo;{d.say}&rdquo;</p>
           <p className="text-xs text-muted-foreground">
-            {dollars(d.value ?? 0)} ({d.value_basis}), {d.tier} repairs about {dollars(d.repairs ?? 0)} ({d.sqft} sq ft, {d.sqft_basis}; {d.tier_basis}),
-            times {Math.round((d.pct ?? 0) * 100)}% = {dollars(d.mao ?? 0)}; the anchor opens {Math.round((d.off ?? 0) * 100)}% under that. Say only {dollars(d.number ?? 0)}, and say it is rough.
+            {dollars(d.value ?? 0)} ({d.value_basis}), repairs about {dollars(d.repairs ?? 0)} ({d.sqft} sq ft, {d.sqft_basis}).
+            Say only {dollars(d.number ?? 0)}, and say it is rough.
           </p>
           <p className="text-sm font-medium">What they said back</p>
           <div className="grid grid-cols-2 gap-2">
