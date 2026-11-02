@@ -6,8 +6,30 @@ import type { Rpc } from './sending.ts'
 
 export type PackageRow = {
   package: Record<string, unknown> & { id: string; condition?: Record<string, string> | null }
-  lead: { id: string; owner_name: string | null; property_address: string | null; municipality: string | null; property_zip: string | null }
+  lead: { id: string; owner_name: string | null; property_address: string | null; municipality: string | null; property_zip: string | null
+    reasons_to_sell?: string[] | null }
   person: string | null
+  // what the county records say (0160; the laptop's motivation count): kinds of distress, owner traits
+  motivation?: { tier: string | null; families: number; lines: string[]; amplifiers: string[]; as_of: string | null } | null
+}
+
+const TIER: Record<string, string> = { A: 'three kinds of distress', B: 'two kinds of distress', C: 'one strong reason', D: 'one light reason' }
+
+/** "Why they might sell, from the records": the laptop's lines, else the card's own reasons; owner traits last. */
+export function motivationRows(r: PackageRow): [string, string][] {
+  const m = r.motivation
+  const rows: [string, string][] = []
+  if (m && m.lines?.length) {
+    if (m.tier) rows.push(['Stack', `Tier ${m.tier}: ${TIER[m.tier] ?? ''}`.trim()])
+    for (const line of m.lines) {
+      const i = line.indexOf(': ')
+      rows.push(i > 0 ? [line.slice(0, i), line.slice(i + 2)] : ['Record', line])
+    }
+  } else {
+    for (const reason of r.lead.reasons_to_sell ?? []) rows.push(['Record', reason])
+  }
+  if (m?.amplifiers?.length) rows.push(['Owner', m.amplifiers.join(', ')])
+  return rows
 }
 
 export const CONDITION_ITEMS: [string, string][] = [
@@ -47,9 +69,11 @@ export function packageEmail(r: PackageRow, appUrl: string): { subject: string; 
   for (const [k, label] of FIELDS) if (p[k]) rows.push([label, String(p[k])])
   const cond = (p.condition ?? {}) as Record<string, string>
   const condRows = CONDITION_ITEMS.filter(([k]) => cond[k]).map(([k, label]) => [label, cond[k]] as [string, string])
+  const whyRows = motivationRows(r)
   const text = [
     subject, '',
     ...rows.map(([k, v]) => `${k}: ${v}`), '',
+    ...(whyRows.length ? ['Why they might sell, from the records:', ...whyRows.map(([k, v]) => `- ${k}: ${v}`), ''] : []),
     'Condition, in their words:',
     ...(condRows.length ? condRows.map(([k, v]) => `- ${k}: ${v}`) : ['- (nothing recorded)']), '',
     `Walk it or pass, on the card (no number goes out by phone; you give yours at the house): ${link}`,
@@ -58,6 +82,8 @@ export function packageEmail(r: PackageRow, appUrl: string): { subject: string; 
   const html = `<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1f2933">
 <h2 style="margin:0 0 8px">${esc(subject)}</h2>
 <table style="border-collapse:collapse">${rows.map(([k, v]) => tr(k, v)).join('')}</table>
+${whyRows.length ? `<h3 style="margin:14px 0 6px">Why they might sell, from the records</h3>
+<table style="border-collapse:collapse">${whyRows.map(([k, v]) => tr(k, v)).join('')}</table>` : ''}
 <h3 style="margin:14px 0 6px">Condition, in their words</h3>
 <table style="border-collapse:collapse">${condRows.length ? condRows.map(([k, v]) => tr(k, v)).join('') : tr('', '(nothing recorded)')}</table>
 <p style="margin-top:16px"><a href="${esc(link)}" style="background:#102a43;color:#fff;padding:9px 14px;border-radius:6px;text-decoration:none">Walk it or pass, on the card</a></p>

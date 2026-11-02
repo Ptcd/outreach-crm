@@ -160,6 +160,26 @@ describe('the package', () => {
     expect(await as(COLIN, () => r(`public.package_decide($1, true, null, 'B')`, [id]))).toMatchObject({ ok: true, status: 'go_walk' })
   })
 
+  it("the email says why the records think they'd sell: the laptop's lines, else the card's reasons (0160)", async () => {
+    const add = async (name: string, street: string, phone: string) => (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({
+      owner_name: name, owner_type: 'individual', address: street, city: 'Racine', phones: [{ number: phone, name }] })])).lead_id as string
+    const lead = await add('GENE RECORDS', '36 Records Test St', '4145562301')
+    await db.query(`update public.leads set reasons_to_sell = array['behind on taxes'] where id = $1`, [lead])
+    await db.query(`insert into public.lead_motivation (lead_id, tier, families, family_list, lines, amplifiers, tax_years, tax_owed, as_of)
+      values ($1, 'B', 2, 'estate + tax', $2::jsonb, array['out of state', 'held 20+ yrs'], 2, 4051, '2026-11-02')`,
+      [lead, JSON.stringify(['Back taxes: 2 years delinquent, $4,051', 'Estate / owner died: probate filed'])])
+    const lead2 = await add('NO ROW YET', '37 Records Test St', '4145562302')
+    await db.query(`update public.leads set reasons_to_sell = array['tired landlord'] where id = $1`, [lead2])
+    for (const l of [lead, lead2]) expect(await as(THALIA, () => r(`public.package_submit($1::jsonb)`, [JSON.stringify({ lead_id: l, need: 'not sure', callback_at: '2030-01-08T19:00:00Z' })]))).toMatchObject({ ok: true })
+    const mail = (await r(`public.package_mail_claim(20)`)) as unknown as PackageRow[]
+    const one = packageEmail(mail.find((m) => m.lead.id === lead)!, 'https://app.example.com')
+    for (const words of ['Why they might sell, from the records:', 'Stack: Tier B: two kinds of distress', 'Back taxes: 2 years delinquent, $4,051',
+      'Estate / owner died: probate filed', 'Owner: out of state, held 20+ yrs']) expect(one.text).toContain(words)
+    expect(one.html).toContain('Why they might sell, from the records')
+    const two = packageEmail(mail.find((m) => m.lead.id === lead2)!, 'https://app.example.com')
+    expect(two.text).toContain('- Record: tired landlord')
+  })
+
   it('the door: Muse lists packages to value and writes the value, never a number', async () => {
     const calls: [string, Record<string, unknown>][] = []
     const db2 = { records: async (fn: string, args: Record<string, unknown>) => { calls.push([fn, args]); return { ok: true } } } as unknown as DoorDb
