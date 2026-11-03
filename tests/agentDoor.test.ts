@@ -45,6 +45,16 @@ describe('the MCP routing', () => {
     expect((await call(intake, 'queue_texts', { texts: [] })).isError).toBe(true)
     expect((await call(sender, 'add_prospects', { prospects: [] })).isError).toBe(true)
   })
+  it('add_prospects takes a parcel per prospect and hands it to the database as sent (0161)', async () => {
+    const add = TOOLS.find((t) => t.name === 'add_prospects')!
+    const props = ((add.inputSchema.properties as { prospects: { items: { properties: Record<string, { type: string }> } } }).prospects.items.properties)
+    expect(props.parcel).toMatchObject({ type: 'string' })
+    const seen: Record<string, unknown>[] = []
+    const db = fakeDb({ addProspect: async (p) => { seen.push(p as Record<string, unknown>); return { status: 'created', lead_id: 'L9' } } })
+    const res = await call(intake, 'add_prospects', { prospects: [{ owner_name: 'A', address: '1 A St', parcel: '0790000000001' }] }, db)
+    expect(res.isError).toBeFalsy()
+    expect(seen).toEqual([{ owner_name: 'A', address: '1 A St', parcel: '0790000000001' }])
+  })
   it('a Dots key with only the channel scope: the desk channel tools and nothing else, posting as Dots; the key may ride in the URL', async () => {
     const dots: Agent = { id: 'k10', name: 'Dots', role: 'agent', scopes: ['channel'] }
     const names = ((await handleMessage({ jsonrpc: '2.0', id: 4, method: 'tools/list' }, dots, fakeDb())) as
@@ -188,6 +198,42 @@ describe('on the real migrations', () => {
     expect(await r(`public.agent_add_prospect('{"owner_name": "X"}'::jsonb, 'm')`)).toMatchObject({ status: 'rejected' })
     const ready = await r(`public.agent_ready_to_text(10, false, false)`)
     expect((ready.new_cards as { lead_id: string }[]).map((c) => c.lead_id)).toEqual([a.lead_id])
+  })
+
+  it('the parcel: the door\'s parcel field lands in leads.parcel_id, else a single "Parcel:" notes line; the notes stay as sent (0161)', async () => {
+    const card = async (id: unknown) => one<{ parcel_id: string | null; notes: string | null }>(`select parcel_id, notes from public.leads where id = $1`, [id])
+    // the field
+    const a = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'Parcel Field', address: '41 Field Test Rd',
+      county: 'Milwaukee', parcel: ' 0790000000001 ', notes: 'Parcel: 0799999999999.' })])
+    expect(a).toMatchObject({ status: 'created', parcel: '0790000000001' })
+    expect(await card(a.lead_id)).toEqual({ parcel_id: '0790000000001', notes: 'Parcel: 0799999999999.' })
+    // the notes fallback, as the packs write it; the notes are not edited
+    const notes = 'Milwaukee County 2026CV000001 (foreclosure). Parcel: 127YU NW 00001.\nProperty address (verbatim from master): 42 Notes Test Rd'
+    const b = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'Parcel Notes', address: '42 Notes Test Rd', notes })])
+    expect(await card(b.lead_id)).toEqual({ parcel_id: '127YU NW 00001', notes })
+    // two different parcels in the notes, or prose after "Parcel:", is no parcel
+    const c = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'Parcel Two', address: '43 Two Test Rd',
+      notes: 'Parcel: 0790000000002.\nlater Parcel: 0790000000003.' })])
+    const d = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'Parcel Prose', address: '44 Prose Test Rd',
+      notes: 'Owner per parcel: SMITH JOHN J & MARY. Assessed value $200,000' })])
+    expect((await card(c.lead_id)).parcel_id).toBeNull()
+    expect((await card(d.lead_id)).parcel_id).toBeNull()
+    // the same parcel written twice (spaces, dashes) is one parcel
+    expect(await r(`public.notes_parcels($1)`, ['Parcel: 079-0000000004.\nMuse: Parcel: 0790000000004.'])).toEqual(['079-0000000004'])
+    // a merge fills an agent card's empty parcel; a set one is kept and the result says it differs
+    const e = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'Parcel Prose', address: '44 Prose Test Rd', parcel: '0790000000005' })])
+    expect(e).toMatchObject({ status: 'updated', lead_id: d.lead_id, parcel: '0790000000005' })
+    expect(e.filled).toContain('parcel_id')
+    const f = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'Parcel Prose', address: '44 Prose Test Rd', parcel: '0790000000006' })])
+    expect(f).toMatchObject({ parcel: '0790000000005', parcel_conflict: { card: '0790000000005', sent: '0790000000006' } })
+    expect((await card(d.lead_id)).parcel_id).toBe('0790000000005')
+    // a laptop card's parcel is the laptop's: never filled by the door
+    const lap = (await one<{ id: string }>(`insert into public.leads (wpie_owner_id, owner_name, property_address, stage)
+      values (889, 'LAPTOP OWNER', '45 LAPTOP TEST RD', 'opener_queued') returning id`)).id
+    const g = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'Laptop Owner', address: '45 Laptop Test Rd', parcel: '0790000000007' })])
+    expect(g).toMatchObject({ status: 'already_have', lead_id: lap })
+    expect(g.filled).not.toContain('parcel_id')
+    expect((await card(lap)).parcel_id).toBeNull()
   })
 
   it('the queue takes a follow-up without a STOP line and refuses a first text without one (0143, Colin 2026-10-30)', async () => {

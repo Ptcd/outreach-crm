@@ -43,7 +43,7 @@ The intake agent applies the prospect rules itself, so the door accepts every pr
 ```json
 { "prospects": [ {
   "owner_name": "Pat Sample", "address": "12 Maple St", "city": "Waukesha", "zip": "53186", "county": "Waukesha",
-  "mailing_state": "WI",
+  "parcel": "133XXXX0000000", "mailing_state": "WI",
   "phones": [ { "number": "414-555-0142", "type": "mobile", "name": "Pat Sample" } ],
   "reasons": [ { "kind": "tax_delinquent", "label": "Behind on taxes 2 years", "detail": "2024 and 2025",
                  "amount": 6100, "date": "2026-01-31", "source": "Waukesha County treasurer" } ],
@@ -55,6 +55,15 @@ Each card it makes:
 - gets a negative owner number (the laptop's cards are positive);
 - starts at stage `opener_queued`;
 - shows its reasons on the card.
+
+**The parcel (app 0161).** Send each prospect's parcel in `parcel`, as the county or the statewide parcel layer prints
+it (the statewide STATEID, county FIPS code first, is fine: `0791630013000` is Milwaukee taxkey `1630013000`). It lands
+in the card's parcel field. Without `parcel`, a single `Parcel: X` line in `notes` is used; two different parcels in the
+notes, or words after `Parcel:`, give no parcel. A merge fills an agent card's empty parcel and never changes a set one:
+the result carries the card's `parcel`, and `parcel_conflict: {card, sent}` when yours differed. A laptop card's parcel
+is the laptop's and is never touched. Once an hour the laptop ties each agent card's (county, parcel) to its county
+record (`tools/card_parcels.py`, parcel only, never the address) and writes `wpie_property_id`, so the card's tax,
+foreclosure, estate and condition records count in its motivation tier (`lead_motivation`).
 
 ## Sender: writing and queueing texts
 
