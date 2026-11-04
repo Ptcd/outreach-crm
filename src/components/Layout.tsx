@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
-import { BarChart3, CalendarCheck, CheckCheck, Flame, Home, Inbox, ListChecks, LogOut, MessageSquareText, Moon, PhoneCall, Settings as SettingsIcon, Sun } from 'lucide-react'
+import { BarChart3, CalendarCheck, CheckCheck, Flame, FolderKanban, Home, Inbox, ListChecks, LogOut, MessageSquareText, Moon, PhoneCall, Settings as SettingsIcon, Sun } from 'lucide-react'
 import { useTheme } from '@/lib/theme'
 import { useAuth } from '@/providers/AuthProvider'
 import { useRepliesWaiting } from '@/lib/queries'
@@ -17,6 +17,7 @@ const NAV: { to: string; label: string; short?: string; icon: typeof CalendarChe
   { to: '/inbox', label: 'Inbox', icon: Inbox },
   { to: '/texts', label: 'Texts', icon: MessageSquareText },
   { to: '/warm', label: 'Warm', icon: Flame },
+  { to: '/mine', label: 'My cards', short: 'Mine', icon: FolderKanban },
   { to: '/pipeline', label: 'Pipeline', short: 'Pipe', icon: ListChecks },
   { to: '/approvals', label: 'Approve', short: 'Approve', icon: CheckCheck },
   { to: '/scoreboard', label: 'Scoreboard', short: 'Score', icon: BarChart3 },
@@ -84,7 +85,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <main className="mx-auto max-w-6xl px-4 py-5 sm:py-6">{children}</main>
       <IncomingCallBar />
       <CallBar />
-      <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 grid grid-cols-7 border-t border-border/60 bg-background/85 px-1 backdrop-blur-xl md:hidden" aria-label="Main">
+      <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 grid border-t border-border/60 bg-background/85 px-1 backdrop-blur-xl md:hidden" style={{ gridTemplateColumns: `repeat(${NAV.length}, minmax(0, 1fr))` }} aria-label="Main">
         {NAV.map((n) => (
           <NavLink
             key={n.to}

@@ -8,6 +8,7 @@ import SetPassword from '@/pages/SetPassword'
 import Today from '@/pages/Today'
 import Warm from '@/pages/Warm'
 import Pipeline from '@/pages/Pipeline'
+import MyCards from '@/pages/MyCards'
 import LeadDetail from '@/pages/LeadDetail'
 import Approvals from '@/pages/Approvals'
 import Inbox from '@/pages/Inbox'
@@ -83,6 +84,7 @@ export default function App() {
         <Route path="/calls" element={<CallQueue />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/pipeline" element={<Pipeline />} />
+        <Route path="/mine" element={<MyCards />} />
         <Route path="/lead/:id" element={<LeadDetail />} />
         <Route path="/inbox" element={<Inbox />} />
         <Route path="/texts" element={<Texts />} />
