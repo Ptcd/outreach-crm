@@ -438,7 +438,7 @@ function LogCall({ lead, contacts, phone, onLogged, voicemailLine }: { lead: Lea
   const [note, setNote] = useState('')
   // "Not now" carries the date they gave (Codex's walk, 2026-10-22: the generic 30 days lost the real date)
   const [until, setUntil] = useState('')
-  const [notNowKind, setNotNowKind] = useState<'date' | 'condition'>('date')
+  const [notNowKind, setNotNowKind] = useState<'date' | 'condition' | 'nothing'>('date')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const save = async () => {
@@ -447,7 +447,9 @@ function LogCall({ lead, contacts, phone, onLogged, voicemailLine }: { lead: Lea
     const when = outcome === 'not_now' && notNowKind === 'date' && until ? localInputToIso(`${until}T12:00`) : null
     // a voicemail is a no-answer that left a message (the packet's outcome list)
     const sent = outcome === 'voicemail' ? 'no_answer' : outcome
-    const words = outcome === 'voicemail' ? ['Left a voicemail.', note.trim()].filter(Boolean).join(' ') : note.trim()
+    // 0178: a want with nothing to go on is the machine's; the note says so, and no caller check-back is made
+    const words = outcome === 'voicemail' ? ['Left a voicemail.', note.trim()].filter(Boolean).join(' ')
+      : outcome === 'not_now' && notNowKind === 'nothing' ? ['Nothing to go on (just curious / the right price).', note.trim()].filter(Boolean).join(' ') : note.trim()
     const r = await api.logCall(lead.id, from || null, sent, words || null, when)
     setBusy(false)
     const d = r.data as { ok: boolean; reason?: string } | null
@@ -488,9 +490,10 @@ function LogCall({ lead, contacts, phone, onLogged, voicemailLine }: { lead: Lea
       {outcome === 'not_now' && (
         <div className="space-y-2 rounded-md bg-muted p-2">
           <label className="block text-sm font-medium">What did they give you?
-            <Select className="mt-1" value={notNowKind} onChange={(e) => setNotNowKind(e.target.value as 'date' | 'condition')}>
-              <option value="date">A specific date</option>
-              <option value="condition">An event or condition, no date</option>
+            <Select className="mt-1" value={notNowKind} onChange={(e) => setNotNowKind(e.target.value as 'date' | 'condition' | 'nothing')}>
+              <option value="date">A specific date: the call on that date is yours</option>
+              <option value="condition">An event, no date: the machine texts, you call once at 90 days</option>
+              <option value="nothing">Nothing to go on (just curious, the right price): the machine's</option>
             </Select>
           </label>
           {notNowKind === 'date' && (
@@ -499,7 +502,8 @@ function LogCall({ lead, contacts, phone, onLogged, voicemailLine }: { lead: Lea
                 onChange={(e) => setUntil(e.target.value)} />
             </label>
           )}
-          {notNowKind === 'condition' && <p className="text-xs text-muted-foreground">Write the event in the notes below (for example, “after the tenant moves”). The 30-day date is only a review reminder, not a date the seller gave.</p>}
+          {notNowKind === 'condition' && <p className="text-xs text-muted-foreground">Write the event in the notes below (for example, “after the tenant moves”). A text names it at 30 days, your call at 90, a text at 180; then quarterly texts and your &quot;still yours?&quot; call about a year on.</p>}
+          {notNowKind === 'nothing' && <p className="text-xs text-muted-foreground">No check-back of yours. Texts at 30, 90 and 180 days, then quarterly; it comes back to you only on a reply or when a new record lands on the house.</p>}
         </div>
       )}
       <Textarea rows={3} placeholder="Notes from the call" value={note} onChange={(e) => setNote(e.target.value)} />
