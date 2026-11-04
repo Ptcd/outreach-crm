@@ -299,7 +299,7 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
             </div>
             {Number(num.replace(/[^0-9.]/g, '')) > 0 && (
               <blockquote className={say}>
-                &quot;Colin looked at it. {reason.trim() ? `${reason.trim()}. ` : ''}{p.their_number && /\d/.test(String(p.their_number)) ? `He can't be at ${String(p.their_number)}; he'd be closer to ` : "He can't be anywhere near what it would list for; he'd be closer to "}
+                &quot;Colin looked at it. {reason.trim() ? `${reason.trim()}. ` : ''}{p.their_number && /\d/.test(String(p.their_number)) ? `He can't be at ${String(p.their_number)}; he'd be closer to ` : "He'd have to be under "}
                 {money(Number(num.replace(/[^0-9.]/g, '')))}. Does that still work?&quot;
               </blockquote>
             )}
@@ -319,7 +319,7 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
         <div className="space-y-2 rounded-lg border-2 border-emerald-400 p-3">
           <p className="font-medium">The callback: Colin&apos;s number, {money(p.our_number)}, said once as a ceiling</p>
           <blockquote className={say}>
-            &quot;Colin looked at it. {p.number_note ? `${String(p.number_note)}. ` : ''}{p.their_number && /\d/.test(String(p.their_number)) ? `He can't be at ${String(p.their_number)}; he'd be closer to ` : "He can't be anywhere near what it would list for; he'd be closer to "}{money(p.our_number)}. Does that still work?&quot;
+            &quot;Colin looked at it. {p.number_note ? `${String(p.number_note)}. ` : ''}{p.their_number && /\d/.test(String(p.their_number)) ? `He can't be at ${String(p.their_number)}; he'd be closer to ` : "He'd have to be under "}{money(p.our_number)}. Does that still work?&quot;
           </blockquote>
           <p className="text-xs text-muted-foreground">Then silence; count to five. If they push: &quot;That&apos;s not an offer, I&apos;m just saying he&apos;d have to be under that.&quot; Could work: book his walk. &quot;I&apos;d need Y&quot;: ask why that doesn&apos;t work and how they got to Y, write it word for word, &quot;Colin will look at that.&quot; No: their words, a check-back. Never defend it, explain it, go up, or offer anything in between.</p>
           <div className="grid gap-2 sm:grid-cols-2">

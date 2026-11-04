@@ -514,7 +514,7 @@ function NumberCallback({ p, leadId, onDone }: { p: NonNullable<Item['package']>
   return (
     <div className="space-y-2">
       <blockquote className={say}>
-        &quot;Colin looked at it. {p.number_note ? `${p.number_note}. ` : ''}{p.their_number && /\d/.test(String(p.their_number)) ? `He can't be at ${p.their_number}; he'd be closer to ` : "He can't be anywhere near what it would list for; he'd be closer to "}{money(n)}. Does that still work?&quot;
+        &quot;Colin looked at it. {p.number_note ? `${p.number_note}. ` : ''}{p.their_number && /\d/.test(String(p.their_number)) ? `He can't be at ${p.their_number}; he'd be closer to ` : "He'd have to be under "}{money(n)}. Does that still work?&quot;
       </blockquote>
       <p className="text-xs text-muted-foreground">Then silence; count to five. If they push: &quot;That&apos;s not an offer, I&apos;m just saying he&apos;d have to be under that.&quot; Never defend it, explain it, go up, or offer anything in between.</p>
       <div className="grid gap-2 sm:grid-cols-2">
