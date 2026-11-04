@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge, Empty, ErrorNote, Section, Select } from '@/components/ui/form'
@@ -27,6 +28,14 @@ export default function Today() {
   const until = endOfTodayIso()
   const tasks = useDueTasks(until, who)
   const stops = useMyStops(until, who)
+  // a caller's day (0173): dials, reached, packages, what is left; Colin sees the lists' counts as before
+  const mine = who === 'thalia' || who === 'adil' ? who : null
+  const day = useQuery({
+    queryKey: ['my_day', mine],
+    enabled: mine != null,
+    refetchInterval: 60_000,
+    queryFn: async () => { const r = await api.myDay(mine); if (r.error) throw new Error(r.error.message); return r.data as { dials: number; reached: number; packages: number; done: number; set: number; left_today: number } },
+  })
   const replies = useUnseenReplies()
   const debt = useFollowupDebt()
   const recovery = useSellerRecovery()
@@ -56,12 +65,21 @@ export default function Today() {
         </Button>
       </div>
       <OnPhonePrompt />
-      <StatTiles tiles={[
-        { label: 'New replies', value: replies.data?.length, icon: MessageCircle, tone: 'indigo', to: '/inbox' },
-        { label: 'Calls due', value: stops.data?.length, icon: PhoneCall, tone: 'emerald', to: '/calls' },
-        { label: 'Tasks due', value: tasks.data?.length, icon: ClipboardList, tone: 'amber' },
-        { label: 'Seller asks', value: replyTasks.data?.length, icon: Sparkles, tone: 'rose' },
-      ]} />
+      {mine ? (
+        <StatTiles tiles={[
+          { label: 'Dials today', value: day.data?.dials, icon: PhoneCall, tone: 'indigo', to: '/calls' },
+          { label: 'Reached', value: day.data?.reached, icon: Sparkles, tone: 'emerald' },
+          { label: 'Packages', value: day.data?.packages, icon: ClipboardList, tone: 'amber' },
+          { label: 'Left today', value: day.data?.left_today, icon: Zap, tone: 'rose', to: '/mine' },
+        ]} />
+      ) : (
+        <StatTiles tiles={[
+          { label: 'New replies', value: replies.data?.length, icon: MessageCircle, tone: 'indigo', to: '/inbox' },
+          { label: 'Calls due', value: stops.data?.length, icon: PhoneCall, tone: 'emerald', to: '/calls' },
+          { label: 'Tasks due', value: tasks.data?.length, icon: ClipboardList, tone: 'amber' },
+          { label: 'Seller asks', value: replyTasks.data?.length, icon: Sparkles, tone: 'rose' },
+        ]} />
+      )}
       {isOwner && <BeltHealthStrip />}
       <MissedCalls />
       <PackagesToday />

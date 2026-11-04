@@ -5,23 +5,30 @@ import { Input } from '@/components/ui/input'
 import { Badge, Empty, ErrorNote, Select } from '@/components/ui/form'
 import { PAGE_SIZE, useLeads, usePipelineCounts, type LeadFilter } from '@/lib/queries'
 import { PhoneLookup } from '@/components/PhoneLookup'
-import { STAGES, STAGE_LABEL, WORKING_STAGES } from '@/lib/wpie'
+import { STAGES, STAGE_LABEL, WORKING_STAGES, personLabel } from '@/lib/wpie'
+import { BELTS, BELT_LABEL, beltLine } from '@/lib/belts'
+import { useAuth } from '@/providers/AuthProvider'
 import { fmtDateTime, fullAddress } from '@/lib/format'
 import type { LeadStage } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 export default function Pipeline() {
+  const { member } = useAuth()
   const [params, setParams] = useSearchParams()
+  // a caller opens on their own cards (0168/0173); "owner=all" in the address shows everyone
+  const me = member?.role === 'caller' ? member.person ?? null : null
+  const ownerParam = params.get('owner')
   const filter: LeadFilter = {
     stage: (params.get('stage') as LeadFilter['stage']) || 'working',
     belt: params.get('belt') || 'all',
     lane: (params.get('lane') as LeadFilter['lane']) || 'all',
     county: params.get('county') || 'all',
+    owner: (ownerParam as LeadFilter['owner']) || (me ?? 'all'),
     search: params.get('q') || '',
     page: Number(params.get('page') || 0),
   }
   const [search, setSearch] = useState(filter.search)
-  const set = (patch: Partial<Record<'stage' | 'belt' | 'lane' | 'county' | 'q' | 'page', string>>) => {
+  const set = (patch: Partial<Record<'stage' | 'belt' | 'lane' | 'county' | 'owner' | 'q' | 'page', string>>) => {
     const next = new URLSearchParams(params)
     for (const [k, v] of Object.entries(patch)) {
       if (!v || v === 'all' || (k === 'page' && v === '0')) next.delete(k)
@@ -70,6 +77,15 @@ export default function Pipeline() {
       <PhoneLookup />
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Select value={filter.owner ?? 'all'} onChange={(e) => set({ owner: e.target.value === 'all' && me ? 'all' : e.target.value })} aria-label="Whose cards">
+          <option value="all">Everyone&apos;s cards</option>
+          <option value="thalia">Thalia&apos;s cards</option>
+          <option value="adil">Adil&apos;s cards</option>
+        </Select>
+        <Select value={filter.belt} onChange={(e) => set({ belt: e.target.value })} aria-label="Belt">
+          <option value="all">Every belt</option>
+          {BELTS.map((b) => <option key={b} value={b}>{BELT_LABEL[b]}</option>)}
+        </Select>
         <Select value={filter.lane} onChange={(e) => set({ lane: e.target.value })} aria-label="Lane">
           <option value="all">Both lanes</option>
           <option value="hold">Hold (keep)</option>
@@ -90,7 +106,7 @@ export default function Pipeline() {
             set({ q: search })
           }}
         >
-          <Input placeholder="Name or address" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input placeholder="Name, address or town" value={search} onChange={(e) => setSearch(e.target.value)} />
           <Button type="submit" variant="outline">
             Find
           </Button>
@@ -115,16 +131,17 @@ export default function Pipeline() {
                 <span className={`font-medium${l.stage === 'dnc' ? ' text-red-700' : ''}`}>{l.owner_name}</span>
                 <Badge tone={l.stage === 'dnc' ? 'bad' : undefined}>{STAGE_LABEL[l.stage]}</Badge>
                 {l.lane && <Badge tone="info">{l.lane === 'hold' ? 'Hold' : 'Flip'}</Badge>}
+                {l.locked_to && <Badge tone="good">{personLabel(l.locked_to)}</Badge>}
               </div>
               <div className="text-sm text-muted-foreground">
                 {fullAddress(l)}
                 {l.municipality ? `, ${l.municipality}` : ''} {l.county ? `(${l.county})` : ''}
               </div>
-              {l.next_action_at && (
-                <div className="text-xs">
-                  Next: {l.next_action || 'action'} {fmtDateTime(l.next_action_at)}
-                </div>
-              )}
+              {l.belt ? (
+                <div className="text-xs">{beltLine({ belt: l.belt, belt_step: l.belt_step ?? 0, next_stop_who: l.next_stop_who ?? null, next_stop_at: l.next_stop_at ?? null, next_stop_say: l.next_stop_say ?? null })}</div>
+              ) : l.next_action_at ? (
+                <div className="text-xs">Next: {l.next_action || 'action'} {fmtDateTime(l.next_action_at)}</div>
+              ) : null}
             </Link>
           </li>
         ))}

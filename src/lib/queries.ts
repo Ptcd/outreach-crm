@@ -175,6 +175,7 @@ export interface LeadFilter {
   belt: string | 'all'
   lane: 'hold' | 'flip' | 'all'
   county: string | 'all'
+  owner?: Person | 'all'          // whose cards (leads.locked_to, 0168)
   search: string
   page: number
 }
@@ -187,15 +188,17 @@ export function useLeads(f: LeadFilter, workingStages: LeadStage[]) {
     queryFn: async () => {
       let q = supabase
         .from('leads')
-        .select('id, owner_name, property_address, property_zip, municipality, county, lane, stage, next_action_at, next_action, assigned_to, reasons_to_sell, last_inbound_at, belt, belt_step, next_stop_at, next_stop_who', { count: 'exact' })
+        .select('id, owner_name, property_address, property_zip, municipality, county, lane, stage, next_action_at, next_action, assigned_to, locked_to, reasons_to_sell, last_inbound_at, belt, belt_step, next_stop_at, next_stop_who, next_stop_say', { count: 'exact' })
       if (f.stage === 'working') q = q.in('stage', workingStages)
       else if (f.stage !== 'all') q = q.eq('stage', f.stage)
       if (f.belt && f.belt !== 'all') q = q.eq('belt', f.belt)
       if (f.lane !== 'all') q = q.eq('lane', f.lane)
       if (f.county !== 'all') q = q.eq('county', f.county)
+      if (f.owner && f.owner !== 'all') q = q.eq('locked_to', f.owner)
       const s = f.search.trim().replace(/[%,()]/g, ' ')
-      if (s) q = q.or(`owner_name.ilike.%${s}%,property_address.ilike.%${s}%`)
-      q = q.order('next_action_at', { ascending: true, nullsFirst: false }).order('score', { ascending: false, nullsFirst: false })
+      if (s) q = q.or(`owner_name.ilike.%${s}%,property_address.ilike.%${s}%,municipality.ilike.%${s}%`)
+      // the belt's next stop is the real "what's next" (0173); the old next-action date only when the belt has none
+      q = q.order('next_stop_at', { ascending: true, nullsFirst: false }).order('next_action_at', { ascending: true, nullsFirst: false }).order('score', { ascending: false, nullsFirst: false })
       const res = await q.range(f.page * PAGE_SIZE, f.page * PAGE_SIZE + PAGE_SIZE - 1)
       if (res.error) throw new Error(res.error.message)
       return { rows: (res.data ?? []) as Partial<Lead>[] as Lead[], count: res.count ?? 0 }
@@ -327,6 +330,11 @@ export const api = {
     supabase.rpc('contact_add', { p_lead_id: leadId, p_kind: kind, p_value: value, p_person_name: personName, p_note: note }),
   contactFix: (contactId: string, value: string | null, personName: string | null, note: string | null) =>
     supabase.rpc('contact_fix', { p_contact_id: contactId, p_value: value, p_person_name: personName, p_note: note }),
+  // the lists (0173): a caller's day, and bulk actions that go through the single doors one task at a time
+  myDay: (person: string | null) => supabase.rpc('my_day', person ? { p_person: person } : {}),
+  followupsMoveMany: (taskIds: string[], atIso: string, why: string | null) => supabase.rpc('followups_move_many', { p_task_ids: taskIds, p_at: atIso, p_why: why }),
+  followupsDoneMany: (taskIds: string[], outcome: string, note: string | null) => supabase.rpc('followups_done_many', { p_task_ids: taskIds, p_outcome: outcome, p_note: note }),
+  cardsHandMany: (leadIds: string[], note: string) => supabase.rpc('cards_hand_many', { p_lead_ids: leadIds, p_note: note }),
   leadFix: (leadId: string, x: { owner_name?: string | null; property_address?: string | null; municipality?: string | null; property_zip?: string | null; why?: string | null }) =>
     supabase.rpc('lead_fix', { p_lead_id: leadId, p_owner_name: x.owner_name ?? null, p_property_address: x.property_address ?? null,
       p_municipality: x.municipality ?? null, p_property_zip: x.property_zip ?? null, p_why: x.why ?? null }),

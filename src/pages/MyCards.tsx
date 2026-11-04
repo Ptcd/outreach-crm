@@ -16,6 +16,7 @@ import type { LeadStage } from '@/lib/types'
 import { PILES, groupPiles, type Pile, type PileCard } from '@/lib/piles'
 import { cn } from '@/lib/utils'
 import { NextStep } from '@/components/NextStep'
+import { BulkBar } from '@/components/BulkBar'
 import type { Task } from '@/lib/types'
 
 function usePiles(person: string | null) {
@@ -34,6 +35,9 @@ export default function MyCards() {
   const [person, setPerson] = useState('thalia')
   const [search, setSearch] = useState('')
   const [open, setOpen] = useState<Record<Pile, boolean>>(() => Object.fromEntries(PILES.map((p) => [p.id, p.open])) as Record<Pile, boolean>)
+  // bulk (0173): tick rows, then move, close or hand them to Colin in one go
+  const [picked, setPicked] = useState<Record<string, boolean>>({})
+  const toggle = (id: string) => setPicked((s) => ({ ...s, [id]: !s[id] }))
   const q = usePiles(isOwner ? person : null)
   const piles = groupPiles(q.data?.cards ?? [], search)
   const total = q.data?.cards.length ?? 0
@@ -68,6 +72,7 @@ export default function MyCards() {
 
       <ErrorNote error={q.error} />
       {q.isLoading && <Empty>Loading...</Empty>}
+      <BulkBar cards={(q.data?.cards ?? []).filter((c) => picked[c.lead_id])} onDone={() => setPicked({})} />
 
       {q.data && PILES.map((p) => {
         const rows = piles[p.id]
@@ -85,7 +90,7 @@ export default function MyCards() {
             </button>
             {isOpen && (rows.length === 0
               ? <p className="border-t px-4 py-3 text-sm text-muted-foreground">Nothing here.</p>
-              : <ul className="divide-y border-t">{rows.map((c) => <Row key={c.lead_id} c={c} />)}</ul>)}
+              : <ul className="divide-y border-t">{rows.map((c) => <Row key={c.lead_id} c={c} picked={!!picked[c.lead_id]} onPick={() => toggle(c.lead_id)} />)}</ul>)}
           </section>
         )
       })}
@@ -93,7 +98,7 @@ export default function MyCards() {
   )
 }
 
-function Row({ c }: { c: PileCard }) {
+function Row({ c, picked, onPick }: { c: PileCard; picked: boolean; onPick: () => void }) {
   const late = c.next_at != null && new Date(c.next_at).getTime() < Date.now()
   const status = c.belt ? (BELT_LABEL[c.belt as Belt] ?? c.belt) : (STAGE_LABEL[c.stage as LeadStage] ?? c.stage)
   // the row's follow-up, enough of it for the Next step control (0170)
@@ -101,7 +106,11 @@ function Row({ c }: { c: PileCard }) {
     ? { id: c.task_id, lead_id: c.lead_id, due_at: c.next_at, kind: c.task_kind ?? 'call', owner: (c.locked_to ?? 'colin') as Task['owner'], done_at: null, note: null, created_at: '', source: c.task_source }
     : null
   return (
-    <li className="px-4 py-3 hover:bg-accent/60">
+    <li className={cn('flex gap-3 px-4 py-3 hover:bg-accent/60', picked && 'bg-accent/40')}>
+      {c.pile !== 'closed' && (
+        <input type="checkbox" checked={picked} onChange={onPick} aria-label={`Pick ${c.owner_name ?? 'this card'}`} className="mt-1.5 h-5 w-5 shrink-0" />
+      )}
+      <div className="min-w-0 flex-1">
       <Link to={`/lead/${c.lead_id}`} className="block">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{c.owner_name}</span>
@@ -123,6 +132,7 @@ function Row({ c }: { c: PileCard }) {
         )}
       </Link>
       {c.pile !== 'closed' && <div className="mt-1.5"><NextStep leadId={c.lead_id} task={task} compact /></div>}
+      </div>
     </li>
   )
 }
