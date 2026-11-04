@@ -46,8 +46,8 @@ begin
   if due < now() + interval '30 minutes' then due := new.named_date - interval '3 hours'; end if;
   if due < now() + interval '30 minutes' then return new; end if;   -- booked for the next few hours: they just said yes
   -- the card's caller confirms the walk (0173); the weekday rule only for a card nobody owns yet
-  who := coalesce((select l2.locked_to from public.leads l2 where l2.id = new.lead_id and l2.locked_to in ('thalia', 'adil')),
-                  case when extract(isodow from due at time zone tz) in (6, 7) then 'adil' else 'thalia' end);
+  who := coalesce((select l2.locked_to from public.leads l2 where l2.id = new.id and l2.locked_to in ('thalia', 'adil')),
+                  (case when extract(isodow from due at time zone tz) in (6, 7) then 'adil' else 'thalia' end)::public.team_person);
   insert into public.tasks (lead_id, due_at, kind, owner, source, note)
   values (new.id, due, 'confirm_walk', who, 'walk_confirm',
           'Confirm Colin''s walk ' || to_char(new.named_date at time zone tz, 'FMDy FMHH12:MI AM')

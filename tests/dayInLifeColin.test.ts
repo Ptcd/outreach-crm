@@ -77,6 +77,9 @@ describe("Colin's day", () => {
     await expect(as(db, THALIA, () => db.exec(dealSql))).rejects.toThrow()
     await as(db, COLIN, () => db.exec(dealSql))
 
+    // the calls Colin logged above already stamped the card's connect, at the real clock; pin it to the synthetic day
+    // so the four milestones land in one week of the scoreboard
+    await db.exec(`update public.lead_milestones set at = '2026-10-22T16:00:00Z' where lead_id = '${LEAD}' and kind = 'connect'`)
     await as(db, COLIN, () => db.exec(`insert into public.lead_milestones (lead_id, kind, at) values
       ('${LEAD}', 'connect', '2026-10-22T16:00:00Z'),
       ('${LEAD}', 'contact', '2026-10-22T16:01:00Z'),

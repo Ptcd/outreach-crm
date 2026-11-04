@@ -718,6 +718,14 @@ describe('on the real migrations', () => {
   it('a seller calling back rings only the caller who dialed them; otherwise the shift (inbound_call_ring, 2026-10-29)', async () => {
     const a = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: 'Ring Test', address: '9 Ring Rd', city: 'Waukesha', zip: '53186', county: 'Waukesha', mailing_state: 'WI', phones: ['4145550777'] })])
     const wk = '2026-10-28T19:30:00Z'   // Wednesday 2:30 PM CT: Thalia's shift
+    // a new card is split to Thalia or Adil as it comes in (0168, Colin 2026-11-03) and its caller is who rings
+    const owner = (await one<{ who: string }>(`select locked_to::text who from public.leads where id = $1`, [a.lead_id])).who
+    expect(['thalia', 'adil']).toContain(owner)
+    expect(await r(`public.inbound_call_ring('+1 (414) 555-0777', $1::timestamptz)`, [wk])).toMatchObject({ ring: [owner], return_call: false, dialed_by: null, locked_to: owner })
+    expect(await r(`public.inbound_call_ring('4145550777', '2026-10-25T15:00:00Z'::timestamptz)`)).toMatchObject({ ring: [owner] })   // Saturday too: the lock beats the shift
+    // with no lock the shift decides (the number is also on Sam Follow's card above: the lookup is by phone, so every
+    // card holding it is unlocked here)
+    await db.query(`update public.leads set locked_to = null, assigned_to = null where id in (select lead_id from public.contacts where kind = 'phone' and value_normalized = '4145550777')`)
     expect(await r(`public.inbound_call_ring('+1 (414) 555-0777', $1::timestamptz)`, [wk])).toMatchObject({ ring: ['thalia'], return_call: false, dialed_by: null, locked_to: null })
     expect(await r(`public.inbound_call_ring('4145550777', '2026-10-28T22:00:00Z'::timestamptz)`)).toMatchObject({ ring: ['thalia', 'adil'], return_call: false })   // weekday 5 PM: both in Power hour
     expect(await one(`select public.on_shift_person('2026-10-28T22:30:00Z'::timestamptz)::text s`)).toEqual({ s: 'adil' })   // weekday 5:30 PM is Adil's hour (0140)
@@ -731,6 +739,13 @@ describe('on the real migrations', () => {
 
   it('a missed call belongs to the caller who dialed that number out (7 days), else the shift (missed_call_person, 0144)', async () => {
     const tue10 = '2026-10-27T15:00:00Z'      // Tuesday 10 AM CT: Thalia's shift
+    // the number sits on a card the 0168 split already locked to a caller, and the locked caller beats the shift (0148)
+    const locked = (await one<{ who: string }>(`select l.locked_to::text who from public.contacts c join public.leads l on l.id = c.lead_id
+      where c.kind = 'phone' and c.value_normalized = '4145550991' order by l.locked_at desc nulls last limit 1`)).who
+    expect(['thalia', 'adil']).toContain(locked)
+    expect(await one(`select public.missed_call_person('4145550991', $1::timestamptz)::text p`, [tue10])).toEqual({ p: locked })
+    // with no lock the shift decides, unless someone dialed the number out
+    await db.query(`update public.leads set locked_to = null, assigned_to = null where id in (select lead_id from public.contacts where kind = 'phone' and value_normalized = '4145550991')`)
     expect(await one(`select public.missed_call_person('4145550991', $1::timestamptz)::text p`, [tue10])).toEqual({ p: 'thalia' })
     expect(await one(`select public.missed_call_person('4145550991', '2026-10-25T15:00:00Z'::timestamptz)::text p`)).toEqual({ p: 'adil' })   // Saturday
     const lid = (await one<{ id: string }>(`select id from public.leads where owner_name = 'Pat Sample'`)).id

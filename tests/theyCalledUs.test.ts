@@ -85,10 +85,18 @@ describe('they called us', () => {
     expect(await all(`select person from public.belt_stops where lead_id = $1 and done_at is null`, [LEAD])).toEqual([{ person: 'thalia' }])
   })
 
-  it('weekend calls go to Adil, nights to Colin', async () => {
+  it('a locked card calls back its own caller whatever the hour; an unlocked one: weekends to Adil, nights to Colin', async () => {
+    // every card is split between Thalia and Adil as it comes in (0168, Colin 2026-11-03) and the call-back is the
+    // card's caller's (missed_call_person prefers locked_to, 0148): this card is Thalia's, Saturday or not
+    expect(await one(`select locked_to::text from public.leads where id = $1`, [LEAD])).toEqual({ locked_to: 'thalia' })
+    expect(await log(SID(2), 'missed', SAT_3PM)).toMatchObject({ owner: 'thalia' })
+    expect(await one(`select next_stop_who from public.leads where id = $1`, [LEAD])).toEqual({ next_stop_who: 'thalia_call' })
+    // with no lock the shift decides (0063): weekends Adil, nights Colin
+    await db.exec(`truncate public.inbound_calls, public.tasks, public.belt_events, public.messages cascade;
+                   update public.leads set belt = 'cold_texts', belt_step = 2, locked_to = null, assigned_to = null`)
     expect(await log(SID(2), 'missed', SAT_3PM)).toMatchObject({ owner: 'adil' })
     await db.exec(`truncate public.inbound_calls, public.tasks, public.belt_events, public.messages cascade;
-                   update public.leads set belt = 'cold_texts', belt_step = 2`)
+                   update public.leads set belt = 'cold_texts', belt_step = 2, locked_to = null, assigned_to = null`)
     expect(await log(SID(3), 'missed', SUN_9PM)).toMatchObject({ owner: 'colin' })
     expect(await one(`select next_stop_who from public.leads where id = $1`, [LEAD])).toEqual({ next_stop_who: 'colin_call' })
     const t = await one<{ due_at: string }>(`select due_at from public.tasks where lead_id = $1 and done_at is null`, [LEAD])
@@ -160,7 +168,8 @@ describe('they called us', () => {
 
   it('a card with a call booked keeps its belt; the call-back is a task of its own', async () => {
     await db.exec(`update public.leads set belt = 'call_booked', belt_step = 1 where id = '${LEAD}'`)
-    expect(await log(SID(10), 'missed', SAT_3PM)).toMatchObject({ status: 'missed', owner: 'adil' })
+    // a Saturday call, but the card is Thalia's (the 0168 split locked it to her), so the call-back is hers
+    expect(await log(SID(10), 'missed', SAT_3PM)).toMatchObject({ status: 'missed', owner: 'thalia' })
     expect(await one(`select belt from public.leads where id = $1`, [LEAD])).toEqual({ belt: 'call_booked' })
     expect(await one(`select source, title from public.tasks where lead_id = $1`, [LEAD])).toEqual({ source: 'inbound_call', title: 'They called us: call back' })
   })

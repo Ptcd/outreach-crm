@@ -33,6 +33,17 @@ const openTasks = async () => (await db.query<{ owner: string; kind: string; due
 const drafts = async () => (await db.query<{ status: string; body: string | null; kind: string; draft_source: string | null }>(
   `select status, body, kind, draft_source from public.reply_drafts where lead_id = $1 order by created_at`, [A])).rows
 const central = (iso: string) => new Date(iso).toLocaleString('en-US', { timeZone: 'America/Chicago', weekday: 'short', hour: 'numeric', minute: '2-digit', hour12: false })
+const iso = (d: Date | string) => new Date(d).toISOString().replace('.000Z', 'Z')
+const plus = (at: string, ms: number) => iso(new Date(new Date(at).getTime() + ms))
+// call_answer and the reply-thread trigger book against the wall clock (now()), so a booked slot has to lie ahead of the
+// real date: the next <isodow> at <hour> Central at least <minDays> out, and a day on the same Central calendar from there
+const futureSlot = async (isodow: number, hour: number, minDays: number) => (await one<{ at: string }>(
+  `select to_char(((d::date + make_time($2::int, 0, 0)) at time zone 'America/Chicago') at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as at
+     from generate_series((now() at time zone 'America/Chicago')::date + $3::int, (now() at time zone 'America/Chicago')::date + $3::int + 7, interval '1 day') d
+    where extract(isodow from d) = $1::int order by d limit 1`, [isodow, hour, minDays])).at
+const atCentral = async (from: string, days: number, hour: number) => (await one<{ at: string }>(
+  `select to_char(((($1::timestamptz at time zone 'America/Chicago')::date + $2::int) + make_time($3::int, 0, 0)) at time zone 'America/Chicago' at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as at`,
+  [from, days, hour])).at
 
 async function as<T>(who: { sub: string; email: string }, fn: () => Promise<T>): Promise<T> {
   await db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify(who)])
@@ -68,6 +79,9 @@ beforeEach(async () => {
     insert into public.leads (id, wpie_owner_id, owner_name, property_address, municipality, mailing_state, lane, stage) values
       ('${A}', 77, 'JANE ROE', '100 N MAIN ST, Milwaukee', 'Milwaukee', 'WI', 'flip', 'opener_sent');
     insert into public.contacts (lead_id, kind, value, value_normalized, line_type) values ('${A}', 'phone', '4145550177', '4145550177', 'mobile');
+    -- every new card is split between Thalia and Adil as it is inserted (0168, Colin 2026-11-03) and the caller
+    -- steps follow that lock (0148/0157); this file's card is Thalia's, whichever turn the split was on
+    update public.leads set locked_to = 'thalia' where id = '${A}';
   `)
 })
 
@@ -147,8 +161,10 @@ describe('the belts move cards', () => {
       .toMatch(/^On belt: Said yes, not booked · stop 1 of 4 · next: Thalia or Adil calls .* · say: "You asked for a call about 100 N Main St"$/)
     const t = await openTasks()
     expect(t).toHaveLength(1)
+    // the stop is the card's caller's (locked_to, 0148/0168), not the weekday shift's
     expect(t[0]).toMatchObject({ owner: 'thalia', kind: 'call', title: 'Said yes, not booked: stop 1 of 4' })
     expect(t[0].source_key).toBe(`belt:${A}:yes_unbooked:1:1`)
+    expect(await one(`select locked_to::text from public.leads where id = $1`, [A])).toEqual({ locked_to: t[0].owner })
   })
 
   it('a logged outcome schedules the next stop: no answer -> the "just tried you" text an hour later; then a call at another hour band; then dormant', async () => {
@@ -172,7 +188,11 @@ describe('the belts move cards', () => {
     l = await lead()
     expect(l).toMatchObject({ belt: 'yes_unbooked', belt_step: 3, next_stop_who: 'thalia_call', unanswered_count: 2 })
     const [t3] = await openTasks()
-    expect(central(t3.due_at)).toMatch(/Sat (10|15):00/)   // +2 days, a different band than the noon call
+    // +2 days, a different band than the noon call. The dry send steps the belt on through the draft's status trigger
+    // (belt_on_draft_status, 0031), which uses the wall clock, so the two days count from the real now, not NOW
+    expect(central(t3.due_at)).toMatch(/ 15:00$/)
+    expect(iso(t3.due_at)).toBe((await one<{ at: string }>(`select to_char(public.belt_slide(now() + interval '48 hours', 'America/Chicago', 'call', 15)
+      at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as at`)).at)
     // no answer again -> the +14 door-open text; a fourth silence -> dormant (cap of four)
     await ev('stop_done', { outcome: 'voicemail', task_id: (await one<{ id: string }>(`select id from public.tasks where source_key = $1`, [t3.source_key])).id })
     l = await lead()
@@ -186,7 +206,7 @@ describe('the belts move cards', () => {
   })
 
   it('a booked call gets a morning-of reminder and the call at the slot; a miss goes to the missed ladder; a second miss goes dormant', async () => {
-    const slot = '2026-10-23T19:00:00Z'                                     // Friday 2 PM Central
+    const slot = await futureSlot(5, 14, 7)                                 // a Friday 2 PM Central, a week or more out
     const r = await as(THALIA, () => one<{ r: Record<string, unknown> }>(`select public.call_answer($1, 'next_step', '{"kind":"callback","at":"${slot}"}') as r`, [A]))
     expect(r.r).toMatchObject({ ok: true, belt: 'call_booked' })
     let l = await lead()
@@ -194,37 +214,41 @@ describe('the belts move cards', () => {
     expect(central(l.next_stop_at!)).toBe('Fri 08:30')
     expect(l.named_date).toBeTruthy()
     expect((await openTasks()).map((t) => `${t.kind} ${t.owner} ${t.title}`)).toEqual(['call thalia Call booked: stop 2 of 2'])
-    // the reminder went: step 2 is the call at the slot, Thalia's (the card is hers)
-    await ev('auto_text_sent', {}, '2026-10-23T13:31:00Z')
+    // the reminder went (8:31 the morning of): step 2 is the call at the slot, Thalia's (the card is hers)
+    await ev('auto_text_sent', {}, plus(slot, -(5 * 60 + 29) * 60_000))
     l = await lead()
     expect(l).toMatchObject({ belt: 'call_booked', belt_step: 2, next_stop_who: 'thalia_call' })
-    expect(l.next_stop_at).toBe('2026-10-23T19:00:00Z')
+    expect(l.next_stop_at).toBe(slot)
     // missed at the slot: one more try in 45 minutes, then the "missed each other" text an hour after
     await ev('stop_done', { outcome: 'no_answer' }, slot)
     l = await lead()
     expect(l).toMatchObject({ belt: 'call_missed', belt_step: 1, next_stop_who: 'thalia_call' })
     expect(new Date(l.next_stop_at!).getTime() - new Date(slot).getTime()).toBe(45 * 60_000)
-    await ev('stop_done', { outcome: 'no_answer' }, '2026-10-23T19:45:00Z')
+    await ev('stop_done', { outcome: 'no_answer' }, plus(slot, 45 * 60_000))
     l = await lead()
     expect(l).toMatchObject({ belt: 'call_missed', belt_step: 2, next_stop_who: 'auto_text' })
-    // they rebook, then miss again: straight to dormant
-    await ev('next_step', { kind: 'callback', at: '2026-10-26T19:00:00Z' }, '2026-10-23T21:00:00Z')
-    await ev('auto_text_sent', {}, '2026-10-26T13:31:00Z')
-    await ev('stop_done', { outcome: 'no_answer' }, '2026-10-26T19:00:00Z')
+    // they rebook (the Monday after, 2 PM), then miss again: straight to dormant
+    const mon = await atCentral(slot, 3, 14)
+    await ev('next_step', { kind: 'callback', at: mon }, plus(slot, 2 * 3600_000))
+    await ev('auto_text_sent', {}, plus(mon, -(5 * 60 + 29) * 60_000))
+    await ev('stop_done', { outcome: 'no_answer' }, mon)
     expect((await lead()).belt).toBe('dormant')
   })
 
   it('a walk-through booked is Colin\'s visit; the visit kept moves to "after the visit"; a verdict of don\'t book routes by its reason', async () => {
-    await as(COLIN, () => one(`select public.call_answer($1, 'next_step', '{"kind":"walk","at":"2026-10-24T18:00:00Z"}') as r`, [A]))
+    const slot = await futureSlot(6, 13, 7)                                 // a Saturday 1 PM Central, a week or more out
+    await as(COLIN, () => one(`select public.call_answer($1, 'next_step', $2::jsonb) as r`, [A, JSON.stringify({ kind: 'walk', at: slot })]))
     let l = await lead()
     expect(l).toMatchObject({ belt: 'visit_booked', stage: 'walkthrough_booked', next_action: 'Walk-through', next_stop_who: 'auto_text' })
     // the reminder's switch is off: it is skipped, never a draft, and the visit itself is the stop
     expect((await one<{ r: Record<string, unknown> }>(`select public.belt_claim_text($1, true, false, $2::timestamptz) as r`, [A, l.next_stop_at])).r)
       .toMatchObject({ outcome: 'skipped', reason: 'reminder switch is off' })
+    // the visit itself is Colin's; a caller's conditioning call the day before rides along (walk_confirm_task, 0114)
     const t = await openTasks()
-    expect(t.map((x) => x.kind)).toEqual(['visit'])
-    expect(t[0].owner).toBe('colin')
-    await ev('stop_done', { outcome: 'reached', said: 'wants to think about the roof' }, '2026-10-24T18:40:00Z')
+    expect(t.map((x) => x.kind)).toEqual(['confirm_walk', 'visit'])
+    expect(t.find((x) => x.kind === 'visit')!.owner).toBe('colin')
+    expect(['thalia', 'adil']).toContain(t.find((x) => x.kind === 'confirm_walk')!.owner)
+    await ev('stop_done', { outcome: 'reached', said: 'wants to think about the roof' }, plus(slot, 40 * 60_000))
     l = await lead()
     expect(l).toMatchObject({ belt: 'after_visit_quiet', belt_step: 1, next_stop_who: 'colin_call' })
     expect(l.next_stop_say).toMatch(/think 100 N Main St over/)
@@ -241,18 +265,21 @@ describe('the belts move cards', () => {
     expect((await lead()).belt).toBe('not_now_condition')                                 // no date given: a condition
     await ev('named_date', { named_date: '2026-11-16T18:00:00Z', named_event: 'the tenant moving out' })
     let l = await lead()
-    expect(l).toMatchObject({ belt: 'not_now_dated', belt_step: 1, next_stop_who: 'colin_call' })
+    // "call me in March" is the card's caller's follow-up, not Colin's (0170, Colin 2026-11-03): both stops are thalia_call
+    expect(l).toMatchObject({ belt: 'not_now_dated', belt_step: 1, next_stop_who: 'thalia_call' })
     expect(new Date(l.next_stop_at!).getTime()).toBeGreaterThanOrEqual(new Date('2026-11-16T18:00:00Z').getTime())
     expect(l.next_stop_say).toBe('You mentioned the tenant moving out for 100 N Main St; how did it go?')
+    expect((await openTasks()).map((t) => t.owner)).toEqual(['thalia'])
     await ev('stop_done', { outcome: 'no_answer' }, '2026-11-16T20:00:00Z')
     l = await lead()
     expect(l.belt_step).toBe(2)
+    expect(l.next_stop_who).toBe('thalia_call')
     expect(l.next_stop_at!.slice(0, 10)).toBe('2026-11-23')
     // A near date follows the same quiet rule: the first and only initial stop is the call.
     await db.query(`update public.leads set belt = null, belt_step = 0 where id = $1`, [A])
     await ev('named_date', { named_date: '2026-10-24T18:00:00Z', named_event: 'the closing' }, NOW)
     l = await lead()
-    expect(l).toMatchObject({ belt: 'not_now_dated', belt_step: 1, next_stop_who: 'colin_call' })
+    expect(l).toMatchObject({ belt: 'not_now_dated', belt_step: 1, next_stop_who: 'thalia_call' })
     expect(new Date(l.next_stop_at!).getTime()).toBeGreaterThanOrEqual(new Date('2026-10-24T18:00:00Z').getTime())
   })
 
@@ -366,9 +393,9 @@ describe('the belts move cards', () => {
     // a hot reply
     await db.query(`insert into public.hot_alerts (inbound_sid, lead_id, phone10, body) values ('SM1', $1, '4145550177', 'yes what would you pay')`, [A])
     expect(await lead()).toMatchObject({ belt: 'yes_unbooked', next_stop_who: 'thalia_call' })
-    // the laptop's thread says the owner booked a slot
+    // the laptop's thread says the owner booked a slot (the trigger books against the wall clock, so the slot lies ahead)
     await db.query(`insert into public.reply_threads (phone10, lead_id, wpie_owner_id, agent_stage, outcome, callback_slot, last_inbound_at, last_inbound)
-      values ('4145550177', $1, 77, 'book', 'handoff', '2026-10-23T20:00:00Z', $2, 'tomorrow 3pm')`, [A, NOW])
+      values ('4145550177', $1, 77, 'book', 'handoff', $3, $2, 'tomorrow 3pm')`, [A, NOW, await futureSlot(5, 15, 7)])
     expect(await lead()).toMatchObject({ belt: 'call_booked', belt_step: 1 })
     // a synced STOP
     await db.query(`insert into public.messages (lead_id, direction, channel, body, is_opt_out, sent_at, source_key) values ($1, 'in', 'sms', 'STOP', true, now(), 'ledger:77:1:opted_out')`, [A])
@@ -421,8 +448,10 @@ describe('health', () => {
     expect(w.alerted).toContain('heartbeat')
     expect((await one<{ r: { alerted: string[] } }>(`select public.belt_watch($1::timestamptz) as r`, [NOW])).r.alerted).toEqual([])
     expect((await db.query<{ text: string }>(`select text from public.ops_alerts`)).rows[0].text).toMatch(/^Belt health: the conveyor has not run/)
-    // clean up and run the canary: green
+    // clean up and run the canary: green. The canary's test card is a new insert, so the 50/50 split (0168) hands it to
+    // whichever caller is behind; the canary checks the first stop is Thalia's, so put the split on Thalia's turn
     await db.query(`truncate public.tasks, public.reply_drafts, public.belt_health cascade`)
+    await db.query(`update public.card_split_state set diff = 0`)
     await ev('inbound_text', { intent: 'interested', interest: true })
     const c = (await one<{ r: { ok: boolean; why: string | null; steps: { step: string; ok: boolean; detail: string }[] } }>(`select public.belt_canary($1::timestamptz) as r`, [NOW])).r
     if (!c.ok) console.log(JSON.stringify(c.steps))

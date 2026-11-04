@@ -58,7 +58,10 @@ describe('release-candidate seller journey', () => {
       from public.leads l left join public.tasks t on t.lead_id = l.id and t.source = 'belt' and t.done_at is null
       where l.id = '${LEAD}' group by l.id`)
     expect(new Date(rescheduled.due).getTime()).toBeGreaterThanOrEqual(new Date(rescheduled.named).getTime())
-    expect(rescheduled.owner).toBe('colin')
+    // "call me after the move" is the caller's own follow-up, not Colin's (0170, Colin 2026-11-03): Thalia's first call
+    // locked the card to her (0167) and the dated stop follows the lock
+    expect(await one(db, `select locked_to::text from public.leads where id = '${LEAD}'`)).toEqual({ locked_to: 'thalia' })
+    expect(rescheduled.owner).toBe('thalia')
     expect(rescheduled.tasks).toBe(1)
     expect(await as(db, THALIA, () => rpc(db, 'begin_human_call', {
       p_lead_id: LEAD, p_phone: '4145550177', p_source: 'personal', p_key: 'before_named_date_001',

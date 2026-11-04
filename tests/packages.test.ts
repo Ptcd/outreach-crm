@@ -123,12 +123,16 @@ describe('the package', () => {
       address: '25 Package Test St', phones: ['4145562205'] })])).lead_id as string
     const open = async () => (await db.query<{ owner: string; due: string; note: string }>(`select owner::text, to_char(due_at at time zone 'America/Chicago', 'YYYY-MM-DD HH24:MI') due, note
       from public.tasks where lead_id = $1 and source = 'walk_confirm' and done_at is null`, [lead])).rows
-    // a Wednesday walk at 2 PM, booked well ahead: Tuesday 10 AM, Thalia
+    // the confirm call is the card's caller's (0173, Colin 2026-11-03), whatever day it falls on; this card is Thalia's
+    await db.query(`update public.leads set locked_to = 'thalia' where id = $1`, [lead])
+    // a Wednesday walk at 2 PM, booked well ahead: Tuesday 10 AM
     await db.query(`update public.leads set belt = 'visit_booked', belt_step = 1, named_date = '2030-01-09 14:00 America/Chicago' where id = $1`, [lead])
     expect(await open()).toEqual([{ owner: 'thalia', due: '2030-01-08 10:00', note: expect.stringContaining('ready to give him a yes or a no') }])
-    // moved to Monday: Sunday 10 AM, Adil
+    // moved to Monday: Sunday 10 AM, still Thalia's (the weekday rule only decides for a card nobody owns)
     await db.query(`update public.leads set named_date = '2030-01-07 14:00 America/Chicago' where id = $1`, [lead])
-    expect(await open()).toEqual([{ owner: 'adil', due: '2030-01-06 10:00', note: expect.stringContaining('Mon 2:00 PM') }])
+    expect(await open()).toEqual([{ owner: 'thalia', due: '2030-01-06 10:00', note: expect.stringContaining('Mon 2:00 PM') }])
+    await db.query(`update public.leads set locked_to = null, assigned_to = null, named_date = '2030-01-07 14:05 America/Chicago' where id = $1`, [lead])
+    expect(await open()).toEqual([{ owner: 'adil', due: '2030-01-06 10:00', note: expect.stringContaining('Mon 2:05 PM') }])
     await db.query(`update public.leads set belt = 'dead' where id = $1`, [lead])
     expect(await open()).toEqual([])
   })
