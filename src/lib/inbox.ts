@@ -227,7 +227,7 @@ export interface TimelineItem {
   key: string
   at: string
   who: 'us' | 'them' | 'team'
-  kind: 'text' | 'call' | 'note' | 'email' | 'stage' | 'task'
+  kind: 'text' | 'call' | 'note' | 'email' | 'stage' | 'task' | 'move'
   title: string
   body: string
   badges: string[]
@@ -243,7 +243,15 @@ export function timelineOf(x: {
   stageEvents?: { id: number | string; from_stage: string | null; to_stage: string; at: string; source: string }[]
   tasks?: { id: string; kind: string; owner: string; done_at: string | null; note: string | null; title?: string | null }[]
   stageLabel?: (s: string) => string
+  // one timeline (0172): the belt's moves, every reschedule, and who wrote each note or logged each call
+  beltEvents?: { id: number | string; event: string; from_belt: string | null; to_belt: string | null; step: number | null; payload: Record<string, unknown> | null; at: string; by: string | null }[]
+  taskMoves?: { id: number | string; by: string; from_at: string | null; to_at: string | null; why: string | null; at: string }[]
+  people?: Record<string, { person: string; display_name: string | null }>
+  beltLabel?: (b: string) => string
+  fmtWhen?: (iso: string) => string
 }): TimelineItem[] {
+  const author = (uid: string | null | undefined) => (uid && x.people?.[uid]) ? (x.people[uid].display_name || x.people[uid].person) : null
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
   const name = firstNameOf(x.ownerName) || 'the owner'
   const items: TimelineItem[] = []
   for (const m of x.messages) {
@@ -258,8 +266,9 @@ export function timelineOf(x: {
     // a voicemail: their words first, then the call line under them
     const rest = (m.body ?? '').replace(/\n?Voicemail: "[\s\S]*"/, '').trim()
     const body = vm ? `"${vm[1]}"\n\n${rest}` : m.body ?? ''
+    const by = (m.channel === 'note' || (m.channel === 'call' && !them)) ? author((m as { created_by?: string | null }).created_by) : null
     items.push({ key: `m-${m.id}`, at: m.sent_at, who: m.channel === 'note' ? 'team' : them ? 'them' : 'us',
-      kind: m.channel === 'sms' ? 'text' : m.channel, title, body, badges: vm ? [...badges, 'voicemail'] : badges })
+      kind: m.channel === 'sms' ? 'text' : m.channel, title: by ? `${title} (${by})` : title, body, badges: vm ? [...badges, 'voicemail'] : badges })
   }
   for (const t of x.inbound ?? []) {
     const dup = x.messages.some((m) => m.direction === 'in' && (m.body ?? '').trim() === (t.body ?? '').trim()
@@ -277,5 +286,34 @@ export function timelineOf(x: {
     items.push({ key: `k-${t.id}`, at: t.done_at, who: 'team', kind: 'task', title: `Done: ${t.title || t.kind.replace(/_/g, ' ')}`,
       body: t.note ?? '', badges: [t.owner] })
   }
-  return items.sort((a, b) => b.at.localeCompare(a.at))
+  const bl = x.beltLabel ?? ((b: string) => b.replace(/_/g, ' '))
+  const fw = x.fmtWhen ?? ((iso: string) => iso)
+  for (const e of x.beltEvents ?? []) {
+    // the belt's own bookkeeping is noise; a move, a stop done or missed, a reassignment is history
+    if (!['move', 'named_date', 'stop_done', 'stop_missed', 'reassigned', 'stop_moved', 'verdict_no', 'flag'].includes(e.event)) continue
+    const pl = e.payload ?? {}
+    const title = e.event === 'reassigned' ? `Card moved to ${cap(String(pl.to ?? ''))}`
+      : e.event === 'stop_moved' ? 'Follow-up moved'
+      : e.event === 'stop_done' ? `Stop done: ${String(pl.outcome ?? 'done').replace(/_/g, ' ')}`
+      : e.event === 'stop_missed' ? 'Stop missed'
+      : e.event === 'named_date' ? 'They named a date'
+      : e.event === 'verdict_no' ? "Don't book"
+      : e.event === 'flag' ? 'Flagged'
+      : e.to_belt && e.to_belt !== e.from_belt ? `Belt: ${bl(e.to_belt)}` : `Belt: ${bl(e.to_belt ?? e.from_belt ?? '')}`
+    const body = [pl.why, pl.reason, pl.note, pl.event, e.event === 'stop_moved' && pl.to ? `to ${fw(String(pl.to))}` : null].filter(Boolean).map(String).join(' - ')
+    items.push({ key: `b-${e.id}`, at: e.at, who: 'team', kind: 'move', title, body, badges: e.by ? [e.by] : [] })
+  }
+  for (const t of x.taskMoves ?? []) {
+    const title = t.to_at ? `Follow-up moved to ${fw(t.to_at)}` : 'Follow-up deleted'
+    items.push({ key: `tm-${t.id}`, at: t.at, who: 'team', kind: 'move', title, body: t.why ?? '', badges: [cap(t.by)] })
+  }
+  // a reschedule shows once: the belt's own line wins when both wrote one within the same minute
+  const seen = new Set<string>()
+  const out = items.filter((i) => {
+    if (i.kind !== 'move' || !i.title.startsWith('Follow-up moved')) return true
+    const k = i.at.slice(0, 16)
+    if (seen.has(k)) return false
+    seen.add(k); return true
+  })
+  return out.sort((a, b) => b.at.localeCompare(a.at))
 }

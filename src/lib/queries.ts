@@ -5,8 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabaseClient'
 import type {
   BeltEvent, BeltHealth, CampaignControl, Contact, Deal, FollowupDebt, GateScore, Lead, LeadStage, Message, Milestone, MilestoneKind,
-  OpenerDecision, Person, PlannedOpener, ReplyDraft, ReplyThread, ScoreboardWeek, SellerRecovery, SignalWeek, Task, TouchTemplate, TwilioInbound,
-} from './types'
+  OpenerDecision, Person, PlannedOpener, ReplyDraft, ReplyThread, ScoreboardWeek, SellerRecovery, SignalWeek, Task, TouchTemplate, TwilioInbound, TaskMove } from './types'
 import type { InboxLead } from './inbox'
 
 function check<T>(res: { data: T | null; error: { message: string } | null }): T {
@@ -209,7 +208,7 @@ export function useLead(id: string) {
   return useQuery({
     queryKey: ['lead', id],
     queryFn: async () => {
-      const [lead, contacts, messages, tasks, gates, milestones, facts, stageEvents, inbound] = await Promise.all([
+      const [lead, contacts, messages, tasks, gates, milestones, facts, stageEvents, inbound, beltEvents, taskMoves, people] = await Promise.all([
         supabase.from('leads').select('*').eq('id', id).single(),
         supabase.from('contacts').select('*').eq('lead_id', id).order('kind').order('line_type'),
         supabase.from('messages').select('*').eq('lead_id', id).order('sent_at', { ascending: false }),
@@ -220,6 +219,10 @@ export function useLead(id: string) {
         // the card's full history (Adil 2026-10-24): stage changes and texts Twilio has that WPIE has not recorded yet
         supabase.from('lead_stage_events').select('id, from_stage, to_stage, at, source').eq('lead_id', id).order('at', { ascending: false }).limit(100),
         supabase.from('twilio_inbound').select('*').eq('lead_id', id).order('received_at', { ascending: false }).limit(100),
+        // one timeline (0172): the belt's moves, every reschedule, and who did what (login id -> person)
+        supabase.from('belt_events').select('*').eq('lead_id', id).order('at', { ascending: false }).limit(150),
+        supabase.from('task_moves').select('*').eq('lead_id', id).order('at', { ascending: false }).limit(100),
+        supabase.rpc('people_by_uid'),
       ])
       return {
         lead: check(lead) as Lead,
@@ -230,6 +233,9 @@ export function useLead(id: string) {
         milestones: check(milestones) as Milestone[],
         stageEvents: (stageEvents.data ?? []) as { id: number; from_stage: string | null; to_stage: string; at: string; source: string }[],
         inbound: (inbound.data ?? []) as TwilioInbound[],
+        beltEvents: (beltEvents.data ?? []) as BeltEvent[],
+        taskMoves: (taskMoves.data ?? []) as TaskMove[],
+        people: ((people.data ?? {}) as Record<string, { person: string; display_name: string | null }>),
         // What the seller has told us so far (the drafting model's facts, newest value wins)
         facts: Object.assign({}, ...((facts.data ?? []) as { facts: Record<string, unknown> }[]).map((f) => f.facts ?? {})) as Record<string, unknown>,
       }
@@ -314,6 +320,16 @@ export const api = {
     supabase.rpc('followup_done', { p_task_id: taskId, p_outcome: outcome, p_note: note }),
   followupDelete: (taskId: string, why: string | null) =>
     supabase.rpc('followup_delete', { p_task_id: taskId, p_why: why }),
+  // the card (0172): an append-only note with its author, Colin moving a card, fixing phones, names and addresses
+  noteAdd: (leadId: string, body: string) => supabase.rpc('note_add', { p_lead_id: leadId, p_body: body }),
+  cardReassign: (leadId: string, person: Person, why: string | null) => supabase.rpc('card_reassign', { p_lead_id: leadId, p_person: person, p_why: why }),
+  contactAdd: (leadId: string, kind: 'phone' | 'email', value: string, personName: string | null, note: string | null) =>
+    supabase.rpc('contact_add', { p_lead_id: leadId, p_kind: kind, p_value: value, p_person_name: personName, p_note: note }),
+  contactFix: (contactId: string, value: string | null, personName: string | null, note: string | null) =>
+    supabase.rpc('contact_fix', { p_contact_id: contactId, p_value: value, p_person_name: personName, p_note: note }),
+  leadFix: (leadId: string, x: { owner_name?: string | null; property_address?: string | null; municipality?: string | null; property_zip?: string | null; why?: string | null }) =>
+    supabase.rpc('lead_fix', { p_lead_id: leadId, p_owner_name: x.owner_name ?? null, p_property_address: x.property_address ?? null,
+      p_municipality: x.municipality ?? null, p_property_zip: x.property_zip ?? null, p_why: x.why ?? null }),
   addGate: (row: Omit<GateScore, 'id' | 'total' | 'suggested_decision' | 'at'>) => supabase.from('gate_scores').insert(row),
   addMilestone: (lead_id: string, kind: MilestoneKind) => supabase.from('lead_milestones').insert({ lead_id, kind }),
   removeMilestone: (id: number) => supabase.from('lead_milestones').delete().eq('id', id),

@@ -86,6 +86,27 @@ describe('Adil 2026-10-24: replies on top, names not numbers, the whole history'
     expect(items.map((i) => i.title)).toEqual(['Moved to dead', 'Call with Mark', 'Text from Mark', 'First text to Mark'])
     expect(items.some((i) => /\d{3}/.test(i.title))).toBe(false)
   })
+  it('one timeline (0172): names who wrote a note or logged a call, shows belt moves and reschedules, once each', async () => {
+    const { timelineOf } = await import('../src/lib/inbox')
+    const items = timelineOf({
+      ownerName: 'JANE ROE',
+      people: { 'u-t': { person: 'thalia', display_name: 'Thalia' } },
+      messages: [
+        { id: '1', lead_id: 'L', direction: 'out', channel: 'note', body: 'tenant leaves in Dec', sent_at: '2026-11-03T20:00:00Z', from_number: null, to_number: null, status: null, is_opener: false, is_opt_out: false, seen_at: null, created_by: 'u-t' },
+        { id: '2', lead_id: 'L', direction: 'out', channel: 'call', body: 'no answer', sent_at: '2026-11-03T19:00:00Z', from_number: null, to_number: null, status: 'no_answer', is_opener: false, is_opt_out: false, seen_at: null, created_by: 'u-t' },
+      ],
+      beltEvents: [
+        { id: 1, event: 'move', from_belt: 'cold_texts', to_belt: 'yes_unbooked', step: 1, payload: { reason: 'interested' }, at: '2026-11-03T19:01:00Z', by: 'Thalia' },
+        { id: 2, event: 'stop_moved', from_belt: 'yes_unbooked', to_belt: 'yes_unbooked', step: 1, payload: { to: '2026-11-05T16:00:00Z', why: 'she asked' }, at: '2026-11-03T21:00:00Z', by: 'thalia' },
+        { id: 3, event: 'next_step', from_belt: null, to_belt: 'yes_unbooked', step: 1, payload: {}, at: '2026-11-03T19:01:30Z', by: 'system' },
+      ],
+      taskMoves: [{ id: 7, by: 'thalia', from_at: '2026-11-04T16:00:00Z', to_at: '2026-11-05T16:00:00Z', why: 'she asked', at: '2026-11-03T21:00:10Z' }],
+      beltLabel: (b) => b === 'yes_unbooked' ? 'Said yes, not booked' : b, fmtWhen: (iso) => iso.slice(0, 10),
+    })
+    expect(items.map((i) => i.title)).toEqual(['Follow-up moved', 'Note (Thalia)', 'Belt: Said yes, not booked', 'Call with Jane (Thalia)'])
+    expect(items[0].body).toContain('she asked')
+    expect(items.some((i) => i.key === 'b-3')).toBe(false)           // the belt's bookkeeping stays out
+  })
 })
 
 describe('the call panel (Colin 2026-10-24: "Where is the place to call")', () => {

@@ -27,6 +27,8 @@ import { firstNameOf, timelineOf } from '@/lib/inbox'
 import { DEAL_STATUS_LABEL, MILESTONES, PEOPLE, SELLER_FACTS, STAGES, STAGE_LABEL, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
 import { NextStep } from '@/components/NextStep'
+import { handoffToColin } from '@/lib/apiExtra'
+import { BELT_LABEL, type Belt } from '@/lib/belts'
 import { useColinHere } from '@/components/OnPhonePicker'
 import type { Contact, Deal, DealStatus, Lead, LeadStage, Person } from '@/lib/types'
 
@@ -62,7 +64,9 @@ export default function LeadDetail() {
           {verdict.verdict !== 'open' && <VerdictBadge v={verdict} />}
           {lead.lane && <Badge tone="info">{lead.lane === 'hold' ? 'Hold lane' : 'Flip lane'}</Badge>}
           {lead.county && <Badge>{lead.county} County</Badge>}
+          {lead.locked_to && <Badge tone="good">{personLabel(lead.locked_to)}&apos;s card</Badge>}
         </div>
+        <CardOwner lead={lead} />
       </div>
 
       {lead.stage === 'dnc' && (
@@ -100,7 +104,7 @@ export default function LeadDetail() {
       {/* the package to Colin, his number and the callback (migration 0085) */}
       <DealPackage lead={lead} />
       <History leadId={lead.id} ownerName={lead.owner_name} messages={messages} inbound={q.data.inbound}
-        stageEvents={q.data.stageEvents} tasks={tasks} />
+        stageEvents={q.data.stageEvents} tasks={tasks} beltEvents={q.data.beltEvents} taskMoves={q.data.taskMoves} people={q.data.people} />
       {/* the follow-up belt (what happens next on its own) sits under the history: callers start at the Call panel */}
       <BeltStrip lead={lead} />
       {(lead.belt === 'visit_booked' || lead.stage === 'walkthrough_booked') && (
@@ -318,6 +322,19 @@ function Contacts({ contacts, leadId, lead }: { contacts: Contact[]; leadId: str
     ({ id, patch }: { id: string; patch: Partial<Pick<Contact, 'status' | 'dnc_app'>> }) => api.updateContact(id, patch),
     [['lead', leadId]],
   )
+  // a phone or email the seller gave, or one the county card shows (0172); a wrong digit fixed in place
+  const [addKind, setAddKind] = useState<'phone' | 'email'>('phone')
+  const [addValue, setAddValue] = useState('')
+  const [addWho, setAddWho] = useState('')
+  const [fixing, setFixing] = useState<string | null>(null)
+  const [fixValue, setFixValue] = useState('')
+  const [fixWho, setFixWho] = useState('')
+  const rpc = async (r: { data: unknown; error: { message: string } | null }) => {
+    const d = r.data as { ok?: boolean; reason?: string } | null
+    return { error: r.error ?? (d && d.ok === false ? { message: d.reason ?? 'not saved' } : null) }
+  }
+  const add = useWrite(async () => rpc(await api.contactAdd(leadId, addKind, addValue, addWho.trim() || null, null)), [['lead', leadId]])
+  const fix = useWrite(async (id: string) => rpc(await api.contactFix(id, fixValue.trim() || null, fixWho.trim() || null, null)), [['lead', leadId]])
   const notBefore = lead?.belt === 'not_now_dated' ? lead.named_date : null
   const waitingForNamedDate = !!notBefore && new Date(notBefore).getTime() > Date.now()
   return (
@@ -369,11 +386,31 @@ function Contacts({ contacts, leadId, lead }: { contacts: Contact[]; leadId: str
               >
                 {c.dnc_app ? 'Clear do-not-contact' : 'Do not contact'}
               </Button>
+              <Button size="sm" variant="outline" onClick={() => { setFixing(fixing === c.id ? null : c.id); setFixValue(c.value); setFixWho(c.person_name ?? '') }}>
+                {fixing === c.id ? 'Cancel' : 'Fix'}
+              </Button>
             </div>
+            {fixing === c.id && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-2">
+                <Input value={fixValue} onChange={(e) => setFixValue(e.target.value)} aria-label="The right number or address" className="h-9 w-44" />
+                <Input value={fixWho} onChange={(e) => setFixWho(e.target.value)} placeholder="Whose it is" aria-label="Whose it is" className="h-9 w-40" />
+                <Button size="sm" disabled={fix.isPending} onClick={() => fix.mutate(c.id, { onSuccess: () => setFixing(null) })}>Save</Button>
+                <ErrorNote error={fix.error} />
+              </div>
+            )}
           </li>
         ))}
       </ul>
       <ErrorNote error={upd.error} />
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Select value={addKind} onChange={(e) => setAddKind(e.target.value as 'phone' | 'email')} aria-label="Phone or email" className="w-28">
+          <option value="phone">Phone</option><option value="email">Email</option>
+        </Select>
+        <Input value={addValue} onChange={(e) => setAddValue(e.target.value)} placeholder={addKind === 'phone' ? '(414) 555-0100' : 'name@example.com'} aria-label="New phone or email" className="h-9 w-44" />
+        <Input value={addWho} onChange={(e) => setAddWho(e.target.value)} placeholder="Whose it is (optional)" aria-label="Whose it is" className="h-9 w-44" />
+        <Button size="sm" variant="outline" disabled={!addValue.trim() || add.isPending} onClick={() => add.mutate(undefined, { onSuccess: () => { setAddValue(''); setAddWho('') } })}>Add</Button>
+        <ErrorNote error={add.error} />
+      </div>
     </Section>
   )
 }
@@ -413,24 +450,40 @@ function Milestones({ leadId, done }: { leadId: string; done: { id: number; kind
 
 // Everything with this owner, newest first (Adil 2026-10-24): texts both ways, calls, emails, notes, stage changes
 // and finished tasks, by name. A notification or the Inbox name opens the card at #history.
-function History({ leadId, ownerName, messages, inbound, stageEvents, tasks }: {
+const HISTORY_FILTERS: { id: string; label: string; kinds: string[] }[] = [
+  { id: 'all', label: 'All', kinds: [] },
+  { id: 'calls', label: 'Calls', kinds: ['call'] },
+  { id: 'texts', label: 'Texts', kinds: ['text', 'email'] },
+  { id: 'notes', label: 'Notes', kinds: ['note'] },
+  { id: 'moves', label: 'Moves', kinds: ['move', 'stage', 'task'] },
+]
+
+function History({ leadId, ownerName, messages, inbound, stageEvents, tasks, beltEvents, taskMoves, people }: {
   leadId: string
   ownerName: string
   messages: import('@/lib/types').Message[]
   inbound: import('@/lib/types').TwilioInbound[]
   stageEvents: { id: number; from_stage: string | null; to_stage: string; at: string; source: string }[]
   tasks: import('@/lib/types').Task[]
+  beltEvents?: import('@/lib/types').BeltEvent[]
+  taskMoves?: import('@/lib/types').TaskMove[]
+  people?: Record<string, { person: string; display_name: string | null }>
 }) {
-  const [kind, setKind] = useState<'note' | 'call'>('note')
   const [body, setBody] = useState('')
   const [all, setAll] = useState(false)
-  const add = useWrite(
-    () => api.addMessage({ lead_id: leadId, channel: kind, direction: 'out', body: body.trim() }),
-    [['lead', leadId]],
-  )
-  const items = timelineOf({ ownerName, messages, inbound, stageEvents, tasks,
-    stageLabel: (s) => STAGE_LABEL[s as LeadStage] ?? s.replace(/_/g, ' ') })
-  const contacts = items.filter((i) => i.kind !== 'stage' && i.kind !== 'task').length
+  const [filter, setFilter] = useState('all')
+  // a note is append-only, with its author and time (0172); a call is logged from the script, never typed in here
+  const add = useWrite(async () => {
+    const r = await api.noteAdd(leadId, body.trim())
+    const d = r.data as { ok?: boolean; reason?: string } | null
+    return { error: r.error ?? (d && d.ok === false ? { message: d.reason ?? 'not saved' } : null) }
+  }, [['lead', leadId]])
+  const everything = timelineOf({ ownerName, messages, inbound, stageEvents, tasks, beltEvents, taskMoves, people,
+    stageLabel: (s) => STAGE_LABEL[s as LeadStage] ?? s.replace(/_/g, ' '),
+    beltLabel: (b) => BELT_LABEL[b as Belt] ?? b.replace(/_/g, ' '), fmtWhen: fmtDateTime })
+  const kinds = HISTORY_FILTERS.find((f) => f.id === filter)?.kinds ?? []
+  const items = kinds.length ? everything.filter((i) => kinds.includes(i.kind)) : everything
+  const contacts = everything.filter((i) => i.kind !== 'stage' && i.kind !== 'task' && i.kind !== 'move').length
   const shown = all ? items : items.slice(0, 8)
   const first = firstNameOf(ownerName)
   useEffect(() => {
@@ -439,11 +492,19 @@ function History({ leadId, ownerName, messages, inbound, stageEvents, tasks }: {
   return (
     <div id="history" className="scroll-mt-16">
       <Section title={`Everything with ${first || ownerName} (${contacts})`}>
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {HISTORY_FILTERS.map((f) => (
+            <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}
+              className={cn('min-h-9 rounded-full border px-3 text-xs font-medium', filter === f.id ? 'border-primary bg-primary text-primary-foreground' : 'bg-background hover:bg-accent')}>
+              {f.label}
+            </button>
+          ))}
+        </div>
         {items.length === 0 && <Empty>Nothing yet.</Empty>}
         <ul className="space-y-2">
           {shown.map((m) => (
             <li key={m.key}
-              className={cn('rounded-md p-2 text-sm', m.who === 'them' ? 'bg-blue-50' : m.who === 'us' ? 'bg-muted' : 'border border-dashed')}>
+              className={cn('rounded-md p-2 text-sm', m.who === 'them' ? 'bg-blue-50' : m.who === 'us' ? 'bg-muted' : m.kind === 'move' ? 'border border-dotted text-muted-foreground' : 'border border-dashed')}>
               <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <span className="font-medium text-foreground">{m.title}</span>
                 <span>{fmtDateTime(m.at)}</span>
@@ -458,21 +519,16 @@ function History({ leadId, ownerName, messages, inbound, stageEvents, tasks }: {
             {all ? 'Show the latest only' : `Show all ${items.length}`}
           </Button>
         )}
-        <details className="mt-3">
-          <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium">Add a note or a call log</summary>
-          <div className="mt-2 space-y-2">
-            <Select value={kind} onChange={(e) => setKind(e.target.value as 'note' | 'call')} className="w-40">
-              <option value="note">Note</option>
-              <option value="call">Call log</option>
-            </Select>
-            <Textarea placeholder={kind === 'call' ? 'What happened on the call' : 'Note'} value={body} onChange={(e) => setBody(e.target.value)} />
+        <div className="mt-3 space-y-2">
+          <Textarea placeholder="Add a note (it keeps your name and the time)" value={body} onChange={(e) => setBody(e.target.value)} className="min-h-20" />
+          <div className="flex flex-wrap items-center gap-3">
             <Button size="sm" disabled={!body.trim() || add.isPending} onClick={() => add.mutate(undefined, { onSuccess: () => setBody('') })}>
-              Add
+              Add note
             </Button>
-            <p className="text-xs text-muted-foreground">Texts are sent from WPIE, not from here.</p>
-            <ErrorNote error={add.error} />
+            <p className="text-xs text-muted-foreground">A call is logged from the script above, so the follow-ups know about it. Texts are sent from WPIE.</p>
           </div>
-        </details>
+          <ErrorNote error={add.error} />
+        </div>
       </Section>
     </div>
   )
@@ -612,20 +668,94 @@ function DealBlock({ leadId }: { leadId: string }) {
   )
 }
 
+// The card's one notes field is where the import and the system write (Muse's research, the lock lines). Since 0172
+// a person's note goes in the history with their name; this block is read-only for callers so nothing gets wiped.
 function Notes({ lead }: { lead: Lead }) {
+  const { isOwner } = useAuth()
   const [notes, setNotes] = useState(lead.notes ?? '')
+  const [edit, setEdit] = useState(false)
   useEffect(() => setNotes(lead.notes ?? ''), [lead.notes])
   const save = useWrite(() => api.updateLead(lead.id, { notes: notes.trim() || null }), [['lead', lead.id]])
+  if (!lead.notes && !isOwner) return null
   return (
-    <Section title="Lead notes">
-      <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-28" />
-      <div className="mt-2 flex items-center gap-3">
-        <Button size="sm" disabled={save.isPending} onClick={() => save.mutate(undefined)}>
-          Save notes
-        </Button>
-        {save.isSuccess && <span className="text-sm text-emerald-700">Saved</span>}
-      </div>
-      <ErrorNote error={save.error} />
+    <Section title="Card notes (research and system)" right={isOwner && !edit ? <Button size="sm" variant="outline" onClick={() => setEdit(true)}>Edit</Button> : undefined}>
+      {edit ? (
+        <>
+          <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-28" />
+          <div className="mt-2 flex items-center gap-3">
+            <Button size="sm" disabled={save.isPending} onClick={() => save.mutate(undefined, { onSuccess: () => setEdit(false) })}>Save</Button>
+            <Button size="sm" variant="outline" onClick={() => { setEdit(false); setNotes(lead.notes ?? '') }}>Cancel</Button>
+          </div>
+          <ErrorNote error={save.error} />
+        </>
+      ) : (
+        <>
+          {lead.notes ? <p className="whitespace-pre-wrap text-sm">{lead.notes}</p> : <Empty>Nothing from the import yet.</Empty>}
+          <p className="mt-2 text-xs text-muted-foreground">Your own notes go in the history above, with your name and the time.</p>
+        </>
+      )}
     </Section>
+  )
+}
+
+/** Whose card it is, and the three things people do about that (0172): Colin moves it, a caller hands it to Colin
+ * with one line, anyone fixes the name or address when the county card says otherwise. */
+function CardOwner({ lead }: { lead: Lead }) {
+  const { isOwner, member } = useAuth()
+  const [panel, setPanel] = useState<'move' | 'hand' | 'fix' | null>(null)
+  const [why, setWhy] = useState('')
+  const [to, setTo] = useState<Person>(lead.locked_to === 'thalia' ? 'adil' : 'thalia')
+  const [name, setName] = useState(lead.owner_name ?? '')
+  const [addr, setAddr] = useState(lead.property_address ?? '')
+  const [town, setTown] = useState(lead.municipality ?? '')
+  const [msg, setMsg] = useState<string | null>(null)
+  const keys = [['lead', lead.id], ['leads'], ['my_piles'], ['warm_board'], ['tasks']]
+  const rpc = async (r: { data: unknown; error: { message: string } | null }) => {
+    const d = r.data as { ok?: boolean; reason?: string } | null
+    return { error: r.error ?? (d && d.ok === false ? { message: d.reason ?? 'not done' } : null) }
+  }
+  const move = useWrite(async () => rpc(await api.cardReassign(lead.id, to, why.trim() || null)), keys)
+  const hand = useWrite(async () => rpc({ data: await handoffToColin(lead.id, why.trim()), error: null }), keys)
+  const fix = useWrite(async () => rpc(await api.leadFix(lead.id, { owner_name: name, property_address: addr, municipality: town, why: why.trim() || null })), keys)
+  const done = (m: string) => { setPanel(null); setWhy(''); setMsg(m) }
+  const btn = 'min-h-9 rounded-md border px-2.5 text-xs font-medium hover:bg-accent'
+  const isCaller = member?.role === 'caller'
+  return (
+    <div className="mt-2 space-y-2 text-sm">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {isOwner && <button type="button" className={cn(btn, panel === 'move' && 'bg-accent')} onClick={() => setPanel(panel === 'move' ? null : 'move')}>Move the card</button>}
+        {isCaller && <button type="button" className={cn(btn, panel === 'hand' && 'bg-accent')} onClick={() => setPanel(panel === 'hand' ? null : 'hand')}>Hand to Colin</button>}
+        <button type="button" className={cn(btn, panel === 'fix' && 'bg-accent')} onClick={() => setPanel(panel === 'fix' ? null : 'fix')}>Fix name or address</button>
+        {msg && <span className="text-xs text-emerald-700">{msg}</span>}
+      </div>
+      {panel === 'move' && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-2">
+          <Select value={to} onChange={(e) => setTo(e.target.value as Person)} aria-label="To whom" className="w-32">
+            <option value="thalia">Thalia</option><option value="adil">Adil</option>
+          </Select>
+          <Input value={why} onChange={(e) => setWhy(e.target.value)} placeholder="Why (optional)" className="h-9 min-w-40 flex-1" />
+          <Button size="sm" disabled={move.isPending} onClick={() => move.mutate(undefined, { onSuccess: () => done(`Moved to ${personLabel(to)}`) })}>Move it</Button>
+          <p className="w-full text-xs text-muted-foreground">Their open calls on this card go with it. The lock never moves on its own.</p>
+          <ErrorNote error={move.error} />
+        </div>
+      )}
+      {panel === 'hand' && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-2">
+          <Input value={why} onChange={(e) => setWhy(e.target.value)} placeholder="One line for Colin: what he needs to do" className="h-9 min-w-56 flex-1" />
+          <Button size="sm" disabled={!why.trim() || hand.isPending} onClick={() => hand.mutate(undefined, { onSuccess: () => done('Handed to Colin') })}>Hand it over</Button>
+          <ErrorNote error={hand.error} />
+        </div>
+      )}
+      {panel === 'fix' && (
+        <div className="grid gap-2 rounded-md border bg-muted/40 p-2 sm:grid-cols-2">
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Owner name" aria-label="Owner name" className="h-9" />
+          <Input value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="Property address" aria-label="Property address" className="h-9" />
+          <Input value={town} onChange={(e) => setTown(e.target.value)} placeholder="Town" aria-label="Town" className="h-9" />
+          <Input value={why} onChange={(e) => setWhy(e.target.value)} placeholder="Where the right one came from (county card, the seller)" aria-label="Why" className="h-9" />
+          <div className="sm:col-span-2"><Button size="sm" disabled={fix.isPending} onClick={() => fix.mutate(undefined, { onSuccess: () => done('Fixed; the old value is in the history') })}>Save the fix</Button></div>
+          <ErrorNote error={fix.error} />
+        </div>
+      )}
+    </div>
   )
 }

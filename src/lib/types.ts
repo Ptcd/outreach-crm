@@ -23,6 +23,7 @@ export interface TeamMember {
 
 export interface Lead {
   id: string
+  locked_to?: Person | null      // whose card it is (0148/0168)
   wpie_owner_id: number | null
   owner_name: string
   owner_type: string | null
@@ -91,6 +92,17 @@ export interface BeltEvent {
   by: string | null
 }
 
+export interface TaskMove {
+  id: number
+  task_id: string
+  lead_id: string | null
+  by: string
+  from_at: string | null
+  to_at: string | null
+  why: string | null
+  at: string
+}
+
 export interface BeltHealth {
   id: number
   at: string
@@ -141,6 +153,7 @@ export interface Message {
   sent_at: string
   seen_at: string | null
   provider_sid?: string | null
+  created_by?: string | null     // the login that wrote a note or logged a call
 }
 
 export interface Task {
