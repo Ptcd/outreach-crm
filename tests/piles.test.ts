@@ -3,7 +3,7 @@ import { PILES, groupPiles, type PileCard } from '../src/lib/piles'
 
 const card = (over: Partial<PileCard>): PileCard => ({
   lead_id: 'x', owner_name: 'JANE DOE', address: '12 OAK ST', municipality: 'Racine', county: 'Racine', stage: 'follow_up',
-  belt: null, pile: 'call_now', next_at: null, next_what: null, last_call_at: null, last_call: null, why: null, locked_to: null, tier: null, task_id: null, task_kind: null, task_source: null, ...over,
+  belt: null, pile: 'call_now', next_at: null, next_what: null, last_call_at: null, last_call: null, why: null, locked_to: null, tier: null, task_id: null, task_kind: null, task_source: null, walk_at: null, named_event: null, hot_at: null, ...over,
 })
 
 describe('my cards piles', () => {

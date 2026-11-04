@@ -17,6 +17,7 @@ import { PILES, groupPiles, type Pile, type PileCard } from '@/lib/piles'
 import { cn } from '@/lib/utils'
 import { NextStep } from '@/components/NextStep'
 import { BulkBar } from '@/components/BulkBar'
+import { WalkControl } from '@/components/WalkControl'
 import type { Task } from '@/lib/types'
 
 function usePiles(person: string | null) {
@@ -115,6 +116,7 @@ function Row({ c, picked, onPick }: { c: PileCard; picked: boolean; onPick: () =
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{c.owner_name}</span>
           <Badge>{status}</Badge>
+          {c.hot_at && <Badge tone="warn">Hot</Badge>}
           {c.tier && <Badge tone={c.tier === 'A' || c.tier === 'B' ? 'good' : undefined}>Tier {c.tier}</Badge>}
         </div>
         <div className="text-sm text-muted-foreground">
@@ -131,7 +133,12 @@ function Row({ c, picked, onPick }: { c: PileCard; picked: boolean; onPick: () =
           </div>
         )}
       </Link>
-      {c.pile !== 'closed' && <div className="mt-1.5"><NextStep leadId={c.lead_id} task={task} compact /></div>}
+      {c.walk_at && (c.belt === 'visit_booked' || c.belt === 'call_booked' || c.stage === 'walkthrough_booked') ? (
+        <div className="mt-1.5 space-y-1">
+          <p className="text-xs font-medium">{c.belt === 'visit_booked' || c.stage === 'walkthrough_booked' ? "Colin's walk" : 'The call'} {fmtDateTime(c.walk_at)}</p>
+          <WalkControl leadId={c.lead_id} kind={c.belt === 'visit_booked' || c.stage === 'walkthrough_booked' ? 'walk' : 'call'} />
+        </div>
+      ) : c.pile !== 'closed' && <div className="mt-1.5"><NextStep leadId={c.lead_id} task={task} compact /></div>}
       </div>
     </li>
   )

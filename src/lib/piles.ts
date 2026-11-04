@@ -23,11 +23,14 @@ export interface PileCard {
   task_id: string | null
   task_kind: string | null
   task_source: string | null
+  walk_at?: string | null
+  named_event?: string | null
+  hot_at?: string | null
 }
 
 export const PILES: { id: Pile; title: string; hint: string; open: boolean }[] = [
   { id: 'call_now', title: 'Call today', hint: 'Your calls and callbacks due today or late. Do these first.', open: true },
-  { id: 'booked', title: 'Booked', hint: "A call or walk is set, or Colin's offer is out.", open: true },
+  { id: 'booked', title: 'Booked and hot', hint: "Walks and calls on the books, Colin's offers out, and hot replies of the last two weeks. Move a walk, flag a waver, or take it off to a check-back right here.", open: true },
   { id: 'colin', title: 'Waiting on Colin', hint: 'You sent the package; Colin owes a value or a number.', open: true },
   { id: 'this_week', title: 'This week', hint: 'Your next call on these is in the next 7 days.', open: true },
   { id: 'no_step', title: 'Talked, nothing scheduled', hint: 'You reached them but nothing is set. Give each one a next step.', open: true },
