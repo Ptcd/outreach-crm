@@ -183,6 +183,26 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
   const decide = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('decide') : null
   const numRef = useRef<HTMLInputElement>(null)
   useEffect(() => { if (decide === 'number') numRef.current?.focus() }, [decide])
+  // the suggested ceiling (0179): Colin sees Rick's math and the reason already filled in; he approves or edits
+  const canPrice = isOwner && ['waiting_value', 'waiting_number', 'go_walk', 'counter'].includes(p.status)
+  const suggest = useQuery({
+    queryKey: ['package_suggest', p.id],
+    enabled: canPrice,
+    queryFn: async () => {
+      const r = await api.packageSuggest(p.id)
+      if (r.error) throw new Error(r.error.message)
+      return r.data as { ok: boolean; ceiling?: number; mao?: number; value?: number; value_basis?: string; sqft?: string; tier?: string; repairs?: string
+        off?: string; n_comps?: number; reason?: string | null; suggested_reason?: string | null; their_number?: string | null; walk_first?: boolean }
+    },
+  })
+  useEffect(() => {
+    const s = suggest.data
+    if (!s) return
+    if (s.ok && s.ceiling && !num) setNum(String(Math.round(s.ceiling)))
+    const why = s.ok ? s.reason : s.suggested_reason
+    if (why && !reason) setReason(why)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggest.data])
   const [counter, setCounter] = useState('')  // what the seller said back to it
   const [walkAt, setWalkAt] = useState('')
   const [newCb, setNewCb] = useState(() => isoToLocalInput(new Date(Date.now() + 24 * 3600_000).toISOString()))
@@ -265,6 +285,14 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
           )}
           {/* 0149/0175: a non-firm number from Colin's desk with the reason she says it with; firm numbers still at the house */}
           <div className={cn('space-y-2 rounded-md p-2', decide === 'number' && 'border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30')}>
+            {suggest.data?.ok && suggest.data.ceiling != null && (
+              <p className="text-sm"><span className="font-medium">Suggested ceiling {money(suggest.data.ceiling)}</span>
+                <span className="text-muted-foreground"> from {suggest.data.n_comps ?? 0} sold comps ({suggest.data.value != null ? money(suggest.data.value) : 'no value'} on {suggest.data.sqft ?? '?'} sq ft), {suggest.data.tier ?? 'medium'} repairs; your share, then {Math.round(Number(suggest.data.off ?? 0.3) * 100)}% under. Edit it or set it as is.</span>
+              </p>
+            )}
+            {suggest.data && !suggest.data.ok && (
+              <p className="text-sm text-muted-foreground">No suggestion: {suggest.data.walk_first ? 'water, foundation or fire on the card; walk it first' : String((suggest.data as { reason?: string }).reason ?? 'no comps or size on file')}.</p>
+            )}
             <div className="grid gap-2 sm:grid-cols-[12rem_1fr]">
               <Input ref={numRef} inputMode="decimal" placeholder="Your non-firm number ($)" value={num} onChange={(e) => setNum(e.target.value)} aria-label="Your non-firm number" />
               <Input placeholder="The reason she says with it: original windows, the baths, the taxes owed" value={reason} onChange={(e) => setReason(e.target.value)} aria-label="The reason" />

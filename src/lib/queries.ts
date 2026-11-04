@@ -330,6 +330,8 @@ export const api = {
     supabase.rpc('contact_add', { p_lead_id: leadId, p_kind: kind, p_value: value, p_person_name: personName, p_note: note }),
   contactFix: (contactId: string, value: string | null, personName: string | null, note: string | null) =>
     supabase.rpc('contact_fix', { p_contact_id: contactId, p_value: value, p_person_name: personName, p_note: note }),
+  // the suggested ceiling on a package, Colin only (0179): Rick's math plus the reason, approved not typed
+  packageSuggest: (packageId: string) => supabase.rpc('package_suggest', { p_package_id: packageId }),
   // a booked walk or call (0177): rebook, wavering, no-show, off to a check-back
   walkOutcome: (leadId: string, outcome: string, atIso: string | null, note: string | null) =>
     supabase.rpc('walk_outcome', { p_lead_id: leadId, p_outcome: outcome, p_at: atIso, p_note: note }),

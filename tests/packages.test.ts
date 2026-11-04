@@ -56,6 +56,11 @@ describe('the package', () => {
     for (const words of ['Moving to Arizona', 'what she owes plus moving money', 'Pat and her ex-husband Lee', '22 years old, leaks over the kitchen',
       'big oak over the garage', 'Yard and outside', `https://app.example.com/lead/${lead}#package`]) expect(e.text).toContain(words)
     expect(e.html).toContain('Set the number')
+    // the suggested ceiling rides along when the mailer attached one (0179)
+    const e2 = packageEmail({ ...mail[0], suggest: { ok: true, ceiling: 122000, n_comps: 6, tier: 'medium', value: 263000, reason: 'the original windows, the baths and the taxes owed' } }, 'https://app.example.com')
+    expect(e2.text).toContain('Suggested ceiling: $122,000 (the original windows, the baths and the taxes owed; 6 sold comps, medium repairs, value $263,000)')
+    expect(e2.html).toContain('Suggested ceiling: $122,000')
+    expect(e.text).not.toContain('Suggested ceiling')
     expect(e.html).toContain('decide=number')
     expect(e.html).toContain('Walk it')
     expect(e.html).toContain('Pass')

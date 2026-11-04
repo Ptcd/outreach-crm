@@ -11,6 +11,8 @@ export type PackageRow = {
   person: string | null
   // what the county records say (0160; the laptop's motivation count): kinds of distress, owner traits
   motivation?: { tier: string | null; families: number; lines: string[]; amplifiers: string[]; as_of: string | null } | null
+  // the suggested ceiling (0179): Rick's math on the card, with the reason the caller would say; Colin approves or edits
+  suggest?: { ok: boolean; ceiling?: number; n_comps?: number; value?: number; sqft?: string; tier?: string; reason?: string | null; walk_first?: boolean } | null
 }
 
 const TIER: Record<string, string> = { A: 'three kinds of distress', B: 'two kinds of distress', C: 'one strong reason', D: 'one light reason' }
@@ -75,12 +77,18 @@ export function packageEmail(r: PackageRow, appUrl: string): { subject: string; 
   const cond = (p.condition ?? {}) as Record<string, string>
   const condRows = CONDITION_ITEMS.filter(([k]) => cond[k]).map(([k, label]) => [label, cond[k]] as [string, string])
   const whyRows = motivationRows(r)
+  const dollars = (n: number) => '$' + Math.round(n).toLocaleString('en-US')
+  const sg = r.suggest
+  const suggestLine = sg?.ok && sg.ceiling != null
+    ? `Suggested ceiling: ${dollars(sg.ceiling)} (${sg.reason ? sg.reason + '; ' : ''}${sg.n_comps ?? 0} sold comps, ${sg.tier ?? 'medium'} repairs${sg.value != null ? `, value ${dollars(sg.value)}` : ''}). Tap Set the number to approve it or edit it.`
+    : sg && !sg.ok ? `No suggested ceiling: ${sg.walk_first ? 'water, foundation or fire on the card; walk it first' : 'no comps or size on file'}.` : ''
   const text = [
     subject, '',
     ...rows.map(([k, v]) => `${k}: ${v}`), '',
     ...(whyRows.length ? ['Why they might sell, from the records:', ...whyRows.map(([k, v]) => `- ${k}: ${v}`), ''] : []),
     'Condition, in their words:',
     ...(condRows.length ? condRows.map(([k, v]) => `- ${k}: ${v}`) : ['- (nothing recorded)']), '',
+    ...(suggestLine ? [suggestLine, ''] : []),
     `Set the number (she says it once, as a ceiling with your reason): ${linkNumber}`,
     `Walk it (she books your walk, your number at the house): ${linkWalk}`,
     `Pass (she closes it politely at the promised time): ${linkPass}`,
@@ -94,6 +102,7 @@ ${whyRows.length ? `<h3 style="margin:14px 0 6px">Why they might sell, from the 
 <table style="border-collapse:collapse">${whyRows.map(([k, v]) => tr(k, v)).join('')}</table>` : ''}
 <h3 style="margin:14px 0 6px">Condition, in their words</h3>
 <table style="border-collapse:collapse">${condRows.length ? condRows.map(([k, v]) => tr(k, v)).join('') : tr('', '(nothing recorded)')}</table>
+${suggestLine ? `<p style="margin-top:14px;padding:8px 10px;border-left:4px solid #c77d10;background:#fff4e0"><strong>${esc(suggestLine.split('.')[0])}.</strong> ${esc(suggestLine.slice(suggestLine.indexOf('.') + 2))}</p>` : ''}
 <p style="margin-top:16px">
 <a href="${esc(linkNumber)}" style="display:inline-block;background:#c77d10;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:600;margin:0 8px 8px 0">Set the number</a>
 <a href="${esc(linkWalk)}" style="display:inline-block;background:#1e8e5a;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:600;margin:0 8px 8px 0">Walk it</a>
@@ -115,6 +124,9 @@ export async function runPackageMail(deps: NotifyDeps, rpc: Rpc, fanOut?: (m: { 
     const r = await rpc('package_mail_claim', { p_limit: 5 })
     for (const row of ((r.data as PackageRow[] | null) ?? [])) {
       try {
+        // the suggested ceiling rides along (0179); a failure here never stops the email
+        const sg = await rpc('package_suggest', { p_package_id: row.package.id }).catch(() => ({ data: null, error: { message: 'no suggestion' } }))
+        if (!sg.error && sg.data) row.suggest = sg.data as PackageRow['suggest']
         await deps.email({ to: deps.emailTo, ...packageEmail(row, deps.appUrl) })
         s.emailed++
       } catch (e) {
