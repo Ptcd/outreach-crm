@@ -55,7 +55,10 @@ describe('the package', () => {
     expect(e.subject).toBe('HOT Package: PAT PACKAGE, 21 Package Test St')
     for (const words of ['Moving to Arizona', 'what she owes plus moving money', 'Pat and her ex-husband Lee', '22 years old, leaks over the kitchen',
       'big oak over the garage', 'Yard and outside', `https://app.example.com/lead/${lead}#package`]) expect(e.text).toContain(words)
-    expect(e.html).toContain('Walk it or pass, on the card')
+    expect(e.html).toContain('Set the number')
+    expect(e.html).toContain('decide=number')
+    expect(e.html).toContain('Walk it')
+    expect(e.html).toContain('Pass')
     // Muse adds the value; only Colin decides, and no number leaves him
     expect(await r(`public.package_set_value($1, 0, 'x', null, 'Muse')`, [id])).toMatchObject({ ok: false })
     expect(await r(`public.package_set_value($1, 265000, '3 sales within half a mile, last 6 months', $2::jsonb, 'Muse')`,

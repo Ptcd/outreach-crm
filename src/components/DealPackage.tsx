@@ -3,9 +3,10 @@
 // decides walk it or pass (and grades the package), and the caller's callback gets the yes-or-no agreement and books
 // Colin's walk. No number on the phone (Colin 2026-10-28, migration 0114): Colin gives his at the house. Each state
 // shows who is up and what they do.
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Badge, ErrorNote, Section, Select, Textarea } from '@/components/ui/form'
 import { supabase } from '@/lib/supabaseClient'
@@ -177,6 +178,11 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
   const [grade, setGrade] = useState('')
   const [note, setNote] = useState('')
   const [num, setNum] = useState('')          // Colin's non-firm number for the callback (0149)
+  const [reason, setReason] = useState('')    // the reason the caller says with it (0175): "original windows, the baths, the taxes owed"
+  // the email's button (0175): ?decide=number|walk|pass opens the card on that decision with the box ready
+  const decide = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('decide') : null
+  const numRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (decide === 'number') numRef.current?.focus() }, [decide])
   const [counter, setCounter] = useState('')  // what the seller said back to it
   const [walkAt, setWalkAt] = useState('')
   const [newCb, setNewCb] = useState(() => isoToLocalInput(new Date(Date.now() + 24 * 3600_000).toISOString()))
@@ -248,8 +254,8 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
               <option value="">Grade</option><option value="A">A</option><option value="B">B</option><option value="C">C</option>
             </Select>
             <Input placeholder="Note for the caller, or what you need to know first" value={note} onChange={(e) => setNote(e.target.value)} />
-            {p.status !== 'go_walk' && <Button onClick={() => void run('package_decide', { p_id: p.id, p_walk: true, p_note: note || null, p_grade: grade || null })}>Walk it</Button>}
-            <Button variant="outline" onClick={() => void run('package_decide', { p_id: p.id, p_walk: false, p_note: note || null, p_grade: grade || null })}>Pass</Button>
+            {p.status !== 'go_walk' && <Button className={cn(decide === 'walk' && 'ring-4 ring-emerald-300')} onClick={() => void run('package_decide', { p_id: p.id, p_walk: true, p_note: note || null, p_grade: grade || null })}>Walk it</Button>}
+            <Button variant="outline" className={cn(decide === 'pass' && 'ring-4 ring-slate-300')} onClick={() => void run('package_decide', { p_id: p.id, p_walk: false, p_note: note || null, p_grade: grade || null })}>Pass</Button>
           </div>
           {p.status !== 'go_walk' && (
             <div className="flex flex-wrap items-center gap-2">
@@ -257,13 +263,25 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
               <span className="text-xs text-muted-foreground">Not sure yet? Type what you need to know in the box (for example: their timeline, what their number means, how many units and the rents) and tap Ask first. The caller gets the answers on the callback and you decide then.</span>
             </div>
           )}
-          {/* 0149: a non-firm number from Colin's desk, read on the callback exactly as typed; firm numbers still at the house */}
-          <div className="grid gap-2 sm:grid-cols-[14rem_auto]">
-            <Input inputMode="decimal" placeholder="Or your non-firm number ($)" value={num} onChange={(e) => setNum(e.target.value)} aria-label="Your non-firm number" />
-            <Button variant="secondary" disabled={!Number(num.replace(/[^0-9.]/g, ''))}
-              onClick={() => void run('package_price', { p_id: p.id, p_number: Number(num.replace(/[^0-9.]/g, '')), p_note: note || null, p_grade: grade || null })}>
-              Set the number for the callback
-            </Button>
+          {/* 0149/0175: a non-firm number from Colin's desk with the reason she says it with; firm numbers still at the house */}
+          <div className={cn('space-y-2 rounded-md p-2', decide === 'number' && 'border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30')}>
+            <div className="grid gap-2 sm:grid-cols-[12rem_1fr]">
+              <Input ref={numRef} inputMode="decimal" placeholder="Your non-firm number ($)" value={num} onChange={(e) => setNum(e.target.value)} aria-label="Your non-firm number" />
+              <Input placeholder="The reason she says with it: original windows, the baths, the taxes owed" value={reason} onChange={(e) => setReason(e.target.value)} aria-label="The reason" />
+            </div>
+            {Number(num.replace(/[^0-9.]/g, '')) > 0 && (
+              <blockquote className={say}>
+                &quot;Colin looked at it. {reason.trim() ? `${reason.trim()}. ` : ''}{p.their_number && /\d/.test(String(p.their_number)) ? `He can't be at ${String(p.their_number)}; he'd be closer to ` : "He can't be anywhere near what it would list for; he'd be closer to "}
+                {money(Number(num.replace(/[^0-9.]/g, '')))}. Does that still work?&quot;
+              </blockquote>
+            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant={decide === 'number' ? 'default' : 'secondary'} disabled={!Number(num.replace(/[^0-9.]/g, ''))}
+                onClick={() => void run('package_price', { p_id: p.id, p_number: Number(num.replace(/[^0-9.]/g, '')), p_note: reason || note || null, p_grade: grade || null })}>
+                Set the number for the callback
+              </Button>
+              <span className="text-xs text-muted-foreground">She says it once, as a ceiling, &quot;not an offer&quot;, then listens. The line lands on her callback card and her phone pings before the call.</span>
+            </div>
           </div>
           <p className="text-xs text-muted-foreground">Walk it: the caller books your walk with everyone on the title there, and you give your number at the house. A number here is non-firm, pending the walk, and the only one the caller may say.</p>
         </div>
@@ -271,11 +289,11 @@ function OpenPackage({ p, lead, isOwner, onDone }: { p: Pkg; lead: Lead; isOwner
 
       {p.status === 'number_ready' && p.our_number != null && (
         <div className="space-y-2 rounded-lg border-2 border-emerald-400 p-3">
-          <p className="font-medium">The callback: Colin&apos;s non-firm number, {money(p.our_number)}</p>
+          <p className="font-medium">The callback: Colin&apos;s number, {money(p.our_number)}, said once as a ceiling</p>
           <blockquote className={say}>
-            &quot;Hi, it&apos;s [your name]. My partner went over everything you told me. Rough, and pending him walking it, he&apos;d be somewhere around {money(p.our_number)}. Is that in the conversation?&quot;
+            &quot;Colin looked at it. {p.number_note ? `${String(p.number_note)}. ` : ''}{p.their_number && /\d/.test(String(p.their_number)) ? `He can't be at ${String(p.their_number)}; he'd be closer to ` : "He can't be anywhere near what it would list for; he'd be closer to "}{money(p.our_number)}. Does that still work?&quot;
           </blockquote>
-          <p className="text-xs text-muted-foreground">Say only that number, and say it is rough. A yes books his walk. A counter goes back to Colin. Never a second number of your own.</p>
+          <p className="text-xs text-muted-foreground">Then silence; count to five. If they push: &quot;That&apos;s not an offer, I&apos;m just saying he&apos;d have to be under that.&quot; Could work: book his walk. &quot;I&apos;d need Y&quot;: ask why that doesn&apos;t work and how they got to Y, write it word for word, &quot;Colin will look at that.&quot; No: their words, a check-back. Never defend it, explain it, go up, or offer anything in between.</p>
           <div className="grid gap-2 sm:grid-cols-2">
             <Input inputMode="decimal" placeholder="Their counter ($), if they named one" value={counter} onChange={(e) => setCounter(e.target.value)} aria-label="Their counter" />
             <Input placeholder="What they said, their words" value={note} onChange={(e) => setNote(e.target.value)} />

@@ -23,7 +23,7 @@ import { fmtDateTime, fmtPhone } from '@/lib/format'
 type Item = {
   lead_id: string; task_id: string | null; source: 'missed_call' | 'callback' | 'replied' | 'checkin' | 'call_list' | 'texted_silent'; why: string | null; reply?: string | null
   task_note?: string | null
-  package?: { id: string; status: string; colin_call: string | null; colin_asks: string | null; caller_answers: string | null; callback_at: string | null; number_note: string | null } | null
+  package?: { id: string; status: string; colin_call: string | null; colin_asks: string | null; caller_answers: string | null; callback_at: string | null; number_note: string | null; our_number?: number | null; their_number?: string | null } | null
   missed_at?: string | null; voicemail?: boolean | null; voicemail_words?: string | null
   owner_name: string; address: string | null; municipality: string | null; reasons: string[] | null; lane: string | null
   texts_sent: number; first_text_at: string | null; last_text_at: string | null; dials_7d: number; dials_total?: number; last_dial: string | null
@@ -443,6 +443,10 @@ function CallbackPlan({ item, caller, street, busy, live, onDone }: { item: Item
       <p>&ldquo;My partner is going over everything you told me and had a couple of quick questions.&rdquo; Then {open} and type their answers under <b>Colin needs to know first</b>, and set the next callback.</p>
     </>
     doneLabel = ''
+  } else if (p && p.status === 'number_ready' && p.our_number != null) {
+    title = `Colin's number, ${money(Number(p.our_number))}: say it once, as a ceiling`
+    body = <NumberCallback p={p} leadId={item.lead_id} onDone={() => void onDone(`gave Colin's number ${money(Number(p.our_number))} (${street})`)} />
+    doneLabel = ''
   } else if (p && ['waiting_value', 'waiting_number'].includes(p.status)) {
     title = "Colin hasn't decided yet"
     body = <>
@@ -457,6 +461,45 @@ function CallbackPlan({ item, caller, street, busy, live, onDone }: { item: Item
       {item.task_note && <p className="text-xs text-muted-foreground">{item.task_note}</p>}
       {body}
       {doneLabel && <Button size="sm" disabled={busy || live} onClick={() => void onDone(doneLabel === 'Callback done' ? 'callback made' : `told them: ${title.toLowerCase()} (${street})`)}>{doneLabel}</Button>}
+    </div>
+  )
+}
+
+const money = (n: number) => '$' + Math.round(n).toLocaleString('en-US')
+
+/** The number-ready callback (0175): Rick's line with Colin's number and reason, then the three outcomes, logged here. */
+function NumberCallback({ p, leadId, onDone }: { p: NonNullable<Item['package']>; leadId: string; onDone: () => void }) {
+  const [counter, setCounter] = useState('')
+  const [words, setWords] = useState('')
+  const [err, setErr] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const say = 'rounded-md border-l-4 border-amber-400 bg-amber-50 p-2 dark:bg-amber-950/30'
+  const n = Number(p.our_number)
+  const deliver = async (response: 'yes' | 'counter' | 'no') => {
+    setBusy(true); setErr(null)
+    const r = await supabase.rpc('package_delivered', { p_id: p.id, p_said: n, p_response: response, p_counter: response === 'counter' ? Number(counter.replace(/[^0-9.]/g, '')) : null, p_note: words.trim() || null })
+    const d = r.data as { ok?: boolean; reason?: string } | null
+    setBusy(false)
+    if (r.error || (d && d.ok === false)) { setErr(r.error?.message ?? d?.reason ?? 'not saved'); return }
+    onDone()
+  }
+  return (
+    <div className="space-y-2">
+      <blockquote className={say}>
+        &quot;Colin looked at it. {p.number_note ? `${p.number_note}. ` : ''}{p.their_number && /\d/.test(String(p.their_number)) ? `He can't be at ${p.their_number}; he'd be closer to ` : "He can't be anywhere near what it would list for; he'd be closer to "}{money(n)}. Does that still work?&quot;
+      </blockquote>
+      <p className="text-xs text-muted-foreground">Then silence; count to five. If they push: &quot;That&apos;s not an offer, I&apos;m just saying he&apos;d have to be under that.&quot; Never defend it, explain it, go up, or offer anything in between.</p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Input placeholder="Their words, word for word" value={words} onChange={(e) => setWords(e.target.value)} aria-label="Their words" />
+        <Input inputMode="decimal" placeholder="Their number, if they named one ($)" value={counter} onChange={(e) => setCounter(e.target.value)} aria-label="Their counter" />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" disabled={busy} onClick={() => void deliver('yes')}>Could work: book Colin&apos;s walk</Button>
+        <Button size="sm" variant="secondary" disabled={busy || !Number(counter.replace(/[^0-9.]/g, ''))} onClick={() => void deliver('counter')}>&quot;I&apos;d need Y&quot;: to Colin</Button>
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => void deliver('no')}>No: check-back</Button>
+      </div>
+      <p className="text-xs text-muted-foreground">&quot;I&apos;d need Y&quot;: first &quot;Why doesn&apos;t that work?&quot; then &quot;How&apos;d you get to Y?&quot; Write it word for word; &quot;Colin will look at that and I&apos;ll get back to you.&quot; A yes books the walk on the card: <a className="underline" href={`/lead/${leadId}#package`}>open it</a>.</p>
+      <ErrorNote error={err} />
     </div>
   )
 }

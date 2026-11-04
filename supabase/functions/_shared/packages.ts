@@ -56,7 +56,12 @@ export function packageEmail(r: PackageRow, appUrl: string): { subject: string; 
   const p = r.package
   const where = whereOf(r)
   const who = r.person || r.lead.owner_name || 'the seller'
-  const link = `${appUrl.replace(/\/$/, '')}/lead/${r.lead.id}#package`
+  const base = `${appUrl.replace(/\/$/, '')}/lead/${r.lead.id}`
+  const link = `${base}#package`
+  // one tap each (Colin 2026-11-04): the card opens on that decision with the box ready
+  const linkNumber = `${base}?decide=number#package`
+  const linkWalk = `${base}?decide=walk#package`
+  const linkPass = `${base}?decide=pass#package`
   const cb = p.walk_booked_on_call ? 'Walk booked on the call' : p.callback_at
     ? `Callback promised ${new Date(String(p.callback_at)).toLocaleString('en-US', { timeZone: 'America/Chicago', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} Central`
     : ''
@@ -76,7 +81,10 @@ export function packageEmail(r: PackageRow, appUrl: string): { subject: string; 
     ...(whyRows.length ? ['Why they might sell, from the records:', ...whyRows.map(([k, v]) => `- ${k}: ${v}`), ''] : []),
     'Condition, in their words:',
     ...(condRows.length ? condRows.map(([k, v]) => `- ${k}: ${v}`) : ['- (nothing recorded)']), '',
-    `Walk it or pass, on the card (no number goes out by phone; you give yours at the house): ${link}`,
+    `Set the number (she says it once, as a ceiling with your reason): ${linkNumber}`,
+    `Walk it (she books your walk, your number at the house): ${linkWalk}`,
+    `Pass (she closes it politely at the promised time): ${linkPass}`,
+    `The card: ${link}`,
   ].join('\n')
   const tr = (k: string, v: string) => `<tr><td style="padding:4px 10px 4px 0;color:#52606d;vertical-align:top;white-space:nowrap">${esc(k)}</td><td style="padding:4px 0">${esc(v)}</td></tr>`
   const html = `<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1f2933">
@@ -86,7 +94,13 @@ ${whyRows.length ? `<h3 style="margin:14px 0 6px">Why they might sell, from the 
 <table style="border-collapse:collapse">${whyRows.map(([k, v]) => tr(k, v)).join('')}</table>` : ''}
 <h3 style="margin:14px 0 6px">Condition, in their words</h3>
 <table style="border-collapse:collapse">${condRows.length ? condRows.map(([k, v]) => tr(k, v)).join('') : tr('', '(nothing recorded)')}</table>
-<p style="margin-top:16px"><a href="${esc(link)}" style="background:#102a43;color:#fff;padding:9px 14px;border-radius:6px;text-decoration:none">Walk it or pass, on the card</a></p>
+<p style="margin-top:16px">
+<a href="${esc(linkNumber)}" style="display:inline-block;background:#c77d10;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:600;margin:0 8px 8px 0">Set the number</a>
+<a href="${esc(linkWalk)}" style="display:inline-block;background:#1e8e5a;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:600;margin:0 8px 8px 0">Walk it</a>
+<a href="${esc(linkPass)}" style="display:inline-block;background:#6b7a8c;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:600;margin:0 8px 8px 0">Pass</a>
+</p>
+<p style="color:#52606d;font-size:12px;margin:0">Set the number: she says it once on the callback, as a ceiling with your reason, "not an offer". Walk it: she books your walk and you give your number at the house. Pass: she closes it politely at the promised time.</p>
+<p style="margin-top:8px"><a href="${esc(link)}" style="color:#102a43">Open the card</a></p>
 </div>`
   return { subject, text, html }
 }
