@@ -2,7 +2,7 @@
 // leads", "a simple way to organize their stuff and have their piles of leads that need to be followed up with after a
 // long time"). The database (my_piles) puts each of the caller's cards in one pile; this file carries the pile words.
 
-export type Pile = 'call_now' | 'booked' | 'colin' | 'this_week' | 'later' | 'no_step' | 'tried' | 'closed'
+export type Pile = 'call_now' | 'booked' | 'colin' | 'this_week' | 'later' | 'no_step' | 'tried' | 'not_called' | 'closed'
 
 export interface PileCard {
   lead_id: string
@@ -19,6 +19,7 @@ export interface PileCard {
   last_call: string | null
   why: string | null
   locked_to: string | null
+  tier: string | null
 }
 
 export const PILES: { id: Pile; title: string; hint: string; open: boolean }[] = [
@@ -29,6 +30,7 @@ export const PILES: { id: Pile; title: string; hint: string; open: boolean }[] =
   { id: 'no_step', title: 'Talked, nothing scheduled', hint: 'You reached them but nothing is set. Give each one a next step.', open: true },
   { id: 'later', title: 'Follow up later', hint: 'Not now, waiting on family or an estate, or a call more than a week out. Soonest first.', open: false },
   { id: 'tried', title: 'Tried, never reached', hint: 'Dialed but no one answered yet, and nothing is scheduled.', open: false },
+  { id: 'not_called', title: 'Not called yet', hint: 'Your cards nobody has dialed. The texts are working them; the best motivation is on top.', open: false },
   { id: 'closed', title: 'Closed', hint: 'Dead, do not contact, or done.', open: false },
 ]
 

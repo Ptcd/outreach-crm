@@ -100,6 +100,7 @@ function Row({ c }: { c: PileCard }) {
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{c.owner_name}</span>
           <Badge>{status}</Badge>
+          {c.tier && <Badge tone={c.tier === 'A' || c.tier === 'B' ? 'good' : undefined}>Tier {c.tier}</Badge>}
         </div>
         <div className="text-sm text-muted-foreground">
           {c.address}{c.municipality ? `, ${c.municipality}` : ''}{c.county ? ` (${c.county})` : ''}
