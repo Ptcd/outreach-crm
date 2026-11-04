@@ -93,6 +93,12 @@ export function PowerDial({ caller }: { caller: string }) {
   const [err, setErr] = useState<string | null>(null)
   // a remark that goes with whichever outcome she taps (Thalia 2026-10-28: "add a remarks")
   const [remark, setRemark] = useState('')
+  // the next number (Colin 2026-11-04: "if the first number in the card is no good or doesn't answer they try the next
+  // one if available"): after a no answer, voicemail, wrong or disconnected number, the card stays up with its next
+  // good phone instead of moving on; the numbers already tried tonight are remembered so it never loops
+  const [tried, setTried] = useState<Record<string, string[]>>({})
+  const [swap, setSwap] = useState<Record<string, { phone: string; line_type: string | null; phone_person: string | null; other_phones: number }>>({})
+  const [nextNote, setNextNote] = useState<string | null>(null)
   const update = useCallback((f: (s: Stats) => Stats) => setStats((s) => { const n = f(s); saveStats(n); return n }), [])
 
   const list = useMemo(() => {
@@ -100,10 +106,11 @@ export function PowerDial({ caller }: { caller: string }) {
     // called us back, a promised callback or a text back comes up again however often it was dialed (Adil 2026-10-29:
     // the seller he had just dialed called back, and his screen hid the card as done)
     const all = (q.data ?? []).filter((x) => !stats.done.includes(x.lead_id) || x.source === 'missed_call' || x.source === 'callback' || x.source === 'replied')
+      .map((x) => (swap[x.lead_id] ? { ...x, ...swap[x.lead_id] } : x))
     const ordered = [...all.filter((x) => !skipped.includes(x.lead_id)), ...all.filter((x) => skipped.includes(x.lead_id))]
     const held = pin ? (ordered.find((x) => x.lead_id === pin) ?? (pinItem.current?.lead_id === pin && !stats.done.includes(pin) ? pinItem.current : undefined)) : undefined
     return held ? [held, ...ordered.filter((x) => x.lead_id !== held.lead_id)] : ordered
-  }, [q.data, stats.done, skipped, pin])
+  }, [q.data, stats.done, skipped, pin, swap])
   const cur = list[0] ?? null
   const onThis = !!active && !!cur && active.leadId === cur.lead_id
   const live = onThis && ['connecting', 'ringing', 'in_call'].includes(active!.status)
@@ -141,8 +148,28 @@ export function PowerDial({ caller }: { caller: string }) {
     setRemark('')
     update((s) => ({ ...s, voicemails: s.voicemails + (o.id === 'voicemail' ? 1 : 0), reached: s.reached + (['wrong_number', 'not_interested'].includes(o.id) ? 1 : 0) }))
     void qc.invalidateQueries({ queryKey: ['tasks'] })
+    // nobody on that number: the card stays, with its next good number, until the numbers run out
+    if (['no_answer', 'voicemail', 'wrong_number', 'disconnected'].includes(o.id) && cur.other_phones > 0) {
+      const used = [...(tried[cur.lead_id] ?? []), cur.phone]
+      const r2 = await supabase.from('contacts').select('value_normalized, line_type, person_name, status, suppressed, dnc_app')
+        .eq('lead_id', cur.lead_id).eq('kind', 'phone').eq('status', 'ok')
+      const cands = ((r2.data ?? []) as { value_normalized: string | null; line_type: string | null; person_name: string | null; suppressed: boolean | null; dnc_app: boolean | null }[])
+        .filter((c) => c.value_normalized && /^\d{10}$/.test(c.value_normalized) && !c.suppressed && !c.dnc_app && !used.includes(c.value_normalized))
+        .sort((a, b) => Number(b.line_type === 'mobile') - Number(a.line_type === 'mobile'))
+      const nx = cands[0]
+      if (nx && nx.value_normalized) {
+        setTried((t) => ({ ...t, [cur.lead_id]: used }))
+        setSwap((s) => ({ ...s, [cur.lead_id]: { phone: nx.value_normalized!, line_type: nx.line_type, phone_person: nx.person_name, other_phones: cands.length - 1 } }))
+        setPin(cur.lead_id)
+        pinItem.current = { ...cur, phone: nx.value_normalized, line_type: nx.line_type, phone_person: nx.person_name, other_phones: cands.length - 1 }
+        setNextNote(`${o.id === 'wrong_number' || o.id === 'disconnected' ? 'That number is marked bad' : 'No answer there'}. Next number on the card: ${fmtPhone(nx.value_normalized)}${nx.person_name ? ` (${nx.person_name})` : ''}${cands.length - 1 ? `, ${cands.length - 1} more after it` : ', the last one'}.`)
+        if (auto) setCountdown(2)
+        return
+      }
+    }
+    setNextNote(null)
     next(cur.lead_id, true)
-  }, [cur, live, busy, onThis, dismiss, update, qc, next, remark])
+  }, [cur, live, busy, onThis, dismiss, update, qc, next, remark, tried, auto])
 
   const skip = useCallback(() => {
     if (!cur || live) return
@@ -329,6 +356,7 @@ export function PowerDial({ caller }: { caller: string }) {
           <p className="text-xs text-muted-foreground">
             {cur.line_type ?? 'phone'}{cur.phone_person && !/^\s*$/.test(cur.phone_person) ? ` · ${title(cur.phone_person)}` : ''}
             {cur.other_phones ? ` · ${cur.other_phones} other number${cur.other_phones > 1 ? 's' : ''} on the card` : ''}
+            {nextNote && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">{nextNote}</span>}
             {onThis && active?.status ? ` · ${active.status === 'in_call' ? 'in call' : active.status}` : ''}{onThis && active?.error ? ` - ${active.error}` : ''}
           </p>
 
