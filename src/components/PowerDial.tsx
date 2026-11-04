@@ -26,7 +26,7 @@ type Item = {
   package?: { id: string; status: string; colin_call: string | null; colin_asks: string | null; caller_answers: string | null; callback_at: string | null; number_note: string | null; our_number?: number | null; their_number?: string | null } | null
   missed_at?: string | null; voicemail?: boolean | null; voicemail_words?: string | null
   owner_name: string; address: string | null; municipality: string | null; reasons: string[] | null; lane: string | null
-  texts_sent: number; first_text_at: string | null; last_text_at: string | null; dials_7d: number; dials_total?: number; last_dial: string | null
+  texts_sent: number; first_text_at: string | null; last_text_at: string | null; dials_7d: number; dials_total?: number; last_dial: string | null; dials_today?: number
   phone: string; line_type: string | null; phone_person: string | null; other_phones: number
 }
 type Stats = { dials: number; reached: number; voicemails: number; interested: number; done: string[]; started: number | null }
@@ -148,13 +148,25 @@ export function PowerDial({ caller }: { caller: string }) {
     setRemark('')
     update((s) => ({ ...s, voicemails: s.voicemails + (o.id === 'voicemail' ? 1 : 0), reached: s.reached + (['wrong_number', 'not_interested'].includes(o.id) ? 1 : 0) }))
     void qc.invalidateQueries({ queryKey: ['tasks'] })
-    // nobody on that number: the card stays, with its next good number, until the numbers run out
+    // nobody on that number: the card stays, with its next good number, for at most four numbers a sitting (Thalia
+    // 2026-11-04: "limit it to 4 numbers per lead ... try the remaining numbers the following day"); the queue (0184)
+    // brings the card back the next day at its next untried number
     if (['no_answer', 'voicemail', 'wrong_number', 'disconnected'].includes(o.id) && cur.other_phones > 0) {
       const used = [...(tried[cur.lead_id] ?? []), cur.phone]
+      if ((cur.dials_today ?? 0) + used.length >= 4) {
+        setTried((t) => ({ ...t, [cur.lead_id]: used }))
+        setNextNote(`Four numbers tried on this card today. The rest come back tomorrow.`)
+        next(cur.lead_id, true)
+        return
+      }
       const r2 = await supabase.from('contacts').select('value_normalized, line_type, person_name, status, suppressed, dnc_app')
         .eq('lead_id', cur.lead_id).eq('kind', 'phone').eq('status', 'ok')
+      // numbers dialed earlier today (another sitting) are not offered again today
+      const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0)
+      const r3 = await supabase.from('messages').select('to_number').eq('lead_id', cur.lead_id).eq('channel', 'call').gte('sent_at', dayStart.toISOString())
+      const today = ((r3.data ?? []) as { to_number: string | null }[]).map((m) => (m.to_number ?? '').replace(/\D/g, '').slice(-10))
       const cands = ((r2.data ?? []) as { value_normalized: string | null; line_type: string | null; person_name: string | null; suppressed: boolean | null; dnc_app: boolean | null }[])
-        .filter((c) => c.value_normalized && /^\d{10}$/.test(c.value_normalized) && !c.suppressed && !c.dnc_app && !used.includes(c.value_normalized))
+        .filter((c) => c.value_normalized && /^\d{10}$/.test(c.value_normalized) && !c.suppressed && !c.dnc_app && !used.includes(c.value_normalized) && !today.includes(c.value_normalized))
         .sort((a, b) => Number(b.line_type === 'mobile') - Number(a.line_type === 'mobile'))
       const nx = cands[0]
       if (nx && nx.value_normalized) {
@@ -162,7 +174,8 @@ export function PowerDial({ caller }: { caller: string }) {
         setSwap((s) => ({ ...s, [cur.lead_id]: { phone: nx.value_normalized!, line_type: nx.line_type, phone_person: nx.person_name, other_phones: cands.length - 1 } }))
         setPin(cur.lead_id)
         pinItem.current = { ...cur, phone: nx.value_normalized, line_type: nx.line_type, phone_person: nx.person_name, other_phones: cands.length - 1 }
-        setNextNote(`${o.id === 'wrong_number' || o.id === 'disconnected' ? 'That number is marked bad' : 'No answer there'}. Next number on the card: ${fmtPhone(nx.value_normalized)}${nx.person_name ? ` (${nx.person_name})` : ''}${cands.length - 1 ? `, ${cands.length - 1} more after it` : ', the last one'}.`)
+        const left = 4 - (cur.dials_today ?? 0) - used.length
+        setNextNote(`${o.id === 'wrong_number' || o.id === 'disconnected' ? 'That number is marked bad' : 'No answer there'}. Next number on the card: ${fmtPhone(nx.value_normalized)}${nx.person_name ? ` (${nx.person_name})` : ''} (try ${used.length + 1 + (cur.dials_today ?? 0)} of 4 today${cands.length - 1 > left - 1 ? `, ${cands.length - 1} more wait for tomorrow` : cands.length - 1 ? `, ${cands.length - 1} more after it` : ', the last one'}).`)
         if (auto) setCountdown(2)
         return
       }
@@ -297,7 +310,7 @@ export function PowerDial({ caller }: { caller: string }) {
             <p className="text-sm">{street(cur.address)}{cur.municipality ? `, ${cur.municipality}` : ''}</p>
             <p className="mt-1 text-xs text-muted-foreground">
               {cur.source === 'missed_call' ? `They called us ${fmtDateTime(cur.missed_at ?? null)}${cur.voicemail ? ' and left a voicemail' : ''}` : cur.source === 'replied' ? 'They texted back' : cur.texts_sent ? `${cur.texts_sent} text${cur.texts_sent > 1 ? 's' : ''}, last ${fmtDateTime(cur.last_text_at)}, no reply` : 'Never texted'}
-              {cur.dials_7d ? ` · dialed ${cur.dials_7d}x this week` : ''}
+              {cur.dials_today ? ` · ${cur.dials_today} of 4 numbers tried today` : cur.dials_7d ? ` · dialed ${cur.dials_7d}x this week` : ''}
               {cur.reasons?.length ? ` · on the list for: ${cur.reasons.join(', ')} (never say this)` : ''}
             </p>
           </div>
@@ -355,7 +368,7 @@ export function PowerDial({ caller }: { caller: string }) {
           </div>
           <p className="text-xs text-muted-foreground">
             {cur.line_type ?? 'phone'}{cur.phone_person && !/^\s*$/.test(cur.phone_person) ? ` · ${title(cur.phone_person)}` : ''}
-            {cur.other_phones ? ` · ${cur.other_phones} other number${cur.other_phones > 1 ? 's' : ''} on the card` : ''}
+            {cur.other_phones ? ` · ${cur.other_phones} other number${cur.other_phones > 1 ? 's' : ''} on the card${cur.other_phones > 3 ? ' (four a day, the rest tomorrow)' : ''}` : ''}
             {nextNote && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">{nextNote}</span>}
             {onThis && active?.status ? ` · ${active.status === 'in_call' ? 'in call' : active.status}` : ''}{onThis && active?.error ? ` - ${active.error}` : ''}
           </p>
