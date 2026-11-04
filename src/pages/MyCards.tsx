@@ -15,6 +15,8 @@ import { STAGE_LABEL } from '@/lib/wpie'
 import type { LeadStage } from '@/lib/types'
 import { PILES, groupPiles, type Pile, type PileCard } from '@/lib/piles'
 import { cn } from '@/lib/utils'
+import { NextStep } from '@/components/NextStep'
+import type { Task } from '@/lib/types'
 
 function usePiles(person: string | null) {
   return useQuery({
@@ -94,9 +96,13 @@ export default function MyCards() {
 function Row({ c }: { c: PileCard }) {
   const late = c.next_at != null && new Date(c.next_at).getTime() < Date.now()
   const status = c.belt ? (BELT_LABEL[c.belt as Belt] ?? c.belt) : (STAGE_LABEL[c.stage as LeadStage] ?? c.stage)
+  // the row's follow-up, enough of it for the Next step control (0170)
+  const task: Task | null = c.task_id && c.next_at
+    ? { id: c.task_id, lead_id: c.lead_id, due_at: c.next_at, kind: c.task_kind ?? 'call', owner: (c.locked_to ?? 'colin') as Task['owner'], done_at: null, note: null, created_at: '', source: c.task_source }
+    : null
   return (
-    <li>
-      <Link to={`/lead/${c.lead_id}`} className="block px-4 py-3 hover:bg-accent">
+    <li className="px-4 py-3 hover:bg-accent/60">
+      <Link to={`/lead/${c.lead_id}`} className="block">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{c.owner_name}</span>
           <Badge>{status}</Badge>
@@ -116,6 +122,7 @@ function Row({ c }: { c: PileCard }) {
           </div>
         )}
       </Link>
+      {c.pile !== 'closed' && <div className="mt-1.5"><NextStep leadId={c.lead_id} task={task} compact /></div>}
     </li>
   )
 }

@@ -37,11 +37,11 @@ describe('who is working this phone', () => {
     expect(workerFor({ role: 'owner', person: 'colin' }, 'thalia')).toBe('thalia')
     expect(workerFor({ role: 'owner', person: 'colin' }, null)).toBeNull()
     expect(ownerFilterFor('colin')).toBe('colin')
-    expect(ownerFilterFor('thalia')).toBe('callers')
-    expect(ownerFilterFor('adil')).toBe('callers')   // Adil covers the callers' list at the weekend
+    expect(ownerFilterFor('thalia')).toBe('thalia')   // since 0168/0170 every card and follow-up has one caller: their own list
+    expect(ownerFilterFor('adil')).toBe('adil')
     expect(ownerFilterFor(null)).toBe('callers')
     expect(ownerFilterFor(null, 'colin')).toBe('colin')        // the shared login before the phone answers: as before
-    expect(ownerFilterFor('thalia', 'colin')).toBe('callers')
+    expect(ownerFilterFor('thalia', 'colin')).toBe('thalia')
   })
 
   it('asks once, remembers the answer, and hides Colin\'s controls for a caller', () => {
@@ -54,10 +54,10 @@ describe('who is working this phone', () => {
     expect(screen.getByText('caller view')).toBeTruthy()
   })
 
-  it("the Calls page shows the callers' list to Thalia or Adil, and Colin's own to Colin", () => {
+  it("the Calls page shows Adil his own list, and Colin's own to Colin", () => {
     localStorage.setItem('wpie.on_phone', 'adil')
     mount(<CallQueue />)
-    expect(useDueTasks.mock.calls.at(-1)?.[1]).toBe('callers')
+    expect(useDueTasks.mock.calls.at(-1)?.[1]).toBe('adil')
     cleanup()
     localStorage.setItem('wpie.on_phone', 'colin')
     mount(<CallQueue />)

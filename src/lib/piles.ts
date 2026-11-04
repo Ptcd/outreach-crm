@@ -20,6 +20,9 @@ export interface PileCard {
   why: string | null
   locked_to: string | null
   tier: string | null
+  task_id: string | null
+  task_kind: string | null
+  task_source: string | null
 }
 
 export const PILES: { id: Pile; title: string; hint: string; open: boolean }[] = [

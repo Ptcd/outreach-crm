@@ -6,6 +6,7 @@ import { api, useDueTasks, useFollowupDebt, useMyStops, useReplyTasks, useSeller
 import { ReplyTaskCard } from '@/components/ReplyTaskCard'
 import { BeltHealthStrip } from '@/components/BeltHealthStrip'
 import { StopCard } from '@/components/StopCard'
+import { NextStep } from '@/components/NextStep'
 import { endOfTodayIso, fmtDateTime, fullAddress } from '@/lib/format'
 import { STAGE_LABEL, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
@@ -139,9 +140,7 @@ export default function Today() {
                     {fmtDateTime(t.due_at)} {t.note ? `- ${t.note}` : ''}
                   </p>
                 </div>
-                <Button size="sm" disabled={done.isPending} onClick={() => done.mutate(t.id)}>
-                  Done
-                </Button>
+                <NextStep leadId={t.lead_id} task={t} compact />
               </li>
             )
           })}

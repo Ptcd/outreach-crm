@@ -35,12 +35,12 @@ export function workerFor(member: { role?: string | null; person?: string | null
   return picked
 }
 
-/** Whose tasks a worker sees: Colin his own; Thalia and Adil the callers' list, since the call list and the
- *  conveyor's caller stops are written in Thalia's name and Adil covers them at the weekend. A phone that has
- *  not answered yet shows the login's own list, as before the picker (the question sits on top). */
+/** Whose tasks a worker sees: their own. Since 2026-11-03 every card and its follow-ups belong to one caller
+ *  (app 0168, 0170), so Thalia sees Thalia's and Adil sees Adil's; the dropdown on Today still shows the other
+ *  lists. A phone that has not answered the picker yet shows the login's own list (the question sits on top). */
 export function ownerFilterFor(worker: OnPhone | null, login?: string | null): TaskOwner {
   const who = worker ?? (valid(login) ? login : null)
-  return who === 'colin' ? 'colin' : 'callers'
+  return who ?? 'callers'
 }
 
 export function useOnPhone(): [OnPhone | null, (p: OnPhone) => void] {

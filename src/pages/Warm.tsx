@@ -3,7 +3,9 @@
 // call, no next step), then hot, booked (by day), talking, callbacks and nurture. Each row: who, where, their last
 // words, the pillars so far, and the next step. A tap opens the card. The grouping is the database's (warm_board).
 import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useAuth } from '@/providers/AuthProvider'
 import { AlertTriangle, CalendarClock, Flame, HeartHandshake, MessagesSquare, Sprout } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { Badge, Empty, ErrorNote, Section } from '@/components/ui/form'
@@ -27,14 +29,44 @@ function useWarm() {
   })
 }
 
+// whose card each row is (leads.locked_to, 0168): the board itself predates the split
+function useOwners(ids: string[]) {
+  return useQuery({
+    queryKey: ['warm_owners', ids.length, ids[0] ?? ''],
+    enabled: ids.length > 0,
+    queryFn: async () => {
+      const out: Record<string, string | null> = {}
+      for (let i = 0; i < ids.length; i += 500) {
+        const r = await supabase.from('leads').select('id, locked_to').in('id', ids.slice(i, i + 500))
+        if (r.error) throw new Error(r.error.message)
+        for (const l of (r.data ?? []) as { id: string; locked_to: string | null }[]) out[l.id] = l.locked_to
+      }
+      return out
+    },
+  })
+}
+
 export default function Warm() {
+  const { member } = useAuth()
+  const me = member?.role === 'caller' ? member.person ?? null : null
+  const [mine, setMine] = useState<boolean>(me != null)      // a caller starts on their own cards (0170)
   const q = useWarm()
-  const g = groupRows(q.data ?? [])
+  const owners = useOwners((q.data ?? []).map((r) => r.id))
+  const rows = mine && me ? (q.data ?? []).filter((r) => owners.data?.[r.id] === me) : (q.data ?? [])
+  const g = groupRows(rows)
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Warm leads</h1>
-        <p className="text-sm text-muted-foreground">Everyone past the first texts, in the order to work them.</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Warm leads</h1>
+          <p className="text-sm text-muted-foreground">{mine && me ? 'Your cards past the first texts, in the order to work them.' : 'Everyone past the first texts, in the order to work them.'}</p>
+        </div>
+        {me && (
+          <div className="flex rounded-lg border p-0.5 text-sm">
+            <button type="button" aria-pressed={mine} onClick={() => setMine(true)} className={cn('min-h-9 rounded-md px-3', mine && 'bg-primary text-primary-foreground')}>Mine</button>
+            <button type="button" aria-pressed={!mine} onClick={() => setMine(false)} className={cn('min-h-9 rounded-md px-3', !mine && 'bg-primary text-primary-foreground')}>Everyone</button>
+          </div>
+        )}
       </div>
       <StatTiles tiles={[
         { label: 'Decide', value: q.data ? g.decide.length : null, icon: AlertTriangle, tone: 'rose' },
@@ -42,7 +74,7 @@ export default function Warm() {
         { label: 'Booked', value: q.data ? g.booked.length : null, icon: CalendarClock, tone: 'indigo' },
         { label: 'Nurture', value: q.data ? g.talking.length + g.callback.length + g.nurture.length : null, icon: Sprout, tone: 'emerald' },
       ]} />
-      <ErrorNote error={q.error} />
+      <ErrorNote error={q.error ?? owners.error} />
       {GROUPS.map((grp) => {
         const rows = g[grp.id]
         if (grp.id === 'decide' && rows.length === 0) return null

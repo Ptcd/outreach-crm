@@ -305,6 +305,15 @@ export const api = {
   addTask: (row: { lead_id: string | null; due_at: string; kind: string; owner: Person; note: string | null }) =>
     supabase.from('tasks').insert(row),
   finishTask: (id: string) => supabase.from('tasks').update({ done_at: new Date().toISOString() }).eq('id', id),
+  // a caller's own follow-ups (0170): one door each, belt-aware; a caller may touch only tasks they own
+  followupSet: (leadId: string, atIso: string, kind: string, note: string | null) =>
+    supabase.rpc('followup_set', { p_lead_id: leadId, p_at: atIso, p_kind: kind, p_note: note }),
+  followupMove: (taskId: string, atIso: string, why: string | null) =>
+    supabase.rpc('followup_move', { p_task_id: taskId, p_at: atIso, p_why: why }),
+  followupDone: (taskId: string, outcome: string, note: string | null) =>
+    supabase.rpc('followup_done', { p_task_id: taskId, p_outcome: outcome, p_note: note }),
+  followupDelete: (taskId: string, why: string | null) =>
+    supabase.rpc('followup_delete', { p_task_id: taskId, p_why: why }),
   addGate: (row: Omit<GateScore, 'id' | 'total' | 'suggested_decision' | 'at'>) => supabase.from('gate_scores').insert(row),
   addMilestone: (lead_id: string, kind: MilestoneKind) => supabase.from('lead_milestones').insert({ lead_id, kind }),
   removeMilestone: (id: number) => supabase.from('lead_milestones').delete().eq('id', id),

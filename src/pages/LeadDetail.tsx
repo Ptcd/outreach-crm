@@ -24,8 +24,9 @@ import { api, useDeals, useLead, useWrite } from '@/lib/queries'
 import { useDialer } from '@/lib/dialer'
 import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso, fullAddress } from '@/lib/format'
 import { firstNameOf, timelineOf } from '@/lib/inbox'
-import { DEAL_STATUS_LABEL, MILESTONES, PEOPLE, SELLER_FACTS, STAGES, STAGE_LABEL, TASK_KINDS, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
+import { DEAL_STATUS_LABEL, MILESTONES, PEOPLE, SELLER_FACTS, STAGES, STAGE_LABEL, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
+import { NextStep } from '@/components/NextStep'
 import { useColinHere } from '@/components/OnPhonePicker'
 import type { Contact, Deal, DealStatus, Lead, LeadStage, Person } from '@/lib/types'
 
@@ -479,59 +480,39 @@ function History({ leadId, ownerName, messages, inbound, stageEvents, tasks }: {
 
 function Tasks({ leadId, tasks }: { leadId: string; tasks: import('@/lib/types').Task[] }) {
   const { member } = useAuth()
-  const [when, setWhen] = useState('')
-  const [kind, setKind] = useState('call')
-  const [owner, setOwner] = useState<Person>(member?.person ?? 'colin')
-  const [note, setNote] = useState('')
-  const add = useWrite(
-    () => api.addTask({ lead_id: leadId, due_at: localInputToIso(when)!, kind, owner, note: note.trim() || null }),
-    [['lead', leadId], ['tasks']],
-  )
-  const done = useWrite((id: string) => api.finishTask(id), [['lead', leadId], ['tasks']])
+  const me = member?.person ?? null
   const open = tasks.filter((t) => !t.done_at)
   const closed = tasks.filter((t) => t.done_at)
   return (
     <Section title="Follow-ups">
       {open.length === 0 && <Empty>No open follow-ups.</Empty>}
       <ul className="divide-y">
-        {open.map((t) => (
-          <li key={t.id} className="flex items-center justify-between gap-2 py-2 text-sm">
-            <span>
-              <strong>{TASK_KIND_LABEL[t.kind] ?? t.kind}</strong> - {fmtDateTime(t.due_at)} - {personLabel(t.owner)}
-              {t.note ? ` - ${t.note}` : ''}
-            </span>
-            <Button size="sm" variant="outline" disabled={done.isPending} onClick={() => done.mutate(t.id)}>
-              Done
-            </Button>
-          </li>
-        ))}
+        {open.map((t) => {
+          const late = new Date(t.due_at).getTime() < Date.now() - 60_000
+          const mine = member?.role === 'owner' || t.owner === me
+          return (
+            <li key={t.id} className="space-y-1 py-2 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <strong>{t.title ?? TASK_KIND_LABEL[t.kind] ?? t.kind}</strong>
+                <span className={late ? 'font-medium text-red-700' : ''}>{late ? 'was due ' : ''}{fmtDateTime(t.due_at)}</span>
+                <Badge>{personLabel(t.owner)}</Badge>
+                {t.source && <Badge tone="info">{SOURCE_LABEL[t.source] ?? t.source}</Badge>}
+              </div>
+              {t.note && <p className="text-xs text-muted-foreground">{t.note}</p>}
+              {mine ? <NextStep leadId={leadId} task={t} compact /> : <p className="text-xs text-muted-foreground">{personLabel(t.owner)}&apos;s follow-up.</p>}
+            </li>
+          )
+        })}
       </ul>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        <Input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} aria-label="Due" />
-        <Select value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Kind">
-          {TASK_KINDS.map((k) => (
-            <option key={k.id} value={k.id}>
-              {k.label}
-            </option>
-          ))}
-        </Select>
-        <Select value={owner} onChange={(e) => setOwner(e.target.value as Person)} aria-label="Who">
-          {PEOPLE.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-        </Select>
-        <Input placeholder="Note (optional)" value={note} onChange={(e) => setNote(e.target.value)} />
-      </div>
-      <Button
-        size="sm"
-        className="mt-2"
-        disabled={!when || add.isPending}
-        onClick={() => add.mutate(undefined, { onSuccess: () => { setWhen(''); setNote('') } })}
-      >
-        Add follow-up
-      </Button>
-      <ErrorNote error={add.error ?? done.error} />
+      <div className="mt-3"><NextStep leadId={leadId} /></div>
       {closed.length > 0 && <p className="mt-2 text-xs text-muted-foreground">{closed.length} done.</p>}
     </Section>
   )
+}
+
+const SOURCE_LABEL: Record<string, string> = {
+  belt: 'Belt stop', call_list: 'Call list', after_stop: 'After a STOP', mine: 'Set by hand', reply: 'From a reply', checkin: '90-day check-in',
+  power_hour: 'Power hour', power_hour_after: 'Power hour', power_hour_reserve: 'Power hour reserve', call_next: 'Next number', handoff: 'Handed to Colin',
 }
 
 function GateBlock({ leadId, latest, canEdit, hints, hintStops }: { leadId: string; latest: import('@/lib/types').GateScore | null; canEdit: boolean
