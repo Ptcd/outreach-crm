@@ -5,6 +5,7 @@ import { Badge, Empty, ErrorNote, Textarea } from '@/components/ui/form'
 import { CallButton } from '@/components/CallButton'
 import { api, useTextsLive, useWrite, type LiveThread } from '@/lib/queries'
 import { useAuth } from '@/providers/AuthProvider'
+import { supabase } from '@/lib/supabaseClient'
 import { fmtDateTime, fmtPhone, fullAddress } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -12,7 +13,7 @@ import { cn } from '@/lib/utils'
 // Every thread with a seller text in the last two days, newest first: their last text, our last answer and who gave it
 // (Muse, a person, the automation), whether we owe an answer, and who owns the thread. "Take over" makes the thread a
 // person's: Muse, the belt and the follow-ups leave that phone alone until it is handed back (migration 0146).
-type Chip = 'waiting' | 'all' | 'mine'
+type Chip = 'waiting' | 'all' | 'mine' | 'my_cards'
 
 const PERSON_LABEL: Record<string, string> = { colin: 'Colin', thalia: 'Thalia', adil: 'Adil' }
 const who = (by: string | null | undefined) => {
@@ -24,15 +25,39 @@ const who = (by: string | null | undefined) => {
   return by as string
 }
 
+// whose card each thread is on (leads.locked_to, 0168): a caller opens on the texts to their own cards (Colin 2026-11-04)
+function useCardOwners(ids: string[]) {
+  return useQuery({
+    queryKey: ['texts_card_owners', ids.length, ids[0] ?? ''],
+    enabled: ids.length > 0,
+    queryFn: async () => {
+      const out: Record<string, string | null> = {}
+      for (let i = 0; i < ids.length; i += 500) {
+        const r = await supabase.from('leads').select('id, locked_to').in('id', ids.slice(i, i + 500))
+        if (r.error) throw new Error(r.error.message)
+        for (const l of (r.data ?? []) as { id: string; locked_to: string | null }[]) out[l.id] = l.locked_to
+      }
+      return out
+    },
+  })
+}
+
 export default function Texts() {
   const { member } = useAuth()
   const me = member?.person ?? null
+  const isCaller = member?.role === 'caller'
   const q = useTextsLive(48)
-  const [chip, setChip] = useState<Chip>('waiting')
+  const owners = useCardOwners(Array.from(new Set((q.data ?? []).map((t) => t.lead_id).filter((x): x is string => !!x))))
+  const onMyCard = (t: LiveThread) => !!t.lead_id && owners.data?.[t.lead_id] === me
+  const [chip, setChip] = useState<Chip>(isCaller ? 'my_cards' : 'waiting')
   const rows = useMemo(() => (q.data ?? []).filter((t) =>
-    chip === 'all' ? true : chip === 'mine' ? t.owner === me : (t.unanswered && !t.last_in.opt_out)), [q.data, chip, me])
+    chip === 'all' ? true : chip === 'mine' ? t.owner === me : chip === 'my_cards' ? onMyCard(t) : (t.unanswered && !t.last_in.opt_out)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [q.data, chip, me, owners.data])
   const waiting = (q.data ?? []).filter((t) => t.unanswered && !t.last_in.opt_out).length
   const mine = (q.data ?? []).filter((t) => t.owner === me).length
+  const myCards = (q.data ?? []).filter(onMyCard).length
+  const myWaiting = (q.data ?? []).filter((t) => onMyCard(t) && t.unanswered && !t.last_in.opt_out).length
 
   return (
     <div className="space-y-4">
@@ -44,7 +69,7 @@ export default function Texts() {
         Seller texts from the last two days, newest first. Muse answers them; take one over and Muse, the belt and the follow-ups leave that phone to you.
       </p>
       <div className="sticky top-0 z-10 -mx-1 flex gap-2 overflow-x-auto bg-background/95 px-1 py-2 backdrop-blur" role="tablist" aria-label="Filter">
-        {([['waiting', `Waiting on us (${waiting})`], ['all', `All (${(q.data ?? []).length})`], ['mine', `Mine (${mine})`]] as [Chip, string][]).map(([id, label]) => (
+        {([...(me === 'thalia' || me === 'adil' ? [['my_cards', `My cards (${myCards}${myWaiting ? `, ${myWaiting} waiting` : ''})`]] : []), ['waiting', `Waiting on us (${waiting})`], ['all', `All (${(q.data ?? []).length})`], ['mine', `Taken over (${mine})`]] as [Chip, string][]).map(([id, label]) => (
           <button key={id} role="tab" aria-selected={chip === id} onClick={() => setChip(id)}
             className={cn('h-11 shrink-0 rounded-full border px-4 text-sm', chip === id ? 'border-primary bg-primary text-primary-foreground' : 'bg-background')}>
             {label}
@@ -53,7 +78,7 @@ export default function Texts() {
       </div>
       <ErrorNote error={q.error} />
       {q.isLoading && <Empty>Loading the texts...</Empty>}
-      {q.data && rows.length === 0 && <Empty>{chip === 'waiting' ? 'Nobody is waiting on an answer.' : chip === 'mine' ? 'You have not taken a thread over.' : 'No seller texts in the last two days.'}</Empty>}
+      {q.data && rows.length === 0 && <Empty>{chip === 'waiting' ? 'Nobody is waiting on an answer.' : chip === 'mine' ? 'You have not taken a thread over.' : chip === 'my_cards' ? 'No seller texts on your cards in the last two days.' : 'No seller texts in the last two days.'}</Empty>}
       <ul className="space-y-3" aria-label="Text threads">
         {rows.map((t) => <ThreadCard key={t.phone10} t={t} me={me} />)}
       </ul>
