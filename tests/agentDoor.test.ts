@@ -55,6 +55,18 @@ describe('the MCP routing', () => {
     expect(res.isError).toBeFalsy()
     expect(seen).toEqual([{ owner_name: 'A', address: '1 A St', parcel: '0790000000001' }])
   })
+  it('phones_wanted is an intake tool that reaches the database with the agent name and the batch size (0190)', async () => {
+    const seen: [string, Record<string, unknown>][] = []
+    const db = fakeDb({ records: async (fn, args) => { seen.push([fn, args]); return { counts: { open: 2 }, owners: [] } } })
+    const res = await call(intake, 'phones_wanted', { limit: 40, need: 'real need' }, db)
+    expect(res.isError).toBeFalsy()
+    expect(res.value).toEqual({ counts: { open: 2 }, owners: [] })
+    expect(seen).toEqual([['agent_phones_wanted', { p_agent: 'Muse intake', p_limit: 40, p_county: null, p_need: 'real need', p_counts_only: false }]])
+    const add = TOOLS.find((t) => t.name === 'add_prospects')!
+    const props = ((add.inputSchema.properties as { prospects: { items: { properties: Record<string, { type: string }> } } }).prospects.items.properties)
+    expect(props.wpie_owner_id).toMatchObject({ type: 'integer' })
+    expect((await call(sender, 'phones_wanted', {})).isError).toBe(true)
+  })
   it('a Dots key with only the channel scope: the desk channel tools and nothing else, posting as Dots; the key may ride in the URL', async () => {
     const dots: Agent = { id: 'k10', name: 'Dots', role: 'agent', scopes: ['channel'] }
     const names = ((await handleMessage({ jsonrpc: '2.0', id: 4, method: 'tools/list' }, dots, fakeDb())) as

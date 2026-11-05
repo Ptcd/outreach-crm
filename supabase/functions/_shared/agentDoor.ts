@@ -115,13 +115,21 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
       mailing_zip: S('owner mailing ZIP'), property_type: S('house, duplex, ...'), units: { type: 'integer' },
       phones: { type: 'array', items: PHONE }, interests: { type: 'array', items: INTEREST, description: 'the people on this property, each with role, their address and their phones' },
       reasons: { type: 'array', items: REASON },
-      source: S('where this prospect came from (defaults to muse)'), notes: S('anything the team should know') },
+      source: S('where this prospect came from (defaults to muse)'), notes: S('anything the team should know'),
+      wpie_owner_id: { type: 'integer', description: 'the laptop\'s owner id from phones_wanted: the card is keyed to that owner (made or updated), so the laptop texts it from the next plan' } },
       required: ['address'] } } }, required: ['prospects'] } },
   { role: 'intake', name: 'find_prospects',
     description: 'Look up cards by address, phone, a name (owner or anyone on the card) or card id: stage, the people on it (role, status, their address, their phones, their other cards), reasons, and whether they were texted or replied.',
     inputSchema: { type: 'object', properties: { address: S('part of the street address'), phone: S('a phone number'),
       name: S('part of the owner name'), lead_id: S('a card id'), only_agent: { type: 'boolean', description: 'only cards an agent loaded' },
       limit: { type: 'integer', maximum: 100 } } } },
+  // The laptop\'s list of owners who need a phone (app 0190; Colin 2026-11-05: "automatically gives them to muse"). Every
+  // night the laptop lists every owner it would text tomorrow if it had a number; Muse claims a batch, traces the owner,
+  // and loads the phones with add_prospects naming wpie_owner_id. The laptop copies the phones over within ten minutes.
+  { role: 'intake', name: 'phones_wanted',
+    description: 'Owners the laptop would text tomorrow if it had a phone: your batch to trace, real need first (two or more years of tax behind, or a foreclosure, estate, probate, inheritance, court-debt, code or vacancy record), then the most years behind. Each comes with wpie_owner_id, the owner, mailing address, property, parcel, county, reasons, tax_years, need, why, est_value and existing_card. Claiming holds the rows for you for two days. When you find numbers, load them with add_prospects and pass wpie_owner_id on the prospect: the card is then keyed to the laptop\'s owner and the laptop texts it from the next plan. No number found: just leave the row; nothing to mark. counts_only=true returns only the counts (open, real need, yours, by county).',
+    inputSchema: { type: 'object', properties: { limit: { type: 'integer', maximum: 500, description: 'owners per batch (default 100)' },
+      county: S('one county'), need: S('real need | less motivated'), counts_only: { type: 'boolean' } } } },
   { role: 'intake', name: 'packages_to_value', description: 'Packages a caller sent Colin that still need a value: the card (property, people, phones), the condition checklist in the words of the seller, their number and who lives there. For each, find the after-repair value from recent nearby sales and send it with set_package_value. You never set or suggest our number: Colin prices it himself.',
     inputSchema: { type: 'object', properties: { limit: { type: 'integer', maximum: 50 } } } },
   { role: 'intake', name: 'set_package_value', description: 'Write the after-repair value (ARV) for a package: the dollar value, the basis in one or two sentences (which sales, which sources, adjustments), and the comps (address, sold_price, sold_date, sqft, beds, baths, distance, url, note). Colin checks it on the card before he prices. Never a purchase number.',
@@ -314,6 +322,8 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       return { value: await db.findProspects({ address: args.address as string, phone: args.phone as string, name: args.name as string,
         lead_id: args.lead_id as string, only_agent: !!args.only_agent, limit: int(args.limit, 20, 100) }) }
     case 'prospect_counts': return { value: await db.prospectCounts() }
+    case 'phones_wanted': return { value: await db.records('agent_phones_wanted', { p_agent: agent.name, p_limit: int(args.limit, 100, 500),
+      p_county: args.county ? String(args.county) : null, p_need: args.need ? String(args.need) : null, p_counts_only: args.counts_only === true }) }
     case 'packages_to_value': return { value: await db.records('agent_packages_to_value', { p_limit: int(args.limit, 20, 50) }) }
     case 'set_package_value': {
       const r = await db.records('package_set_value', { p_id: String(args.package_id ?? ''), p_arv: Number(args.arv), p_basis: String(args.basis ?? ''),
@@ -457,7 +467,7 @@ export async function handleMessage(msg: Json, agent: Agent, db: DoorDb): Promis
       capabilities: { tools: {} },
       serverInfo: { name: SERVER_NAME, version: '1.0.0' },
       instructions: agent.role === 'agent'
-        ? `One key for WPIE, with these scopes switched on: ${scopesOf(agent).join(', ')}. Every call is logged and every tool has a per-minute budget per key (find_prospects 30, ready_to_text 10; queue_texts, send_reply, mark_card, call_next have none): over it you are refused, and three times over it in five minutes locks that tool for five minutes. Pace and batch lookups; the same database sends the texts. Read desk_inbox at the start of every session: the desk and Colin talk to you there. Texting: read texting_rules first. Records: a batch sends only after a review. Cards: read due_today every morning.`
+        ? `One key for WPIE, with these scopes switched on: ${scopesOf(agent).join(', ')}. Every call is logged and every tool has a per-minute budget per key (find_prospects 30, ready_to_text 10; queue_texts, send_reply, mark_card, call_next have none): over it you are refused, and three times over it in five minutes locks that tool for five minutes. Pace and batch lookups; the same database sends the texts. Read desk_inbox at the start of every session: the desk and Colin talk to you there. Phones: phones_wanted is the laptop\'s list of owners who need a number; trace a batch each night and load what you find with add_prospects naming wpie_owner_id. Texting: read texting_rules first. Records: a batch sends only after a review. Cards: read due_today every morning.`
         : agent.role === 'records'
         ? 'You run the public-records-request cycle: read records_overview, records_replies and records_list(due); mark what came back; draft letters from records_templates; propose batches. Colin approves every batch before anything sends.'
         : agent.role === 'intake'
