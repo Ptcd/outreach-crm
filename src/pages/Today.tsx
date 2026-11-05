@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge, Empty, ErrorNote, Section, Select } from '@/components/ui/form'
 import { api, useDueTasks, useFollowupDebt, useMyStops, useReplyTasks, useSellerRecovery, useUnseenReplies, useWrite } from '@/lib/queries'
@@ -43,6 +43,13 @@ function CallerToday({ me, day }: { me: 'thalia' | 'adil'; day: Day | undefined 
     { id: 'call_now', title: 'Call today' }, { id: 'booked', title: 'Booked and hot' }, { id: 'colin', title: 'Waiting on Colin' }, { id: 'this_week', title: 'This week' },
   ]
   const name = me.charAt(0).toUpperCase() + me.slice(1)
+  const navigate = useNavigate()
+  // Today tells her the calls exist; Power hour makes them. "Dial these" hands Today's Call-today rows to Power hour in
+  // this order (Colin 2026-11-04: Today and Power hour are two things on purpose, but one button closes the gap)
+  const dialThese = (ids: string[]) => {
+    try { sessionStorage.setItem('power:list', JSON.stringify({ label: 'Call today', ids, at: Date.now() })) } catch { /* private window: the queue's own order */ }
+    navigate('/calls?mode=power&list=today')
+  }
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -71,6 +78,11 @@ function CallerToday({ me, day }: { me: 'thalia' | 'adil'; day: Day | undefined 
         return (
           <Section key={s.id} title={`${s.title}${q.data ? ` (${rows.length})` : ''}`}>
             <p className="mb-2 text-sm text-muted-foreground">{hint}</p>
+            {s.id === 'call_now' && rows.length > 0 && (
+              <Button className="mb-2 h-11 w-full sm:w-auto" onClick={() => dialThese(rows.map((c) => c.lead_id))}>
+                <Zap className="mr-2 h-4 w-4" aria-hidden />Dial these ({rows.length}) in Power hour
+              </Button>
+            )}
             {q.isLoading && <Empty>Loading...</Empty>}
             {q.data && rows.length === 0 && <Empty>{s.id === 'call_now' ? 'Nothing due. Power hour, or a card from This week.' : 'Nothing here.'}</Empty>}
             <ul className="divide-y">

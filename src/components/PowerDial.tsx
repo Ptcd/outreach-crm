@@ -58,8 +58,20 @@ const OUTCOMES = [
   { key: '6', id: 'disconnected', label: 'Disconnected', note: 'Disconnected number (Power hour).' },
 ] as const
 
+// a list handed over from Today ("Dial these", 2026-11-04): those cards first, in Today's order, for this sitting
+type DialList = { label: string; ids: string[]; at: number }
+function loadDialList(): DialList | null {
+  try {
+    const raw = sessionStorage.getItem('power:list'); if (!raw) return null
+    const d = JSON.parse(raw) as DialList
+    return Array.isArray(d.ids) && d.ids.length > 0 && Date.now() - (d.at ?? 0) < 6 * 3600_000 ? d : null
+  } catch { return null }
+}
+
 export function PowerDial({ caller }: { caller: string }) {
   const qc = useQueryClient()
+  const [dialList, setDialList] = useState<DialList | null>(loadDialList)
+  const clearDialList = () => { try { sessionStorage.removeItem('power:list') } catch { /* fine */ } setDialList(null) }
   const { active, incoming, start, dismiss, hangUp, supported } = useDialer()
   const q = useQuery({
     // a missed call has to reach the screen fast (Colin 2026-10-29: Adil could not see a seller who called back during
@@ -69,7 +81,9 @@ export function PowerDial({ caller }: { caller: string }) {
     queryKey: ['power_dial'], staleTime: Infinity, refetchOnWindowFocus: true, refetchInterval: 30_000,
     queryFn: async () => {
       const test = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('test') === '1'
-      const r = await supabase.rpc('power_dial_queue', test ? { p_limit: 40, p_test: true } : { p_limit: 40 })   // one card at a time: 40 is plenty, 150 cost minutes
+      // one card at a time: 40 is plenty, 150 cost minutes; a handed list needs the whole day's calls in the answer
+      const lim = dialList ? 120 : 40
+      const r = await supabase.rpc('power_dial_queue', test ? { p_limit: lim, p_test: true } : { p_limit: lim })
       if (r.error) throw new Error(r.error.message)
       return (r.data ?? []) as Item[]
     },
@@ -108,10 +122,18 @@ export function PowerDial({ caller }: { caller: string }) {
     // the seller he had just dialed called back, and his screen hid the card as done)
     const all = (q.data ?? []).filter((x) => !stats.done.includes(x.lead_id) || x.source === 'missed_call' || x.source === 'callback' || x.source === 'replied')
       .map((x) => (swap[x.lead_id] ? { ...x, ...swap[x.lead_id] } : x))
-    const ordered = [...all.filter((x) => !skipped.includes(x.lead_id)), ...all.filter((x) => skipped.includes(x.lead_id))]
+    const rank = new Map((dialList?.ids ?? []).map((id, i) => [id, i]))
+    const inList = (x: Item) => rank.has(x.lead_id)
+    const byList = (a: Item, b: Item) => (rank.get(a.lead_id) ?? 0) - (rank.get(b.lead_id) ?? 0)
+    // a missed call or a promised callback still comes first; then Today's list in its order; then the queue's own order
+    const front = all.filter((x) => x.source === 'missed_call' || x.source === 'callback')
+    const listed = all.filter((x) => inList(x) && !front.includes(x)).sort(byList)
+    const rest = all.filter((x) => !front.includes(x) && !listed.includes(x))
+    const live = [...front, ...listed, ...rest]
+    const ordered = [...live.filter((x) => !skipped.includes(x.lead_id)), ...live.filter((x) => skipped.includes(x.lead_id))]
     const held = pin ? (ordered.find((x) => x.lead_id === pin) ?? (pinItem.current?.lead_id === pin && !stats.done.includes(pin) ? pinItem.current : undefined)) : undefined
     return held ? [held, ...ordered.filter((x) => x.lead_id !== held.lead_id)] : ordered
-  }, [q.data, stats.done, skipped, pin, swap])
+  }, [q.data, stats.done, skipped, pin, swap, dialList])
   const cur = list[0] ?? null
   const onThis = !!active && !!cur && active.leadId === cur.lead_id
   const live = onThis && ['connecting', 'ringing', 'in_call'].includes(active!.status)
@@ -289,6 +311,12 @@ export function PowerDial({ caller }: { caller: string }) {
     <div className="space-y-3" data-testid="power-dial">
       <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-2 text-sm">
         <span className="font-semibold">{stats.dials} dialed</span>
+        {dialList && (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
+            Today&apos;s list: {(q.data ?? []).filter((x) => dialList.ids.includes(x.lead_id) && !stats.done.includes(x.lead_id)).length} of {dialList.ids.length} left
+            <button type="button" className="ml-2 underline" onClick={clearDialList}>clear</button>
+          </span>
+        )}
         <span>{stats.reached} reached</span>
         <span>{stats.voicemails} voicemails</span>
         <span className="text-muted-foreground">{list.length} left{minutes ? ` · ${minutes} min` : ''}</span>
