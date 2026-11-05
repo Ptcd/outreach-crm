@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Badge, Empty, ErrorNote, Textarea } from '@/components/ui/form'
 import { CallButton } from '@/components/CallButton'
 import { api, useTextsLive, useWrite, type LiveThread } from '@/lib/queries'
@@ -47,14 +48,20 @@ export default function Texts() {
   const { member } = useAuth()
   const me = member?.person ?? null
   const isCaller = member?.role === 'caller'
-  const q = useTextsLive(48)
+  // two weeks, not two days (Thalia 2026-11-04: "Texts shows 48 hours"; Colin: "build the full shit"), with a search
+  const q = useTextsLive(336)
   const owners = useCardOwners(Array.from(new Set((q.data ?? []).map((t) => t.lead_id).filter((x): x is string => !!x))))
   const onMyCard = (t: LiveThread) => !!t.lead_id && owners.data?.[t.lead_id] === me
   const [chip, setChip] = useState<Chip>(isCaller ? 'my_cards' : 'waiting')
-  const rows = useMemo(() => (q.data ?? []).filter((t) =>
-    chip === 'all' ? true : chip === 'mine' ? t.owner === me : chip === 'my_cards' ? onMyCard(t) : (t.unanswered && !t.last_in.opt_out)),
+  const [search, setSearch] = useState('')
+  const rows = useMemo(() => {
+    const s = search.trim().toLowerCase(); const sd = s.replace(/\D/g, '')
+    const hit = (t: LiveThread) => !s || (sd.length >= 3 && t.phone10.includes(sd))
+      || [t.owner_name, t.address, t.municipality, t.last_in.body, t.last_out?.body].filter((x): x is string => !!x).join(' ').toLowerCase().includes(s)
+    return (q.data ?? []).filter((t) => hit(t) && (
+      chip === 'all' ? true : chip === 'mine' ? t.owner === me : chip === 'my_cards' ? onMyCard(t) : (t.unanswered && !t.last_in.opt_out)))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [q.data, chip, me, owners.data])
+  }, [q.data, chip, me, owners.data, search])
   const waiting = (q.data ?? []).filter((t) => t.unanswered && !t.last_in.opt_out).length
   const mine = (q.data ?? []).filter((t) => t.owner === me).length
   const myCards = (q.data ?? []).filter(onMyCard).length
@@ -67,10 +74,13 @@ export default function Texts() {
         <span className="text-xs text-muted-foreground">{q.isFetching ? 'updating...' : q.dataUpdatedAt ? `as of ${fmtDateTime(new Date(q.dataUpdatedAt).toISOString())}` : ''}</span>
       </div>
       <p className="text-sm text-muted-foreground">
-        Seller texts from the last two days, newest first. Muse answers them; take one over and Muse, the belt and the follow-ups leave that phone to you.
+        Seller texts from the last two weeks, newest first. Muse answers them; take one over and Muse, the belt and the follow-ups leave that phone to you. Older threads are on the card.
       </p>
+      <Input placeholder="Find a name, address, phone, or words in a text" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search texts" />
       <div className="sticky top-0 z-10 -mx-1 flex gap-2 overflow-x-auto bg-background/95 px-1 py-2 backdrop-blur" role="tablist" aria-label="Filter">
-        {([...(me === 'thalia' || me === 'adil' ? [['my_cards', `My cards (${myCards}${myWaiting ? `, ${myWaiting} waiting` : ''})`]] : []), ['waiting', `Waiting on us (${waiting})`], ['all', `All (${(q.data ?? []).length})`], ['mine', `Taken over (${mine})`]] as [Chip, string][]).map(([id, label]) => (
+        {((isCaller
+          ? [['my_cards', `My cards (${myCards}${myWaiting ? `, ${myWaiting} waiting` : ''})`], ['all', `All (${(q.data ?? []).length})`]]
+          : [['waiting', `Waiting on us (${waiting})`], ['all', `All (${(q.data ?? []).length})`], ['mine', `Taken over (${mine})`]]) as [Chip, string][]).map(([id, label]) => (
           <button key={id} role="tab" aria-selected={chip === id} onClick={() => setChip(id)}
             className={cn('h-11 shrink-0 rounded-full border px-4 text-sm', chip === id ? 'border-primary bg-primary text-primary-foreground' : 'bg-background')}>
             {label}
@@ -79,7 +89,7 @@ export default function Texts() {
       </div>
       <ErrorNote error={q.error} />
       {q.isLoading && <Empty>Loading the texts...</Empty>}
-      {q.data && rows.length === 0 && <Empty>{chip === 'waiting' ? 'Nobody is waiting on an answer.' : chip === 'mine' ? 'You have not taken a thread over.' : chip === 'my_cards' ? 'No seller texts on your cards in the last two days.' : 'No seller texts in the last two days.'}</Empty>}
+      {q.data && rows.length === 0 && <Empty>{search.trim() ? 'Nothing in the last two weeks matches. Older threads: open the card, its thread has everything.' : chip === 'waiting' ? 'Nobody is waiting on an answer.' : chip === 'mine' ? 'You have not taken a thread over.' : chip === 'my_cards' ? 'No seller texts on your cards in the last two weeks.' : 'No seller texts in the last two weeks.'}</Empty>}
       <ul className="space-y-3" aria-label="Text threads">
         {rows.map((t) => <ThreadCard key={t.phone10} t={t} me={me} />)}
       </ul>

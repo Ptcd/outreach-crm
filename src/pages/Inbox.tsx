@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
+import { useAuth } from '@/providers/AuthProvider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge, Empty, ErrorNote } from '@/components/ui/form'
@@ -23,6 +24,7 @@ function daysAgo(n: number): string {
 }
 
 export default function Inbox() {
+  const { member } = useAuth()
   const [from] = useState(daysAgo(30))
   const [to] = useState(daysAgo(-7))
   // The replies waiting for Colin load first; the full list follows.
@@ -45,6 +47,9 @@ export default function Inbox() {
   const counts = rows.reduce((c, r) => ({ ...c, [r.bucket]: (c[r.bucket] ?? 0) + 1 }), {} as Record<Bucket, number>)
   const shown = rows.filter((r) => chip === 'all' || (chip === 'replied' ? r.replied : r.bucket === chip))
   const repliedCount = rows.filter((r) => r.replied).length
+
+  // a caller's texts live on the Texts page (0186): the Inbox is Colin's review deck
+  if (member?.role === 'caller') return <Navigate to="/texts" replace />
 
   return (
     <div className="space-y-4">

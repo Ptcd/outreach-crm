@@ -7,19 +7,29 @@ import { ConfirmButton } from '@/components/ui/confirm'
 import { api, useWrite, type StopTask } from '@/lib/queries'
 import { fmtDateTime, localInputToIso, fullAddress } from '@/lib/format'
 import { BELT_LABEL, STOP_OUTCOMES, type Belt } from '@/lib/belts'
+import { NotNowPicker, saveSayNext } from '@/components/NextStep'
+import type { NotNowKind } from '@/lib/nextStep'
 import { personLabel } from '@/lib/wpie'
 import { cn } from '@/lib/utils'
 
-/** One stop on Today: whose, when, what to say, the numbers, and the outcome buttons that schedule the next stop. */
+/** One stop on Today: whose, when, what to say, the numbers, and the outcome buttons that schedule the next stop.
+ *  "Not now" has the one shape the close and the Next step control use (2026-11-04): a date (the caller's call), an
+ *  event with no date, or nothing to go on (the machine's); the belt reads named_date / named_event / neither. */
 export function StopCard({ t, now }: { t: StopTask; now: number }) {
   const [outcome, setOutcome] = useState<string>('')
   const [note, setNote] = useState('')
   const [slotKind, setSlotKind] = useState<'callback' | 'walk'>('callback')
   const [when, setWhen] = useState('')
+  const [nnKind, setNnKind] = useState<NotNowKind>('date')
+  const [nnDate, setNnDate] = useState('')
   const [event, setEvent] = useState('')
+  const [say, setSay] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
-  const done = useWrite(({ o, detail }: { o: string; detail: Record<string, unknown> }) => api.stopDone(t.id, o, note.trim() || null, detail),
-    [['tasks'], ['lead'], ['cards_no_stop'], ['belt_counts'], ['leads']])
+  const done = useWrite(async ({ o, detail }: { o: string; detail: Record<string, unknown> }) => {
+    const r = await api.stopDone(t.id, o, note.trim() || null, detail)
+    if (!r.error && t.lead?.id) await saveSayNext(t.lead.id, say)
+    return r
+  }, [['tasks'], ['lead'], ['cards_no_stop'], ['belt_counts'], ['leads'], ['my_piles'], ['card_brief']])
   const late = new Date(t.due_at).getTime() < now - 60_000
   const chosen = STOP_OUTCOMES.find((o) => o.id === outcome)
   const isDraft = t.kind === 'text'
@@ -27,8 +37,11 @@ export function StopCard({ t, now }: { t: StopTask; now: number }) {
   const save = () => {
     const detail: Record<string, unknown> = {}
     if (chosen?.needs === 'slot') { const at = localInputToIso(when); if (!at) { setMsg('Pick the day and time.'); return } detail.kind = slotKind; detail.at = at }
-    if (chosen?.needs === 'date') { const at = when ? localInputToIso(when) : null; if (at) detail.named_date = at; if (event.trim()) detail.named_event = event.trim()
-      if (!at && !event.trim()) { setMsg('A date, or the thing that has to change.'); return } }
+    if (chosen?.needs === 'date') {
+      if (nnKind === 'date') { const at = nnDate ? localInputToIso(`${nnDate}T10:00`) : null; if (!at) { setMsg('The date they gave.'); return } detail.named_date = at; if (event.trim()) detail.named_event = event.trim() }
+      else if (nnKind === 'condition') { if (!event.trim()) { setMsg('What has to change.'); return } detail.named_event = event.trim() }
+      // nothing to go on: no date, no event; the belt rests the card (dormant) and the texts keep the door open
+    }
     if (note.trim()) detail.said = note.trim()
     setMsg(null)
     done.mutate({ o: outcome, detail }, { onSuccess: () => setMsg(`Logged: ${chosen?.label}. The belt set the next stop.`) })
@@ -64,7 +77,7 @@ export function StopCard({ t, now }: { t: StopTask; now: number }) {
               </button>
             ))}
           </div>
-          {chosen && <p className="text-xs text-muted-foreground">{chosen.hint}</p>}
+          {chosen && chosen.needs !== 'date' && <p className="text-xs text-muted-foreground">{chosen.hint}</p>}
           {chosen?.needs === 'slot' && (
             <div className="grid grid-cols-2 gap-2">
               <Select value={slotKind} onChange={(e) => setSlotKind(e.target.value as 'callback' | 'walk')} aria-label="Booked what">
@@ -75,10 +88,7 @@ export function StopCard({ t, now }: { t: StopTask; now: number }) {
             </div>
           )}
           {chosen?.needs === 'date' && (
-            <div className="grid grid-cols-2 gap-2">
-              <Input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} aria-label="The date they named" />
-              <Input value={event} onChange={(e) => setEvent(e.target.value)} placeholder="What has to change (tenant out, letters, the closing)" aria-label="The event" />
-            </div>
+            <NotNowPicker kind={nnKind} onKind={setNnKind} date={nnDate} onDate={setNnDate} event={event} onEvent={setEvent} say={say} onSay={setSay} busy={done.isPending} />
           )}
           {outcome && <Textarea rows={2} placeholder="What they said, in their words (the next stop opens with it)" value={note} onChange={(e) => setNote(e.target.value)} />}
           {outcome === 'dnc' ? (

@@ -28,6 +28,7 @@ type Item = {
   owner_name: string; address: string | null; municipality: string | null; reasons: string[] | null; lane: string | null
   texts_sent: number; first_text_at: string | null; last_text_at: string | null; dials_7d: number; dials_total?: number; last_dial: string | null; dials_today?: number
   phone: string; line_type: string | null; phone_person: string | null; other_phones: number
+  say_next?: string | null; next_plain?: string | null   // 0186: "when you call back, say", and what happens next in words
 }
 type Stats = { dials: number; reached: number; voicemails: number; interested: number; done: string[]; started: number | null }
 
@@ -163,8 +164,11 @@ export function PowerDial({ caller }: { caller: string }) {
         .eq('lead_id', cur.lead_id).eq('kind', 'phone').eq('status', 'ok')
       // numbers dialed earlier today (another sitting) are not offered again today
       const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0)
-      const r3 = await supabase.from('messages').select('to_number').eq('lead_id', cur.lead_id).eq('channel', 'call').gte('sent_at', dayStart.toISOString())
-      const today = ((r3.data ?? []) as { to_number: string | null }[]).map((m) => (m.to_number ?? '').replace(/\D/g, '').slice(-10))
+      let today: string[] = []
+      try {
+        const r3 = await supabase.from('messages').select('to_number').eq('lead_id', cur.lead_id).eq('channel', 'call').gte('sent_at', dayStart.toISOString())
+        today = ((r3.data ?? []) as { to_number: string | null }[]).map((m) => (m.to_number ?? '').replace(/\D/g, '').slice(-10))
+      } catch { today = [] }   // the list is a courtesy: without it the queue's own rule (0184) still holds tomorrow
       const cands = ((r2.data ?? []) as { value_normalized: string | null; line_type: string | null; person_name: string | null; suppressed: boolean | null; dnc_app: boolean | null }[])
         .filter((c) => c.value_normalized && /^\d{10}$/.test(c.value_normalized) && !c.suppressed && !c.dnc_app && !used.includes(c.value_normalized) && !today.includes(c.value_normalized))
         .sort((a, b) => Number(b.line_type === 'mobile') - Number(a.line_type === 'mobile'))
@@ -308,6 +312,9 @@ export function PowerDial({ caller }: { caller: string }) {
                 {cur.source === 'missed_call' ? 'Missed call: call back now' : cur.source === 'callback' ? 'Promised callback' : cur.source === 'checkin' ? '90-day check-in call' : cur.source === 'replied' ? 'Texted back: call now' : cur.source === 'call_list' ? 'On today’s list' : 'Texted, no reply'}</Badge>
             </div>
             <p className="text-sm">{street(cur.address)}{cur.municipality ? `, ${cur.municipality}` : ''}</p>
+            {/* the line the caller left herself for this call, and what the machine does next (0186; Colin 2026-11-04) */}
+            {cur.say_next && <p className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-sm dark:bg-amber-950/30"><span className="font-semibold">Say:</span> {cur.say_next}</p>}
+            {cur.next_plain && <p className="mt-1 text-xs text-muted-foreground">{cur.next_plain}</p>}
             <p className="mt-1 text-xs text-muted-foreground">
               {cur.source === 'missed_call' ? `They called us ${fmtDateTime(cur.missed_at ?? null)}${cur.voicemail ? ' and left a voicemail' : ''}` : cur.source === 'replied' ? 'They texted back' : cur.texts_sent ? `${cur.texts_sent} text${cur.texts_sent > 1 ? 's' : ''}, last ${fmtDateTime(cur.last_text_at)}, no reply` : 'Never texted'}
               {cur.dials_today ? ` · ${cur.dials_today} of 4 numbers tried today` : cur.dials_7d ? ` · dialed ${cur.dials_7d}x this week` : ''}

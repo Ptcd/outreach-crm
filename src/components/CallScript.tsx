@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Badge, Select, Textarea } from '@/components/ui/form'
 import { ConfirmButton } from '@/components/ui/confirm'
 import { api, useOfferSettings } from '@/lib/queries'
-import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso, todayLocal } from '@/lib/format'
+import { fmtDateTime, fmtPhone, isoToLocalInput, localInputToIso } from '@/lib/format'
 import { CALL_OUTCOMES, NEXT_STEP, PHONE_SCRIPT, callScript, clearlyHot, scriptLine, type CallQuestion } from '@/lib/callScript'
 import { answerOf, answerText, gateFromCall, stopsFromCall, type CallFacts, type CallValue } from '@/lib/callGate'
 import { bookingVerdict, type BookingVerdict } from '@/lib/bookingVerdict'
@@ -15,6 +15,8 @@ import { cn } from '@/lib/utils'
 import { OddHourHint } from '@/components/OddHourHint'
 import { useAuth } from '@/providers/AuthProvider'
 import { useOnPhone, workerFor } from '@/lib/onPhone'
+import { NotNowPicker, saveSayNext } from '@/components/NextStep'
+import { CALL_LANES, type CallLane, type NotNowKind } from '@/lib/nextStep'
 import type { Contact, GateScore, Lead, Message } from '@/lib/types'
 
 const LABELS: Record<string, string> = Object.fromEntries(
@@ -51,6 +53,8 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
   useEffect(() => { if (startOpen) setOpen(true) }, [startOpen])   // the panel's "open the script" tap
   const [facts, setFacts] = useState<CallFacts>(() => (lead.call_facts ?? {}) as CallFacts)
   const [err, setErr] = useState<string | null>(null)
+  // the lane picked at the close steers "Log this call": lane 3 preselects Not now, Never preselects Not interested
+  const [laneHint, setLaneHint] = useState<CallLane | null>(null)
   useEffect(() => setFacts((lead.call_facts ?? {}) as CallFacts), [lead.call_facts])
 
   const save = async (key: string, value: CallValue | null) => {
@@ -174,7 +178,7 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
       </details>
 
       {caller === 'colin' && <VerdictBox v={verdict} />}
-      <Close verdict={verdict} hot={hot} vars={vars} facts={facts} replyFacts={replyFacts} onSave={save} canOverride={!!canOverride} />
+      <Close verdict={verdict} hot={hot} vars={vars} facts={facts} replyFacts={replyFacts} onSave={save} canOverride={!!canOverride} onLane={setLaneHint} />
 
       {caller === 'colin' && <details className="rounded-md border p-3">
         <summary className="cursor-pointer font-semibold">Gate items this call settles</summary>
@@ -194,7 +198,7 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
         <p className="mt-1 text-xs text-muted-foreground">These fill in Colin&apos;s score on the card; the booking decision above is the card&apos;s.</p>
       </details>}
 
-      <LogCall lead={lead} contacts={contacts} phone={phone} onLogged={onLogged}
+      <LogCall lead={lead} contacts={contacts} phone={phone} onLogged={onLogged} laneHint={laneHint}
         voicemailLine={`Hi ${vars.first_name}, it's ${vars.caller}. I had a quick question about the place on ${vars.street}. Give me a call when you get a minute.`} />
     </section>
   )
@@ -297,12 +301,17 @@ function AnchorCard({ lead, facts, mode, onSaid }: { lead: Lead; facts: CallFact
  *  rough house, or a sale or move date) gets Colin's walk booked now; everyone else a callback at a set time, when the
  *  caller books Colin's walk if he said walk it. No number on the phone, ever: Colin gives his at the house (0114).
  *  Not ready: the not-ready lines and a dated check-back. */
-function Close({ verdict, hot, vars, facts, replyFacts, onSave, canOverride }: {
+function Close({ verdict, hot, vars, facts, replyFacts, onSave, canOverride, onLane }: {
   verdict: BookingVerdict; hot: boolean; vars: Record<string, string>; facts: CallFacts; replyFacts: Record<string, unknown>
-  onSave: (k: string, v: CallValue | null) => Promise<void>; canOverride: boolean
+  onSave: (k: string, v: CallValue | null) => Promise<void>; canOverride: boolean; onLane?: (lane: CallLane | null) => void
 }) {
   const booked = answerOf(facts, 'next_step')
-  const walkAllowed = hot || verdict.verdict === 'book' || canOverride || !!booked?.choices?.includes('walk')
+  // the lane is the caller's choice (Colin 2026-11-04, the four steps / three lanes PDF): lane 1 always allows the walk;
+  // the card's verdict stays on screen as advice, never as a lock ("why would I drive hours for something not 100%
+  // sure?" is answered by lane 1's own test, not by the card refusing the button)
+  const lane = (answerOf(facts, 'lane')?.choices?.[0] ?? null) as CallLane | null
+  const laneWords = CALL_LANES.find((l) => l.id === lane)
+  const walkAllowed = lane === '1' || hot || verdict.verdict === 'book' || canOverride || !!booked?.choices?.includes('walk')
   const step: CallQuestion = { ...NEXT_STEP, qid: 'booking', gate: [], say: [],
     choices: (NEXT_STEP.choices ?? []).filter((c) => c.id !== 'walk' || walkAllowed).map((c) => c.id === 'walk' ? { ...c, label: "Colin's walk" } : c) }
   const stepCard = <QuestionCard n={0} q={step} facts={facts} replyFacts={replyFacts} onSave={onSave} showGates={false} />
@@ -313,15 +322,65 @@ function Close({ verdict, hot, vars, facts, replyFacts, onSave, canOverride }: {
       Then send the package to Colin (it fills in from these answers)
     </Button>
   )
-  if (verdict.verdict === 'no' && !hot) return (
-    <div className="space-y-2 rounded-md border-2 border-red-300 p-3">
-      <p className="font-semibold">Close: not ready yet</p>
-      <ScriptLines lines={notReady} />
-      {(booked || canOverride) && stepCard}
+  const pickLane = (id: CallLane) => {
+    const next = lane === id ? null : id
+    void onSave('lane', next ? { choices: [next] } : null)
+    onLane?.(next)
+    if (next === '2') setTimeout(() => document.getElementById('package')?.scrollIntoView({ behavior: 'smooth' }), 50)
+    if (next === '3' || next === 'never') setTimeout(() => document.getElementById('log-call')?.scrollIntoView({ behavior: 'smooth' }), 50)
+  }
+  const laneRow = (
+    <div className="space-y-1.5 rounded-md border-2 border-primary/40 p-3">
+      <p className="font-semibold">Which lane?</p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {CALL_LANES.map((l) => (
+          <button key={l.id} type="button" aria-pressed={lane === l.id} onClick={() => pickLane(l.id)}
+            className={cn('min-h-11 rounded-md border px-2 py-2 text-left text-sm font-medium',
+              lane === l.id ? (l.id === 'never' ? 'border-red-700 bg-red-700 text-white' : 'border-primary bg-primary text-primary-foreground') : 'bg-background')}>
+            {l.label}
+          </button>
+        ))}
+      </div>
+      {laneWords && <p className="text-xs text-muted-foreground">{laneWords.hint}</p>}
+      {verdict.verdict !== 'open' && (
+        <p className={cn('text-xs', verdict.verdict === 'no' ? 'text-red-700' : verdict.verdict === 'book' ? 'text-emerald-700' : 'text-amber-700')}>
+          The card&apos;s read (advice, not a rule): {verdict.headline.toLowerCase()}{verdict.because.length ? `, because ${verdict.because.slice(0, 2).join('; ').toLowerCase()}` : ''}.
+        </p>
+      )}
+    </div>
+  )
+  if (lane === '3' || lane === 'never') return (
+    <div className="space-y-2">
+      {laneRow}
+      <div className="space-y-2 rounded-md border-2 border-red-300 p-3">
+        <p className="font-semibold">{lane === '3' ? 'Lane 3: not now' : 'Never'}</p>
+        <ScriptLines lines={notReady} />
+        <p className="text-sm">{lane === '3' ? 'Log the call below as Not now: the date they gave, the event, or nothing to go on.' : 'Log the call below as Not interested, or Do not contact if they asked to be removed.'}</p>
+      </div>
+    </div>
+  )
+  if (verdict.verdict === 'no' && !hot && lane !== '1' && lane !== '2') return (
+    <div className="space-y-2">
+      {laneRow}
+      <div className="space-y-2 rounded-md border-2 border-red-300 p-3">
+        <p className="font-semibold">Close: the card reads not ready yet</p>
+        <ScriptLines lines={notReady} />
+        <p className="text-xs text-muted-foreground">Your call: pick lane 1 or 2 above if what they said earns it; the card&apos;s read is advice.</p>
+        {(booked || canOverride) && stepCard}
+      </div>
     </div>
   )
   return (
     <div className="space-y-3">
+      {laneRow}
+      {lane === '1' && !hot && (
+        <div className="space-y-2 rounded-md border-2 border-emerald-400 p-3">
+          <p className="font-semibold">Lane 1: book Colin&apos;s walk on this call</p>
+          <p className="text-sm text-muted-foreground">Ask the yes-or-no: &ldquo;If Colin came out {vars.day} and the number worked, is that a yes that day?&rdquo; A yes books it; a no is lane 2.</p>
+          <ScriptLines lines={lines((id) => id !== 'b8_call_instead')} />
+          {stepCard}
+        </div>
+      )}
       {hot && (
         <div className="space-y-2 rounded-md border-2 border-emerald-400 p-3">
           <p className="font-semibold">Hot: book Colin&apos;s walk on this call</p>
@@ -332,7 +391,7 @@ function Close({ verdict, hot, vars, facts, replyFacts, onSave, canOverride }: {
       <div className="space-y-2 rounded-md border-2 border-amber-300 p-3">
         <p className="font-semibold">{hot ? 'Or, if they would rather wait: the package and a callback' : 'Close: the package and a callback'}</p>
         <ScriptLines lines={lines((id) => id === 'b8_call_instead')} />
-        {stepCard}
+        {lane !== '1' && stepCard}
         {toPackage}
       </div>
       <details className="rounded-md border p-3">
@@ -430,41 +489,54 @@ function Field({ label, initial, onCommit, multiline, inputMode }: {
   )
 }
 
-function LogCall({ lead, contacts, phone, onLogged, voicemailLine }: { lead: Lead; contacts: Contact[]; phone: string | null; onLogged?: (outcome: string) => void; voicemailLine?: string }) {
+function LogCall({ lead, contacts, phone, onLogged, voicemailLine, laneHint }: {
+  lead: Lead; contacts: Contact[]; phone: string | null; onLogged?: (outcome: string) => void; voicemailLine?: string; laneHint?: CallLane | null
+}) {
   const qc = useQueryClient()
   const phones = contacts.filter((c) => c.kind === 'phone').map((c) => c.value_normalized ?? c.value)
   const [from, setFrom] = useState<string>(phone ?? phones[0] ?? '')
   const [outcome, setOutcome] = useState<string>('')
   const [note, setNote] = useState('')
-  // "Not now" carries the date they gave (Codex's walk, 2026-10-22: the generic 30 days lost the real date)
+  // "Not now" carries the date they gave (Codex's walk, 2026-10-22: the generic 30 days lost the real date); the one
+  // not-now shape (date | event | nothing) is the same here, on a stop and on Next step (2026-11-04)
   const [until, setUntil] = useState('')
-  const [notNowKind, setNotNowKind] = useState<'date' | 'condition' | 'nothing'>('date')
+  const [notNowKind, setNotNowKind] = useState<NotNowKind>('date')
+  const [event, setEvent] = useState('')
+  const [say, setSay] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  // the lane picked at the close lands here: lane 3 is a Not now, Never is a Not interested (or Do not contact)
+  useEffect(() => { if (laneHint === '3') setOutcome('not_now'); else if (laneHint === 'never') setOutcome('not_interested') }, [laneHint])
   const save = async () => {
     setBusy(true)
     setMsg(null)
     const when = outcome === 'not_now' && notNowKind === 'date' && until ? localInputToIso(`${until}T12:00`) : null
     // a voicemail is a no-answer that left a message (the packet's outcome list)
     const sent = outcome === 'voicemail' ? 'no_answer' : outcome
-    // 0178: a want with nothing to go on is the machine's; the note says so, and no caller check-back is made
+    // 0178: a want with nothing to go on is the machine's; the note says so, and no caller check-back is made. An event
+    // with no date goes in the note too: the belt reads it as the condition (belt_event call_logged -> not_now_condition)
     const words = outcome === 'voicemail' ? ['Left a voicemail.', note.trim()].filter(Boolean).join(' ')
-      : outcome === 'not_now' && notNowKind === 'nothing' ? ['Nothing to go on (just curious / the right price).', note.trim()].filter(Boolean).join(' ') : note.trim()
+      : outcome === 'not_now' && notNowKind === 'nothing' ? ['Nothing to go on (just curious / the right price).', note.trim()].filter(Boolean).join(' ')
+      : outcome === 'not_now' && notNowKind === 'condition' ? [event.trim() ? `Until: ${event.trim()}.` : '', note.trim()].filter(Boolean).join(' ')
+      : note.trim()
     const r = await api.logCall(lead.id, from || null, sent, words || null, when)
     setBusy(false)
     const d = r.data as { ok: boolean; reason?: string } | null
     if (r.error || !d?.ok) { setMsg({ ok: false, text: r.error?.message ?? d?.reason ?? 'Not saved' }); return }
+    await saveSayNext(lead.id, say)
     setMsg({ ok: true, text: `Logged: ${outcome === 'voicemail' ? 'Voicemail' : LABEL_OUTCOME[outcome]}.` })
     const logged = outcome
     setOutcome('')
     setNote('')
-    for (const k of [['lead', lead.id], ['leads'], ['pipeline_counts'], ['phone_lookup'], ['seller_recovery_queue']]) void qc.invalidateQueries({ queryKey: k })
+    setSay('')
+    setEvent('')
+    for (const k of [['lead', lead.id], ['leads'], ['pipeline_counts'], ['phone_lookup'], ['seller_recovery_queue'], ['card_brief', lead.id], ['my_piles']]) void qc.invalidateQueries({ queryKey: k })
     onLogged?.(logged)
   }
   const OUTCOMES = [...CALL_OUTCOMES.slice(0, 1), { id: 'voicemail', label: 'Voicemail', hint: 'Left a voicemail; under 20 seconds, your name and the street' } as const, ...CALL_OUTCOMES.slice(1)]
   const chosen = OUTCOMES.find((o) => o.id === outcome)
   return (
-    <div className="space-y-2 rounded-md border-2 p-3">
+    <div id="log-call" className="space-y-2 rounded-md border-2 p-3">
       <p className="font-semibold">Log this call</p>
       {phones.length > 1 && (
         <label className="block text-sm font-medium">The number you talked on
@@ -488,30 +560,17 @@ function LogCall({ lead, contacts, phone, onLogged, voicemailLine }: { lead: Lea
         <p className="rounded-md bg-muted p-2 text-sm">Under 20 seconds: &ldquo;{voicemailLine}&rdquo;</p>
       )}
       {outcome === 'not_now' && (
-        <div className="space-y-2 rounded-md bg-muted p-2">
-          <label className="block text-sm font-medium">What did they give you?
-            <Select className="mt-1" value={notNowKind} onChange={(e) => setNotNowKind(e.target.value as 'date' | 'condition' | 'nothing')}>
-              <option value="date">A specific date: the call on that date is yours</option>
-              <option value="condition">An event, no date: the machine texts, you call once at 90 days</option>
-              <option value="nothing">Nothing to go on (just curious, the right price): the machine's</option>
-            </Select>
-          </label>
-          {notNowKind === 'date' && (
-            <label className="block text-sm font-medium">Check back on (the exact date they gave)
-              <Input type="date" className="mt-1 h-11" value={until} min={todayLocal()}
-                onChange={(e) => setUntil(e.target.value)} />
-            </label>
-          )}
-          {notNowKind === 'condition' && <p className="text-xs text-muted-foreground">Write the event in the notes below (for example, “after the tenant moves”). A text names it at 30 days, your call at 90, a text at 180; then quarterly texts and your &quot;still yours?&quot; call about a year on.</p>}
-          {notNowKind === 'nothing' && <p className="text-xs text-muted-foreground">No check-back of yours. Texts at 30, 90 and 180 days, then quarterly; it comes back to you only on a reply or when a new record lands on the house.</p>}
-        </div>
+        <NotNowPicker kind={notNowKind} onKind={setNotNowKind} date={until} onDate={setUntil} event={event} onEvent={setEvent} say={say} onSay={setSay} busy={busy} />
+      )}
+      {outcome && outcome !== 'not_now' && !['no_answer', 'voicemail', 'wrong_number', 'disconnected', 'dnc'].includes(outcome) && (
+        <Input className="h-11" value={say} onChange={(e) => setSay(e.target.value)} placeholder='When you call back, say (optional): "you were going to ask your sister"' aria-label="When you call back, say" />
       )}
       <Textarea rows={3} placeholder="Notes from the call" value={note} onChange={(e) => setNote(e.target.value)} />
       {outcome === 'dnc' ? (
         <ConfirmButton disabled={busy} question="Block every phone of this owner? Nobody calls or texts them again." yes="Yes, do not contact"
           onConfirm={() => void save()}>Save: do not contact</ConfirmButton>
       ) : (
-        <Button className="h-12 w-full" disabled={busy || !outcome || (outcome === 'not_now' && ((notNowKind === 'date' && !until) || (notNowKind === 'condition' && !note.trim())))}
+        <Button className="h-12 w-full" disabled={busy || !outcome || (outcome === 'not_now' && ((notNowKind === 'date' && !until) || (notNowKind === 'condition' && !event.trim())))}
           onClick={() => void save()}>{busy ? 'Saving...' : 'Save the call'}</Button>
       )}
       {msg && <p className={msg.ok ? 'text-sm font-medium text-emerald-700' : 'text-sm text-red-700'}>{msg.text}</p>}

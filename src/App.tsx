@@ -77,20 +77,23 @@ export default function App() {
     )
   }
 
+  // a caller landing on one of Colin's pages goes to My cards (0186; Colin 2026-11-04: the callers' nav is five pages)
+  const caller = member.role === 'caller'
+  const colinOnly = (page: React.ReactNode) => (caller ? <Navigate to="/mine" replace /> : page)
   return (
     <Layout>
       <Routes>
         <Route path="/today" element={<Today />} />
         <Route path="/calls" element={<CallQueue />} />
         <Route path="/settings" element={<Settings />} />
-        <Route path="/pipeline" element={<Pipeline />} />
+        <Route path="/pipeline" element={colinOnly(<Pipeline />)} />
         <Route path="/mine" element={<MyCards />} />
         <Route path="/lead/:id" element={<LeadDetail />} />
-        <Route path="/inbox" element={<Inbox />} />
+        <Route path="/inbox" element={caller ? <Navigate to="/texts" replace /> : <Inbox />} />
         <Route path="/texts" element={<Texts />} />
         <Route path="/warm" element={<Warm />} />
-        <Route path="/approvals" element={<Approvals />} />
-        <Route path="/scoreboard" element={<Scoreboard />} />
+        <Route path="/approvals" element={colinOnly(<Approvals />)} />
+        <Route path="/scoreboard" element={colinOnly(<Scoreboard />)} />
         <Route path="*" element={<Navigate to="/today" replace />} />
       </Routes>
     </Layout>

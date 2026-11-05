@@ -50,3 +50,20 @@ describe('follow-up reminders', () => {
     expect(s.off).toMatch(/neither/); expect(db.marked).toHaveLength(0)
   })
 })
+
+describe('a heads-up from the other caller (0186/0187)', () => {
+  it('says who it is from and what they wrote, and links the card', () => {
+    const m = followupMessage(due({ kind: 'nudge', title: 'Heads-up from Adil', note: 'she asked for Thalia by name, call her first', person: 'thalia' }), 'https://app.example')
+    expect(m.title).toBe('Heads-up from Adil: JANE ROE')
+    expect(m.body).toBe('she asked for Thalia by name, call her first (12 OAK ST, Racine)')
+    expect(m.url).toBe('https://app.example/lead/L1')
+  })
+  it('is pushed and marked like a reminder, the minute it lands', async () => {
+    const db = fakeDb([due({ kind: 'nudge', title: 'Heads-up from Thalia', note: 'tenant leaves in March', person: 'adil', email: null })])
+    const pushed: { person: string; title: string }[] = []
+    const s = await runFollowupReminders({ rpc: db.rpc, appUrl: 'https://app.example', push: async (person, m) => { pushed.push({ person, title: m.title }); return 1 }, email: null })
+    expect(pushed).toEqual([{ person: 'adil', title: 'Heads-up from Thalia: JANE ROE' }])
+    expect(s.pushes).toBe(1)
+    expect(db.marked).toEqual([{ id: 'T1', note: null }])
+  })
+})

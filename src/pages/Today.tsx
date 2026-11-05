@@ -16,7 +16,86 @@ import { MissedCalls } from '@/components/MissedCalls'
 import { ownerFilterFor, useOnPhone, workerFor, type TaskOwner } from '@/lib/onPhone'
 import { OnPhonePrompt, useColinHere } from '@/components/OnPhonePicker'
 import { StatTiles } from '@/components/StatTiles'
-import { ClipboardList, MessageCircle, PhoneCall, Sparkles, Zap } from 'lucide-react'
+import { BellRing, ClipboardList, MessageCircle, Moon, PhoneCall, Sparkles, Zap } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
+import { Nudges } from '@/components/Nudges'
+import { CardLine } from '@/components/CardRow'
+import { WalkControl } from '@/components/WalkControl'
+import { PILES, groupPiles, type PileCard } from '@/lib/piles'
+
+type Day = { dials: number; reached: number; packages: number; done: number; set: number; left_today: number; nudges?: number; resting?: number }
+
+/** A caller's Today (0186; Colin 2026-11-04: "build the full shit so the system isnt stupid anymore"; Thalia: "five
+ *  pages all claim to be my to-do list"): ONE list. Heads-ups for you, Call today, Booked and hot, Waiting on Colin,
+ *  This week. Everything Colin's (packages, STOPs, recovery, debt, stops) stays off this screen. */
+function CallerToday({ me, day }: { me: 'thalia' | 'adil'; day: Day | undefined }) {
+  const q = useQuery({
+    queryKey: ['my_piles', null],
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const r = await supabase.rpc('my_piles', {})
+      if (r.error) throw new Error(r.error.message)
+      return r.data as { person: string; cards: PileCard[] }
+    },
+  })
+  const piles = groupPiles(q.data?.cards ?? [])
+  const show: { id: 'call_now' | 'booked' | 'colin' | 'this_week'; title: string }[] = [
+    { id: 'call_now', title: 'Call today' }, { id: 'booked', title: 'Booked and hot' }, { id: 'colin', title: 'Waiting on Colin' }, { id: 'this_week', title: 'This week' },
+  ]
+  const name = me.charAt(0).toUpperCase() + me.slice(1)
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Today, {name}</h1>
+          <p className="text-sm text-muted-foreground">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+        </div>
+        <Button asChild size="lg" className="h-12 px-5 text-base">
+          <Link to="/calls?mode=power"><Zap className="mr-2 h-5 w-5" aria-hidden />Power hour</Link>
+        </Button>
+      </div>
+      <OnPhonePrompt />
+      <StatTiles tiles={[
+        { label: 'Dials today', value: day?.dials, icon: PhoneCall, tone: 'indigo', to: '/calls' },
+        { label: 'Reached', value: day?.reached, icon: Sparkles, tone: 'emerald' },
+        { label: 'Left today', value: day?.left_today, icon: Zap, tone: 'rose', to: '/mine' },
+        { label: 'Heads-ups', value: day?.nudges ?? 0, icon: BellRing, tone: 'amber' },
+        { label: 'Resting', value: day?.resting ?? 0, icon: Moon, tone: 'indigo', to: '/mine#pile-resting' },
+      ]} />
+      <MissedCalls />
+      <Nudges />
+      <ErrorNote error={q.error} />
+      {show.map((s) => {
+        const rows = piles[s.id]
+        const hint = PILES.find((p) => p.id === s.id)?.hint
+        return (
+          <Section key={s.id} title={`${s.title}${q.data ? ` (${rows.length})` : ''}`}>
+            <p className="mb-2 text-sm text-muted-foreground">{hint}</p>
+            {q.isLoading && <Empty>Loading...</Empty>}
+            {q.data && rows.length === 0 && <Empty>{s.id === 'call_now' ? 'Nothing due. Power hour, or a card from This week.' : 'Nothing here.'}</Empty>}
+            <ul className="divide-y">
+              {rows.slice(0, 40).map((c) => {
+                const booked = !!c.walk_at && (c.belt === 'visit_booked' || c.belt === 'call_booked' || c.stage === 'walkthrough_booked')
+                const task = c.task_id && c.next_at
+                  ? { id: c.task_id, lead_id: c.lead_id, due_at: c.next_at, kind: c.task_kind ?? 'call', owner: me, done_at: null, note: null, created_at: '', source: c.task_source }
+                  : null
+                return (
+                  <li key={c.lead_id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between">
+                    <CardLine c={c} />
+                    {booked ? <WalkControl leadId={c.lead_id} kind={c.belt === 'visit_booked' || c.stage === 'walkthrough_booked' ? 'walk' : 'call'} />
+                      : <NextStep leadId={c.lead_id} task={task} compact />}
+                  </li>
+                )
+              })}
+            </ul>
+            {rows.length > 40 && <p className="mt-2 text-sm"><Link to={`/mine#pile-${s.id}`} className="underline">All {rows.length} on My cards</Link></p>}
+          </Section>
+        )
+      })}
+      <p className="text-sm text-muted-foreground">Everything else is on <Link to="/mine" className="underline">My cards</Link>: later, tried, not called, resting.</p>
+    </div>
+  )
+}
 
 export default function Today() {
   const { member, user } = useAuth()
@@ -34,7 +113,7 @@ export default function Today() {
     queryKey: ['my_day', mine],
     enabled: mine != null,
     refetchInterval: 60_000,
-    queryFn: async () => { const r = await api.myDay(mine); if (r.error) throw new Error(r.error.message); return r.data as { dials: number; reached: number; packages: number; done: number; set: number; left_today: number } },
+    queryFn: async () => { const r = await api.myDay(mine); if (r.error) throw new Error(r.error.message); return r.data as Day },
   })
   const replies = useUnseenReplies()
   const debt = useFollowupDebt()
@@ -51,6 +130,9 @@ export default function Today() {
   const shownReplies = (replies.data ?? []).filter((m) => !m.is_opt_out)
   const debtRows = (debt.data ?? []).filter((d) => isOwner || !['opener_queued', 'opener_sent', 'postcard_mailed'].includes(d.stage))
   const markAllStops = async () => { for (const m of stopReplies) await seen.mutateAsync(m.id) }
+
+  // a caller gets her own one-list Today (0186); Colin, and the shared login set to Colin, keep the full page
+  if (member?.role === 'caller' && (member.person === 'thalia' || member.person === 'adil')) return <CallerToday me={member.person} day={day.data} />
 
   return (
     <div className="space-y-4">
@@ -82,6 +164,7 @@ export default function Today() {
       )}
       {isOwner && <BeltHealthStrip />}
       <MissedCalls />
+      <Nudges />
       <PackagesToday />
       <Section title={`Tasks from replies${replyTasks.data ? ` (${replyTasks.data.length})` : ''}`}>
         <p className="mb-2 text-sm text-muted-foreground">Things a seller asked for that a text can&apos;t do. Adil by default.</p>

@@ -27,6 +27,7 @@ import { firstNameOf, timelineOf } from '@/lib/inbox'
 import { DEAL_STATUS_LABEL, MILESTONES, PEOPLE, SELLER_FACTS, STAGES, STAGE_LABEL, TASK_KIND_LABEL, personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
 import { NextStep } from '@/components/NextStep'
+import { CardBrief } from '@/components/CardBrief'
 import { handoffToColin } from '@/lib/apiExtra'
 import { BELT_LABEL, type Belt } from '@/lib/belts'
 import { useColinHere } from '@/components/OnPhonePicker'
@@ -36,6 +37,8 @@ export default function LeadDetail() {
   const { id = '' } = useParams()
   const q = useLead(id)
   const isOwner = useColinHere()   // Colin's controls: on the shared login, the phone set to Colin
+  const { member } = useAuth()
+  const isCaller = member?.role === 'caller'   // a caller's way back is My cards, never the pipeline (2026-11-04)
   const [params] = useSearchParams()
   const dialer = useDialer()
 
@@ -54,8 +57,8 @@ export default function LeadDetail() {
   return (
     <div className="space-y-4">
       <div>
-        <Link to="/pipeline" className="inline-flex min-h-11 items-center text-sm underline">
-          Back to pipeline
+        <Link to={isCaller ? '/mine' : '/pipeline'} className="inline-flex min-h-11 items-center text-sm underline">
+          {isCaller ? 'Back to My cards' : 'Back to pipeline'}
         </Link>
         <h1 className={cn('mt-1 text-2xl font-bold tracking-tight', lead.stage === 'dnc' && 'text-red-700')}>{lead.owner_name}</h1>
         {fullAddress(lead) && <p className="mt-0.5 text-base font-medium text-muted-foreground">{fullAddress(lead)}</p>}
@@ -94,6 +97,9 @@ export default function LeadDetail() {
         </div>
       )}
       <CallPanel lead={lead} contacts={contacts} inbound={q.data.inbound} replyFacts={facts} messages={messages} />
+      {/* the card in plain words (0186): what happens next, what to say, why, the touches, a rest, heads-ups; above
+          everything a caller reads after the call (Thalia 2026-11-04: "the one thing I must do is below everything") */}
+      <CardBrief lead={lead} tasks={tasks} />
       <CallNotes leadId={lead.id} messages={messages} />
       <TextThread leadId={lead.id} phone={bestPhone(contacts, q.data.inbound, lead.owner_name)} messages={messages} inbound={q.data.inbound}
         closed={lead.stage === 'dnc'} />

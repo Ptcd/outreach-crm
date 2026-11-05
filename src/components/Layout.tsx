@@ -11,13 +11,15 @@ import { useDialer } from '@/lib/dialer'
 import { cn } from '@/lib/utils'
 import { OnPhoneSwitch } from '@/components/OnPhonePicker'
 
-const NAV: { to: string; label: string; short?: string; icon: typeof CalendarCheck }[] = [
-  { to: '/today', label: 'Today', icon: CalendarCheck },
-  { to: '/calls', label: 'Calls', icon: PhoneCall },
+// a caller's nav is the five pages she works (Colin 2026-11-04: "build the full shit so the system isnt stupid anymore";
+// Thalia: "a caller's nav has Approve, Scoreboard and Pipeline"): Today, My cards, Calls, Texts, Warm. Colin keeps the rest.
+const NAV_ALL: { to: string; label: string; short?: string; icon: typeof CalendarCheck; caller?: boolean }[] = [
+  { to: '/today', label: 'Today', icon: CalendarCheck, caller: true },
+  { to: '/mine', label: 'My cards', short: 'Mine', icon: FolderKanban, caller: true },
+  { to: '/calls', label: 'Calls', icon: PhoneCall, caller: true },
   { to: '/inbox', label: 'Inbox', icon: Inbox },
-  { to: '/texts', label: 'Texts', icon: MessageSquareText },
-  { to: '/warm', label: 'Warm', icon: Flame },
-  { to: '/mine', label: 'My cards', short: 'Mine', icon: FolderKanban },
+  { to: '/texts', label: 'Texts', icon: MessageSquareText, caller: true },
+  { to: '/warm', label: 'Warm', icon: Flame, caller: true },
   { to: '/pipeline', label: 'Pipeline', short: 'Pipe', icon: ListChecks },
   { to: '/approvals', label: 'Approve', short: 'Approve', icon: CheckCheck },
   { to: '/scoreboard', label: 'Scoreboard', short: 'Score', icon: BarChart3 },
@@ -25,6 +27,7 @@ const NAV: { to: string; label: string; short?: string; icon: typeof CalendarChe
 
 export function Layout({ children }: { children: ReactNode }) {
   const { member, signOut } = useAuth()
+  const NAV = member?.role === 'caller' ? NAV_ALL.filter((n) => n.caller) : NAV_ALL
   const { ready } = useDialer()   // registered with Twilio: a seller's call rings in this open app
   const w = useRepliesWaiting().data
   const waiting = (w?.drafts_waiting ?? 0) + (w?.tasks_open ?? 0)

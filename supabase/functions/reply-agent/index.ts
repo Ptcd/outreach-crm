@@ -11,7 +11,7 @@ import { runPackageMail } from '../_shared/packages.ts'
 import { runVoicemailRead } from '../_shared/voicemailRead.ts'
 import { pmPhoneSender, pmPhoneWhatsApp, runHotAlerts } from '../_shared/hotLeads.ts'
 import { runMissedCallAlerts } from '../_shared/missedCalls.ts'
-import { runFollowupReminders } from '../_shared/followupAlerts.ts'
+import { runFollowupReminders, runWeeklyDigest } from '../_shared/followupAlerts.ts'
 import { metaWhatsAppSender } from '../_shared/metaWhatsApp.ts'
 import { hotPush, notifyDeps, pushToPerson } from '../_shared/notifyDeno.ts'
 import { senderEnv, twilioPort, type Rpc } from '../_shared/sending.ts'
@@ -70,8 +70,14 @@ Deno.serve(async (req) => {
     // a caller's own follow-up reminds them ten minutes before (0170/0171): push to their phones, email to their address
     const reminders = await runFollowupReminders({ rpc, push: pushToPerson(sb), email: deps.email, appUrl: Deno.env.get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com' })
       .catch((e) => ({ error: String(e).slice(0, 200) }))
-    await rpc('note_agent_run', { p_summary: { ...summary, notified, hot_alerts: hot, packages, voicemails, missed_calls: missed, reminders, drafter: key ? 'claude' : 'none (ANTHROPIC_API_KEY not set)' } })
-    return Response.json({ ...summary, notified, hot_alerts: hot, packages, voicemails, missed_calls: missed, reminders })
+    // a rested card wakes on its own when its day comes (0186): the lists already treat it as awake, this tidies the row
+    const woke = await rpc('wake_rested', { p_now: new Date().toISOString() }).then((r) => (r.error ? { error: r.error.message.slice(0, 200) } : Number(r.data ?? 0)))
+    if (typeof woke === 'number' && woke > 0) console.log(`wake_rested: ${woke} card(s) back`)
+    // Monday 8 AM Central: each caller's week in one push and one email (0187)
+    const digest = await runWeeklyDigest({ rpc, push: pushToPerson(sb), email: deps.email, appUrl: Deno.env.get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com' })
+      .catch((e) => ({ error: String(e).slice(0, 200) }))
+    await rpc('note_agent_run', { p_summary: { ...summary, notified, hot_alerts: hot, packages, voicemails, missed_calls: missed, reminders, woke, digest, drafter: key ? 'claude' : 'none (ANTHROPIC_API_KEY not set)' } })
+    return Response.json({ ...summary, notified, hot_alerts: hot, packages, voicemails, missed_calls: missed, reminders, woke, digest })
   } catch (e) {
     await rpc('note_agent_run', { p_summary: { error: String(e instanceof Error ? e.message : e).slice(0, 300) } })
     return Response.json({ error: String(e) }, { status: 500 })
