@@ -37,6 +37,13 @@ export function likelyDisconnected(error: string | null | undefined): boolean {
   return /\b3100[359]\b|gateway in HANGUP/i.test(error ?? '')
 }
 /** What the call bar says about a failed call. */
+/** What a thrown value says, never the word "undefined": an Error's message, else its name, else the value. */
+export function errorText(e: unknown): string {
+  if (e instanceof Error) return e.message || e.name || 'Call failed'
+  if (e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string') return (e as { message: string }).message
+  return e === undefined || e === null ? 'Call failed (no error given)' : String(e)
+}
+
 export function plainCallError(error: string): string {
   return likelyDisconnected(error) ? 'The phone network hung up before it rang: usually a disconnected number. Tap Disconnected, or try once more.' : error
 }
@@ -204,8 +211,10 @@ export function DialerProvider({ children }: { children: ReactNode }) {
 
   // A call that ended or failed before pm-phone claimed it never rang anyone: un-pause its card at once.
   // The database decides (migration 0043); a call that was placed stays paused for its outcome.
-  const releaseIfUnclaimed = useCallback((leadId: string, key: string) => {
-    void Promise.resolve(supabase.rpc('release_unclaimed_human_call', { p_lead_id: leadId, p_key: key }))
+  // The dialer's own error text rides along (0192), so a phone that never reaches Twilio can be diagnosed from
+  // the server: "undefined" on Adil's screen (2026-11-05) said nothing about what his phone actually saw.
+  const releaseIfUnclaimed = useCallback((leadId: string, key: string, error?: string | null) => {
+    void Promise.resolve(supabase.rpc('release_unclaimed_human_call', { p_lead_id: leadId, p_key: key, p_error: error ?? null }))
       .then(() => qc.invalidateQueries({ queryKey: ['lead', leadId] }))
       .catch(() => undefined)   // the minute sweep releases it anyway
   }, [qc])
@@ -255,18 +264,23 @@ export function DialerProvider({ children }: { children: ReactNode }) {
         setActive((a) => (a ? { ...a, status: 'in_call', startedAt: Date.now() } : a))
       })
       const key = takeoverKey
-      const ended = () => releaseIfUnclaimed(leadId, key)
+      const ended = (why?: string | null) => releaseIfUnclaimed(leadId, key, why)
       // a call she ended to take one ringing in no longer owns the bar: only its card is released
       const mine = () => callRef.current === call
       call.on('disconnect', () => { if (mine()) finish('ended', null); ended() })
       call.on('cancel', () => { if (mine()) finish('ended', null); ended() })
       call.on('reject', () => { if (mine()) finish('ended', 'They declined the call.'); ended() })
-      call.on('error', (e: { message?: string }) => { if (mine()) finish('error', plainCallError(e?.message ?? 'Call failed')); ended() })
+      call.on('error', (e: { message?: string; code?: number }) => {
+        const why = `${e?.message ?? 'Call failed'}${e?.code ? ` (Twilio ${e.code})` : ''}`
+        if (mine()) finish('error', plainCallError(e?.message ?? 'Call failed'))
+        ended(why)
+      })
     } catch (e) {
       // Authorized but the call failed: released if pm-phone never claimed it (nobody rang); a claimed
       // call stays paused for its outcome, with "call did not happen — resume" on the card.
-      if (takeoverKey && leadId) releaseIfUnclaimed(leadId, takeoverKey)
-      const msg = e instanceof Error ? e.message : String(e)
+      const msg = errorText(e)
+      const state = deviceRef.current ? ` (dialer ${deviceRef.current.state})` : ' (no dialer)'
+      if (takeoverKey && leadId) releaseIfUnclaimed(leadId, takeoverKey, msg + state)
       finish('error', /Permission|NotAllowed|microphone/i.test(msg) ? 'Allow the microphone to call from here.' : msg)
     }
   }, [device, finish, releaseIfUnclaimed])
