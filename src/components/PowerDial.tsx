@@ -114,6 +114,9 @@ export function PowerDial({ caller }: { caller: string }) {
   const [tried, setTried] = useState<Record<string, string[]>>({})
   const [swap, setSwap] = useState<Record<string, { phone: string; line_type: string | null; phone_person: string | null; other_phones: number }>>({})
   const [nextNote, setNextNote] = useState<string | null>(null)
+  // an interested seller's card stays up until the package goes (Adil 2026-11-06, the Webers on Phlox Drive: logging
+  // Interested brought the next card, and the package form under the script went with it, so it was never sent)
+  const [packageFor, setPackageFor] = useState<string | null>(null)
   const update = useCallback((f: (s: Stats) => Stats) => setStats((s) => { const n = f(s); saveStats(n); return n }), [])
 
   const list = useMemo(() => {
@@ -413,11 +416,14 @@ export function PowerDial({ caller }: { caller: string }) {
           <QuickNumber key={cur.lead_id} leadId={cur.lead_id} />
 
           {talking === cur.lead_id ? (
-            <TalkPanel leadId={cur.lead_id} phone={cur.phone} onLogged={(o) => {
-              update((s) => ({ ...s, interested: s.interested + (o === 'interested' ? 1 : 0) }))
-              if (onThis) dismiss()
-              next(cur.lead_id, false)
-            }} />
+            <TalkPanel leadId={cur.lead_id} phone={cur.phone} held={packageFor === cur.lead_id}
+              onNext={() => { setPackageFor(null); next(cur.lead_id, false) }}
+              onLogged={(o) => {
+                update((s) => ({ ...s, interested: s.interested + (o === 'interested' ? 1 : 0) }))
+                if (onThis) dismiss()
+                if (o === 'interested') { setPackageFor(cur.lead_id); return }
+                next(cur.lead_id, false)
+              }} />
           ) : (
             <>
             <Input placeholder="Remark (optional): saved with the button you tap" className="h-10" value={remark}
@@ -581,7 +587,7 @@ function NumberCallback({ p, leadId, onDone }: { p: NonNullable<Item['package']>
 }
 
 /** A real conversation: the card's full call script, and its Log this call moves Power hour on. */
-function TalkPanel({ leadId, phone, onLogged }: { leadId: string; phone: string; onLogged: (outcome: string) => void }) {
+function TalkPanel({ leadId, phone, onLogged, held = false, onNext }: { leadId: string; phone: string; onLogged: (outcome: string) => void; held?: boolean; onNext?: () => void }) {
   const q = useLead(leadId)
   if (q.isLoading) return <Empty>Loading the script...</Empty>
   if (q.error) return <ErrorNote error={q.error} />
@@ -593,6 +599,12 @@ function TalkPanel({ leadId, phone, onLogged }: { leadId: string; phone: string;
     <div className="space-y-3">
       <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={q.data.facts ?? {}} latestGate={gates[0] ?? null}
         phone={phone} startOpen canOverride={false} onLogged={onLogged} />
+      {held && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border-2 border-emerald-400 bg-emerald-50 p-2 text-sm dark:bg-emerald-950/30">
+          <span className="flex-1"><span className="font-semibold">Logged as interested.</span> Send the package to Colin below: it already has everything you tapped in the script. Then go to the next card.</span>
+          <Button size="sm" variant="outline" onClick={onNext}>Next card</Button>
+        </div>
+      )}
       <div id="package"><DealPackage lead={lead} /></div>
     </div>
   )
