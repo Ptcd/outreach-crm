@@ -14,6 +14,7 @@ import Approvals from '@/pages/Approvals'
 import Inbox from '@/pages/Inbox'
 import Texts from '@/pages/Texts'
 import Scoreboard from '@/pages/Scoreboard'
+import CallTime from '@/pages/CallTime'
 import SignContract from '@/pages/SignContract'
 import CallQueue from '@/pages/CallQueue'
 import Settings from '@/pages/Settings'
@@ -94,6 +95,7 @@ export default function App() {
         <Route path="/warm" element={<Warm />} />
         <Route path="/approvals" element={colinOnly(<Approvals />)} />
         <Route path="/scoreboard" element={colinOnly(<Scoreboard />)} />
+        <Route path="/call-time" element={<CallTime />} />
         <Route path="*" element={<Navigate to="/today" replace />} />
       </Routes>
     </Layout>

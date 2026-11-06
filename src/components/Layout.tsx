@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
-import { BarChart3, CalendarCheck, CheckCheck, Flame, FolderKanban, Home, Inbox, ListChecks, LogOut, MessageSquareText, Moon, PhoneCall, Settings as SettingsIcon, Sun } from 'lucide-react'
+import { BarChart3, CalendarCheck, CheckCheck, Clock, Flame, FolderKanban, Home, Inbox, ListChecks, LogOut, MessageSquareText, Moon, PhoneCall, Settings as SettingsIcon, Sun } from 'lucide-react'
 import { useTheme } from '@/lib/theme'
 import { useAuth } from '@/providers/AuthProvider'
 import { useRepliesWaiting } from '@/lib/queries'
@@ -23,6 +23,8 @@ const NAV_ALL: { to: string; label: string; short?: string; icon: typeof Calenda
   { to: '/pipeline', label: 'Pipeline', short: 'Pipe', icon: ListChecks },
   { to: '/approvals', label: 'Approve', short: 'Approve', icon: CheckCheck },
   { to: '/scoreboard', label: 'Scoreboard', short: 'Score', icon: BarChart3 },
+  // call time, Sat-Fri, per caller (Colin 2026-11-06); a caller sees only her own week
+  { to: '/call-time', label: 'Call time', short: 'Time', icon: Clock, caller: true },
 ]
 
 export function Layout({ children }: { children: ReactNode }) {
