@@ -34,6 +34,6 @@ returns jsonb language sql stable security definer set search_path = public as $
     'locked_to', (select who from locked),
     'dialed_by', (select who from last_dialer),
     'whatsapp', (select coalesce(jsonb_object_agg(m.person::text, m.alert_whatsapp), '{}'::jsonb)
-                   from public.team_members m where m.person::text = any((select who from ring)) and m.alert_whatsapp is not null),
+                   from public.team_members m where m.person::text in (select unnest(r.who) from ring r) and m.alert_whatsapp is not null),
     'card', (select jsonb_build_object('lead_id', c.id, 'owner_name', c.owner_name, 'address', c.property_address, 'municipality', c.municipality) from card c))
 $$;
