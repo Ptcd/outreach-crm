@@ -206,7 +206,10 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     }
     window.addEventListener('online', kick)
     document.addEventListener('visibilitychange', kick)
-    return () => { alive = false; window.removeEventListener('online', kick); document.removeEventListener('visibilitychange', kick) }
+    // the Stay awake switch (components/StayAwake) nudges every half minute while on: a softphone that silently
+    // dropped off re-registers before the next seller call (Adil 2026-11-07: "it rings like a blip, or it doesn't ring")
+    window.addEventListener('wpie-kick-dialer', kick)
+    return () => { alive = false; window.removeEventListener('online', kick); document.removeEventListener('visibilitychange', kick); window.removeEventListener('wpie-kick-dialer', kick) }
   }, [supported, member, device])
 
   // A call that ended or failed before pm-phone claimed it never rang anyone: un-pause its card at once.

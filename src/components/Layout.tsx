@@ -7,6 +7,7 @@ import { useRepliesWaiting } from '@/lib/queries'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { CallBar } from '@/components/CallBar'
 import { IncomingCallBar } from '@/components/IncomingCallBar'
+import { StayAwake } from '@/components/StayAwake'
 import { useDialer } from '@/lib/dialer'
 import { cn } from '@/lib/utils'
 import { OnPhoneSwitch } from '@/components/OnPhonePicker'
@@ -73,6 +74,7 @@ export function Layout({ children }: { children: ReactNode }) {
               </span>
             )}
             {member?.role === 'caller' && <span className="hidden text-muted-foreground sm:inline">{member?.display_name}</span>}
+            <StayAwake />
             <OnPhoneSwitch />
             <ThemeButton />
             <NavLink to="/settings" aria-label="Settings" title="Settings: your alert email and phone, notifications"
