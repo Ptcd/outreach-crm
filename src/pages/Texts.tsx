@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils'
 // person's: Muse, the belt and the follow-ups leave that phone alone until it is handed back (migration 0146).
 type Chip = 'waiting' | 'all' | 'mine' | 'my_cards' | 'going_out'
 
-const PERSON_LABEL: Record<string, string> = { colin: 'Colin', thalia: 'Thalia', adil: 'Adil' }
+const PERSON_LABEL: Record<string, string> = { colin: 'Colin', thalia: 'Thalia', adil: 'Tyler' }
 const who = (by: string | null | undefined) => {
   const b = (by ?? '').toLowerCase()
   if (!b) return 'us'

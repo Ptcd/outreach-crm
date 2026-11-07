@@ -737,7 +737,7 @@ function CardOwner({ lead }: { lead: Lead }) {
       {panel === 'move' && (
         <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 p-2">
           <Select value={to} onChange={(e) => setTo(e.target.value as Person)} aria-label="To whom" className="w-32">
-            <option value="thalia">Thalia</option><option value="adil">Adil</option>
+            <option value="thalia">Thalia</option><option value="adil">Tyler</option>
           </Select>
           <Input value={why} onChange={(e) => setWhy(e.target.value)} placeholder="Why (optional)" className="h-9 min-w-40 flex-1" />
           <Button size="sm" disabled={move.isPending} onClick={() => move.mutate(undefined, { onSuccess: () => done(`Moved to ${personLabel(to)}`) })}>Move it</Button>

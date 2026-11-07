@@ -6,7 +6,7 @@ import { useOnPhone, workerFor, type OnPhone } from '@/lib/onPhone'
 
 const WHO: { id: OnPhone; label: string }[] = [
   { id: 'thalia', label: 'Thalia' },
-  { id: 'adil', label: 'Adil' },
+  { id: 'adil', label: 'Tyler' },
   { id: 'colin', label: 'Colin' },
 ]
 

@@ -181,7 +181,7 @@ export const DEAL_STATUS_LABEL = { offer: 'Offer made', contract: 'Under contrac
 
 /** Who can own a task. Adil works the tasks and bookings (Colin 2026-10-21). */
 export const PEOPLE: { id: 'colin' | 'adil' | 'thalia'; label: string }[] = [
-  { id: 'adil', label: 'Adil' },
+  { id: 'adil', label: 'Tyler' },
   { id: 'colin', label: 'Colin' },
   { id: 'thalia', label: 'Thalia' },
 ]

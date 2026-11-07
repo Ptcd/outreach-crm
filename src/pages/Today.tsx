@@ -226,7 +226,7 @@ export default function Today() {
             <option value="callers">Thalia + Adil</option>
             <option value="all">Everyone</option>
             <option value="colin">Colin</option>
-            <option value="adil">Adil</option>
+            <option value="adil">Tyler</option>
             <option value="thalia">Thalia</option>
           </Select>
         }
@@ -309,7 +309,7 @@ export default function Today() {
             <option value="callers">Thalia + Adil</option>
             <option value="all">Everyone</option>
             <option value="colin">Colin</option>
-            <option value="adil">Adil</option>
+            <option value="adil">Tyler</option>
             <option value="thalia">Thalia</option>
           </Select>
         }

@@ -5,7 +5,7 @@ export type SignInPerson = 'colin' | 'thalia' | 'adil'
 export const SIGN_IN_PEOPLE: { person: SignInPerson; name: string }[] = [
   { person: 'colin', name: 'Colin' },
   { person: 'thalia', name: 'Thalia' },
-  { person: 'adil', name: 'Adil' },
+  { person: 'adil', name: 'Tyler' },
 ]
 export const TEAM_DOMAIN = 'team.junkcarsmequon.com'
 

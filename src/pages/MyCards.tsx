@@ -66,7 +66,7 @@ export default function MyCards() {
         {isOwner && (
           <Select value={person} onChange={(e) => setPerson(e.target.value)} aria-label="Whose cards" className="w-40">
             <option value="thalia">Thalia</option>
-            <option value="adil">Adil</option>
+            <option value="adil">Tyler</option>
           </Select>
         )}
       </div>
