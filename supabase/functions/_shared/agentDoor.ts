@@ -130,6 +130,24 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
     description: 'Owners the laptop would text tomorrow if it had a phone: your batch to trace, real need first (two or more years of tax behind, or a foreclosure, estate, probate, inheritance, court-debt, code or vacancy record), then the most years behind. Each comes with wpie_owner_id, the owner, mailing address, property, parcel, county, reasons, tax_years, need, why, est_value and existing_card. Claiming holds the rows for you for two days. When you find numbers, load them with add_prospects and pass wpie_owner_id on the prospect: the card is then keyed to the laptop\'s owner and the laptop texts it from the next plan. No number found: just leave the row; nothing to mark. counts_only=true returns only the counts (open, real need, yours, by county).',
     inputSchema: { type: 'object', properties: { limit: { type: 'integer', maximum: 500, description: 'owners per batch (default 100)' },
       county: S('one county'), need: S('real need | less motivated'), counts_only: { type: 'boolean' } } } },
+  // The laptop's list of parcels whose equity is unknown (app 0195; Colin 2026-11-07: "figure out the equity these people
+  // have before we waste time on outreach" ... "wire it up, muse can do anything on a browser"). Every night the laptop
+  // lists the open cards whose equity grade is unknown or estimated; Muse claims a batch, reads the county's FREE public
+  // Register of Deeds index parcel by parcel, and loads what the index shows with mortgage_add. The laptop pulls it
+  // within ten minutes and the card's equity line updates on the next refresh.
+  { role: 'intake', name: 'mortgages_wanted',
+    description: 'Parcels whose equity the laptop cannot grade: your batch to look up in the county Register of Deeds FREE public index (index_url and index_notes say where and how; a parcel with no index_url has no free index: skip it, never pay, never log in). Real need first. Each comes with wpie_property_id, parcel (the tax key to search), address, city, county, owner_name, the grade and line the laptop holds now, need, why and card. Claiming holds the rows for you for two days. For each parcel read the index page for the parcel and report every mortgage, satisfaction / release, assignment and modification the index shows with mortgage_add: document number, recording date, lender, borrower, and the original principal ONLY when the index prints it (never from a paid copy, never estimated). Nothing recorded: mortgage_add with found=false and a note, so the laptop knows the index was searched. A disclaimer that forbids automated use, a CAPTCHA or a login is a gate: stop and say so on the desk. One parcel at a time, a few seconds apart. counts_only=true returns only the counts.',
+    inputSchema: { type: 'object', properties: { limit: { type: 'integer', maximum: 200, description: 'parcels per batch (default 50)' },
+      county: S('one county'), counts_only: { type: 'boolean' } } } },
+  { role: 'intake', name: 'mortgage_add',
+    description: 'What the Register of Deeds index showed for one parcel from your mortgages_wanted batch. wpie_property_id (from the batch), found (true when documents are recorded against the parcel, false when the index was searched and shows nothing), documents: one per recorded document: doc_type (mortgage | satisfaction | assignment | modification | other), document_number, recorded_on (YYYY-MM-DD), amount (the original principal, digits only, only when the index prints it; otherwise leave it out), lender, borrower, satisfies_document_number (on a satisfaction: the mortgage it clears, when shown), notes, source_url (the index page you read, required), page_reference, extraction_confidence (0 to 1). notes: what you searched and saw, in a line. The laptop pulls it within ten minutes; the card's Equity line updates on the next refresh.',
+    inputSchema: { type: 'object', properties: { wpie_property_id: { type: 'integer' }, found: { type: 'boolean' }, notes: S('what you searched and saw'),
+      documents: { type: 'array', maxItems: 50, items: { type: 'object', properties: {
+        doc_type: S('mortgage | satisfaction | assignment | modification | other'), document_number: S('as the index prints it'), recorded_on: S('YYYY-MM-DD'),
+        amount: { type: 'number', description: 'original principal, digits only, only when the index prints it' }, lender: S('mortgagee / grantee'), borrower: S('mortgagor / grantor'),
+        satisfies_document_number: S('on a satisfaction: the mortgage it clears'), notes: S('brief'), source_url: S('the index page read (required)'),
+        page_reference: S('row / result number or a short quote'), extraction_confidence: { type: 'number', minimum: 0, maximum: 1 } }, required: ['doc_type', 'source_url'] } } },
+      required: ['wpie_property_id'] } },
   { role: 'intake', name: 'packages_to_value', description: 'Packages a caller sent Colin that still need a value: the card (property, people, phones), the condition checklist in the words of the seller, their number and who lives there. For each, find the after-repair value from recent nearby sales and send it with set_package_value. You never set or suggest our number: Colin prices it himself.',
     inputSchema: { type: 'object', properties: { limit: { type: 'integer', maximum: 50 } } } },
   { role: 'intake', name: 'set_package_value', description: 'Write the after-repair value (ARV) for a package: the dollar value, the basis in one or two sentences (which sales, which sources, adjustments), and the comps (address, sold_price, sold_date, sqft, beds, baths, distance, url, note). Colin checks it on the card before he prices. Never a purchase number.',
@@ -324,6 +342,13 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
     case 'prospect_counts': return { value: await db.prospectCounts() }
     case 'phones_wanted': return { value: await db.records('agent_phones_wanted', { p_agent: agent.name, p_limit: int(args.limit, 100, 500),
       p_county: args.county ? String(args.county) : null, p_need: args.need ? String(args.need) : null, p_counts_only: args.counts_only === true }) }
+    case 'mortgages_wanted': return { value: await db.records('agent_mortgages_wanted', { p_agent: agent.name, p_limit: int(args.limit, 50, 200),
+      p_county: args.county ? String(args.county) : null, p_counts_only: args.counts_only === true }) }
+    case 'mortgage_add': {
+      const r = await db.records('agent_mortgage_add', { p: { wpie_property_id: args.wpie_property_id, found: args.found, notes: args.notes,
+        documents: Array.isArray(args.documents) ? (args.documents as Json[]).slice(0, 50) : [] }, p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
     case 'packages_to_value': return { value: await db.records('agent_packages_to_value', { p_limit: int(args.limit, 20, 50) }) }
     case 'set_package_value': {
       const r = await db.records('package_set_value', { p_id: String(args.package_id ?? ''), p_arv: Number(args.arv), p_basis: String(args.basis ?? ''),
@@ -467,7 +492,7 @@ export async function handleMessage(msg: Json, agent: Agent, db: DoorDb): Promis
       capabilities: { tools: {} },
       serverInfo: { name: SERVER_NAME, version: '1.0.0' },
       instructions: agent.role === 'agent'
-        ? `One key for WPIE, with these scopes switched on: ${scopesOf(agent).join(', ')}. Every call is logged and every tool has a per-minute budget per key (find_prospects 30, ready_to_text 10; queue_texts, send_reply, mark_card, call_next have none): over it you are refused, and three times over it in five minutes locks that tool for five minutes. Pace and batch lookups; the same database sends the texts. Read desk_inbox at the start of every session: the desk and Colin talk to you there. Phones: phones_wanted is the laptop\'s list of owners who need a number; trace a batch each night and load what you find with add_prospects naming wpie_owner_id. Texting: read texting_rules first. Records: a batch sends only after a review. Cards: read due_today every morning.`
+        ? `One key for WPIE, with these scopes switched on: ${scopesOf(agent).join(', ')}. Every call is logged and every tool has a per-minute budget per key (find_prospects 30, ready_to_text 10; queue_texts, send_reply, mark_card, call_next have none): over it you are refused, and three times over it in five minutes locks that tool for five minutes. Pace and batch lookups; the same database sends the texts. Read desk_inbox at the start of every session: the desk and Colin talk to you there. Phones: phones_wanted is the laptop\'s list of owners who need a number; trace a batch each night and load what you find with add_prospects naming wpie_owner_id. Equity: mortgages_wanted is the laptop's list of parcels whose equity it cannot grade; read the county's free Register of Deeds index for a batch each night and load what it shows with mortgage_add. Texting: read texting_rules first. Records: a batch sends only after a review. Cards: read due_today every morning.`
         : agent.role === 'records'
         ? 'You run the public-records-request cycle: read records_overview, records_replies and records_list(due); mark what came back; draft letters from records_templates; propose batches. Colin approves every batch before anything sends.'
         : agent.role === 'intake'
