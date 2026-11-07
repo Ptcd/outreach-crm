@@ -542,6 +542,29 @@ export function useTextsLive(hours = 48) {
   })
 }
 
+/** Texts going out to a person's cards (Colin 2026-11-07: "make sure he can see all those texts going out"): every planned,
+ * sending, sent, delivered or bounced text from today and yesterday whose card is locked to `person` (Colin: everyone's),
+ * soonest first. Read straight from planned_openers (the team may read it, 0003). */
+export type GoingOut = PlannedOpener & { lead: { locked_to: string | null; municipality: string | null } | null }
+export function usePlannedToMyCards(person: string | null, mine: boolean) {
+  return useQuery({
+    queryKey: ['texts_going_out', person, mine],
+    refetchInterval: 30_000,
+    queryFn: async (): Promise<GoingOut[]> => {
+      const from = new Date(Date.now() - 36 * 3600 * 1000).toISOString().slice(0, 10)
+      const rows = check(
+        await supabase.from('planned_openers')
+          .select('*, lead:leads(locked_to, municipality)')
+          .gte('plan_date', from)
+          .in('send_status', ['planned', 'would_send', 'sending', 'sent', 'delivered', 'undelivered', 'failed', 'uncertain'])
+          .order('scheduled_at', { ascending: true, nullsFirst: false })
+          .limit(1000),
+      ) as GoingOut[]
+      return mine && person ? rows.filter((r) => r.lead?.locked_to === person) : rows
+    },
+  })
+}
+
 export function usePlannedOpeners(planDate: string) {
   return useQuery({
     queryKey: ['planned_openers', planDate],
