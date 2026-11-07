@@ -323,6 +323,9 @@ export const api = {
     supabase.rpc('followup_done', { p_task_id: taskId, p_outcome: outcome, p_note: note }),
   followupDelete: (taskId: string, why: string | null) =>
     supabase.rpc('followup_delete', { p_task_id: taskId, p_why: why }),
+  // a follow-up with how (text | call), the line to open with and the number (0200; set from a text thread or the card)
+  followupSetHow: (leadId: string, atIso: string, how: 'text' | 'call', say: string | null, phone: string | null) =>
+    supabase.rpc('followup_set_how', { p_lead_id: leadId, p_at: atIso, p_how: how, p_say: say, p_phone: phone }),
   // the card (0172): an append-only note with its author, Colin moving a card, fixing phones, names and addresses
   noteAdd: (leadId: string, body: string) => supabase.rpc('note_add', { p_lead_id: leadId, p_body: body }),
   cardReassign: (leadId: string, person: Person, why: string | null) => supabase.rpc('card_reassign', { p_lead_id: leadId, p_person: person, p_why: why }),

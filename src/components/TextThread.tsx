@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ErrorNote, Textarea } from '@/components/ui/form'
 import { api, useWrite } from '@/lib/queries'
+import { FollowUpPanel } from '@/components/TextFollowUp'
 import { fmtDateTime, fmtPhone } from '@/lib/format'
 import { textThreadOf } from '@/lib/textThread'
 import { cn } from '@/lib/utils'
@@ -18,6 +19,7 @@ export function TextThread({ leadId, phone, messages, inbound, closed }: {
   const box = useRef<HTMLDivElement>(null)
   const [text, setText] = useState('')
   const [result, setResult] = useState<string | null>(null)
+  const [followUp, setFollowUp] = useState(false)
   useEffect(() => { if (box.current) box.current.scrollTop = box.current.scrollHeight }, [items.length])
   const send = useWrite((body: string) => api.sendCardText(leadId, phone!.value, body).then((r) => {
     if (!r.error) {
@@ -49,13 +51,15 @@ export function TextThread({ leadId, phone, messages, inbound, closed }: {
         <div className="space-y-2 border-t p-3">
           <Textarea value={text} onChange={(e) => { setText(e.target.value); setResult(null) }} rows={2}
             placeholder={`Text ${fmtPhone(phone.value)}`} aria-label="Your text" />
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button className="h-11 px-6" disabled={!text.trim() || send.isPending} onClick={() => send.mutate(text.trim())}>
               {send.isPending ? 'Sending...' : 'Send text'}
             </Button>
+            <Button variant={followUp ? 'default' : 'outline'} className="h-11" onClick={() => setFollowUp((v) => !v)}>Follow up</Button>
             {result && <span className="text-sm">{result}</span>}
           </div>
           {send.error && <ErrorNote error={send.error} />}
+          {followUp && <FollowUpPanel leadId={leadId} phone={phone.value} onSet={() => setFollowUp(false)} />}
         </div>
       )}
     </section>

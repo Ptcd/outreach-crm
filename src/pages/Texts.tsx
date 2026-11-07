@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge, Empty, ErrorNote, Textarea } from '@/components/ui/form'
 import { CallButton } from '@/components/CallButton'
+import { DueTextCard, FollowUpPanel, useTextFollowupsDue } from '@/components/TextFollowUp'
 import { api, usePlannedToMyCards, useTextsLive, useWrite, type GoingOut, type LiveThread } from '@/lib/queries'
 import { useAuth } from '@/providers/AuthProvider'
 import { useQuery } from '@tanstack/react-query'
@@ -15,7 +16,7 @@ import { cn } from '@/lib/utils'
 // Every thread with a seller text in the last two days, newest first: their last text, our last answer and who gave it
 // (Muse, a person, the automation), whether we owe an answer, and who owns the thread. "Take over" makes the thread a
 // person's: Muse, the belt and the follow-ups leave that phone alone until it is handed back (migration 0146).
-type Chip = 'waiting' | 'all' | 'mine' | 'my_cards' | 'going_out'
+type Chip = 'waiting' | 'all' | 'mine' | 'my_cards' | 'going_out' | 'due'
 
 const PERSON_LABEL: Record<string, string> = { colin: 'Colin', thalia: 'Thalia', adil: 'Tyler' }
 const who = (by: string | null | undefined) => {
@@ -56,6 +57,10 @@ export default function Texts() {
   // texts going out to my cards, today and yesterday (Colin 2026-11-07: "make sure he can see all those texts going out")
   const going = usePlannedToMyCards(me, isCaller)
   const goingRows = going.data ?? []
+  // my text follow-ups due today (0200): set from a thread, the line comes back ready to send
+  const due = useTextFollowupsDue()
+  const dueRows = due.data ?? []
+  const dueOverdue = dueRows.filter((d) => d.overdue).length
   const goingWaiting = goingRows.filter((g) => ['planned', 'would_send', 'sending'].includes(g.send_status)).length
   const [search, setSearch] = useState('')
   const rows = useMemo(() => {
@@ -83,15 +88,30 @@ export default function Texts() {
       <Input placeholder="Find a name, address, phone, or words in a text" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search texts" />
       <div className="sticky top-0 z-10 -mx-1 flex gap-2 overflow-x-auto bg-background/95 px-1 py-2 backdrop-blur" role="tablist" aria-label="Filter">
         {((isCaller
-          ? [['my_cards', `My cards (${myCards}${myWaiting ? `, ${myWaiting} waiting` : ''})`], ['going_out', `Going out (${goingRows.length}${goingWaiting ? `, ${goingWaiting} still to send` : ''})`], ['all', `All (${(q.data ?? []).length})`]]
-          : [['waiting', `Waiting on us (${waiting})`], ['all', `All (${(q.data ?? []).length})`], ['mine', `Taken over (${mine})`], ['going_out', `Going out (${goingRows.length})`]]) as [Chip, string][]).map(([id, label]) => (
+          ? [['my_cards', `My cards (${myCards}${myWaiting ? `, ${myWaiting} waiting` : ''})`], ['due', `Follow-ups due (${dueRows.length}${dueOverdue ? `, ${dueOverdue} overdue` : ''})`], ['going_out', `Going out (${goingRows.length}${goingWaiting ? `, ${goingWaiting} still to send` : ''})`], ['all', `All (${(q.data ?? []).length})`]]
+          : [['waiting', `Waiting on us (${waiting})`], ['due', `Follow-ups due (${dueRows.length})`], ['all', `All (${(q.data ?? []).length})`], ['mine', `Taken over (${mine})`], ['going_out', `Going out (${goingRows.length})`]]) as [Chip, string][]).map(([id, label]) => (
           <button key={id} role="tab" aria-selected={chip === id} onClick={() => setChip(id)}
             className={cn('h-11 shrink-0 rounded-full border px-4 text-sm', chip === id ? 'border-primary bg-primary text-primary-foreground' : 'bg-background')}>
             {label}
           </button>
         ))}
       </div>
-      {chip === 'going_out' ? (
+      {chip === 'due' ? (
+        <>
+          <p className="text-sm text-muted-foreground">
+            Text follow-ups you set, due today or overdue, with the line you wrote ready to send. One tap sends it and closes the follow-up. If they texted first, answer them in the thread instead; that closes it too. Call follow-ups are in your dialer.
+          </p>
+          <ErrorNote error={due.error} />
+          {due.isLoading && <Empty>Loading your follow-ups...</Empty>}
+          {due.data && dueRows.length === 0 && <Empty>No text follow-ups due today. Set one from any thread with "Follow up".</Empty>}
+          <ul className="space-y-3" aria-label="Text follow-ups due">
+            {dueRows.filter((d) => {
+              const s = search.trim().toLowerCase()
+              return !s || [d.owner_name, d.property_address, d.say, d.phone10].filter((x): x is string => !!x).join(' ').toLowerCase().includes(s)
+            }).map((d) => <DueTextCard key={d.task_id} d={d} />)}
+          </ul>
+        </>
+      ) : chip === 'going_out' ? (
         <>
           <p className="text-sm text-muted-foreground">
             {isCaller ? 'Every text the system is sending to your cards' : 'Every text the system is sending'}, today and yesterday, soonest first. A text goes out inside the day's window; a reply shows up under My cards.
@@ -157,6 +177,7 @@ function ThreadCard({ t, me }: { t: LiveThread; me: string | null }) {
   const [text, setText] = useState('')
   const [open, setOpen] = useState(false)
   const [note, setNote] = useState<string | null>(null)
+  const [followUp, setFollowUp] = useState(false)
   const mineNow = !!me && t.owner === me
   const someoneElse = !!t.owner && t.owner !== me
   const keys = [['texts_live'], ['inbox'], ['reply_drafts'], ...(t.lead_id ? [['lead', t.lead_id]] : [])]
@@ -218,9 +239,19 @@ function ThreadCard({ t, me }: { t: LiveThread; me: string | null }) {
         )}
         {someoneElse && <span className="text-sm text-muted-foreground">{PERSON_LABEL[t.owner!] ?? t.owner} is on this one.</span>}
         {t.lead_id && !t.last_in.opt_out && <CallButton to={t.phone10} leadId={t.lead_id} name={t.owner_name} address={t.address} size="sm" className="h-10" />}
+        {t.lead_id && !t.last_in.opt_out && !someoneElse && (
+          <Button variant={followUp ? 'default' : 'outline'} className="h-10" disabled={!me} onClick={() => setFollowUp((v) => !v)}>Follow up</Button>
+        )}
         {t.lead_id && <Link to={`/lead/${t.lead_id}`} className="text-sm underline-offset-2 hover:underline">Open the card</Link>}
       </div>
       {(take.error || release.error) && <ErrorNote error={take.error ?? release.error} />}
+      {followUp && t.lead_id && (
+        <div className="mt-3 border-t pt-3">
+          <FollowUpPanel leadId={t.lead_id} phone={t.phone10}
+            beforeSet={mineNow ? undefined : () => api.threadTake(t.lead_id, t.phone10, 'follow-up set from the thread')}
+            onSet={() => setFollowUp(false)} />
+        </div>
+      )}
       {mineNow && open && t.lead_id && !t.last_in.opt_out && (
         <div className="mt-3 space-y-2 border-t pt-3">
           <Textarea value={text} onChange={(e) => { setText(e.target.value); setNote(null) }} rows={2} placeholder={`Text ${fmtPhone(t.phone10)} as yourself`} aria-label="Your reply" />
