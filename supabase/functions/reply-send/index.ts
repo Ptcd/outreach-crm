@@ -64,8 +64,10 @@ Deno.serve(async (req) => {
     return json({ outcome: 'tested', push_configured: deps.push != null, email_configured: deps.email != null && deps.emailTo != null, ...s })
   }
   if (action === 'send_card_text') {
-    // A text typed on the card (Adil 2026-10-24): a one-off draft from the number that texted them, then the same
-    // gate as an approved reply. A refused one is withdrawn so it never sits in "Needs you".
+    // A text typed on the card (Adil 2026-10-24): a one-off draft from the number that texted them. Since 2026-11-07
+    // (Colin: "once adil or thalia text anything then the ai must stop and no guards apply") it goes as typed: no
+    // wording rule, no quiet hours, no staleness check; only a phone that opted out still stops it (the law, not a
+    // guard). From that text on, the AI is off the card. A refused one is withdrawn so it never sits in "Needs you".
     const s = await asUser.rpc('start_card_text', { p_lead_id: body.lead_id ?? null, p_phone: String(body.phone ?? '') })
     if (s.error || !s.data) return json({ outcome: 'refused', reason: s.error?.message ?? 'could not start the text' })
     const sbt = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', { auth: { persistSession: false } })
@@ -75,7 +77,7 @@ Deno.serve(async (req) => {
     }
     const envt = senderEnv((n) => Deno.env.get(n), `${url}/functions/v1`)
     const res = await approveReply({ rpc: rpct, env: envt, twilio: envt.twilio ? twilioPort(envt.twilio, fetch) : null, id: s.data as string,
-      text: String(text ?? ''), actor, companyName: Deno.env.get('REPLY_COMPANY_NAME') ?? undefined })
+      text: String(text ?? ''), actor, companyName: Deno.env.get('REPLY_COMPANY_NAME') ?? undefined, teamText: true })
     if (res.outcome === 'refused') {
       await sbt.from('reply_drafts').update({ status: 'superseded', note: 'card text not sent: ' + (res.reason ?? '') })
         .eq('id', s.data as string).eq('status', 'awaiting_approval')

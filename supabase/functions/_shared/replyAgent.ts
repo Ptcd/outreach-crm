@@ -235,17 +235,22 @@ export async function runReplyAgent(opts: {
 /** Colin's Approve (with his final wording). Refuses a price, an offer or the business name
  *  rather than changing his words; the database refuses stale, sent or opted-out replies. */
 export async function approveReply(opts: { rpc: Rpc; env: SenderEnv; twilio: TwilioPort | null; id: string; text: string;
-  actor: string; now?: () => Date; companyName?: string }): Promise<{ outcome: string; reason?: string }> {
+  actor: string; now?: () => Date; companyName?: string; teamText?: boolean }): Promise<{ outcome: string; reason?: string }> {
   const now = opts.now ?? (() => new Date())
   const text = (opts.text ?? '').replace(/\s+/g, ' ').trim()
-  const g = guardDraft(text, { companyName: opts.companyName || 'Merrill Holdings', maxChars: 480 })
-  const blocked = g.violations.filter((v) => v === 'price_or_offer' || v === 'names_company' || v === 'mentions_postcard')
-  if (blocked.length) {
-    const what = blocked.map((b) => b.replace(/_/g, ' ')).join(', ')
-    return { outcome: 'refused', reason: 'not sent: the text has ' + what + (g.blocked.length ? ' (' + g.blocked.join(', ') + ')' : '') }
+  // A caller's own text from the card goes as typed (Colin 2026-11-07: once Adil or Thalia text, no guards apply);
+  // the one thing that still stops it is a phone that opted out, checked in reply_claim_send. Everything else keeps the
+  // wording rules: no price, no company name, no postcard talk.
+  if (!opts.teamText) {
+    const g = guardDraft(text, { companyName: opts.companyName || 'Merrill Holdings', maxChars: 480 })
+    const blocked = g.violations.filter((v) => v === 'price_or_offer' || v === 'names_company' || v === 'mentions_postcard')
+    if (blocked.length) {
+      const what = blocked.map((b) => b.replace(/_/g, ' ')).join(', ')
+      return { outcome: 'refused', reason: 'not sent: the text has ' + what + (g.blocked.length ? ' (' + g.blocked.join(', ') + ')' : '') }
+    }
   }
   const live = opts.env.live && opts.twilio != null
-  const r = await opts.rpc('reply_claim_send', { p_id: opts.id, p_mode: 'approve', p_body: text, p_actor: opts.actor, p_dry: !live,
+  const r = await opts.rpc('reply_claim_send', { p_id: opts.id, p_mode: opts.teamText ? 'team' : 'approve', p_body: text, p_actor: opts.actor, p_dry: !live,
     p_now: now().toISOString() })
   if (r.error) return { outcome: 'refused', reason: r.error.message }
   const j = r.data as { outcome: string; reason?: string; id?: string; to?: string; from?: string | null; body?: string }
