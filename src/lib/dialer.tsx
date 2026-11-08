@@ -77,6 +77,8 @@ interface DialerApi {
   supported: boolean
   ready: boolean          // registered with Twilio: a seller's call can ring here
   start: (x: { to: string; label: string; leadId: string | null; contactId: string | null; quiet?: boolean }) => Promise<void>
+  /** Settings, "Test the assistant": this browser calls the inbound assistant as a test; Muse plays the seller on the speaker. */
+  testAssistant: (mode: 'known' | 'unknown') => Promise<void>
   accept: () => Promise<{ leadId: string | null; phone: string } | null>
   decline: () => void
   hangUp: () => void
@@ -343,14 +345,35 @@ export function DialerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => () => { deviceRef.current?.destroy() }, [])
 
-  const value = useMemo<DialerApi>(() => ({ active, incoming, supported, ready, start, accept, decline, hangUp, toggleMute, dismiss }),
-    [active, incoming, supported, ready, start, accept, decline, hangUp, toggleMute, dismiss])
+  // The test call to the assistant (2026-11-07): the same softphone, To "assistant", no card, no authorization gate; the
+  // phone system puts the assistant on the line at once as a test, so the browser's speaker and microphone are the call.
+  const testAssistant = useCallback(async (mode: 'known' | 'unknown') => {
+    setActive({ status: 'connecting', to: 'assistant', label: `Assistant test (${mode === 'known' ? 'known seller' : 'unknown number'})`, leadId: null,
+      startedAt: null, muted: false, error: null, answered: false, inbound: false, line: null })
+    try {
+      const dev = await device()
+      const mic = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mic.getTracks().forEach((t) => t.stop())
+      const call = await dev.connect({ params: { To: 'assistant', mode } })
+      callRef.current = call
+      call.on('accept', () => { answeredRef.current = true; setActive((a) => (a ? { ...a, status: 'in_call', startedAt: Date.now() } : a)) })
+      const mine = () => callRef.current === call
+      call.on('disconnect', () => { if (mine()) finish('ended', null) })
+      call.on('cancel', () => { if (mine()) finish('ended', null) })
+      call.on('error', (e: { message?: string }) => { if (mine()) finish('error', e?.message ?? 'Call failed') })
+    } catch (e) {
+      finish('error', errorText(e))
+    }
+  }, [device, finish])
+
+  const value = useMemo<DialerApi>(() => ({ active, incoming, supported, ready, start, accept, decline, hangUp, toggleMute, dismiss, testAssistant }),
+    [active, incoming, supported, ready, start, accept, decline, hangUp, toggleMute, dismiss, testAssistant])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
 const NO_DIALER: DialerApi = {
   active: null, incoming: null, supported: false, ready: false, start: async () => undefined, accept: async () => null,
-  decline: () => undefined, hangUp: () => undefined, toggleMute: () => undefined, dismiss: () => undefined,
+  decline: () => undefined, hangUp: () => undefined, toggleMute: () => undefined, dismiss: () => undefined, testAssistant: async () => undefined,
 }
 
 /** Outside DialerProvider (tests, previews) the dialer is simply unavailable: buttons render disabled. */

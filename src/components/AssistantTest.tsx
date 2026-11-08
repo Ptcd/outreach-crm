@@ -1,26 +1,22 @@
 // Test the inbound assistant (Colin 2026-11-07: "give me a button to test you with Muse in the WPIE settings"). The
-// button has Twilio call the number typed here and put the assistant on the line at once, no rings. Hold the phone to
-// Muse's speaker and let Muse play the seller. Nothing touches a card: the call is marked test, and the transcript and
+// buttons place a call from this browser's own softphone straight to the assistant (no phone number, no rings), so the
+// laptop's speaker and microphone are the call and Muse, in voice mode on Colin's phone, plays the seller. Nothing touches a card: the call is marked test, and the transcript and
 // what the assistant extracted appear below when it ends. Owner only (the function refuses anyone else).
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Badge, Empty, ErrorNote } from '@/components/ui/form'
 import { supabase } from '@/lib/supabaseClient'
+import { useDialer } from '@/lib/dialer'
 import { fmtDateTime, fmtPhone } from '@/lib/format'
 
 type TestCall = { call_sid: string; from10: string | null; started_at: string; ended_at: string | null; seconds: number | null
   transcript: { role: string; text: string }[] | null; extraction: Record<string, unknown> | null; outcome: string }
 
-const KEY = 'wpie.assistant_test_phone'
-
 export function AssistantTest() {
-  const [phone, setPhone] = useState(() => { try { return localStorage.getItem(KEY) ?? '' } catch { return '' } })
-  const [busy, setBusy] = useState<'known' | 'unknown' | null>(null)
-  const [msg, setMsg] = useState<string | null>(null)
-  const [err, setErr] = useState<string | null>(null)
+  const dialer = useDialer()
   const [watch, setWatch] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
   const calls = useQuery({
     queryKey: ['assistant_test_calls'],
     refetchInterval: watch ? 8_000 : false,
@@ -32,32 +28,26 @@ export function AssistantTest() {
     },
   })
   useEffect(() => { if (!watch) return; const t = setTimeout(() => setWatch(false), 6 * 60_000); return () => clearTimeout(t) }, [watch])
-
-  const call = async (mode: 'known' | 'unknown') => {
-    setBusy(mode); setMsg(null); setErr(null)
-    try { localStorage.setItem(KEY, phone) } catch { /* fine */ }
-    const r = await supabase.functions.invoke('reply-send', { body: { action: 'test_assistant', to: phone, mode } })
-    const d = (r.data ?? {}) as { outcome?: string; reason?: string; to?: string }
-    if (r.error || d.outcome !== 'calling') setErr(r.error?.message ?? d.reason ?? 'not placed')
-    else { setMsg(`Calling ${fmtPhone(d.to ?? phone)}. Answer, then hold the phone to Muse's speaker. The transcript shows here when the call ends.`); setWatch(true) }
-    setBusy(null)
+  const busy = !!dialer.active && ['connecting', 'ringing', 'in_call'].includes(dialer.active.status)
+  const run = async (mode: 'known' | 'unknown') => {
+    setNote('Connecting. When the assistant greets, hold the phone with Muse in voice mode up to this speaker and let Muse answer. Hang up from the call bar when done; the transcript shows here.')
+    setWatch(true)
+    await dialer.testAssistant(mode)
   }
-
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        The assistant calls the number below and comes on the line at once, no rings. Let Muse play the seller through the speaker. Nothing touches a card; the call is a test and lands here.
+        Runs right here in the browser: this device's speaker and microphone are the call. Tap a button, then put your phone with Muse in voice mode next to it and let Muse play the seller. Nothing touches a card; the call is a test and lands below when it ends.
       </p>
-      <div className="flex flex-wrap items-end gap-2">
-        <label className="text-sm font-medium">Call this phone
-          <Input className="mt-1 h-10 w-44" inputMode="tel" placeholder="(414) 555-0100" value={phone} onChange={(e) => setPhone(e.target.value)} />
-        </label>
-        <Button className="h-10" disabled={!!busy || phone.replace(/\D/g, '').length < 10} onClick={() => call('known')}>{busy === 'known' ? 'Calling...' : 'Call me as a known seller'}</Button>
-        <Button variant="outline" className="h-10" disabled={!!busy || phone.replace(/\D/g, '').length < 10} onClick={() => call('unknown')}>{busy === 'unknown' ? 'Calling...' : 'Call me as an unknown number'}</Button>
+      {!dialer.supported && <ErrorNote error={new Error('This browser cannot place calls (no microphone access or WebRTC). Open the app in Chrome on the laptop.')} />}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button className="h-10" disabled={busy || !dialer.supported} onClick={() => void run('known')}>{busy ? 'On the call...' : 'Start as a known seller'}</Button>
+        <Button variant="outline" className="h-10" disabled={busy || !dialer.supported} onClick={() => void run('unknown')}>{busy ? 'On the call...' : 'Start as an unknown number'}</Button>
+        {busy && <Button variant="outline" className="h-10" onClick={() => dialer.hangUp()}>Hang up</Button>}
       </div>
       <p className="text-xs text-muted-foreground">Known seller: the assistant believes the card is Pat Tester at 123 Test St, West Bend, and says the address. Unknown number: it asks for the house, the town and a name.</p>
-      {msg && <p className="text-sm">{msg}</p>}
-      {err && <ErrorNote error={new Error(err)} />}
+      {note && <p className="text-sm">{note}</p>}
+      {dialer.active?.error && <ErrorNote error={new Error(dialer.active.error)} />}
       <div className="space-y-2">
         <p className="text-sm font-semibold">Recent test calls</p>
         <ErrorNote error={calls.error} />
