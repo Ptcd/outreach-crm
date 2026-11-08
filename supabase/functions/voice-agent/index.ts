@@ -98,20 +98,23 @@ async function extract(transcript: Turn[], card: CallCard | null, from: string):
   try { return JSON.parse(m[0]) as Record<string, unknown> } catch { return null }
 }
 
-async function finish(x: { callSid: string; from: string; to: string; card: CallCard | null; transcript: Turn[]; startedAt: number; test: boolean; outcome?: string }) {
+async function finish(x: { callSid: string; from: string; to: string; card: CallCard | null; transcript: Turn[]; startedAt: number; test: boolean; outcome?: string; events: object[] }) {
   const seconds = Math.round((Date.now() - x.startedAt) / 1000)
-  const extraction = x.transcript.some((t) => t.role === 'caller') ? await extract(x.transcript, x.card, x.from) : null
+  let extraction: Record<string, unknown> | null = null
+  try { extraction = x.transcript.some((t) => t.role === 'caller') ? await extract(x.transcript, x.card, x.from) : null }
+  catch (e) { x.events.push({ at: Date.now() - x.startedAt, type: 'extract_error', detail: String(e).slice(0, 160) }) }
   const db = sb()
   if (x.test) {
-    // a test call (Settings, "Test the assistant"): nothing touches a card; the transcript and extraction are kept as a test
+    // a test call (Settings, "Test the assistant"): nothing touches a card; the transcript, extraction and events are kept as a test
     await db.from('voice_calls').upsert({ call_sid: x.callSid, lead_id: null, from10: x.from.replace(/\D/g, '').slice(-10), to_number: x.to, ended_at: new Date().toISOString(),
-      seconds, transcript: x.transcript, extraction, outcome: 'test' }, { onConflict: 'call_sid' })
+      seconds, transcript: x.transcript, extraction, outcome: 'test', events: x.events }, { onConflict: 'call_sid' })
     return { test: true, seconds, extraction }
   }
   const r = await db.rpc('voice_agent_result', { p: { call_sid: x.callSid, from: x.from, to: x.to, lead_id: x.card?.lead_id ?? null,
     transcript: x.transcript, extraction, seconds, outcome: x.outcome ?? (extraction ? null : 'hung_up') } })
   const d = (r.data ?? {}) as { ok?: boolean; outcome?: string; owner?: string; owner_whatsapp?: string | null; owner_name?: string; address?: string; municipality?: string; lead_id?: string; due_at?: string }
-  if (r.error) console.error('[voice-agent] result:', r.error.message)
+  if (r.error) { console.error('[voice-agent] result:', r.error.message); x.events.push({ at: Date.now() - x.startedAt, type: 'result_error', detail: r.error.message.slice(0, 160) }) }
+  await db.from('voice_calls').update({ events: x.events }).eq('call_sid', x.callSid)
   // buzz the caller who owns the card: push to their phones, WhatsApp through pm-phone
   if (d.ok && d.owner && ['callback_booked', 'not_now'].includes(d.outcome ?? '')) {
     const name = d.owner_name || x.from
@@ -174,15 +177,20 @@ ${callBlock(null, '+15555550100', greetingFor(null))}`
   let finished = false
   let wrapTimer: number | undefined
   let hardTimer: number | undefined
+  let resumeTimer: number | undefined
+  let lastUser = ''
   const startedAt = Date.now()
+  const events: object[] = []
+  const log = (type: string, detail?: string) => { if (events.length < 400) events.push({ at: Date.now() - startedAt, type, ...(detail ? { detail: detail.slice(0, 160) } : {}) }) }
   const send = (m: object) => { try { socket.send(JSON.stringify(m)) } catch { /* closed */ } }
   const endCall = (reason: string) => { send({ type: 'end', handoffData: JSON.stringify({ reason, callSid }) }) }
 
-  const speak = async (userText: string) => {
+  const speak = async (userText: string, resume = false) => {
     turn?.abort()
     const ctl = new AbortController(); turn = ctl
-    messages.push({ role: 'user', content: userText })
-    transcript.push({ role: 'caller', text: userText })
+    if (!resume) { messages.push({ role: 'user', content: userText }); transcript.push({ role: 'caller', text: userText }) }
+    lastUser = userText
+    log(resume ? 'turn_resume' : 'turn_start', userText)
     const said: string[] = []
     try {
       for await (const piece of claudeTurn(system, messages, ctl.signal, state)) {
@@ -190,56 +198,70 @@ ${callBlock(null, '+15555550100', greetingFor(null))}`
         said.push(piece)
         send({ type: 'text', token: piece, last: false })
       }
-      if (!ctl.signal.aborted) send({ type: 'text', token: '', last: true })
+      if (!ctl.signal.aborted) { send({ type: 'text', token: '', last: true }); log('turn_done', said.join('').slice(0, 80)) }
+      else log('turn_aborted', said.join('').slice(0, 80))
     } catch (e) {
       if (!ctl.signal.aborted) {
         console.error('[voice-agent] turn:', String(e).slice(0, 200))
+        log('turn_error', String(e))
         const line = "I'm sorry, I lost you for a second. Could you say that once more?"
         said.push(line); send({ type: 'text', token: line, last: true })
-      }
+      } else log('turn_abort_error', String(e))
     } finally {
       const text = said.join('').trim()
       if (text || state.ended) { messages.push({ role: 'assistant', content: text || '(ended the call)' }); transcript.push({ role: 'agent', text }) }
-      if (state.ended && turn === ctl) endCall('conversation-complete')
+      if (state.ended && turn === ctl) { log('end_sent'); endCall('conversation-complete') }
     }
   }
 
   socket.onmessage = async (ev) => {
     let msg: Record<string, unknown>
     try { msg = JSON.parse(String(ev.data)) } catch { return }
+    log(String(msg.type), msg.type === 'prompt' ? `${msg.last === false ? 'partial: ' : ''}${String(msg.voicePrompt ?? '').slice(0, 80)}` : msg.type === 'interrupt' ? String(msg.utteranceUntilInterrupt ?? '').slice(0, 80) : msg.type === 'error' ? String(msg.description ?? '') : undefined)
     if (msg.type === 'setup') {
       callSid = String(msg.callSid ?? ''); from = String(msg.from ?? ''); to = String(msg.to ?? '')
       const custom = (msg.customParameters ?? {}) as Record<string, string>
       test = custom.test === '1'
-      if (!Deno.env.get('ANTHROPIC_API_KEY')) { endCall('no-key'); return }
+      if (!Deno.env.get('ANTHROPIC_API_KEY')) { log('no_key'); endCall('no-key'); return }
       card = custom.lead_id ? { lead_id: custom.lead_id, owner_name: custom.owner_name, address: custom.address, municipality: custom.municipality } : null
       const full = await cardFor(from)
       if (full) card = { ...card, ...full }
       const greeting = custom.greeting || greetingFor(card)
       transcript.push({ role: 'agent', text: greeting })
       system = `${STATIC_PROMPT}\n\n# This call\n${callBlock(card, from, greeting)}`
-      wrapTimer = setTimeout(() => { if (!state.ended) messages.push({ role: 'user', content: '(system: the call is running long; book the callback in one sentence, say goodbye, and end)' }) }, WRAP_UP_MS)
-      hardTimer = setTimeout(() => { if (!state.ended) { state.ended = true; send({ type: 'text', token: "I have to let you go now. Thanks for calling; the team will call you back shortly.", last: true }); endCall('time-limit') } }, MAX_CALL_MS)
+      wrapTimer = setTimeout(() => { log('wrap_up'); if (!state.ended) messages.push({ role: 'user', content: '(system: the call is running long; book the callback in one sentence, say goodbye, and end)' }) }, WRAP_UP_MS)
+      hardTimer = setTimeout(() => { log('hard_stop'); if (!state.ended) { state.ended = true; send({ type: 'text', token: "I have to let you go now. Thanks for calling; the team will call you back shortly.", last: true }); endCall('time-limit') } }, MAX_CALL_MS)
+      log('ready', card?.address ?? 'no card')
       return
     }
     if (msg.type === 'prompt') {
       if (msg.last === false) return
+      clearTimeout(resumeTimer)
       const text = String(msg.voicePrompt ?? msg.transcription ?? '').trim()
       if (!text || state.ended) return
       void speak(text)
       return
     }
-    if (msg.type === 'interrupt') { turn?.abort(); return }
+    if (msg.type === 'interrupt') {
+      // the caller spoke over the reply: stop talking. Twilio then sends their words as a prompt; if none comes in
+      // 2.5 s (a cough, an echo, a half word), answer the last thing they said instead of going quiet for good
+      // (Colin's first browser test, 2026-11-07: "it died and stopped replying").
+      turn?.abort()
+      clearTimeout(resumeTimer)
+      resumeTimer = setTimeout(() => { if (!state.ended && lastUser && !(turn && !turn.signal.aborted)) { log('resume_after_interrupt'); void speak(lastUser, true) } }, 2500)
+      return
+    }
     if (msg.type === 'error') console.error('[voice-agent] relay:', String(msg.description ?? '').slice(0, 200))
   }
 
-  socket.onclose = async () => {
-    clearTimeout(wrapTimer); clearTimeout(hardTimer); turn?.abort()
+  socket.onclose = async (ev) => {
+    log('close', `code ${ev.code}${ev.reason ? ' ' + ev.reason : ''}`)
+    clearTimeout(wrapTimer); clearTimeout(hardTimer); clearTimeout(resumeTimer); turn?.abort()
     if (finished || !callSid) return
     finished = true
-    try { await finish({ callSid, from, to, card, transcript, startedAt, test, outcome: state.ended ? undefined : 'hung_up' }) }
+    try { await finish({ callSid, from, to, card, transcript, startedAt, test, outcome: state.ended ? undefined : 'hung_up', events }) }
     catch (e) { console.error('[voice-agent] finish:', String(e).slice(0, 200)) }
   }
-  socket.onerror = (e) => console.error('[voice-agent] socket:', String((e as ErrorEvent).message ?? '').slice(0, 200))
+  socket.onerror = (e) => { const m = String((e as ErrorEvent).message ?? ''); log('socket_error', m); console.error('[voice-agent] socket:', m.slice(0, 200)) }
   return response
 })
