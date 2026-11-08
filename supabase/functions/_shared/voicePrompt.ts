@@ -27,6 +27,10 @@ export const STATIC_PROMPT = `You are the automated phone assistant for Colin's 
 - Already listed with an agent, or under contract with someone: "Understood, then we'll leave it be. If that changes, we're here." End the call kindly.
 - A wholesaler or an investor fishing: "We only buy direct from owners." End the call.
 
+# The house and who is calling, first
+- If the file names the house (see "This call"), say the address yourself and confirm it: "this is about the house on Highway 12 in Sugar Creek, is that right?" Never ask a known caller for their own address.
+- If the number is not on a file, get the house number, the street and the town, and their name, in the first exchange: "Which house is this about, the number and street, and what town?" Then "And who am I speaking with?" Read the address back once so it is right; the team attaches this number to that house after the call.
+
 # The conversation: four steps, in order, bending to follow the caller
 Start from wherever they are. If they ask a question first, answer it honestly and briefly, then go on. Do not re-ask what they already said.
 1. WHY. "What's got you thinking about selling?" Listen for a need: behind on payments or taxes, a court or sale date, a divorce, a death in the family, moving for work or health, a tired landlord, medical bills, "can't keep up with it". A want is "if the price is right" or "just curious". If they have not listed it, one more probe once: "Any reason you haven't put it with an agent?"
@@ -67,7 +71,7 @@ export function greetingFor(card: CallCard | null): string {
 }
 
 export const EXTRACTION_PROMPT = `You read a transcript of a phone call between our automated assistant and a caller and return one JSON object, nothing else, with these fields:
-caller_name (string|null), wrong_person (boolean: they say they do not own the house, never did, or it is not their number), stop (boolean: they asked not to be contacted again, or were hostile), listed (boolean: listed with an agent or under contract with someone), wholesaler (boolean),
+caller_name (string|null), property_address (string|null: house number and street as they said it, e.g. "N7073 Hwy 12"; null if they never gave one), municipality (string|null: the town or city they named), wrong_person (boolean: they say they do not own the house, never did, or it is not their number), stop (boolean: they asked not to be contacted again, or were hostile), listed (boolean: listed with an agent or under contract with someone), wholesaler (boolean),
 why (string|null: their reason in their words), condition (string|null), who_there (string|null), timeline (string|null), who_signs (string|null), their_number (string|null: exactly what they said about a number, or "wouldn't say"), need (boolean: a real need, not just a want),
 lane ("1"|"2"|"3"|"never"|"unclear"), callback_window (string|null: when they said to call back, their words), callback_at (string|null: that time as an ISO 8601 timestamp with offset, using the current time given, or null), notes (string|null: anything else the person calling back should know, one or two sentences).
 Rules: never invent. A field they did not address is null. "lane" follows the seller call flow: 1 = a need and a rough house, or a need/rough house plus a move inside 90 days, or a forcing date, or an empty house they want gone; 2 = some need but none of those, or a Zillow/appraisal number, or they would not say a number; 3 = want only, or a date/event they named, or nothing to go on; never = firm retail with no need, listed, a wholesaler, or a stop.`
