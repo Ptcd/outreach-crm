@@ -192,7 +192,15 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
   { role: 'sender', name: 'ready_to_text',
     description: 'Cards waiting for a text: your own new cards, and the cards the laptop picked for a first text and handed to you (they passed the prospect rules; laptop_text is the wording the laptop would have sent, for reference). Each has a usable mobile phone and nothing queued. With followups=true, also your cards that got a text, never answered, and are due for the next step. next_numbers: cards where the number we texted reached someone else (the wrong person); each comes with the next number of the owner (phone): send it a first text (step 1) as on a new card, the usual first question. Includes owner_type (individual, trust, llc, estate), address, phones, reasons and what was sent before.',
     inputSchema: { type: 'object', properties: { limit: { type: 'integer', maximum: 300 }, followups: { type: 'boolean' },
-      all_sources: { type: 'boolean', description: 'include cards the laptop loaded (default: only agent-loaded cards)' } } } },
+      all_sources: { type: 'boolean', description: 'the whole store: every card in opener_queued or postcard_mailed with a textable mobile and nothing sent or planned, not only agent-loaded and handed cards (Colin 2026-11-08; each card says laptop_card). Follow-ups stay your own cards and the handed ones.' } } } },
+  { role: 'sender', name: 'store_cards',
+    description: 'The whole card store, a page at a time (Colin 2026-11-08: work the book like your own sales rep). Every card: id, owner and type, address, county, city, property (type, units, parcel, lane, score, laptop_card), stage and when it changed, dead_reason, card_owner (Thalia or Tyler), held (parked, resting, human takeover, elderly_or_ill, grief, caller_texting), belt and next stop, check_back_at, named date or event, say_next, reasons with details, motivation (tier, families, lines, tax years and dollars), equity (the laptop\'s grade and Equity line with every input: value and source, last sale date and price, tenure, arrears, judgment, mortgage, debt, share, estimated), people with roles and status, phones (textable, opted_out, blocked, texts sent, last sent, replies), and a cadence summary (texts sent, last out, last in, replied, call_reached, planned). Ordered by updated_at then id, up to 500 a page (default 200): pass next_after.updated_at and next_after.id back as after_updated and after_id to continue; since=<timestamp> gives only cards changed since then (the nightly delta). The first page also carries store_counts. live_only defaults true (no dead, dnc, closed). Read-only: to act, use queue_texts, mark_card, add_prospects.',
+    inputSchema: { type: 'object', properties: { after_updated: S('next_after.updated_at from the previous page'), after_id: S('next_after.id from the previous page'),
+      since: S('only cards updated at or after this timestamp'), limit: { type: 'integer', maximum: 500 }, county: S('one county'),
+      stage: { type: 'array', items: { type: 'string' }, description: 'only these stages' }, live_only: { type: 'boolean', description: 'default true' } } } },
+  { role: 'sender', name: 'store_cadence',
+    description: 'Conversation and cadence state for up to 200 cards by id: each phone (textable, texts sent, last sent and its status, replies, last reply, opted_out, blocked, hold), the thread (the phone the first text ran on, texts in it, next_step and next_due_day on the 1-3-10-17-24 schedule), replied, last_inbound_at, call_reached, what is planned, and blockers (replied, call_reached, elderly_or_ill, grief, human_takeover, caller_texting, parked, resting, closed, planned_waiting), plus check_back_at, parked_why, rest_until, the belt\'s next stop, named date or event and say_next. Use it to own follow-ups: a card with next_due_day today or earlier and no blockers is due.',
+    inputSchema: { type: 'object', properties: { lead_ids: { type: 'array', items: { type: 'string' }, maxItems: 200 } }, required: ['lead_ids'] } },
   { role: 'sender', name: 'queue_texts',
     description: 'Queue texts you wrote. Each: card id, the person (interest_id; without it, the phone\'s person on the card), phone (one of theirs on that card), the exact text, step (1 = first text, 2-5 = follow-ups) and optionally the earliest time to send. The server sends each one inside the recipient\'s window, under the daily limit. Refused texts come back with the reason. Up to 100 per call.',
     inputSchema: { type: 'object', properties: { texts: { type: 'array', maxItems: 100, items: { type: 'object', properties: {
@@ -397,6 +405,16 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
     case 'sending_status': return { value: await db.status() }
     case 'ready_to_text':
       return { value: await db.readyToText({ limit: int(args.limit, 50, 300), followups: !!args.followups, all_sources: !!args.all_sources }) }
+    case 'store_cards':
+      return { value: await db.records('agent_store_cards', { p_after_updated: args.after_updated ? String(args.after_updated) : null,
+        p_after_id: args.after_id ? String(args.after_id) : null, p_since: args.since ? String(args.since) : null, p_limit: int(args.limit, 200, 500),
+        p_county: args.county ? String(args.county) : null, p_stage: Array.isArray(args.stage) ? (args.stage as unknown[]).map(String) : null,
+        p_live_only: args.live_only !== false }) }
+    case 'store_cadence': {
+      const ids = Array.isArray(args.lead_ids) ? (args.lead_ids as unknown[]).map(String).slice(0, 200) : []
+      if (!ids.length) return { value: { error: 'lead_ids is an empty list' }, isError: true }
+      return { value: await db.records('agent_store_cadence', { p_lead_ids: ids }) }
+    }
     case 'queue_texts': {
       const list = Array.isArray(args.texts) ? (args.texts as Json[]).slice(0, 100) : []
       if (!list.length) return { value: { error: 'texts is an empty list' }, isError: true }
