@@ -9,7 +9,7 @@
 // A customParameter test=1 runs the conversation but writes nothing and returns the extraction in handoffData.
 import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
 import { pushToPerson } from '../_shared/notifyDeno.ts'
-import { callBlock, END_CALL, EXTRACTION_PROMPT, EXTRACTION_SCHEMA, PROMPT_VERSION, STATIC_PROMPT, greetingFor, type CallCard } from '../_shared/voicePrompt.ts'
+import { callBlock, END_CALL, EXTRACTION_PROMPT, EXTRACTION_SCHEMA, laneFrom, PROMPT_VERSION, STATIC_PROMPT, greetingFor, type CallCard } from '../_shared/voicePrompt.ts'
 import { PERSONAS, SELLER_SYSTEM, grade } from '../_shared/voiceSim.ts'
 
 const MODEL = Deno.env.get('VOICE_MODEL') || 'claude-sonnet-5-5'
@@ -147,7 +147,11 @@ async function extract(transcript: Turn[], card: CallCard | null, from: string):
   if (r.stop_reason === 'max_tokens') throw new Error('extraction cut at max_tokens')
   const m = r.text.match(/\{[\s\S]*\}/)
   if (!m) throw new Error(`extraction not JSON: ${r.text.slice(0, 120)}`)
-  try { return JSON.parse(m[0]) as Record<string, unknown> } catch { throw new Error(`extraction JSON invalid: ${m[0].slice(0, 120)}`) }
+  let x: Record<string, unknown>
+  try { x = JSON.parse(m[0]) as Record<string, unknown> } catch { throw new Error(`extraction JSON invalid: ${m[0].slice(0, 120)}`) }
+  x.lane_model = x.lane            // the model's opinion, kept for the record
+  x.lane = laneFrom(x)             // the sheet's rule decides
+  return x
 }
 
 /** One turn, collected (the simulator and the self-test): the reply text and whether the assistant ended the call. */

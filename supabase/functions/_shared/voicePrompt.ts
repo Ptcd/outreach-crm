@@ -2,7 +2,7 @@
 // compressed for speech and for a caller who rang us and got no human. If the sheet and this file disagree, fix this
 // file: the sheet is the source of truth. One static block (cached across turns and calls) plus a small per-call block.
 export const END_CALL = '[END_CALL]'
-export const PROMPT_VERSION = '2026-11-07f'
+export const PROMPT_VERSION = '2026-11-07g'
 
 export type CallCard = {
   lead_id?: string | null; owner_name?: string | null; address?: string | null; municipality?: string | null
@@ -82,11 +82,27 @@ export function greetingFor(card: CallCard | null): string {
 
 export const EXTRACTION_PROMPT = `You read a transcript of a phone call between our automated assistant and a caller and return one JSON object, nothing else, with these fields:
 caller_name (string|null), property_address (string|null: house number and street as they said it, e.g. "N7073 Hwy 12"; null if they never gave one), municipality (string|null: the town or city they named), wrong_person (boolean: they say they do not own the house, never did, or it is not their number), stop (boolean: they asked not to be contacted again, or were hostile), listed (boolean: listed with an agent or under contract with someone), wholesaler (boolean),
-why (string|null: their reason in their words), condition (string|null), who_there (string|null), timeline (string|null), who_signs (string|null), their_number (string|null: exactly what they said about a number, or "wouldn't say"), need (boolean: a real need, not just a want),
+why (string|null: their reason in their words), condition (string|null), who_there (string|null), timeline (string|null), who_signs (string|null), their_number (string|null: exactly what they said about a number, or "wouldn't say"), need (boolean: a real need, not just a want: behind on taxes or payments, an estate, a divorce, can't keep the place up, health, a job elsewhere, a landlord who is done; "just curious" or "testing the market" is not a need),
+rough_house (boolean: real repairs named: a roof leak, a failing furnace or boiler, foundation, water, mold, electrical, "needs a lot of work", long vacant; dated kitchens and baths alone are not rough), forcing_date (boolean: a deadline they cannot move, see below), move_within_90_days (boolean: they want to be out inside about three months), empty_house_wants_gone (boolean: nobody lives there and they want it off their hands), number_from_zillow_or_appraisal (boolean), wouldnt_say_number (boolean: asked for a number and declined), firm_retail (boolean: they named a full market or Zillow price, will list with an agent otherwise, and named no need),
 language (string|null: BCP-47 like "es" when the caller did not speak English, else null), address_mismatch (boolean: the file named one house and the caller a different one), prefers_text (boolean: asked to be texted rather than called),
 lane ("1"|"2"|"3"|"never"|"unclear"), callback_window (string|null: when they said to call back, their words), callback_at (string|null: that time as an ISO 8601 timestamp with offset, using the current time given, or null), notes (string|null: anything else the person calling back should know, one or two sentences).
 Rules: never invent. A field they did not address is null. "lane" follows the seller call flow: 1 = a need and a rough house, or a need/rough house plus a move inside 90 days, or a forcing date, or an empty house they want gone; 2 = some need but none of those, or a Zillow/appraisal number, or they would not say a number; 3 = want only, or a date/event they named, or nothing to go on; never = firm retail with no need, listed, a wholesaler, or a stop.
-A forcing date is a deadline they cannot move: a divorce decree's window to sell, a sheriff sale or foreclosure date, a probate or court deadline, a closing on another house, a job start out of state, a tax or lender deadline. A forcing date makes lane 1 even when the house is fine and even when the number they named is only the payoff. A date they merely prefer (a tenant leaving in March, "by spring") is lane 3's date/event, not a forcing date.`
+A forcing date is a deadline they cannot move: a divorce decree's window to sell, a sheriff sale or foreclosure date, a probate or court deadline, a closing on another house, a job start out of state, a tax or lender deadline. A forcing date makes lane 1 even when the house is fine and even when the number they named is only the payoff. A date they merely prefer (a tenant leaving in March, "by spring") is lane 3's date/event, not a forcing date. Fill the boolean facts carefully: the lane is computed from them.`
+
+/** The lane as a rule (the seller call flow, "four steps, three lanes"), computed from the facts the summary classified; the
+ *  model's own lane is the fallback when the facts say nothing. Run 3 of the simulator (2026-11-07) graded the same
+ *  persona lane 1 once and lane 2 the next time with identical facts; a rule does not wobble. */
+export function laneFrom(x: Record<string, unknown>): '1' | '2' | '3' | 'never' | 'unclear' {
+  const b = (k: string) => x[k] === true
+  if (b('stop') || b('listed') || b('wholesaler') || b('wrong_person')) return 'never'
+  if (b('firm_retail') && !b('need')) return 'never'
+  if ((b('need') && b('rough_house')) || b('forcing_date') || ((b('need') || b('rough_house')) && b('move_within_90_days')) || b('empty_house_wants_gone')) return '1'
+  if (b('need') || b('number_from_zillow_or_appraisal') || b('wouldnt_say_number') || /wouldn'?t say/i.test(String(x.their_number ?? ''))) return '2'
+  const said = ['why', 'condition', 'who_there', 'timeline', 'their_number'].some((k) => x[k] != null && String(x[k]).trim() !== '')
+  if (said) return '3'
+  const m = String(x.lane ?? '')
+  return m === '1' || m === '2' || m === '3' || m === 'never' ? m : 'unclear'
+}
 
 /** The extraction's shape, enforced by the API as a structured output (a run on 2026-11-07 returned JSON that would not parse). */
 const S = (t: string) => ({ type: [t, 'null'] })
@@ -97,10 +113,13 @@ export const EXTRACTION_SCHEMA = {
     wrong_person: { type: 'boolean' }, stop: { type: 'boolean' }, listed: { type: 'boolean' }, wholesaler: { type: 'boolean' },
     why: S('string'), condition: S('string'), who_there: S('string'), timeline: S('string'), who_signs: S('string'), their_number: S('string'),
     need: { type: 'boolean' }, language: S('string'), address_mismatch: { type: 'boolean' }, prefers_text: { type: 'boolean' },
+    rough_house: { type: 'boolean' }, forcing_date: { type: 'boolean' }, move_within_90_days: { type: 'boolean' }, empty_house_wants_gone: { type: 'boolean' },
+    number_from_zillow_or_appraisal: { type: 'boolean' }, wouldnt_say_number: { type: 'boolean' }, firm_retail: { type: 'boolean' },
     lane: { type: 'string', enum: ['1', '2', '3', 'never', 'unclear'] },
     callback_window: S('string'), callback_at: S('string'), notes: S('string'),
   },
   required: ['caller_name', 'property_address', 'municipality', 'wrong_person', 'stop', 'listed', 'wholesaler', 'why', 'condition', 'who_there',
-    'timeline', 'who_signs', 'their_number', 'need', 'language', 'address_mismatch', 'prefers_text', 'lane', 'callback_window', 'callback_at', 'notes'],
+    'timeline', 'who_signs', 'their_number', 'need', 'language', 'address_mismatch', 'prefers_text', 'lane', 'callback_window', 'callback_at', 'notes',
+    'rough_house', 'forcing_date', 'move_within_90_days', 'empty_house_wants_gone', 'number_from_zillow_or_appraisal', 'wouldnt_say_number', 'firm_retail'],
 }
 
