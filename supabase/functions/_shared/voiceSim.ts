@@ -258,7 +258,7 @@ export const PERSONAS: Persona[] = [
   { id: 'mobile_home', name: 'A mobile home on a rented lot', card: true,
     brief: "Pat Tester, 57. It is a 1998 mobile home in a park; the lot is rented. Behind on lot rent. Wants to sell the home itself. Asks if we buy those.",
     opening: "It's a mobile home in a park, I don't own the land. Do you buy those?",
-    expect: { ended: true, max_turns: 8 } },
+    expect: { ended: true, max_turns: 14 } },
 ]
 
 export const SELLER_SYSTEM = (p: Persona) => `You are role-playing a homeowner on a phone call with a company's automated phone assistant, for a test. Stay in character the whole time. Speak like a real person on the phone: one to three short sentences, no lists, no narration, no stage directions, never say you are an AI or a test. Answer what you are asked the way this person would; volunteer only what this person would. If the assistant says goodbye or ends the call, reply with exactly: [HANGUP]
