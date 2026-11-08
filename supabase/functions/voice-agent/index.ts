@@ -9,7 +9,7 @@
 // A customParameter test=1 runs the conversation but writes nothing and returns the extraction in handoffData.
 import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
 import { pushToPerson } from '../_shared/notifyDeno.ts'
-import { callBlock, END_CALL, EXTRACTION_PROMPT, PROMPT_VERSION, STATIC_PROMPT, greetingFor, type CallCard } from '../_shared/voicePrompt.ts'
+import { callBlock, END_CALL, EXTRACTION_PROMPT, EXTRACTION_SCHEMA, PROMPT_VERSION, STATIC_PROMPT, greetingFor, type CallCard } from '../_shared/voicePrompt.ts'
 import { PERSONAS, SELLER_SYSTEM, grade } from '../_shared/voiceSim.ts'
 
 const MODEL = Deno.env.get('VOICE_MODEL') || 'claude-sonnet-5-5'
@@ -142,6 +142,7 @@ async function extract(transcript: Turn[], card: CallCard | null, from: string):
   const text = transcript.map((t) => `${t.role === 'agent' ? 'Assistant' : 'Caller'}: ${t.text}`).join('\n')
   // retried on 429/5xx; a failure throws with its reason so the call's events (and the simulator) say why
   const r = await claudeJson({ model: EXTRACT_MODEL, max_tokens: 1500, thinking: THINKING, system: EXTRACTION_PROMPT,
+    output_config: { format: { type: 'json_schema', schema: EXTRACTION_SCHEMA } },
     messages: [{ role: 'user', content: `Current time: ${now.toISOString()} (America/Chicago is UTC-6 in November).\nCaller's number: ${from}.\nFile on record: ${card?.owner_name ?? 'unknown'}${card?.address ? `, ${card.address}` : ''}.\n\nTranscript:\n${text}\n\nReturn the JSON object only.` }] })
   if (r.stop_reason === 'max_tokens') throw new Error('extraction cut at max_tokens')
   const m = r.text.match(/\{[\s\S]*\}/)

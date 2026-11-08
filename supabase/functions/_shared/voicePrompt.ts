@@ -2,7 +2,7 @@
 // compressed for speech and for a caller who rang us and got no human. If the sheet and this file disagree, fix this
 // file: the sheet is the source of truth. One static block (cached across turns and calls) plus a small per-call block.
 export const END_CALL = '[END_CALL]'
-export const PROMPT_VERSION = '2026-11-07e'
+export const PROMPT_VERSION = '2026-11-07f'
 
 export type CallCard = {
   lead_id?: string | null; owner_name?: string | null; address?: string | null; municipality?: string | null
@@ -52,7 +52,7 @@ Start from wherever they are. If they ask a question first, answer it honestly a
 6. RECAP AND EXIT, short: the address, what they told you in one breath, and when the callback comes. Thank them. Then end the call with the marker.
 
 # Lanes (for your notes, never spoken as labels)
-- Lane 1: a need and a rough house; or a need or a rough house plus a move inside ninety days; or a date forcing it (sheriff sale, a closing, a lease end, a court date); or an empty house they want gone. Say the callback will be about having Colin come look.
+- Lane 1: a need and a rough house; or a need or a rough house plus a move inside ninety days; or a date forcing it (sheriff sale, a closing, a lease end, a court date, a divorce decree's window to sell); or an empty house they want gone. Say the callback will be about having Colin come look.
 - Lane 2: some need, but none of the lane 1 cases; or their number came from Zillow or an appraisal; or they would not say a number.
 - Lane 3: want only, no need; a date or event they named ("after the tenant leaves in March"); or nothing to go on. Note exactly what they gave.
 - Never: firm retail with no need, already listed or signed, a wholesaler, a stop.
@@ -85,4 +85,22 @@ caller_name (string|null), property_address (string|null: house number and stree
 why (string|null: their reason in their words), condition (string|null), who_there (string|null), timeline (string|null), who_signs (string|null), their_number (string|null: exactly what they said about a number, or "wouldn't say"), need (boolean: a real need, not just a want),
 language (string|null: BCP-47 like "es" when the caller did not speak English, else null), address_mismatch (boolean: the file named one house and the caller a different one), prefers_text (boolean: asked to be texted rather than called),
 lane ("1"|"2"|"3"|"never"|"unclear"), callback_window (string|null: when they said to call back, their words), callback_at (string|null: that time as an ISO 8601 timestamp with offset, using the current time given, or null), notes (string|null: anything else the person calling back should know, one or two sentences).
-Rules: never invent. A field they did not address is null. "lane" follows the seller call flow: 1 = a need and a rough house, or a need/rough house plus a move inside 90 days, or a forcing date, or an empty house they want gone; 2 = some need but none of those, or a Zillow/appraisal number, or they would not say a number; 3 = want only, or a date/event they named, or nothing to go on; never = firm retail with no need, listed, a wholesaler, or a stop.`
+Rules: never invent. A field they did not address is null. "lane" follows the seller call flow: 1 = a need and a rough house, or a need/rough house plus a move inside 90 days, or a forcing date, or an empty house they want gone; 2 = some need but none of those, or a Zillow/appraisal number, or they would not say a number; 3 = want only, or a date/event they named, or nothing to go on; never = firm retail with no need, listed, a wholesaler, or a stop.
+A forcing date is a deadline they cannot move: a divorce decree's window to sell, a sheriff sale or foreclosure date, a probate or court deadline, a closing on another house, a job start out of state, a tax or lender deadline. A forcing date makes lane 1 even when the house is fine and even when the number they named is only the payoff. A date they merely prefer (a tenant leaving in March, "by spring") is lane 3's date/event, not a forcing date.`
+
+/** The extraction's shape, enforced by the API as a structured output (a run on 2026-11-07 returned JSON that would not parse). */
+const S = (t: string) => ({ type: [t, 'null'] })
+export const EXTRACTION_SCHEMA = {
+  type: 'object', additionalProperties: false,
+  properties: {
+    caller_name: S('string'), property_address: S('string'), municipality: S('string'),
+    wrong_person: { type: 'boolean' }, stop: { type: 'boolean' }, listed: { type: 'boolean' }, wholesaler: { type: 'boolean' },
+    why: S('string'), condition: S('string'), who_there: S('string'), timeline: S('string'), who_signs: S('string'), their_number: S('string'),
+    need: { type: 'boolean' }, language: S('string'), address_mismatch: { type: 'boolean' }, prefers_text: { type: 'boolean' },
+    lane: { type: 'string', enum: ['1', '2', '3', 'never', 'unclear'] },
+    callback_window: S('string'), callback_at: S('string'), notes: S('string'),
+  },
+  required: ['caller_name', 'property_address', 'municipality', 'wrong_person', 'stop', 'listed', 'wholesaler', 'why', 'condition', 'who_there',
+    'timeline', 'who_signs', 'their_number', 'need', 'language', 'address_mismatch', 'prefers_text', 'lane', 'callback_window', 'callback_at', 'notes'],
+}
+
