@@ -53,7 +53,7 @@ export async function readVoicemail(v: { words: string; owner_name?: string | nu
       headers: { 'content-type': 'application/json', 'x-api-key': opts.apiKey, 'anthropic-version': '2023-06-01',
         'anthropic-beta': 'server-side-fallback-2026-07-01' },
       body: JSON.stringify({
-        model: opts.model || VOICEMAIL_MODEL, max_tokens: 400, fallbacks: 'default', system: SYSTEM,
+        model: opts.model || VOICEMAIL_MODEL, max_tokens: 2000 /* room for default thinking */, fallbacks: 'default', system: SYSTEM,
         messages: [{ role: 'user', content: `The property: ${v.property_address ?? 'unknown'} (owner of record: ${v.owner_name ?? 'unknown'}).\n\nThe voicemail, as transcribed:\n"""${v.words}"""` }],
         output_config: { format: { type: 'json_schema', schema: SCHEMA } },
       }),

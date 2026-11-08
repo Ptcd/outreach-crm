@@ -75,7 +75,7 @@ export function claudeDrafter(opts: { apiKey: string; model?: string; effort?: s
         headers: { 'content-type': 'application/json', 'x-api-key': opts.apiKey, 'anthropic-version': '2023-06-01' },
         body: JSON.stringify({
           model: opts.model || 'claude-sonnet-5-5',
-          max_tokens: 600,
+          max_tokens: 4000,   // room for the model's thinking (on by default on claude-sonnet-5-5): at 600 the thinking ate the budget, stop_reason max_tokens, no draft (2026-11-07)
           system: [
             { type: 'text', text: REPLY_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
             { type: 'text', text: conversationContext(x) },
