@@ -42,7 +42,7 @@ async function* claudeTurn(system: string, messages: Msg[], signal: AbortSignal,
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST', signal,
     headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: MODEL, max_tokens: 300, stream: true, temperature: 0.4,
+    body: JSON.stringify({ model: MODEL, max_tokens: 300, stream: true,
       system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages }),
   })
   if (!res.ok || !res.body) throw new Error(`claude ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`)
@@ -87,7 +87,7 @@ async function extract(transcript: Turn[], card: CallCard | null, from: string):
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: EXTRACT_MODEL, max_tokens: 700, temperature: 0, system: EXTRACTION_PROMPT,
+    body: JSON.stringify({ model: EXTRACT_MODEL, max_tokens: 700, system: EXTRACTION_PROMPT,
       messages: [{ role: 'user', content: `Current time: ${now.toISOString()} (America/Chicago is UTC-6 in November).\nCaller's number: ${from}.\nFile on record: ${card?.owner_name ?? 'unknown'}${card?.address ? `, ${card.address}` : ''}.\n\nTranscript:\n${text}\n\nReturn the JSON object only.` }] }),
   })
   if (!res.ok) return null
