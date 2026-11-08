@@ -28,15 +28,18 @@ $$;
 revoke all on function public.caller_numbers() from public, anon;
 grant execute on function public.caller_numbers() to authenticated, service_role;
 
--- a text typed on the card goes from the caller's own number when they have one (0054 otherwise unchanged)
+-- a text typed on the card goes from the caller's own number when they have one (the live start_card_text, one step added)
 create or replace function public.start_card_text(p_lead_id uuid, p_phone text)
-returns uuid language plpgsql security definer set search_path = public as $$
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
 declare
   l public.leads;
   p text := right(regexp_replace(coalesce(p_phone, ''), '\D', '', 'g'), 10);
   ours text;
   id uuid;
-  me public.team_person := public.wpie_person();
 begin
   if not public.is_team() then raise exception 'not on the team'; end if;
   select * into l from public.leads where leads.id = p_lead_id;
@@ -45,12 +48,13 @@ begin
   if p !~ '^[2-9][0-9]{9}$' then raise exception 'not a phone number'; end if;
   if not exists (select 1 from public.contacts c where c.lead_id = p_lead_id and c.kind = 'phone'
                   and right(regexp_replace(coalesce(c.value_normalized, c.value), '\D', '', 'g'), 10) = p
-                  and not coalesce(c.dnc_app, false) and coalesce(c.status, '') <> 'bad') then
+                  and not coalesce(c.dnc_app, false) and c.status is distinct from 'bad') then
     raise exception 'that phone is not on this card';
   end if;
   if exists (select 1 from public.suppressed_phones s where s.phone10 = p) then raise exception 'this phone opted out'; end if;
-  -- the caller's own line first (0203); else our side of the latest text with this phone; else the latest number we texted the card from
-  select c.number into ours from public.caller_numbers c where c.person = me;
+  -- the caller's own line first (0203: Tyler and Thalia text from their own numbers), else our side of the latest text
+  -- with this phone, else the latest number we texted the card from
+  select c.number into ours from public.caller_numbers c where c.person = public.wpie_person();
   if ours is null then
     select case when m.direction = 'out' then m.from_number else m.to_number end into ours
       from public.messages m
@@ -65,8 +69,8 @@ begin
   end if;
   if ours is null then raise exception 'we have never texted this card: no number to text from yet'; end if;
   insert into public.reply_drafts (phone10, our_number, lead_id, inbound_at, intent, kind, outcome, note, draft_source, status, notified_at)
-  values (p, ours, p_lead_id, now(), 'team_text', 'team', 'open', 'typed on the card by ' || coalesce(me::text, 'team'),
+  values (p, ours, p_lead_id, now(), 'team_text', 'team', 'open', 'typed on the card by ' || coalesce(public.wpie_person()::text, 'team'),
           'team', 'awaiting_approval', now())
   returning reply_drafts.id into id;
   return id;
-end $$;
+end $function$;
