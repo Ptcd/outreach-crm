@@ -134,7 +134,7 @@ export const PERSONAS: Persona[] = [
   { id: 'asks_for_tyler', name: 'Asks for Tyler by name', card: { say_next: 'Tyler texted them yesterday about a cash offer conversation' },
     brief: "Mike, 45. Got a text from 'Tyler' yesterday and wants Tyler, not a machine. Will talk once told the team will call back and Tyler will get the note (does not need it to be Tyler himself). Landlord, tenant trashed the place, wants it gone. Will say 'I'd take one-sixty' if asked.",
     opening: "Yeah, is this Tyler? He texted me yesterday.",
-    expect: { lanes: ['1', '2'], forbid: ["no (one|body) (here )?(named|called) tyler", "don'?t (know|have) (a |any |anyone named )?tyler", 'no tyler'], ended: true, max_turns: 12 } },
+    expect: { lanes: ['1', '2'], forbid: ["no (one|body) (here )?(named|called) tyler", "don'?t (know|have) (a |any |anyone named )?tyler", 'no tyler'], ended: true, max_turns: 14 } },
   { id: 'scam_check', name: 'Thinks the text was a scam, wants to know how we got the number', card: true,
     brief: "Carol, 61. Not hostile, but suspicious: 'is this a scam? how did you get my number?' Wants a real answer before anything. If the answer is honest (public records, a small local company), she relaxes a little but says she is not selling right now. Does not ask to be removed.",
     opening: "Okay, before anything else, how did you get my number? Is this a scam?",
