@@ -40,12 +40,53 @@ async function cardFor(from: string): Promise<CallCard | null> {
   } catch { return null }
 }
 
-/** One streamed Claude turn: yields text pieces with the END_CALL marker held back; sets ended when it appears. */
-async function* claudeTurn(system: string, messages: Msg[], signal: AbortSignal, state: { ended: boolean }): AsyncGenerator<string> {
+const API = 'https://api.anthropic.com/v1/messages'
+const headersFor = (key: string) => ({ 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' })
+const RETRY_STATUSES = new Set([408, 409, 425, 429, 500, 502, 503, 504, 529])
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** A plain (non-streaming) Claude call, retried on 429/5xx/529 and dropped connections; throws with the reason. */
+async function claudeJson(body: Record<string, unknown>, tries = 3): Promise<{ text: string; stop_reason: string }> {
   const key = Deno.env.get('ANTHROPIC_API_KEY') ?? ''
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST', signal,
-    headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+  let last = ''
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await fetch(API, { method: 'POST', headers: headersFor(key), body: JSON.stringify(body) })
+      if (res.ok) {
+        const j = await res.json() as { content?: { text?: string }[]; stop_reason?: string }
+        return { text: (j.content ?? []).map((c) => c.text ?? '').join('').trim(), stop_reason: j.stop_reason ?? '' }
+      }
+      last = `claude ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`
+      if (!RETRY_STATUSES.has(res.status)) break
+    } catch (e) { last = String(e).slice(0, 160) }
+    await wait(1200 * (i + 1))
+  }
+  throw new Error(last || 'claude: no answer')
+}
+
+/** One streamed Claude turn: yields text pieces with the END_CALL marker held back; sets ended when it appears.
+ *  A failure before any text has been spoken (an in-stream overloaded/api error, a 429/5xx, a dropped connection, an
+ *  empty stream) is retried twice in place, so the caller never hears a blank turn. The first simulator run
+ *  (2026-11-07) showed the parser swallowing in-stream error events as silence, the same silence Colin's browser test hit. */
+async function* claudeTurn(system: string, messages: Msg[], signal: AbortSignal, state: { ended: boolean }): AsyncGenerator<string> {
+  let yielded = false
+  for (let attempt = 0; ; attempt++) {
+    try {
+      for await (const piece of claudeStream(system, messages, signal, state)) { yielded = true; yield piece }
+      if (!yielded && !state.ended) throw new Error('empty reply')
+      return
+    } catch (e) {
+      if (yielded || signal.aborted || attempt >= 2) throw e
+      console.warn('[voice-agent] turn retry', attempt + 1, String(e).slice(0, 120))
+      await wait((/\b(429|529|overloaded)\b/.test(String(e)) ? 1500 : 400) * (attempt + 1))
+    }
+  }
+}
+
+async function* claudeStream(system: string, messages: Msg[], signal: AbortSignal, state: { ended: boolean }): AsyncGenerator<string> {
+  const key = Deno.env.get('ANTHROPIC_API_KEY') ?? ''
+  const res = await fetch(API, {
+    method: 'POST', signal, headers: headersFor(key),
     body: JSON.stringify({ model: MODEL, max_tokens: 300, stream: true,
       system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages }),
   })
@@ -61,8 +102,11 @@ async function* claudeTurn(system: string, messages: Msg[], signal: AbortSignal,
     const lines = buf.split('\n'); buf = lines.pop() ?? ''
     for (const line of lines) {
       if (!line.startsWith('data: ')) continue
-      let ev: { type?: string; delta?: { type?: string; text?: string } }
+      let ev: { type?: string; delta?: { type?: string; text?: string; stop_reason?: string }; error?: { type?: string; message?: string } }
       try { ev = JSON.parse(line.slice(6)) } catch { continue }
+      // an error inside a 200 stream (overloaded_error, api_error) used to be skipped here and came out as a blank turn
+      if (ev.type === 'error') throw new Error(`stream ${ev.error?.type ?? 'error'}: ${ev.error?.message ?? ''}`.slice(0, 200))
+      if (ev.type === 'message_delta' && ev.delta?.stop_reason === 'max_tokens') console.warn('[voice-agent] turn cut at max_tokens')
       if (ev.type !== 'content_block_delta' || ev.delta?.type !== 'text_delta') continue
       let s = hold + (ev.delta.text ?? '')
       if (s.includes(END_CALL)) {
@@ -88,18 +132,13 @@ async function extract(transcript: Turn[], card: CallCard | null, from: string):
   if (!key || transcript.length < 2) return null
   const now = new Date()
   const text = transcript.map((t) => `${t.role === 'agent' ? 'Assistant' : 'Caller'}: ${t.text}`).join('\n')
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: EXTRACT_MODEL, max_tokens: 700, system: EXTRACTION_PROMPT,
-      messages: [{ role: 'user', content: `Current time: ${now.toISOString()} (America/Chicago is UTC-6 in November).\nCaller's number: ${from}.\nFile on record: ${card?.owner_name ?? 'unknown'}${card?.address ? `, ${card.address}` : ''}.\n\nTranscript:\n${text}\n\nReturn the JSON object only.` }] }),
-  })
-  if (!res.ok) return null
-  const j = await res.json() as { content?: { type: string; text?: string }[] }
-  const raw = (j.content ?? []).map((c) => c.text ?? '').join('').trim()
-  const m = raw.match(/\{[\s\S]*\}/)
-  if (!m) return null
-  try { return JSON.parse(m[0]) as Record<string, unknown> } catch { return null }
+  // retried on 429/5xx; a failure throws with its reason so the call's events (and the simulator) say why
+  const r = await claudeJson({ model: EXTRACT_MODEL, max_tokens: 1200, system: EXTRACTION_PROMPT,
+    messages: [{ role: 'user', content: `Current time: ${now.toISOString()} (America/Chicago is UTC-6 in November).\nCaller's number: ${from}.\nFile on record: ${card?.owner_name ?? 'unknown'}${card?.address ? `, ${card.address}` : ''}.\n\nTranscript:\n${text}\n\nReturn the JSON object only.` }] })
+  if (r.stop_reason === 'max_tokens') throw new Error('extraction cut at max_tokens')
+  const m = r.text.match(/\{[\s\S]*\}/)
+  if (!m) throw new Error(`extraction not JSON: ${r.text.slice(0, 120)}`)
+  try { return JSON.parse(m[0]) as Record<string, unknown> } catch { throw new Error(`extraction JSON invalid: ${m[0].slice(0, 120)}`) }
 }
 
 /** One turn, collected (the simulator and the self-test): the reply text and whether the assistant ended the call. */
@@ -110,16 +149,10 @@ async function turnText(system: string, messages: Msg[], state: { ended: boolean
 }
 
 async function sellerReply(persona: typeof PERSONAS[number], transcript: Turn[]): Promise<string> {
-  const key = Deno.env.get('ANTHROPIC_API_KEY') ?? ''
   // the seller model sees the assistant's lines as the user and its own as the assistant
   const msgs: Msg[] = transcript.map((t) => ({ role: t.role === 'agent' ? 'user' : 'assistant', content: t.text || '(silence)' }))
   if (msgs.length && msgs[msgs.length - 1].role !== 'user') msgs.push({ role: 'user', content: '(silence)' })
-  const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: MODEL, max_tokens: 160, system: SELLER_SYSTEM(persona), messages: msgs }) })
-  if (!res.ok) throw new Error(`seller model ${res.status}`)
-  const j = await res.json() as { content?: { text?: string }[] }
-  return (j.content ?? []).map((c) => c.text ?? '').join('').trim()
+  return (await claudeJson({ model: MODEL, max_tokens: 160, system: SELLER_SYSTEM(persona), messages: msgs })).text
 }
 
 /** The simulator: Claude plays a persona against the real prompt and turn code; the run is graded and kept. */
@@ -134,6 +167,8 @@ async function simulate(personaId: string): Promise<Record<string, unknown>> {
   const messages: Msg[] = []
   const state = { ended: false }
   let errors = 0
+  let harnessError = ''
+  let extractionError = ''
   let sellerText = persona.opening
   const maxTurns = (persona.expect.max_turns ?? 14) + 2
   for (let i = 0; i < maxTurns && !state.ended; i++) {
@@ -145,12 +180,12 @@ async function simulate(personaId: string): Promise<Record<string, unknown>> {
     messages.push({ role: 'assistant', content: reply || '(ended the call)' })
     transcript.push({ role: 'agent', text: reply })
     if (state.ended) break
-    try { sellerText = await sellerReply(persona, transcript) } catch (e) { console.error('[sim] seller:', String(e).slice(0, 160)); break }
+    try { sellerText = await sellerReply(persona, transcript) } catch (e) { harnessError = String(e).slice(0, 160); console.error('[sim] seller:', harnessError); break }
     if (!sellerText) break
   }
   let extraction: Record<string, unknown> | null = null
-  try { extraction = await extract(transcript, card, '+14145550123') } catch { extraction = null }
-  const checks = grade(persona, transcript, extraction, state.ended, errors)
+  try { extraction = await extract(transcript, card, '+14145550123') } catch (e) { extraction = null; extractionError = String(e).slice(0, 160) }
+  const checks = grade(persona, transcript, extraction, state.ended, errors, { harnessError, extractionError })
   const passed = checks.every((c) => c.ok)
   const seconds = Math.round((Date.now() - started) / 1000)
   await sb().from('voice_sim_runs').insert({ persona: persona.id, name: persona.name, passed, checks, transcript, extraction, seconds, model: MODEL, prompt_version: PROMPT_VERSION })

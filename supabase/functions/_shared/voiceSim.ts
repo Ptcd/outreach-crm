@@ -102,17 +102,22 @@ export type Check = { name: string; ok: boolean; detail?: string }
 
 const MONEY = /\$\s?\d|\b\d{2,3}(?:,\d{3})+\b|\b\d{2,3}\s?(?:k|grand|thousand)\b|\b(?:one|two|three|four|five|six|seven|eight|nine)\s+(?:hundred\s+)?(?:thousand|hundred\s+(?:and\s+)?(?:ten|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety))\b|\bhundred (?:and )?(?:ten|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\b/i
 
-export function grade(p: Persona, transcript: { role: string; text: string }[], extraction: Record<string, unknown> | null, ended: boolean, errors: number): Check[] {
+export function grade(p: Persona, transcript: { role: string; text: string }[], extraction: Record<string, unknown> | null, ended: boolean, errors: number,
+  harness: { harnessError?: string; extractionError?: string } = {}): Check[] {
   const agent = transcript.filter((t) => t.role === 'agent').map((t) => t.text)
   const x = extraction ?? {}
   const out: Check[] = []
+  // the simulator's own seller model failing is the harness's fault, not the assistant's: shown, never hidden
+  if (harness.harnessError) out.push({ name: 'harness: the seller model answered', ok: false, detail: harness.harnessError })
+  const blank = agent.filter((t, i) => i > 0 && !t.trim()).length
+  out.push({ name: 'no blank turns', ok: blank === 0, detail: blank ? `${blank} blank reply(ies)` : undefined })
   const money = agent.filter((t) => MONEY.test(t))
   out.push({ name: 'never a money figure', ok: money.length === 0, detail: money[0]?.slice(0, 120) })
   out.push({ name: 'no lost-you errors', ok: errors === 0, detail: errors ? `${errors} turn error(s)` : undefined })
   const turns = transcript.filter((t) => t.role === 'caller').length
   out.push({ name: `under ${p.expect.max_turns ?? 14} seller turns`, ok: turns <= (p.expect.max_turns ?? 14), detail: `${turns} turns` })
   if (p.expect.ended) out.push({ name: 'ended the call itself', ok: ended })
-  out.push({ name: 'extraction produced', ok: !!extraction })
+  out.push({ name: 'extraction produced', ok: !!extraction, detail: extraction ? undefined : (harness.extractionError || 'null') })
   if (p.expect.lanes) out.push({ name: `lane in ${p.expect.lanes.join('/')}`, ok: p.expect.lanes.includes(String(x.lane ?? '')), detail: `lane ${String(x.lane ?? 'none')}` })
   if (p.expect.stop !== undefined) out.push({ name: `stop = ${p.expect.stop}`, ok: Boolean(x.stop) === p.expect.stop })
   if (p.expect.wrong_person !== undefined) out.push({ name: `wrong person = ${p.expect.wrong_person}`, ok: Boolean(x.wrong_person) === p.expect.wrong_person })

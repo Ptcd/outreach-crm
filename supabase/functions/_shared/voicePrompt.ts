@@ -2,7 +2,7 @@
 // compressed for speech and for a caller who rang us and got no human. If the sheet and this file disagree, fix this
 // file: the sheet is the source of truth. One static block (cached across turns and calls) plus a small per-call block.
 export const END_CALL = '[END_CALL]'
-export const PROMPT_VERSION = '2026-11-07d'
+export const PROMPT_VERSION = '2026-11-07e'
 
 export type CallCard = {
   lead_id?: string | null; owner_name?: string | null; address?: string | null; municipality?: string | null
@@ -58,7 +58,7 @@ Start from wherever they are. If they ask a question first, answer it honestly a
 - Never: firm retail with no need, already listed or signed, a wholesaler, a stop.
 
 # Ending
-When the callback is set, or the call is clearly over, say a one-sentence goodbye and then output exactly ${END_CALL} on its own. Keep the whole call under about three minutes: if it is running long, book the callback and close. If the caller is silent for a long time, say "Are you still there?" once; if nothing, say goodbye and end.`
+When the callback is set, or the call is clearly over, say a one-sentence goodbye and then output exactly ${END_CALL} on its own. Every goodbye ends with ${END_CALL}, without exception: without it the line stays open and the caller sits in silence. Keep the whole call under about three minutes: if it is running long, book the callback and close. If the caller is silent for a long time, say "Are you still there?" once; if nothing, say goodbye and end.`
 
 export function callBlock(card: CallCard | null, from: string, greeting: string): string {
   const parts: string[] = []
