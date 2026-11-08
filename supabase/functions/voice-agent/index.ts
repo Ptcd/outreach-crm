@@ -125,9 +125,20 @@ async function finish(x: { callSid: string; from: string; to: string; card: Call
   return d
 }
 
-Deno.serve((req) => {
+Deno.serve(async (req) => {
   if (req.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
-    return Response.json({ ok: true, agent: 'voice-agent', model: MODEL, key: !!Deno.env.get('ANTHROPIC_API_KEY') })
+    const info: Record<string, unknown> = { ok: true, agent: 'voice-agent', model: MODEL, key: !!Deno.env.get('ANTHROPIC_API_KEY') }
+    // ?selftest=1: one tiny model request with the function's own key; the status and the API's words, never the key
+    if (new URL(req.url).searchParams.get('selftest') === '1') {
+      try {
+        const r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-api-key': Deno.env.get('ANTHROPIC_API_KEY') ?? '', 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify({ model: MODEL, max_tokens: 8, system: [{ type: 'text', text: 'Be terse.', cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content: 'Say hi.' }] }) })
+        const t = await r.text()
+        info.selftest = { status: r.status, body: t.slice(0, 300) }
+      } catch (e) { info.selftest = { error: String(e).slice(0, 300) } }
+    }
+    return Response.json(info)
   }
   // Twilio cannot send a token, so the socket is open to the world at the gateway; the phone system proves itself
   // with the shared alert secret on the URL (the same one it checks on /api/alert). No secret, no socket.
