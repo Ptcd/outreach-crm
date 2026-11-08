@@ -43,18 +43,24 @@ async function cardFor(from: string): Promise<CallCard | null> {
 const API = 'https://api.anthropic.com/v1/messages'
 const headersFor = (key: string) => ({ 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' })
 const RETRY_STATUSES = new Set([408, 409, 425, 429, 500, 502, 503, 504, 529])
+// Thinking is ON by default on claude-sonnet-5-5 (adaptive, effort high) when the request omits `thinking`; on a phone
+// turn with max_tokens 300 the thinking blocks ate the whole budget and the caller heard silence (simulator runs 1-2,
+// 2026-11-07). `disabled` is a 400 on this model; `between_tools` is the documented way to turn it off.
+const THINKING = { type: 'between_tools' }
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 /** A plain (non-streaming) Claude call, retried on 429/5xx/529 and dropped connections; throws with the reason. */
-async function claudeJson(body: Record<string, unknown>, tries = 3): Promise<{ text: string; stop_reason: string }> {
+async function claudeJson(body: Record<string, unknown>, tries = 3): Promise<{ text: string; stop_reason: string; blocks: string }> {
   const key = Deno.env.get('ANTHROPIC_API_KEY') ?? ''
   let last = ''
   for (let i = 0; i < tries; i++) {
     try {
       const res = await fetch(API, { method: 'POST', headers: headersFor(key), body: JSON.stringify(body) })
       if (res.ok) {
-        const j = await res.json() as { content?: { text?: string }[]; stop_reason?: string }
-        return { text: (j.content ?? []).map((c) => c.text ?? '').join('').trim(), stop_reason: j.stop_reason ?? '' }
+        const j = await res.json() as { content?: { type?: string; text?: string }[]; stop_reason?: string }
+        const text = (j.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join('').trim()
+        if (!text) console.warn('[voice-agent] empty text; blocks', (j.content ?? []).map((c) => c.type).join(','), 'stop', j.stop_reason)
+        return { text, stop_reason: j.stop_reason ?? '', blocks: (j.content ?? []).map((c) => c.type ?? '?').join(',') }
       }
       last = `claude ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`
       if (!RETRY_STATUSES.has(res.status)) break
@@ -72,8 +78,9 @@ async function* claudeTurn(system: string, messages: Msg[], signal: AbortSignal,
   let yielded = false
   for (let attempt = 0; ; attempt++) {
     try {
-      for await (const piece of claudeStream(system, messages, signal, state)) { yielded = true; yield piece }
-      if (!yielded && !state.ended) throw new Error('empty reply')
+      const seen = { blocks: [] as string[], stop: '' }
+      for await (const piece of claudeStream(system, messages, signal, state, seen)) { yielded = true; yield piece }
+      if (!yielded && !state.ended) throw new Error(`empty reply (blocks ${seen.blocks.join(',') || 'none'}; stop ${seen.stop || '?'})`)
       return
     } catch (e) {
       if (yielded || signal.aborted || attempt >= 2) throw e
@@ -83,11 +90,11 @@ async function* claudeTurn(system: string, messages: Msg[], signal: AbortSignal,
   }
 }
 
-async function* claudeStream(system: string, messages: Msg[], signal: AbortSignal, state: { ended: boolean }): AsyncGenerator<string> {
+async function* claudeStream(system: string, messages: Msg[], signal: AbortSignal, state: { ended: boolean }, seen?: { blocks: string[]; stop: string }): AsyncGenerator<string> {
   const key = Deno.env.get('ANTHROPIC_API_KEY') ?? ''
   const res = await fetch(API, {
     method: 'POST', signal, headers: headersFor(key),
-    body: JSON.stringify({ model: MODEL, max_tokens: 300, stream: true,
+    body: JSON.stringify({ model: MODEL, max_tokens: 400, stream: true, thinking: THINKING,
       system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages }),
   })
   if (!res.ok || !res.body) throw new Error(`claude ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`)
@@ -106,7 +113,8 @@ async function* claudeStream(system: string, messages: Msg[], signal: AbortSigna
       try { ev = JSON.parse(line.slice(6)) } catch { continue }
       // an error inside a 200 stream (overloaded_error, api_error) used to be skipped here and came out as a blank turn
       if (ev.type === 'error') throw new Error(`stream ${ev.error?.type ?? 'error'}: ${ev.error?.message ?? ''}`.slice(0, 200))
-      if (ev.type === 'message_delta' && ev.delta?.stop_reason === 'max_tokens') console.warn('[voice-agent] turn cut at max_tokens')
+      if (ev.type === 'message_delta' && ev.delta?.stop_reason) { if (seen) seen.stop = ev.delta.stop_reason; if (ev.delta.stop_reason === 'max_tokens') console.warn('[voice-agent] turn cut at max_tokens') }
+      if (ev.type === 'content_block_start' && seen) seen.blocks.push((ev as { content_block?: { type?: string } }).content_block?.type ?? '?')
       if (ev.type !== 'content_block_delta' || ev.delta?.type !== 'text_delta') continue
       let s = hold + (ev.delta.text ?? '')
       if (s.includes(END_CALL)) {
@@ -133,7 +141,7 @@ async function extract(transcript: Turn[], card: CallCard | null, from: string):
   const now = new Date()
   const text = transcript.map((t) => `${t.role === 'agent' ? 'Assistant' : 'Caller'}: ${t.text}`).join('\n')
   // retried on 429/5xx; a failure throws with its reason so the call's events (and the simulator) say why
-  const r = await claudeJson({ model: EXTRACT_MODEL, max_tokens: 1200, system: EXTRACTION_PROMPT,
+  const r = await claudeJson({ model: EXTRACT_MODEL, max_tokens: 1500, thinking: THINKING, system: EXTRACTION_PROMPT,
     messages: [{ role: 'user', content: `Current time: ${now.toISOString()} (America/Chicago is UTC-6 in November).\nCaller's number: ${from}.\nFile on record: ${card?.owner_name ?? 'unknown'}${card?.address ? `, ${card.address}` : ''}.\n\nTranscript:\n${text}\n\nReturn the JSON object only.` }] })
   if (r.stop_reason === 'max_tokens') throw new Error('extraction cut at max_tokens')
   const m = r.text.match(/\{[\s\S]*\}/)
@@ -152,7 +160,13 @@ async function sellerReply(persona: typeof PERSONAS[number], transcript: Turn[])
   // the seller model sees the assistant's lines as the user and its own as the assistant
   const msgs: Msg[] = transcript.map((t) => ({ role: t.role === 'agent' ? 'user' : 'assistant', content: t.text || '(silence)' }))
   if (msgs.length && msgs[msgs.length - 1].role !== 'user') msgs.push({ role: 'user', content: '(silence)' })
-  return (await claudeJson({ model: MODEL, max_tokens: 160, system: SELLER_SYSTEM(persona), messages: msgs })).text
+  for (let i = 0; i < 2; i++) {
+    const r = await claudeJson({ model: MODEL, max_tokens: 200, thinking: THINKING, system: SELLER_SYSTEM(persona), messages: msgs })
+    if (r.text) return r.text
+    console.warn('[sim] seller empty reply, stop_reason', r.stop_reason)
+    if (i === 1) throw new Error(`seller model: empty reply twice (blocks ${r.blocks}; stop ${r.stop_reason})`)
+  }
+  throw new Error('seller model: empty reply twice')
 }
 
 /** The simulator: Claude plays a persona against the real prompt and turn code; the run is graded and kept. */
@@ -169,6 +183,7 @@ async function simulate(personaId: string): Promise<Record<string, unknown>> {
   let errors = 0
   let harnessError = ''
   let extractionError = ''
+  const turnErrors: string[] = []
   let sellerText = persona.opening
   const maxTurns = (persona.expect.max_turns ?? 14) + 2
   for (let i = 0; i < maxTurns && !state.ended; i++) {
@@ -176,16 +191,16 @@ async function simulate(personaId: string): Promise<Record<string, unknown>> {
     transcript.push({ role: 'caller', text: sellerText })
     messages.push({ role: 'user', content: sellerText })
     let reply = ''
-    try { reply = await turnText(system, messages, state) } catch (e) { errors += 1; reply = "I'm sorry, I lost you for a second. Could you say that once more?"; console.error('[sim] turn:', String(e).slice(0, 160)) }
+    try { reply = await turnText(system, messages, state) } catch (e) { errors += 1; turnErrors.push(String(e).slice(0, 120)); reply = "I'm sorry, I lost you for a second. Could you say that once more?"; console.error('[sim] turn:', String(e).slice(0, 160)) }
     messages.push({ role: 'assistant', content: reply || '(ended the call)' })
     transcript.push({ role: 'agent', text: reply })
     if (state.ended) break
     try { sellerText = await sellerReply(persona, transcript) } catch (e) { harnessError = String(e).slice(0, 160); console.error('[sim] seller:', harnessError); break }
-    if (!sellerText) break
+    if (!sellerText) { harnessError = 'seller model: empty reply'; break }
   }
   let extraction: Record<string, unknown> | null = null
   try { extraction = await extract(transcript, card, '+14145550123') } catch (e) { extraction = null; extractionError = String(e).slice(0, 160) }
-  const checks = grade(persona, transcript, extraction, state.ended, errors, { harnessError, extractionError })
+  const checks = grade(persona, transcript, extraction, state.ended, errors, { harnessError, extractionError, turnErrors })
   const passed = checks.every((c) => c.ok)
   const seconds = Math.round((Date.now() - started) / 1000)
   await sb().from('voice_sim_runs').insert({ persona: persona.id, name: persona.name, passed, checks, transcript, extraction, seconds, model: MODEL, prompt_version: PROMPT_VERSION })
