@@ -138,6 +138,19 @@ Deno.serve(async (req) => {
         info.selftest = { status: r.status, body: t.slice(0, 300) }
       } catch (e) { info.selftest = { error: String(e).slice(0, 300) } }
     }
+    // ?selftest=2: the real streaming turn, as a call would run it
+    if (new URL(req.url).searchParams.get('selftest') === '2') {
+      const got: string[] = []
+      const st = { ended: false }
+      try {
+        const sys = `${STATIC_PROMPT}
+
+# This call
+${callBlock(null, '+15555550100', greetingFor(null))}`
+        for await (const piece of claudeTurn(sys, [{ role: 'user', content: 'Yeah, this is John. It is about the house on Highway 12.' }], new AbortController().signal, st)) got.push(piece)
+        info.selftest2 = { ok: true, text: got.join('').slice(0, 300), ended: st.ended }
+      } catch (e) { info.selftest2 = { error: String(e).slice(0, 400), stack: String((e as Error).stack ?? '').slice(0, 400) } }
+    }
     return Response.json(info)
   }
   // Twilio cannot send a token, so the socket is open to the world at the gateway; the phone system proves itself
