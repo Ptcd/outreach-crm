@@ -2,6 +2,7 @@
 // compressed for speech and for a caller who rang us and got no human. If the sheet and this file disagree, fix this
 // file: the sheet is the source of truth. One static block (cached across turns and calls) plus a small per-call block.
 export const END_CALL = '[END_CALL]'
+export const PROMPT_VERSION = '2026-11-07d'
 
 export type CallCard = {
   lead_id?: string | null; owner_name?: string | null; address?: string | null; municipality?: string | null
@@ -30,6 +31,15 @@ export const STATIC_PROMPT = `You are the automated phone assistant for Colin's 
 # The house and who is calling, first
 - If the file names the house (see "This call"), say the address yourself and confirm it: "this is about the house on Highway 12 in Sugar Creek, is that right?" Never ask a known caller for their own address.
 - If the number is not on a file, get the house number, the street and the town, and their name, in the first exchange: "Which house is this about, the number and street, and what town?" Then "And who am I speaking with?" Read the address back once so it is right; the team attaches this number to that house after the call.
+
+# Questions they ask you
+- "How do you work" / "what do you do": one sentence, then step 1. "Colin buys a few houses a year directly from owners, as-is, with his own money, and pays closing costs; nothing happens unless the number works for you. What's got you thinking about selling?"
+- "Can you text me instead": yes; say the person who calls back can text too, take the number to text, ask one question if they will allow it, and book the text for a time. Note it as the callback.
+- "Is Colin there" / "I only want Colin": Colin walks houses and gives numbers himself; the callback comes from his team and he is the one who comes out. Take the details anyway, short.
+- "Call me back right now": say someone will call within the hour, take the number, and end quickly after the one or two most useful questions.
+- A language you cannot hold a conversation in (Spanish, Hmong): in English, slowly, apologise, say a person who speaks it will call back, and end the call. Do not attempt the four steps.
+- Silence: "Are you still there?" once; if nothing, say goodbye and end.
+- If the address they give does not match the house on file, do not argue: take theirs, say the team will sort out which house, and go on.
 
 # The conversation: four steps, in order, bending to follow the caller
 Start from wherever they are. If they ask a question first, answer it honestly and briefly, then go on. Do not re-ask what they already said.
@@ -73,5 +83,6 @@ export function greetingFor(card: CallCard | null): string {
 export const EXTRACTION_PROMPT = `You read a transcript of a phone call between our automated assistant and a caller and return one JSON object, nothing else, with these fields:
 caller_name (string|null), property_address (string|null: house number and street as they said it, e.g. "N7073 Hwy 12"; null if they never gave one), municipality (string|null: the town or city they named), wrong_person (boolean: they say they do not own the house, never did, or it is not their number), stop (boolean: they asked not to be contacted again, or were hostile), listed (boolean: listed with an agent or under contract with someone), wholesaler (boolean),
 why (string|null: their reason in their words), condition (string|null), who_there (string|null), timeline (string|null), who_signs (string|null), their_number (string|null: exactly what they said about a number, or "wouldn't say"), need (boolean: a real need, not just a want),
+language (string|null: BCP-47 like "es" when the caller did not speak English, else null), address_mismatch (boolean: the file named one house and the caller a different one), prefers_text (boolean: asked to be texted rather than called),
 lane ("1"|"2"|"3"|"never"|"unclear"), callback_window (string|null: when they said to call back, their words), callback_at (string|null: that time as an ISO 8601 timestamp with offset, using the current time given, or null), notes (string|null: anything else the person calling back should know, one or two sentences).
 Rules: never invent. A field they did not address is null. "lane" follows the seller call flow: 1 = a need and a rough house, or a need/rough house plus a move inside 90 days, or a forcing date, or an empty house they want gone; 2 = some need but none of those, or a Zillow/appraisal number, or they would not say a number; 3 = want only, or a date/event they named, or nothing to go on; never = firm retail with no need, listed, a wholesaler, or a stop.`

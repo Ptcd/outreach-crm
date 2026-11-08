@@ -9,12 +9,16 @@
 // A customParameter test=1 runs the conversation but writes nothing and returns the extraction in handoffData.
 import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
 import { pushToPerson } from '../_shared/notifyDeno.ts'
-import { callBlock, END_CALL, EXTRACTION_PROMPT, STATIC_PROMPT, greetingFor, type CallCard } from '../_shared/voicePrompt.ts'
+import { callBlock, END_CALL, EXTRACTION_PROMPT, PROMPT_VERSION, STATIC_PROMPT, greetingFor, type CallCard } from '../_shared/voicePrompt.ts'
+import { PERSONAS, SELLER_SYSTEM, grade } from '../_shared/voiceSim.ts'
 
 const MODEL = Deno.env.get('VOICE_MODEL') || 'claude-sonnet-5-5'
 const EXTRACT_MODEL = Deno.env.get('VOICE_EXTRACTION_MODEL') || MODEL
 const MAX_CALL_MS = Number(Deno.env.get('VOICE_MAX_CALL_MS') || 170_000)   // the edge runtime's wall clock is the ceiling
 const WRAP_UP_MS = Number(Deno.env.get('VOICE_WRAP_UP_MS') || 120_000)
+const SILENCE_MS = 15_000          // nothing from the caller for this long: "Are you still there?"
+const SILENCE_END_MS = 10_000      // and this much longer: goodbye
+const MAX_TURN_ERRORS = 2          // model failures in a row before the assistant bows out
 
 type Turn = { role: 'agent' | 'caller'; text: string }
 type Msg = { role: 'user' | 'assistant'; content: string }
@@ -98,6 +102,61 @@ async function extract(transcript: Turn[], card: CallCard | null, from: string):
   try { return JSON.parse(m[0]) as Record<string, unknown> } catch { return null }
 }
 
+/** One turn, collected (the simulator and the self-test): the reply text and whether the assistant ended the call. */
+async function turnText(system: string, messages: Msg[], state: { ended: boolean }): Promise<string> {
+  const parts: string[] = []
+  for await (const piece of claudeTurn(system, messages, new AbortController().signal, state)) parts.push(piece)
+  return parts.join('').trim()
+}
+
+async function sellerReply(persona: typeof PERSONAS[number], transcript: Turn[]): Promise<string> {
+  const key = Deno.env.get('ANTHROPIC_API_KEY') ?? ''
+  // the seller model sees the assistant's lines as the user and its own as the assistant
+  const msgs: Msg[] = transcript.map((t) => ({ role: t.role === 'agent' ? 'user' : 'assistant', content: t.text || '(silence)' }))
+  if (msgs.length && msgs[msgs.length - 1].role !== 'user') msgs.push({ role: 'user', content: '(silence)' })
+  const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: MODEL, max_tokens: 160, system: SELLER_SYSTEM(persona), messages: msgs }) })
+  if (!res.ok) throw new Error(`seller model ${res.status}`)
+  const j = await res.json() as { content?: { text?: string }[] }
+  return (j.content ?? []).map((c) => c.text ?? '').join('').trim()
+}
+
+/** The simulator: Claude plays a persona against the real prompt and turn code; the run is graded and kept. */
+async function simulate(personaId: string): Promise<Record<string, unknown>> {
+  const persona = PERSONAS.find((p) => p.id === personaId)
+  if (!persona) return { ok: false, error: `no persona ${personaId}`, personas: PERSONAS.map((p) => p.id) }
+  const started = Date.now()
+  const card: CallCard | null = persona.card ? { lead_id: null, owner_name: 'Pat Tester', address: '123 Test St', municipality: 'West Bend', reasons: ['behind on taxes'], owner_type: 'individual' } : null
+  const greeting = greetingFor(card)
+  const system = `${STATIC_PROMPT}\n\n# This call\n${callBlock(card, '+14145550123', greeting)}`
+  const transcript: Turn[] = [{ role: 'agent', text: greeting }]
+  const messages: Msg[] = []
+  const state = { ended: false }
+  let errors = 0
+  let sellerText = persona.opening
+  const maxTurns = (persona.expect.max_turns ?? 14) + 2
+  for (let i = 0; i < maxTurns && !state.ended; i++) {
+    if (sellerText.includes('[HANGUP]')) break
+    transcript.push({ role: 'caller', text: sellerText })
+    messages.push({ role: 'user', content: sellerText })
+    let reply = ''
+    try { reply = await turnText(system, messages, state) } catch (e) { errors += 1; reply = "I'm sorry, I lost you for a second. Could you say that once more?"; console.error('[sim] turn:', String(e).slice(0, 160)) }
+    messages.push({ role: 'assistant', content: reply || '(ended the call)' })
+    transcript.push({ role: 'agent', text: reply })
+    if (state.ended) break
+    try { sellerText = await sellerReply(persona, transcript) } catch (e) { console.error('[sim] seller:', String(e).slice(0, 160)); break }
+    if (!sellerText) break
+  }
+  let extraction: Record<string, unknown> | null = null
+  try { extraction = await extract(transcript, card, '+14145550123') } catch { extraction = null }
+  const checks = grade(persona, transcript, extraction, state.ended, errors)
+  const passed = checks.every((c) => c.ok)
+  const seconds = Math.round((Date.now() - started) / 1000)
+  await sb().from('voice_sim_runs').insert({ persona: persona.id, name: persona.name, passed, checks, transcript, extraction, seconds, model: MODEL, prompt_version: PROMPT_VERSION })
+  return { ok: true, persona: persona.id, name: persona.name, passed, checks, seconds, turns: transcript.filter((t) => t.role === 'caller').length, ended: state.ended, extraction, transcript }
+}
+
 async function finish(x: { callSid: string; from: string; to: string; card: CallCard | null; transcript: Turn[]; startedAt: number; test: boolean; outcome?: string; events: object[] }) {
   const seconds = Math.round((Date.now() - x.startedAt) / 1000)
   let extraction: Record<string, unknown> | null = null
@@ -109,6 +168,14 @@ async function finish(x: { callSid: string; from: string; to: string; card: Call
     await db.from('voice_calls').upsert({ call_sid: x.callSid, lead_id: null, from10: x.from.replace(/\D/g, '').slice(-10), to_number: x.to, ended_at: new Date().toISOString(),
       seconds, transcript: x.transcript, extraction, outcome: 'test', events: x.events }, { onConflict: 'call_sid' })
     return { test: true, seconds, extraction }
+  }
+  const callerTurns = x.transcript.filter((t) => t.role === 'caller').length
+  if (!extraction && callerTurns >= 2) {
+    // a real conversation whose read failed: the caller still gets the task, with the thread's tail (0206)
+    const r0 = await db.rpc('voice_agent_talked_no_extraction', { p: { call_sid: x.callSid, from: x.from, to: x.to, lead_id: x.card?.lead_id ?? null,
+      transcript: x.transcript, seconds, events: x.events } })
+    if (r0.error) console.error('[voice-agent] talked_no_extraction:', r0.error.message)
+    return (r0.data ?? {}) as Record<string, unknown>
   }
   const r = await db.rpc('voice_agent_result', { p: { call_sid: x.callSid, from: x.from, to: x.to, lead_id: x.card?.lead_id ?? null,
     transcript: x.transcript, extraction, seconds, outcome: x.outcome ?? (extraction ? null : 'hung_up') } })
@@ -159,6 +226,23 @@ ${callBlock(null, '+15555550100', greetingFor(null))}`
         info.selftest2 = { ok: true, text: got.join('').slice(0, 300), ended: st.ended }
       } catch (e) { info.selftest2 = { error: String(e).slice(0, 400), stack: String((e as Error).stack ?? '').slice(0, 400) } }
     }
+    const u = new URL(req.url)
+    if (u.searchParams.get('personas') === '1') return Response.json({ personas: PERSONAS.map((p) => ({ id: p.id, name: p.name })) , prompt_version: PROMPT_VERSION })
+    const simId = u.searchParams.get('sim')
+    if (simId) {
+      // auth: the shared alert secret (reply-send, on Colin's click), or a one-hour token the laptop wrote to voice_sim_tokens
+      const secret = (Deno.env.get('ALERT_SECRET') ?? '').trim()
+      const given = u.searchParams.get('s') ?? ''
+      let allowed = !!secret && given === secret
+      const token = u.searchParams.get('token') ?? ''
+      if (!allowed && /^[A-Za-z0-9_-]{16,80}$/.test(token)) {
+        const t = await sb().from('voice_sim_tokens').select('token, created_at').eq('token', token).maybeSingle()
+        allowed = !!t.data && Date.now() - new Date((t.data as { created_at: string }).created_at).getTime() < 3_600_000
+      }
+      if (!allowed) return Response.json({ ok: false, error: 'forbidden' }, { status: 403 })
+      if (!Deno.env.get('ANTHROPIC_API_KEY')) return Response.json({ ok: false, error: 'no key' }, { status: 503 })
+      try { return Response.json(await simulate(simId)) } catch (e) { return Response.json({ ok: false, error: String(e).slice(0, 300) }, { status: 500 }) }
+    }
     return Response.json(info)
   }
   // Twilio cannot send a token, so the socket is open to the world at the gateway; the phone system proves itself
@@ -178,12 +262,28 @@ ${callBlock(null, '+15555550100', greetingFor(null))}`
   let wrapTimer: number | undefined
   let hardTimer: number | undefined
   let resumeTimer: number | undefined
+  let silenceTimer: number | undefined
+  let silenceAsked = false
+  let turnErrors = 0
   let lastUser = ''
   const startedAt = Date.now()
   const events: object[] = []
   const log = (type: string, detail?: string) => { if (events.length < 400) events.push({ at: Date.now() - startedAt, type, ...(detail ? { detail: detail.slice(0, 160) } : {}) }) }
   const send = (m: object) => { try { socket.send(JSON.stringify(m)) } catch { /* closed */ } }
   const endCall = (reason: string) => { send({ type: 'end', handoffData: JSON.stringify({ reason, callSid }) }) }
+  // nothing from the caller: ask once, then go
+  const armSilence = () => {
+    clearTimeout(silenceTimer)
+    if (state.ended) return
+    silenceTimer = setTimeout(() => {
+      if (state.ended) return
+      if (!silenceAsked) {
+        silenceAsked = true; log('silence_ask')
+        send({ type: 'text', token: 'Are you still there?', last: true }); transcript.push({ role: 'agent', text: 'Are you still there?' })
+        silenceTimer = setTimeout(() => { if (!state.ended) { state.ended = true; log('silence_end'); send({ type: 'text', token: "I'll let you go. Thanks for calling; the team will call you back. Goodbye.", last: true }); endCall('silence') } }, SILENCE_END_MS)
+      }
+    }, SILENCE_MS)
+  }
 
   const speak = async (userText: string, resume = false) => {
     turn?.abort()
@@ -198,14 +298,21 @@ ${callBlock(null, '+15555550100', greetingFor(null))}`
         said.push(piece)
         send({ type: 'text', token: piece, last: false })
       }
-      if (!ctl.signal.aborted) { send({ type: 'text', token: '', last: true }); log('turn_done', said.join('').slice(0, 80)) }
+      if (!ctl.signal.aborted) { send({ type: 'text', token: '', last: true }); log('turn_done', said.join('').slice(0, 80)); turnErrors = 0; silenceAsked = false; armSilence() }
       else log('turn_aborted', said.join('').slice(0, 80))
     } catch (e) {
       if (!ctl.signal.aborted) {
         console.error('[voice-agent] turn:', String(e).slice(0, 200))
         log('turn_error', String(e))
-        const line = "I'm sorry, I lost you for a second. Could you say that once more?"
-        said.push(line); send({ type: 'text', token: line, last: true })
+        turnErrors += 1
+        if (turnErrors >= MAX_TURN_ERRORS) {
+          state.ended = true
+          const line = "I'm having trouble on my end, so I won't keep you. Someone from the team will call you back shortly. Thanks for calling."
+          said.push(line); send({ type: 'text', token: line, last: true })
+        } else {
+          const line = "I'm sorry, I lost you for a second. Could you say that once more?"
+          said.push(line); send({ type: 'text', token: line, last: true }); armSilence()
+        }
       } else log('turn_abort_error', String(e))
     } finally {
       const text = said.join('').trim()
@@ -232,11 +339,12 @@ ${callBlock(null, '+15555550100', greetingFor(null))}`
       wrapTimer = setTimeout(() => { log('wrap_up'); if (!state.ended) messages.push({ role: 'user', content: '(system: the call is running long; book the callback in one sentence, say goodbye, and end)' }) }, WRAP_UP_MS)
       hardTimer = setTimeout(() => { log('hard_stop'); if (!state.ended) { state.ended = true; send({ type: 'text', token: "I have to let you go now. Thanks for calling; the team will call you back shortly.", last: true }); endCall('time-limit') } }, MAX_CALL_MS)
       log('ready', card?.address ?? 'no card')
+      armSilence()
       return
     }
     if (msg.type === 'prompt') {
-      if (msg.last === false) return
-      clearTimeout(resumeTimer)
+      if (msg.last === false) { clearTimeout(silenceTimer); return }
+      clearTimeout(resumeTimer); clearTimeout(silenceTimer)
       const text = String(msg.voicePrompt ?? msg.transcription ?? '').trim()
       if (!text || state.ended) return
       void speak(text)
@@ -256,7 +364,7 @@ ${callBlock(null, '+15555550100', greetingFor(null))}`
 
   socket.onclose = async (ev) => {
     log('close', `code ${ev.code}${ev.reason ? ' ' + ev.reason : ''}`)
-    clearTimeout(wrapTimer); clearTimeout(hardTimer); clearTimeout(resumeTimer); turn?.abort()
+    clearTimeout(wrapTimer); clearTimeout(hardTimer); clearTimeout(resumeTimer); clearTimeout(silenceTimer); turn?.abort()
     if (finished || !callSid) return
     finished = true
     try { await finish({ callSid, from, to, card, transcript, startedAt, test, outcome: state.ended ? undefined : 'hung_up', events }) }

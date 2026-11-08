@@ -82,6 +82,16 @@ Deno.serve(async (req) => {
     if (!r.ok) return json({ outcome: 'refused', reason: `Twilio: ${(j.message ?? r.status).toString().slice(0, 160)}` })
     return json({ outcome: 'calling', call_sid: j.sid, mode, to: to10 })
   }
+  if (action === 'simulate_assistant') {
+    // Settings, "Run the simulator": one persona through the voice-agent's simulator, graded; owner only
+    if ((me.data as { role?: string }).role !== 'owner') return json({ outcome: 'refused', reason: 'owner only' }, 403)
+    const secret = (Deno.env.get('ALERT_SECRET') ?? '').trim()
+    const persona = String(body.persona ?? '').replace(/[^a-z0-9_]/gi, '').slice(0, 40)
+    if (!persona) return json({ outcome: 'refused', reason: 'which persona' })
+    const r = await fetch(`${url}/functions/v1/voice-agent?sim=${encodeURIComponent(persona)}&s=${encodeURIComponent(secret)}`)
+    const j = await r.json().catch(() => ({ ok: false, error: `voice-agent ${r.status}` }))
+    return json(j, r.ok ? 200 : 502)
+  }
   if (action === 'test_notification') {
     const sbs = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', { auth: { persistSession: false } })
     const rpcs: Rpc = async (fn, args) => {

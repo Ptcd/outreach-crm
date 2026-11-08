@@ -58,6 +58,89 @@ export function AssistantTest() {
   )
 }
 
+type SimRun = { id: number; persona: string; name: string | null; passed: boolean; checks: { name: string; ok: boolean; detail?: string }[]; seconds: number | null; created_at: string
+  transcript: { role: string; text: string }[] | null; extraction: Record<string, unknown> | null; prompt_version: string | null }
+
+/** The simulator (2026-11-07): twenty sellers played by the model against the real assistant, each run graded by machine. */
+export function AssistantSimulator() {
+  const [personas, setPersonas] = useState<{ id: string; name: string }[]>([])
+  const [running, setRunning] = useState<string | null>(null)
+  const [progress, setProgress] = useState<string | null>(null)
+  const runs = useQuery({
+    queryKey: ['voice_sim_runs'],
+    queryFn: async () => {
+      const r = await supabase.from('voice_sim_runs').select('id, persona, name, passed, checks, seconds, created_at, transcript, extraction, prompt_version').order('created_at', { ascending: false }).limit(60)
+      if (r.error) throw new Error(r.error.message)
+      return (r.data ?? []) as SimRun[]
+    },
+  })
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/voice-agent?personas=1`).then((r) => r.json()).then((j) => setPersonas(j.personas ?? [])).catch(() => setPersonas([]))
+  }, [])
+  const latest = new Map<string, SimRun>()
+  for (const r of runs.data ?? []) if (!latest.has(r.persona)) latest.set(r.persona, r)
+  const runOne = async (id: string) => {
+    const r = await supabase.functions.invoke('reply-send', { body: { action: 'simulate_assistant', persona: id } })
+    await runs.refetch()
+    return r
+  }
+  const runAll = async () => {
+    setRunning('all')
+    for (let i = 0; i < personas.length; i++) {
+      setProgress(`${i + 1} of ${personas.length}: ${personas[i].name}`)
+      await runOne(personas[i].id)
+    }
+    setProgress(null); setRunning(null)
+  }
+  const passed = Array.from(latest.values()).filter((r) => r.passed).length
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Twenty sellers played by the model against the real assistant, no phones: the hostile one, the estate, the one who demands a price, the one who will not give one, the wrong number, the Spanish speaker. Each run is graded: never a money figure, the lane the sheet gives, the flags, the answers captured, a clean ending. About a minute a persona.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button className="h-10" disabled={!!running || !personas.length} onClick={() => void runAll()}>{running === 'all' ? 'Running...' : 'Run all twenty'}</Button>
+        {latest.size > 0 && <Badge tone={passed === latest.size ? 'good' : 'warn'}>{passed} of {latest.size} passing</Badge>}
+        {progress && <span className="text-sm text-muted-foreground">{progress}</span>}
+      </div>
+      <ErrorNote error={runs.error} />
+      <ul className="space-y-2">
+        {personas.map((p) => {
+          const r = latest.get(p.id)
+          return <SimRow key={p.id} name={p.name} run={r} busy={!!running} onRun={async () => { setRunning(p.id); await runOne(p.id); setRunning(null) }} />
+        })}
+      </ul>
+    </div>
+  )
+}
+
+function SimRow({ name, run, busy, onRun }: { name: string; run?: SimRun; busy: boolean; onRun: () => Promise<unknown> }) {
+  const [open, setOpen] = useState(false)
+  const failed = run?.checks.filter((c) => !c.ok) ?? []
+  return (
+    <li className="rounded-2xl border bg-card p-3 shadow-[var(--shadow-soft)]">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">{name}</p>
+          {run ? <p className="text-xs text-muted-foreground">{fmtDateTime(run.created_at)} · {run.seconds ?? 0}s · prompt {run.prompt_version ?? '?'}</p> : <p className="text-xs text-muted-foreground">not run yet</p>}
+        </div>
+        <div className="flex items-center gap-1.5">
+          {run && <Badge tone={run.passed ? 'good' : 'bad'}>{run.passed ? 'pass' : `${failed.length} failing`}</Badge>}
+          <Button variant="outline" size="sm" disabled={busy} onClick={() => void onRun()}>Run</Button>
+          {run && <button type="button" className="text-sm underline-offset-2 hover:underline" onClick={() => setOpen((v) => !v)}>{open ? 'Hide' : 'Details'}</button>}
+        </div>
+      </div>
+      {run && failed.length > 0 && !open && <p className="mt-1 text-xs text-destructive">{failed.map((c) => `${c.name}${c.detail ? ` (${c.detail})` : ''}`).join(' · ')}</p>}
+      {run && open && (
+        <div className="mt-2 space-y-2 text-sm">
+          <ul className="grid gap-0.5 sm:grid-cols-2">{run.checks.map((c, i) => <li key={i} className={c.ok ? '' : 'text-destructive'}>{c.ok ? '✓' : '✗'} {c.name}{c.detail ? <span className="text-muted-foreground"> · {c.detail}</span> : null}</li>)}</ul>
+          <div className="space-y-1">{(run.transcript ?? []).map((t, i) => <p key={i} className={t.role === 'agent' ? 'text-primary' : ''}><span className="text-muted-foreground">{t.role === 'agent' ? 'assistant' : 'seller'}:</span> {t.text}</p>)}</div>
+        </div>
+      )}
+    </li>
+  )
+}
+
 function TestCallCard({ c }: { c: TestCall }) {
   const [open, setOpen] = useState(false)
   const [events, setEvents] = useState(false)
