@@ -43,3 +43,8 @@ verify_jwt = false
 # and the app's Settings actions (the function checks the owner role itself). Migration 0074.
 [functions.calendar]
 verify_jwt = false
+
+# voice-agent is opened by Twilio's ConversationRelay, which carries no token; the socket proves itself with the shared
+# alert secret on the URL instead (see the function). Declared here, not as a deploy flag.
+[functions.voice-agent]
+verify_jwt = false
