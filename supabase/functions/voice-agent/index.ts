@@ -179,7 +179,9 @@ async function simulate(personaId: string): Promise<Record<string, unknown>> {
   const persona = PERSONAS.find((p) => p.id === personaId)
   if (!persona) return { ok: false, error: `no persona ${personaId}`, personas: PERSONAS.map((p) => p.id) }
   const started = Date.now()
-  const card: CallCard | null = persona.card ? { lead_id: null, owner_name: 'Pat Tester', address: '123 Test St', municipality: 'West Bend', reasons: ['behind on taxes'], owner_type: 'individual' } : null
+  const card: CallCard | null = persona.card
+    ? { lead_id: null, owner_name: 'Pat Tester', address: '123 Test St', municipality: 'West Bend', reasons: ['behind on taxes'], owner_type: 'individual', ...(typeof persona.card === 'object' ? persona.card : {}) }
+    : null
   const greeting = greetingFor(card)
   const system = `${STATIC_PROMPT}\n\n# This call\n${callBlock(card, '+14145550123', greeting)}`
   const transcript: Turn[] = [{ role: 'agent', text: greeting }]
