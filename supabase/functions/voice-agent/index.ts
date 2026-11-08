@@ -101,8 +101,13 @@ async function extract(transcript: Turn[], card: CallCard | null, from: string):
 async function finish(x: { callSid: string; from: string; to: string; card: CallCard | null; transcript: Turn[]; startedAt: number; test: boolean; outcome?: string }) {
   const seconds = Math.round((Date.now() - x.startedAt) / 1000)
   const extraction = x.transcript.some((t) => t.role === 'caller') ? await extract(x.transcript, x.card, x.from) : null
-  if (x.test) return { test: true, seconds, extraction, transcript: x.transcript }
   const db = sb()
+  if (x.test) {
+    // a test call (Settings, "Test the assistant"): nothing touches a card; the transcript and extraction are kept as a test
+    await db.from('voice_calls').upsert({ call_sid: x.callSid, lead_id: null, from10: x.from.replace(/\D/g, '').slice(-10), to_number: x.to, ended_at: new Date().toISOString(),
+      seconds, transcript: x.transcript, extraction, outcome: 'test' }, { onConflict: 'call_sid' })
+    return { test: true, seconds, extraction }
+  }
   const r = await db.rpc('voice_agent_result', { p: { call_sid: x.callSid, from: x.from, to: x.to, lead_id: x.card?.lead_id ?? null,
     transcript: x.transcript, extraction, seconds, outcome: x.outcome ?? (extraction ? null : 'hung_up') } })
   const d = (r.data ?? {}) as { ok?: boolean; outcome?: string; owner?: string; owner_whatsapp?: string | null; owner_name?: string; address?: string; municipality?: string; lead_id?: string; due_at?: string }

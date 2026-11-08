@@ -13,6 +13,7 @@ import { AgentKeys } from '@/components/AgentKeys'
 import { MyCode, TeamCodes } from '@/components/TeamCodes'
 import { CalendarPanel } from '@/components/CalendarPanel'
 import { OfferSettings } from '@/components/OfferSettings'
+import { AssistantTest } from '@/components/AssistantTest'
 import { useOnPhone, workerFor } from '@/lib/onPhone'
 import { personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
@@ -103,6 +104,11 @@ export default function Settings() {
       {colinHere && (
         <Section title="Calendar (seller calls and visits)">
           <CalendarPanel />
+        </Section>
+      )}
+      {isOwner && colinHere && (
+        <Section title="Test the assistant (the AI that answers missed seller calls)">
+          <AssistantTest />
         </Section>
       )}
       {isOwner && colinHere && (

@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
   // Any team member approves or skips a draft (Colin 2026-10-22: "they approve the texts and drafts").
   // the signed-in person's own row: every team member can read the whole team, so never just the first row
   const myEmail = ((await asUser.auth.getUser()).data.user?.email ?? '').toLowerCase()
-  const me = await asUser.from('team_members').select('person, display_name').eq('email', myEmail).maybeSingle()
+  const me = await asUser.from('team_members').select('person, display_name, role').eq('email', myEmail).maybeSingle()
   if (me.error || !me.data) return json({ outcome: 'refused', reason: 'not on the team' }, 403)
   const actor = (me.data?.display_name as string | undefined) ?? 'Colin'
 
@@ -52,6 +52,35 @@ Deno.serve(async (req) => {
     await sbs.rpc('log_email', { p_lead_id: body.lead_id ?? null, p_task_id: body.task_id ?? null, p_to: to, p_subject: subject,
       p_body: content, p_actor: body.actor ?? actor })
     return json({ outcome: 'sent' })
+  }
+  if (action === 'test_assistant') {
+    // Colin's test button (Settings): Twilio calls the number he typed and puts the inbound assistant on the line at once,
+    // no rings, so Muse can play the seller through the speaker (Colin 2026-11-07). Owner only. The call is marked test:
+    // the assistant writes nothing to any card and files the transcript and extraction under "test calls" in Settings.
+    if ((me.data as { role?: string }).role !== 'owner') return json({ outcome: 'refused', reason: 'owner only' }, 403)
+    const to10 = String(body.to ?? '').replace(/\D/g, '').slice(-10)
+    if (!/^[2-9]\d{9}$/.test(to10)) return json({ outcome: 'refused', reason: 'a 10-digit US number to call' })
+    const mode = body.mode === 'known' ? 'known' : 'unknown'
+    const sid = Deno.env.get('TWILIO_ACCOUNT_SID') ?? ''
+    const tok = Deno.env.get('TWILIO_AUTH_TOKEN') ?? ''
+    const secret = (Deno.env.get('ALERT_SECRET') ?? '').trim()
+    const from = (Deno.env.get('CAMPAIGN_FROM_NUMBER') ?? '').trim() || '+12624180202'
+    if (!sid || !tok || !secret) return json({ outcome: 'refused', reason: 'Twilio or the alert secret is not set up on the server' })
+    const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const ws = `${url.replace(/^https:\/\//, 'wss://')}/functions/v1/voice-agent?s=${encodeURIComponent(secret)}`
+    const card = mode === 'known' ? { owner_name: 'Pat Tester', address: '123 Test St', municipality: 'West Bend' } : null
+    const greeting = card
+      ? `Hi, this is the automated assistant for Colin's team. Sorry, everyone is on another call right now. I can take a few details so the right person calls you back. Is this about 123 Test St?`
+      : `Hi, this is the automated assistant for Colin's team. Sorry, everyone is on another call right now. I can take a few details so the right person calls you back. Is this about a house you own?`
+    const params = [['test', '1'], ['greeting', greeting], ...(card ? [['owner_name', card.owner_name], ['address', card.address], ['municipality', card.municipality]] : [])]
+      .map(([k, v]) => `<Parameter name="${k}" value="${esc(v)}"/>`).join('')
+    const twiml = `<Response><Say voice="Polly.Joanna">Test call. The assistant is coming on the line.</Say><Connect><ConversationRelay url="${esc(ws)}" welcomeGreeting="${esc(greeting)}" language="en-US" interruptible="true">${params}</ConversationRelay></Connect></Response>`
+    const form = new URLSearchParams({ From: from, To: `+1${to10}`, Twiml: twiml, Timeout: '45' })
+    const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Calls.json`, { method: 'POST',
+      headers: { authorization: 'Basic ' + btoa(`${sid}:${tok}`), 'content-type': 'application/x-www-form-urlencoded' }, body: form })
+    const j = await r.json().catch(() => ({})) as { sid?: string; message?: string }
+    if (!r.ok) return json({ outcome: 'refused', reason: `Twilio: ${(j.message ?? r.status).toString().slice(0, 160)}` })
+    return json({ outcome: 'calling', call_sid: j.sid, mode, to: to10 })
   }
   if (action === 'test_notification') {
     const sbs = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', { auth: { persistSession: false } })
