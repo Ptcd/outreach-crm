@@ -11,7 +11,7 @@ import { useDialer } from '@/lib/dialer'
 import { fmtDateTime, fmtPhone } from '@/lib/format'
 
 type TestCall = { call_sid: string; from10: string | null; started_at: string; ended_at: string | null; seconds: number | null
-  transcript: { role: string; text: string }[] | null; extraction: Record<string, unknown> | null; outcome: string }
+  transcript: { role: string; text: string }[] | null; extraction: Record<string, unknown> | null; outcome: string; events: { at: number; type: string; detail?: string }[] | null }
 
 export function AssistantTest() {
   const dialer = useDialer()
@@ -21,7 +21,7 @@ export function AssistantTest() {
     queryKey: ['assistant_test_calls'],
     refetchInterval: watch ? 8_000 : false,
     queryFn: async () => {
-      const r = await supabase.from('voice_calls').select('call_sid, from10, started_at, ended_at, seconds, transcript, extraction, outcome')
+      const r = await supabase.from('voice_calls').select('call_sid, from10, started_at, ended_at, seconds, transcript, extraction, outcome, events')
         .eq('outcome', 'test').order('started_at', { ascending: false }).limit(5)
       if (r.error) throw new Error(r.error.message)
       return (r.data ?? []) as TestCall[]
@@ -60,6 +60,7 @@ export function AssistantTest() {
 
 function TestCallCard({ c }: { c: TestCall }) {
   const [open, setOpen] = useState(false)
+  const [events, setEvents] = useState(false)
   const x = c.extraction ?? {}
   const show = (k: string) => { const v = x[k]; return v === null || v === undefined || v === '' ? null : String(v) }
   return (
@@ -80,12 +81,23 @@ function TestCallCard({ c }: { c: TestCall }) {
             <li key={k}><span className="text-muted-foreground">{label}:</span> {show(k)}</li>) : null)}
         </ul>
       )}
-      <button type="button" className="mt-2 text-sm underline-offset-2 hover:underline" onClick={() => setOpen((v) => !v)}>{open ? 'Hide the transcript' : `Transcript (${c.transcript?.length ?? 0} turns)`}</button>
+      <div className="mt-2 flex gap-3">
+        <button type="button" className="text-sm underline-offset-2 hover:underline" onClick={() => setOpen((v) => !v)}>{open ? 'Hide the transcript' : `Transcript (${c.transcript?.length ?? 0} turns)`}</button>
+        <button type="button" className="text-sm underline-offset-2 hover:underline" onClick={() => setEvents((v) => !v)}>{events ? 'Hide what happened' : `What happened (${c.events?.length ?? 0} events)`}</button>
+      </div>
       {open && (
         <div className="mt-2 space-y-1 text-sm">
           {(c.transcript ?? []).map((t, i) => (
             <p key={i} className={t.role === 'agent' ? 'text-primary' : ''}><span className="text-muted-foreground">{t.role === 'agent' ? 'assistant' : 'seller'}:</span> {t.text}</p>
           ))}
+        </div>
+      )}
+      {events && (
+        <div className="mt-2 max-h-72 space-y-0.5 overflow-y-auto font-mono text-[11px]">
+          {(c.events ?? []).map((e, i) => (
+            <p key={i}><span className="text-muted-foreground">{(e.at / 1000).toFixed(1)}s</span> {e.type}{e.detail ? `: ${e.detail}` : ''}</p>
+          ))}
+          {!c.events?.length && <p className="text-muted-foreground">No events recorded (the call predates the log).</p>}
         </div>
       )}
     </div>
