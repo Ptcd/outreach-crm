@@ -240,7 +240,7 @@ async function finish(x: { callSid: string; from: string; to: string; card: Call
   if (r.error) { console.error('[voice-agent] result:', r.error.message); x.events.push({ at: Date.now() - x.startedAt, type: 'result_error', detail: r.error.message.slice(0, 160) }) }
   await db.from('voice_calls').update({ events: x.events }).eq('call_sid', x.callSid)
   // buzz the caller who owns the card: push to their phones, WhatsApp through pm-phone
-  if (d.ok && d.owner && ['callback_booked', 'not_now'].includes(d.outcome ?? '')) {
+  if (d.ok && d.owner && ['callback_booked', 'not_now', 'never_callback'].includes(d.outcome ?? '')) {
     const name = d.owner_name || x.from
     const where = [d.address, d.municipality].filter(Boolean).join(', ')
     const when = d.due_at ? new Date(d.due_at).toLocaleString('en-US', { timeZone: 'America/Chicago', weekday: 'short', hour: 'numeric', minute: '2-digit' }) : 'soon'
