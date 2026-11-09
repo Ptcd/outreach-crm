@@ -1,6 +1,6 @@
 // the drafted replyed reply for a real conversation (Colin approves every one before it goes).
-// Same prompt and guard pm-phone uses (both generated from WPIE): REPLY_SYSTEM_PROMPT,
-// then guardDraft strips price/offer language (replaced by the deflection), the business
+// The prompt is generated from WPIE (pm-phone has an older copy of it): REPLY_SYSTEM_PROMPT,
+// then guardDraft strips the business
 // name, "postcard" and markdown, and caps the length. Returns null when there is nothing
 // safe to suggest; Colin then writes the reply himself.
 import { openerAskedSelling } from './replyBrain.ts'
@@ -57,7 +57,7 @@ export function conversationContext(x: DraftInput): string {
     x.propertyAddress ? `Property the text was about: ${x.propertyAddress}` : "Ask, the way Colin would in one short friendly line, which property they are texting about (e.g. 'Thanks for getting back to me - which property is this about?'). Never say you can't find, lost or don't have their information, and never mention a database or records.",
     'The assistant turns above were sent by Colin or for him (the first is usually his own opening text).',
     ...openerLine(x.history.find((h) => h.who === 'us')?.body ?? null),
-    'Never mention a postcard or a business. Never give or hint at a price, value or offer.',
+    'Never mention a postcard or a business.',
     'Your message is a draft Colin reads in the WPIE app and approves or edits before it is sent.',
   ].join('\n')
 }

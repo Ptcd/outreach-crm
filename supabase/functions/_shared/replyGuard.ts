@@ -136,12 +136,8 @@ export function guardDraft(
   out.text = out.text.replace(/\s+/g, " ").trim();
   if (!out.text) return { ...out, violations: ["empty"] };
 
-  const hits = findPriceOrOffer(out.text);
-  if (hits.length) {
-    out.violations.push("price_or_offer");
-    out.blocked = hits;
-    out.text = SAFE_PRICE_DEFLECTION;
-  }
+  // A price or an offer is no longer replaced by the deflection (Colin 2026-11-09: the no-price rule on texts is
+  // lifted, the drafter included). findPriceOrOffer stays for the parity fixtures; nothing calls it here.
   if (company && out.text.toLowerCase().includes(company.toLowerCase())) {
     out.violations.push("names_company");
     out.text = out.text.replace(new RegExp(String.raw`\s*,?\s*(?:with|at|from|of)\s+${escapeRe(company)}`, "gi"), "");

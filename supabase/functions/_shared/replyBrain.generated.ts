@@ -2,7 +2,7 @@
 // Source: WPIE repo (claude/real estate): wpie/reply/rules.py (_INTENTS = classify, the negation
 // rule, is_spanish, CARRIER_KEYWORDS) and wpie/reply/brain.py (routing regexes and the fixed lines
 // the server may send on its own), converted by tools/export_reply_prompt.py --app-dir
-// from WPIE commit d6ce9bf (with uncommitted wpie/reply or wpie/sms changes) on 2026-11-07 (texts written as Colin Merrill, first person; no agent name).
+// from WPIE commit 7427c97 on 2026-11-09 (texts written as Colin Merrill, first person; no agent name).
 // replyBrain.ts holds the small algorithm; tests prove it agrees with Python.
 
 import type { RegexSpec } from './replyRules.generated.ts'
