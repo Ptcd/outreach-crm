@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Badge, Empty, ErrorNote } from '@/components/ui/form'
 import { CallScript, pickupLine } from '@/components/CallScript'
 import { QuickNumber } from '@/components/QuickNumber'
+import { AddNumber } from '@/components/AddNumber'
 import { DealPackage } from '@/components/DealPackage'
 import { PHONE_SCRIPT } from '@/lib/callScript'
 import { supabase } from '@/lib/supabaseClient'
@@ -411,6 +412,14 @@ export function PowerDial({ caller }: { caller: string }) {
             {onThis && active?.status ? ` · ${active.status === 'in_call' ? 'in call' : active.status}` : ''}{onThis && active?.error ? ` - ${active.error}` : ''}
           </p>
 
+
+          {/* a number the seller gives on the call (Adil 2026-11-08): saved to the card, and one tap makes it the next Dial */}
+          <AddNumber key={`add-${cur.lead_id}`} leadId={cur.lead_id} live={live} onAdded={(ph, nm) => {
+            setSwap((s) => ({ ...s, [cur.lead_id]: { phone: ph, line_type: null, phone_person: nm, other_phones: cur.other_phones + 1 } }))
+            pinItem.current = { ...cur, phone: ph, line_type: null, phone_person: nm, other_phones: cur.other_phones + 1 }
+            setPin(cur.lead_id)
+            setNextNote(`The next dial goes to ${fmtPhone(ph)}${nm ? ` (${nm})` : ''}, the number they gave.`)
+          }} />
 
           {/* the quick number (0154): four taps, the anchor, while she is on the call; hidden while the anchor is off */}
           <QuickNumber key={cur.lead_id} leadId={cur.lead_id} />
