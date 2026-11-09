@@ -1,10 +1,9 @@
 // The agent door (Colin 2026-10-25: "design it agent first"): the MCP tools two Muse agents (or any MCP client)
 // use. The intake agent loads prospects; the sender agent writes and queues texts and watches the results. The
 // agent applies the prospect rules itself. What this door refuses is only what may never go out: an opted-out or
-// do-not-contact phone, a closed card, a text with a price, cash, a business name or no STOP line. Everything
+// do-not-contact phone, a closed card, a text with cash, a business name or no STOP line. Everything
 // queued still passes the database's send check (switch, pause, no Sundays, window, daily cap, already texted).
 // Transport: MCP over streamable HTTP, stateless JSON responses (supabase/functions/agent-mcp).
-import { findPriceOrOffer } from './replyGuard.ts'
 import { CALENDAR_TOOLS, callCalendarTool, isCalendarTool, type CalendarDoor } from './calendar.ts'
 
 export type Role = 'intake' | 'sender' | 'records' | 'agent'
@@ -67,7 +66,7 @@ export const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05']
 
 export const TEXTING_RULES = [
   'You write texts as Colin Merrill himself, first person ("I"). He is one local person who buys houses; never name a business, company, team or "investors".',
-  'Never mention a price, a number of dollars, an offer, "cash" or "as-is" (carriers flag it). No $ anywhere.',
+  'Never say "cash" or "as-is" (carriers flag it). A price or a dollar figure may be in a text: Colin removed the no-price rule on 2026-11-08, and the door no longer refuses a figure, a $ or the word offer. The door does not check the figure: what you offer follows the instructions Colin gave you. Never invent or guess one.',
   'A first text ends with a way out that contains the word STOP, for example "Reply STOP if you\'d rather not hear from me." A follow-up (steps 2-5) may leave the STOP line out (Colin 2026-10-29); a reply never needs one. Tag each arm of a follow-up test with its own variant code so test_results can tell them apart.',
   'A first text only asks a simple question about the property (is it still yours / are you the right person to ask about <address>). No pitch until they answer.',
   'Keep it under 160 characters when you can (320 is the hard limit). No links, no emojis, no ALL CAPS.',
@@ -77,7 +76,7 @@ export const TEXTING_RULES = [
   'Replies: you answer them now (replies_waiting, then send_reply), on the same thread. Read the whole conversation and the card first. One reply per text from them; never a first text or follow-up (queue_texts) to someone who has texted back.',
   'A thread a caller has taken over is theirs: send_reply is refused with the person\'s name (Thalia or Adil has this thread). Say nothing further on that phone until it is handed back; the card is still yours to read.',
   'Power hour (weekdays 4 to 6 PM Central): read replies_waiting every few minutes. A reply with any interest at all ("maybe", "what would you pay", "depends", a question about selling, "call me") goes to call_next with their words and the number they texted from, and you do NOT text them back: the caller phones them next (Rick: interest means a call, not more texts). If the call does not reach them, their reply is still waiting for you: answer it then. Not interest (STOP, no, wrong number, not the owner, an older or grieving owner): handle it as usual.',
-  'In a reply: never give, guess or react to a price; Colin gives his number himself, in person at the house. Your job is to learn why they would sell, the condition, the timing, who signs and their number, then book a call with Colin.',
+  'In a reply: your job is to learn why they would sell, the condition, the timing, who signs and their number, then book a call with Colin.',
   "Booking: open_slots gives Colin's real open times (his calendar and his hours). Offer two or three, book_slot the one they pick with the 4 pillars, and confirm the time in your reply. Never promise a time you did not book.",
   "Phone calls: the card's call_notes say what was said on each recorded call (summary, the 4 pillars and who signs, outcome, next step, the mark the caller confirmed). Read them before you text: never ask again what they already told us on the phone, and follow the next step they agreed to.",
   'A card is one property; the people on it (people[] on every card) each have a role, a status, their own address and their own phones. Text a person (interest_id), on one of their numbers. Never text a person who is not active. One person on a card at a time: the next person gets a first text only after the one you texted is closed (deceased, dnc, wrong_person) or every first text to them bounced.',
@@ -308,15 +307,13 @@ export function replyProblem(body: string): string | null {
   const b = (body ?? '').trim()
   if (!b) return 'empty reply'
   if (b.length > 480) return 'over 480 characters'
-  if (b.includes('$')) return 'no $ or prices'
-  if (findPriceOrOffer(b).length) return 'mentions a price or an offer: Colin gives numbers himself, on a call'
   if (/\bcash\b/i.test(b)) return 'no "cash" in a text'
   if (/https?:\/\/|www\./i.test(b)) return 'no links'
   if (/\b(llc|inc|company|investors?|our team)\b/i.test(b)) return 'sounds like a business: write as Colin, one person'
   return null
 }
 
-/** The wording check before a text is queued (the database checks STOP, $, length and the business name again). */
+/** The wording check before a text is queued (the database checks STOP, length and the business name again; the price check was removed 2026-11-08). */
 /** The wording check for a queued text. The STOP way out is required on a first text (step 1), where the opt-out
  * notice belongs; a follow-up (steps 2-5) may leave it out (Colin 2026-10-29: the step-2 test arm, after 10 of 11
  * traced STOPs followed a step 2 that ended "just reply STOP"). Everything else applies to every step. */
@@ -325,8 +322,6 @@ export function textProblem(body: string, step = 1): string | null {
   if (!b) return 'empty text'
   if (step <= 1 && !/\bSTOP\b/.test(b)) return 'a first text needs a STOP line (e.g. "Reply STOP if you\'d rather not hear from me.")'
   if (b.length > 320) return 'over 320 characters'
-  if (b.includes('$')) return 'no $ or prices'
-  if (findPriceOrOffer(b).length) return 'mentions a price or an offer'
   if (/\bcash\b/i.test(b)) return 'no "cash" in a text'
   if (/\bas[\s-]?is\b/i.test(b)) return '"as-is" is flagged by carriers'
   if (/https?:\/\/|www\./i.test(b)) return 'no links'

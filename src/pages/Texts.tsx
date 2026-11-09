@@ -262,7 +262,7 @@ function ThreadCard({ t, me }: { t: LiveThread; me: string | null }) {
             {note && <span className="text-sm">{note}</span>}
           </div>
           {send.error && <ErrorNote error={send.error} />}
-          <p className="text-xs text-muted-foreground">Same rules as any text: no price, no business name; held until morning in quiet hours.</p>
+          <p className="text-xs text-muted-foreground">Same rules as any text: no business name; held until morning in quiet hours.</p>
         </div>
       )}
     </li>

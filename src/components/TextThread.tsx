@@ -11,7 +11,7 @@ import type { Contact, Message, TwilioInbound } from '@/lib/types'
 // The card's texts as a phone's message log (Colin 2026-10-24): theirs on the left, ours on the right, oldest at the
 // top and the newest at the bottom, with the box to text them right under it (Adil: "unable to figure out where to
 // send the text from"). A typed text goes from the number that texted them, through the same checks as an approved
-// reply: no price or business name, nobody who opted out, held until morning in quiet hours.
+// reply: no business name, nobody who opted out, held until morning in quiet hours.
 export function TextThread({ leadId, phone, messages, inbound, closed }: {
   leadId: string; phone: Contact | null; messages: Message[]; inbound: TwilioInbound[]; closed: boolean
 }) {

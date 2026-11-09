@@ -232,7 +232,7 @@ export async function runReplyAgent(opts: {
   return s
 }
 
-/** Colin's Approve (with his final wording). Refuses a price, an offer or the business name
+/** Colin's Approve (with his final wording). Refuses the business name or postcard talk (a price is allowed: Colin 2026-11-08)
  *  rather than changing his words; the database refuses stale, sent or opted-out replies. */
 export async function approveReply(opts: { rpc: Rpc; env: SenderEnv; twilio: TwilioPort | null; id: string; text: string;
   actor: string; now?: () => Date; companyName?: string; teamText?: boolean }): Promise<{ outcome: string; reason?: string }> {
@@ -240,10 +240,10 @@ export async function approveReply(opts: { rpc: Rpc; env: SenderEnv; twilio: Twi
   const text = (opts.text ?? '').replace(/\s+/g, ' ').trim()
   // A caller's own text from the card goes as typed (Colin 2026-11-07: once Adil or Thalia text, no guards apply);
   // the one thing that still stops it is a phone that opted out, checked in reply_claim_send. Everything else keeps the
-  // wording rules: no price, no company name, no postcard talk.
+  // wording rules: no company name, no postcard talk.
   if (!opts.teamText) {
     const g = guardDraft(text, { companyName: opts.companyName || 'Merrill Holdings', maxChars: 480 })
-    const blocked = g.violations.filter((v) => v === 'price_or_offer' || v === 'names_company' || v === 'mentions_postcard')
+    const blocked = g.violations.filter((v) => v === 'names_company' || v === 'mentions_postcard')
     if (blocked.length) {
       const what = blocked.map((b) => b.replace(/_/g, ' ')).join(', ')
       return { outcome: 'refused', reason: 'not sent: the text has ' + what + (g.blocked.length ? ' (' + g.blocked.join(', ') + ')' : '') }

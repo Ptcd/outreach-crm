@@ -1,5 +1,5 @@
 // reply-send: the Inbox's Approve / Skip. Called by the app with the signed-in user's token;
-// only the owner role may act. Approve re-checks the wording (no price, offer or business
+// only the owner role may act. Approve re-checks the wording (no business
 // name), then the database refuses anything stale, already sent or to an opted-out phone,
 // and holds it until morning in quiet hours. Dry ("would send") unless TWILIO_LIVE_SENDING=1.
 import { createClient } from 'npm:@supabase/supabase-js@2.56.1'

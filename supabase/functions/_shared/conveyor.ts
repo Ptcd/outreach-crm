@@ -4,7 +4,7 @@
 // belt_health_check, migration 0031); this file only moves texts to Twilio and records what happened.
 //   1. due text stops -> belt_claim_text: a queued belt text (switch on) goes out, or a draft waits for
 //      Colin's tap (switch off), or the stop slides / is skipped. A live send is checked once more by
-//      guardDraft (no price, offer or business name) before Twilio is called.
+//      guardDraft (no business name or postcard talk; a price is allowed since 2026-11-08) before Twilio is called.
 //   2. missed stops (due and not logged by end of day) are swept.
 //   3. the daily canary (once a day after 7 AM Central), then the health heartbeat.
 import { guardDraft } from './replyGuard.ts'
@@ -43,9 +43,9 @@ export async function runConveyor(opts: {
     const j = c.data as { outcome: string; reason?: string; id?: string; to?: string; from?: string | null; body?: string }
     if (!j) continue
     if (j.outcome === 'send' && live && opts.twilio && j.id && j.to && j.body) {
-      // the last word on the wording: never a price, an offer or the business name
+      // the last word on the wording: never the business name or postcard talk (a price is allowed: Colin 2026-11-08)
       const g = guardDraft(j.body, { companyName: opts.companyName || 'Merrill Holdings', maxChars: 480 })
-      const blocked = g.violations.filter((v) => v === 'price_or_offer' || v === 'names_company' || v === 'mentions_postcard')
+      const blocked = g.violations.filter((v) => v === 'names_company' || v === 'mentions_postcard')
       if (blocked.length) {
         await opts.rpc('reply_record_result', { p_id: j.id, p_status: 'failed', p_sid: null, p_error_code: 'guard',
           p_reason: `not sent: the text has ${blocked.join(', ')}`, p_now: now().toISOString() })
