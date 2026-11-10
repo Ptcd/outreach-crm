@@ -11,7 +11,14 @@ type ToolRole = Exclude<Role, 'agent'> | 'any'
 /** What a key may do (Muse 2026-10-26): one key, five switches Colin flips in Settings > Agent keys. */
 export type Scope = 'prospects' | 'texting' | 'calendar' | 'records' | 'marks' | 'channel'
 export const SCOPES: Scope[] = ['prospects', 'texting', 'calendar', 'records', 'marks', 'channel']
-export interface Agent { id: string; name: string; role: Role; scopes?: Scope[] }
+/** tools: an explicit list of tool names this key may call (0214, Muse 2's seat); undefined or null = every tool in its scopes. */
+export interface Agent { id: string; name: string; role: Role; scopes?: Scope[]; tools?: string[] | null }
+
+/** The tools a key may call: its scopes, narrowed to its own list when it has one. */
+export function toolAllowed(agent: Agent, tool: { name: string; role: string }): boolean {
+  if (!scopesOf(agent).includes(scopeOf(tool))) return false
+  return !agent.tools || agent.tools.includes(tool.name)
+}
 
 /** The old single-role keys keep exactly what their role had; a key with its own scopes has those. */
 export function scopesOf(agent: Agent): Scope[] {
@@ -370,6 +377,7 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
   if (!tool) return { value: { error: `no tool ${name}` }, isError: true }
   const scope = scopeOf(tool)
   if (!scopesOf(agent).includes(scope)) return { value: { error: `this key has no ${scope} scope, so it cannot use ${name} (Colin switches scopes in Settings > Agent keys)` }, isError: true }
+  if (agent.tools && !agent.tools.includes(name)) return { value: { error: `this key is limited to: ${agent.tools.join(', ')}; ${name} is not on its list. Post to the desk and Muse handles it.` }, isError: true }
   if (isCalendarTool(name)) return callCalendarTool(name, args, agent.name, db.calendar)
   switch (name) {
     case 'add_prospects': {
@@ -595,8 +603,7 @@ export async function handleMessage(msg: Json, agent: Agent, db: DoorDb): Promis
   }
   if (method === 'ping') return ok(id, {})
   if (method === 'tools/list') {
-    const allowed = scopesOf(agent)
-    return ok(id, { tools: TOOLS.filter((t) => allowed.includes(scopeOf(t))).map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) })
+    return ok(id, { tools: TOOLS.filter((t) => toolAllowed(agent, t)).map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) })
   }
   if (method === 'tools/call') {
     const p = (msg.params ?? {}) as Json
@@ -624,8 +631,9 @@ export async function handleMessage(msg: Json, agent: Agent, db: DoorDb): Promis
 }
 
 /** Who a key speaks as on the desk channel: a key named for Dots (OpenAI) is Dots; every other key is Muse. */
-export function channelAuthor(agent: Agent): 'dots' | 'muse' {
-  return /\bdots?\b|openai/i.test(agent.name) ? 'dots' : 'muse'
+export function channelAuthor(agent: Agent): 'dots' | 'muse' | 'muse 2' {
+  if (/\bdots?\b|openai/i.test(agent.name)) return 'dots'
+  return /\bmuse\s*2\b/i.test(agent.name) ? 'muse 2' : 'muse'
 }
 
 /** A key in the URL, for MCP clients that cannot send a header (ChatGPT connectors): .../agent-mcp/k/<key> or ?key=<key>. */

@@ -20,10 +20,11 @@ Deno.serve(async (req) => {
   const sb = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', { auth: { persistSession: false } })
   const key = keyFrom(req.headers) ?? keyFromUrl(req.url)
   const check = key ? await sb.rpc('agent_key_check', { p_key: key }) : null
-  const k = check?.data as { ok?: boolean; id?: string; name?: string; role?: string; scopes?: string[] } | null
+  const k = check?.data as { ok?: boolean; id?: string; name?: string; role?: string; scopes?: string[]; tools?: string[] | null } | null
   if (!k?.ok) return Response.json({ jsonrpc: '2.0', id: null, error: { code: -32001, message: 'missing or turned-off agent key' } }, { status: 401, headers: CORS })
   const role = k.role === 'sender' || k.role === 'records' || k.role === 'agent' ? k.role : 'intake'
-  const agent: Agent = { id: k.id!, name: k.name!, role, scopes: (k.scopes ?? []).filter((x): x is Scope => (SCOPES as string[]).includes(x)) }
+  const agent: Agent = { id: k.id!, name: k.name!, role, scopes: (k.scopes ?? []).filter((x): x is Scope => (SCOPES as string[]).includes(x)),
+    tools: Array.isArray(k.tools) && k.tools.length ? k.tools.map(String) : null }
 
   const rpc = async (fn: string, args: Record<string, unknown>) => {
     const r = await sb.rpc(fn, args)

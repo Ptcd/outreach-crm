@@ -22,7 +22,7 @@ export const SCOPES: { id: Scope; label: string }[] = [
   { id: 'records', label: 'Records' }, { id: 'marks', label: 'Cards' }, { id: 'channel', label: 'Desk channel' },
 ]
 type Key = { id: string; name: string; role: Role; key_hint: string; created_at: string; last_used_at: string | null; revoked_at: string | null
-  scopes: Scope[] | null; calls_24h: number | null; refused_24h: number | null }
+  scopes: Scope[] | null; calls_24h: number | null; refused_24h: number | null; tools: string[] | null }
 
 const DEFAULT_NAME: Record<Role, string> = { agent: 'Muse', intake: 'Muse intake', sender: 'Muse sender', records: 'Muse records' }
 
@@ -117,6 +117,7 @@ export function AgentKeys() {
                   {k.revoked_at ? `Turned off ${fmtDateTime(k.revoked_at)}` : k.last_used_at ? `Last used ${fmtDateTime(k.last_used_at)}` : 'Not used yet'}
                   {!k.revoked_at && (k.calls_24h ?? 0) > 0 && ` · ${k.calls_24h} calls today${(k.refused_24h ?? 0) > 0 ? `, ${k.refused_24h} refused` : ''}`}
                 </p>
+                {k.tools && k.tools.length > 0 && <p className="text-xs text-muted-foreground">Limited to: {k.tools.join(', ')}</p>}
               </div>
               {!k.revoked_at && <Button size="sm" variant="outline" onClick={() => void off(k.id)}>Turn off</Button>}
             </div>
