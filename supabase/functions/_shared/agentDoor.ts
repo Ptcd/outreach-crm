@@ -284,6 +284,25 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
       reason: S('why, in their words where possible; the blocker for held; the condition for not_now without a date; what cleared for release; the note for note; words from the note to remove for note_delete'),
       date: S('ISO time: the check-back date for not_now, or when a held card should be looked at again'),
       phone: S('the phone, for wrong_number, or to say which person (deceased, wrong_person, dnc)') }, required: ['lead_id', 'mark'] } },
+  // Muse does its own card work (0211; Colin 2026-11-09: "i dont want to have to approve posts ... how do we remove me in
+  // the loop"): the five requests Muse used to post to the desk, each with the rule the desk applied written into the
+  // database function, which says in words why it refused.
+  { role: 'any', name: 'reassign_card',
+    description: 'Give a card to Thalia or Tyler (person: thalia | adil; Tyler is adil in the app). The open calls and callbacks on the card go with it. A reason is required and goes on the card. Colin owns no cards and none are moved to him.',
+    inputSchema: { type: 'object', properties: { lead_id: S('card id'), person: S('thalia | adil'), reason: S('why it moves') }, required: ['lead_id', 'person', 'reason'] } },
+  { role: 'any', name: 'add_call_task',
+    description: 'Put a card on its caller Power hour list as a call task (source power_hour). Rules in the function: a sheriff sale is callable only 14 or more days out (sale_date is refused inside the window, and the title and note carry the sale date and the last call day); the card must be live, must have a caller (its locked_to, or owner when it has none, which then locks the card), and must have a dialable phone, else the queue would never show the task; a card marked elderly, grief or taken over by a caller is refused; a card you held (belt hold_not_now) loses the hold date, because the queue hides a card until that date, while the hold and its reason stay; a date set by the seller or Colin is never overridden. One open list task per card: a second call returns the existing one. rank orders the list that day (lower first) and is written as call list (#rank) in the note; without rank the task is due now.',
+    inputSchema: { type: 'object', properties: { lead_id: S('card id'), sale_date: S('YYYY-MM-DD sheriff sale date when there is one'), reason: S('why the caller should dial it'),
+      rank: { type: 'integer', description: 'position in the list that day, lower first' }, owner: S('thalia | adil, only for a card that has no caller yet') }, required: ['lead_id', 'reason'] } },
+  { role: 'any', name: 'close_task',
+    description: 'Close a caller call task that should not be dialed (stale list task, duplicate). Allowed when the card is closed (dead, dnc, closed, under contract), when the card is one you hold (belt hold_not_now), or when it is a duplicate of another open call task for the same caller. Refused: the belt own stop (a logged call or the caller closes it), a callback the seller was promised while the card is live, and the only call task on a live unheld card (that one is the caller to close, or hold the card first). A reason is required. Never changes the card itself.',
+    inputSchema: { type: 'object', properties: { task_id: S('the task (from call_list)'), reason: S('why it closes') }, required: ['task_id', 'reason'] } },
+  { role: 'any', name: 'merge_people',
+    description: 'Two records on one card for one person (a spelling variant, a middle name): keep one, drop the other. The stricter status wins and is never lost (deceased, do_not_contact, not_the_contact); phones and emails move to the kept record; the dropped record is removed only if it is on no other card (else refused: merge it there too, or link the cards). Pass the two interest_id values from the card people list. A reason is required.',
+    inputSchema: { type: 'object', properties: { lead_id: S('card id'), keep_interest_id: S('the person record to keep'), drop_interest_id: S('the duplicate record'), reason: S('why they are one person') }, required: ['lead_id', 'keep_interest_id', 'drop_interest_id', 'reason'] } },
+  { role: 'any', name: 'merge_cards',
+    description: 'Two cards for one property: keep one, close the duplicate. Refused unless they share a parcel or the same address and municipality, and refused when the duplicate has a texting thread, a promised callback or a deal (then link_cards same_person and keep both). Phones, people, reasons and notes the kept card lacks move over; a do-not-contact on the duplicate makes the kept card do-not-contact too; the duplicate closes as a duplicate with its open tasks, and the two are linked. A reason is required.',
+    inputSchema: { type: 'object', properties: { keep_lead_id: S('the card to keep'), drop_lead_id: S('the duplicate to close'), reason: S('why they are one property') }, required: ['keep_lead_id', 'drop_lead_id', 'reason'] } },
   { role: 'any', name: 'link_cards',
     description: 'Link two cards: same_person (one owner, two cards), other_property (they mentioned another place), estate_contact (the person handling an estate), shared_phone, occupant (lives there, not the owner), co_owner, related. Shown on both cards.',
     inputSchema: { type: 'object', properties: { lead_id: S('card id'), other_id: S('the other card id'),
@@ -466,6 +485,28 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       }
       return { value: await db.markCard({ lead_id: String(args.lead_id ?? ''), mark: String(args.mark ?? ''), reason: args.reason ? String(args.reason) : null,
         date: args.date ? String(args.date) : null, phone: args.phone ? String(args.phone) : null }, agent.name) }
+    }
+    case 'reassign_card': {
+      const r = await db.records('agent_reassign_card', { p_lead_id: String(args.lead_id ?? ''), p_person: String(args.person ?? ''), p_why: args.reason ? String(args.reason) : null, p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'add_call_task': {
+      const r = await db.records('agent_add_call_task', { p_lead_id: String(args.lead_id ?? ''), p_sale_date: args.sale_date ? String(args.sale_date) : null, p_why: args.reason ? String(args.reason) : null,
+        p_rank: typeof args.rank === 'number' ? Math.trunc(args.rank) : null, p_owner: args.owner ? String(args.owner) : null, p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'close_task': {
+      const r = await db.records('agent_close_task', { p_task_id: String(args.task_id ?? ''), p_why: args.reason ? String(args.reason) : null, p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'merge_people': {
+      const r = await db.records('agent_merge_people', { p_lead_id: String(args.lead_id ?? ''), p_keep_interest_id: String(args.keep_interest_id ?? ''), p_drop_interest_id: String(args.drop_interest_id ?? ''),
+        p_why: args.reason ? String(args.reason) : null, p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'merge_cards': {
+      const r = await db.records('agent_merge_cards', { p_keep_lead_id: String(args.keep_lead_id ?? ''), p_drop_lead_id: String(args.drop_lead_id ?? ''), p_why: args.reason ? String(args.reason) : null, p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
     }
     case 'link_cards':
       return { value: await db.linkCards({ lead_id: String(args.lead_id ?? ''), other_id: String(args.other_id ?? ''), kind: String(args.kind ?? ''),
