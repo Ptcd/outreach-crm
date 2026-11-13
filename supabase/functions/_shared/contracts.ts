@@ -28,7 +28,10 @@ export interface ContractPorts {
   notify?: (m: { title: string; body: string; url: string; tag: string }) => Promise<void>
   /** the system's own email (the signing link, the signed copy); absent = nothing is emailed */
   mail?: (m: OutMail) => Promise<void>
+  /** where a seller's signing link lives (offers.welivewi.com) */
   appUrl: string
+  /** where the team's own links go (the app's address they are signed in on); appUrl when not given */
+  teamUrl?: string
   now?: () => Date
 }
 export type Seller = { name: string; email?: string | null; phone?: string | null }
@@ -531,7 +534,7 @@ export async function seal(ports: ContractPorts, contractId: string): Promise<{ 
   if (!dd.already && ports.notify) {
     await ports.notify({ title: `Contract signed: ${c.terms.street}`,
       body: `Every seller signed. Contract + earnest money to ${c.terms.earnestHolder} today.`,
-      url: `${ports.appUrl.replace(/\/$/, '')}/lead/${c.lead_id}`, tag: `contract-${c.id}` }).catch(() => undefined)
+      url: `${(ports.teamUrl ?? ports.appUrl).replace(/\/$/, '')}/lead/${c.lead_id}`, tag: `contract-${c.id}` }).catch(() => undefined)
   }
   return { ok: true, path, copies }
 }

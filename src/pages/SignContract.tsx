@@ -56,8 +56,10 @@ export default function SignContract() {
   useEffect(() => {
     const root = document.documentElement
     const wasDark = root.classList.contains('dark')
+    const title = document.title
     root.classList.remove('dark')
-    return () => { if (wasDark) root.classList.add('dark') }
+    document.title = 'Offer to purchase | WeLiveWI'
+    return () => { if (wasDark) root.classList.add('dark'); document.title = title }
   }, [])
 
   const who = view?.terms.buyerSigner ?? 'Colin Merrill'

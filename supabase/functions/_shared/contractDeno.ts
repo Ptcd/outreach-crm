@@ -33,7 +33,10 @@ export function contractPorts(): ContractPorts {
     rpc,
     lib: PDFLib as unknown as PdfLib,
     template: b64ToBytes(WB11_B64),
-    appUrl: Deno.env.get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com',
+    // sellers sign at the company's own address (welivewi.com, bought 2026-11-12); the team's alert links stay on the
+    // address they are signed in on
+    appUrl: Deno.env.get('OFFER_APP_URL') || 'https://offers.welivewi.com',
+    teamUrl: Deno.env.get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com',
     storage: {
       put: async (path, bytes, contentType) => {
         const r = await bucket().upload(path, bytes, { contentType, upsert: false })
