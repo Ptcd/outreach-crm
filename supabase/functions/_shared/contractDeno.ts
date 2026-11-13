@@ -54,13 +54,28 @@ export function contractPorts(): ContractPorts {
       },
     },
     notify: async (m) => { await notifyEveryone(deps, m) },
-    // the same Gmail sender the app's other emails use (tools\set_supabase_email.ps1)
+    // Offers go out from the company mailbox at welivewi.com when it is set up (tools\set_offer_email.ps1 puts
+    // OFFER_SMTP_* in the function secrets; Colin types the password, nobody else sees it). Until then, or if that
+    // mailbox refuses, they go out from the Gmail sender the app's other emails use, so an offer is never stuck.
     mail: async (m) => {
+      const send = async (host: string, user: string, pass: string, from: string) => {
+        const conn = await Deno.connectTls({ hostname: host, port: 465 })
+        await sendMail(conn, { user, pass }, { from, ...m })
+      }
+      const ou = Deno.env.get('OFFER_SMTP_USER') ?? ''
+      const op = Deno.env.get('OFFER_SMTP_PASSWORD') ?? ''
+      if (ou && op) {
+        try {
+          await send(Deno.env.get('OFFER_SMTP_HOST') || 'smtp.titan.email', ou, op, Deno.env.get('OFFER_SMTP_FROM') || ou)
+          return
+        } catch (e) {
+          console.error(`offer mailbox refused, falling back to the default sender: ${String(e instanceof Error ? e.message : e).slice(0, 200)}`)
+        }
+      }
       const user = Deno.env.get('SMTP_USER') ?? ''
       const pass = Deno.env.get('SMTP_PASSWORD') ?? ''
-      if (!user || !pass) throw new Error('email is not set up (Colin runs tools\\set_supabase_email.ps1 once)')
-      const conn = await Deno.connectTls({ hostname: Deno.env.get('SMTP_HOST') || 'smtp.gmail.com', port: 465 })
-      await sendMail(conn, { user, pass }, { from: Deno.env.get('SMTP_FROM') || user, ...m })
+      if (!user || !pass) throw new Error('email is not set up (Colin runs tools\set_supabase_email.ps1 once)')
+      await send(Deno.env.get('SMTP_HOST') || 'smtp.gmail.com', user, pass, Deno.env.get('SMTP_FROM') || user)
     },
   }
 }
