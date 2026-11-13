@@ -40,6 +40,43 @@ Deno.serve(async (req) => {
     queueText: (t, a) => rpc('agent_queue_text', { p_lead_id: t.lead_id, p_phone: t.phone, p_body: t.body, p_step: t.step,
       p_send_after: t.send_after, p_agent: a, p_variant: t.variant, p_template: t.template, p_slot: t.slot, p_interest_id: t.interest_id }) as Promise<Record<string, unknown>>,
     records: (fn, args) => rpc(fn, args),
+    // records files (0222): the laptop reaches only the database, so a file crosses on a signed link made here
+    recordsFileUpload: async (a, who) => {
+      const r = await rpc('records_file_new', { p_request_id: a.request_id, p_name: a.filename, p_portal: a.portal, p_number: a.number, p_note: a.note, p_agent: who }) as Record<string, unknown>
+      if (!r?.ok) return r
+      const up = await sb.storage.from('records').createSignedUploadUrl(String(r.path), { upsert: true })
+      if (up.error) return { ok: false, reason: 'could not make an upload link: ' + up.error.message }
+      return { ok: true, file_id: r.file_id, office: r.office, upload_url: up.data.signedUrl,
+        how: "PUT the raw file bytes to upload_url within 2 hours (curl -X PUT --data-binary @<file> -H 'Content-Type: application/octet-stream' '<upload_url>'), then call records_file_done with file_id." }
+    },
+    recordsFileDone: async (id, _who) => {
+      const row = (await sb.from('records_files').select('id, storage_path, status, direction, name').eq('id', id).maybeSingle()).data as
+        { storage_path: string; status: string; direction: string; name: string } | null
+      if (!row || row.direction !== 'to_laptop') return { ok: false, reason: 'no such upload: file_id comes from records_file_upload' }
+      if (row.status === 'done') return { ok: true, status: 'done', next: 'the laptop already has it' }
+      const link = await sb.storage.from('records').createSignedUrl(row.storage_path, 7 * 24 * 3600)
+      if (link.error) return { ok: false, reason: 'the file is not there yet: PUT it to upload_url first (' + link.error.message + ')' }
+      await rpc('records_file_mark', { p_id: id, p_status: 'ready', p_url: link.data.signedUrl })
+      return { ok: true, status: 'ready', name: row.name,
+        next: 'the laptop copies it into the records inbox on its next pass (about 10 minutes) as a reply on that request; the muni intake agent reads it on its next run' }
+    },
+    recordsFileGet: async (replyId, name, who) => {
+      const r = await rpc('records_file_want', { p_reply_id: replyId, p_name: name, p_agent: who }) as Record<string, unknown>
+      if (!r?.ok) return r
+      if (r.status === 'failed') return { ok: false, reason: 'the laptop could not send that file: ' + String(r.error ?? 'unknown') + '. Ask again to retry.' }
+      if (r.status === 'ready' || r.status === 'done') {
+        const link = await sb.storage.from('records').createSignedUrl(String(r.path), 600)
+        if (link.error) return { ok: false, reason: 'the file is not readable: ' + link.error.message }
+        if (r.status === 'ready') await rpc('records_file_mark', { p_id: r.file_id, p_status: 'done' })
+        return { ok: true, status: 'ready', url: link.data.signedUrl, expires_in_seconds: 600 }
+      }
+      if (!r.has_url) {
+        const up = await sb.storage.from('records').createSignedUploadUrl(String(r.path), { upsert: true })
+        if (up.error) return { ok: false, reason: 'could not make a link for the laptop: ' + up.error.message }
+        await rpc('records_file_mark', { p_id: r.file_id, p_status: 'waiting', p_url: up.data.signedUrl })
+      }
+      return { ok: true, status: 'asked', ready_in: 'about 10 minutes: the laptop sends the file up on its next pass. Call records_file_get again with the same reply_id and name.' }
+    },
     dueToday: () => rpc('agent_due_today', {}) as Promise<unknown[]>,
     markCard: (m, a) => rpc('agent_mark_card', { p_lead_id: m.lead_id, p_mark: m.mark, p_reason: m.reason, p_date: m.date, p_phone: m.phone, p_agent: a }) as Promise<Record<string, unknown>>,
     markPerson: (m, a) => rpc('agent_mark_person', { p_lead_id: m.lead_id, p_mark: m.mark, p_interest_id: m.interest_id, p_phone: m.phone, p_reason: m.reason, p_agent: a }) as Promise<Record<string, unknown>>,

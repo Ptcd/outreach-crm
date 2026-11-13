@@ -38,6 +38,10 @@ export function scopeOf(tool: { name: string; role: string }): Scope {
 
 /** Everything the tools touch, so the routing and the checks are testable without a database. */
 export interface DoorDb {
+  /** records files (0222): a link to put a file at, mark it put, and a link to read an attachment the laptop holds */
+  recordsFileUpload?(a: { request_id: string; filename: string; portal: string | null; number: string | null; note: string | null }, agent: string): Promise<Record<string, unknown>>
+  recordsFileDone?(file_id: string, agent: string): Promise<Record<string, unknown>>
+  recordsFileGet?(reply_id: string, name: string, agent: string): Promise<Record<string, unknown>>
   addProspect(p: Record<string, unknown>, agent: string): Promise<Record<string, unknown>>
   findProspects(f: { address?: string; phone?: string; name?: string; lead_id?: string; only_agent?: boolean; limit: number }): Promise<unknown[]>
   prospectCounts(): Promise<Record<string, unknown>>
@@ -265,6 +269,20 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
     inputSchema: { type: 'object', properties: { note: S('the note'), for: S('records_agent | colin | all'), request_id: S('optional'), resolve: { type: 'integer' } } } },
   { role: 'records', name: 'records_reinstate_ramp', description: 'A failed audit (a letter outside the playbook, an unstamped ask, a sheet/mailbox mismatch): put the records agent back on the ramp (on=true), or clear it after a clean sample (on=false).',
     inputSchema: { type: 'object', properties: { on: { type: 'boolean' }, reason: S('what failed, or what passed') }, required: ['on', 'reason'] } },
+  { role: 'records', name: 'records_portals',
+    description: "The records portals worklist (NextRequest, JustFOIA, GovQA): every portal request by office, request number and where it stands by its notices (submitted, documents released, completed, closed, invoice). A portal shows documents only to the signed-in requester, so nothing reaches the mailbox but the notice. waiting=true means documents are there and nobody has brought them in: sign in at site as the requester, download every released document, and hand each one over with records_file_upload then records_file_done. An invoice is a fee: leave it for Colin and say so with records_log_write.",
+    inputSchema: { type: 'object', properties: {} } },
+  { role: 'records', name: 'records_file_upload',
+    description: "Hand a file to the laptop for a records request (a document you downloaded from a portal, or one a clerk gave you another way). Returns upload_url: PUT the raw file bytes to it within 2 hours, for example  curl -X PUT --data-binary @list.xlsx -H 'Content-Type: application/octet-stream' '<upload_url>'  then call records_file_done with the file_id. Give the file's own name with its extension, the portal and the request number. Up to 50 MB a file; one call per file.",
+    inputSchema: { type: 'object', required: ['request_id', 'filename'], properties: { request_id: S('the request (records_portals or records_list)'),
+      filename: S('the file name with its extension'), portal: S('nextrequest.com, justfoia.com, ...'), number: S('the portal request number, e.g. 26-1698'),
+      note: S('what the file is, in a line') } } },
+  { role: 'records', name: 'records_file_done',
+    description: 'Say the file is uploaded (after the PUT to upload_url). The laptop copies it into the records inbox on its next pass, about 10 minutes, as a reply on that request; the muni intake agent reads it on its next run. Refused if the file is not there yet.',
+    inputSchema: { type: 'object', required: ['file_id'], properties: { file_id: S('from records_file_upload') } } },
+  { role: 'records', name: 'records_file_get',
+    description: "Open an attachment on a reply (records_replies lists each reply's attachments by name). The files live on the laptop: the first call asks for it and answers status asked; the laptop sends it up on its next pass, about 10 minutes; call again and you get url, a link to download the file, good for 10 minutes. Use it when you cannot tell from the reply's words what the clerk sent (a fee letter, a list, a denial).",
+    inputSchema: { type: 'object', required: ['reply_id', 'name'], properties: { reply_id: S('the reply'), name: S('the attachment name as listed') } } },
   { role: 'records', name: 'records_mark', description: 'Update a request after reading a reply or a bounce: status (acknowledged, replied, received, no_records, needs_payment, denied, bounced, skip, draft), a note, received_date, records_through (the last date the records cover: the next re-request starts the day after), next_due (received and no_records default to the cadence_days of the request), a corrected to_email, and reply_id to mark that reply handled.',
     inputSchema: { type: 'object', properties: { request_id: S('the request'), status: S('new status'), note: S('what happened'), received_date: S('YYYY-MM-DD'),
       records_through: S('date the records cover through'), next_due: S('YYYY-MM-DD'), to_email: S('corrected address'), reply_id: S('the reply this handles') }, required: ['request_id'] } },
@@ -492,6 +510,23 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       return { value: await db.records('records_log_write', { p_author: 'muse', p_for: String(args.for ?? 'records_agent'), p_note: String(args.note ?? ''),
         p_request_id: args.request_id ? String(args.request_id) : null }) }
     case 'records_reinstate_ramp': return { value: await db.records('records_reinstate_ramp', { p_reason: String(args.reason ?? ''), p_agent: agent.name, p_on: args.on !== false }) }
+    case 'records_portals': return { value: await db.records('records_portals', {}) }
+    case 'records_file_upload': {
+      if (!db.recordsFileUpload) return { value: { ok: false, reason: 'file hand-off is not available here' }, isError: true }
+      const r = await db.recordsFileUpload({ request_id: String(args.request_id ?? ''), filename: String(args.filename ?? ''),
+        portal: args.portal ? String(args.portal) : null, number: args.number ? String(args.number) : null, note: args.note ? String(args.note) : null }, agent.name)
+      return { value: r, isError: (r as Json)?.ok === false }
+    }
+    case 'records_file_done': {
+      if (!db.recordsFileDone) return { value: { ok: false, reason: 'file hand-off is not available here' }, isError: true }
+      const r = await db.recordsFileDone(String(args.file_id ?? ''), agent.name)
+      return { value: r, isError: (r as Json)?.ok === false }
+    }
+    case 'records_file_get': {
+      if (!db.recordsFileGet) return { value: { ok: false, reason: 'file hand-off is not available here' }, isError: true }
+      const r = await db.recordsFileGet(String(args.reply_id ?? ''), String(args.name ?? ''), agent.name)
+      return { value: r, isError: (r as Json)?.ok === false }
+    }
     case 'records_mark': return { value: await db.records('records_mark', { p_request_id: String(args.request_id ?? ''), p_status: args.status ? String(args.status) : null,
       p_note: args.note ? String(args.note) : null, p_received_date: args.received_date ? String(args.received_date) : null,
       p_records_through: args.records_through ? String(args.records_through) : null, p_next_due: args.next_due ? String(args.next_due) : null,
