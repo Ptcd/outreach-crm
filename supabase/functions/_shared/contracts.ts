@@ -18,6 +18,8 @@ export interface Storage {
   /** downloadAs: the link saves the file under that name instead of opening it */
   signedUrl: (path: string, seconds: number, downloadAs?: string) => Promise<string>
 }
+/** Which mailbox an email actually left from, and why not the company one when it fell back. */
+export type MailSent = { from: string; fallback?: string }
 export type OutMail = { to: string; subject: string; text: string; html: string; fromName?: string; replyTo?: string
   attachments?: { filename: string; contentType: string; bytes: Uint8Array }[] }
 export interface ContractPorts {
@@ -27,7 +29,7 @@ export interface ContractPorts {
   template: Uint8Array
   notify?: (m: { title: string; body: string; url: string; tag: string }) => Promise<void>
   /** the system's own email (the signing link, the signed copy); absent = nothing is emailed */
-  mail?: (m: OutMail) => Promise<void>
+  mail?: (m: OutMail) => Promise<void | MailSent>
   /** where a seller's signing link lives (offers.welivewi.com) */
   appUrl: string
   /** where the team's own links go (the app's address they are signed in on); appUrl when not given */
@@ -308,14 +310,20 @@ export function signedMail(t: Wb11Terms, to: { name: string; email: string }, pd
 async function mailAndLog(ports: ContractPorts, m: OutMail, log: { id: string; signerId: string | null; what: 'link' | 'signed'; actor: string; now: Date }):
   Promise<{ to: string; ok: boolean; reason?: string }> {
   let reason: string | undefined
+  let sent: MailSent | void = undefined
   try {
     if (!ports.mail) throw new Error('email is not set up')
-    await ports.mail(m)
+    sent = await ports.mail(m)
   } catch (e) {
     reason = String(e instanceof Error ? e.message : e).slice(0, 200)
   }
   await ports.rpc('contract_mailed', { p_id: log.id, p_signer_id: log.signerId, p_what: log.what, p_to: m.to, p_actor: log.actor,
     p_ok: !reason, p_error: reason ?? null, p_now: log.now.toISOString() })
+  // which mailbox it left from goes in the audit trail, so a fall-back to the old sender is never silent
+  if (sent) {
+    await ports.rpc('contract_log', { p_id: log.id, p_actor: 'WPIE', p_kind: 'email_sender',
+      p_detail: { to: m.to, from: sent.from, ...(sent.fallback ? { fallback: sent.fallback.slice(0, 200) } : {}) }, p_now: log.now.toISOString() })
+  }
   return { to: m.to, ok: !reason, reason }
 }
 

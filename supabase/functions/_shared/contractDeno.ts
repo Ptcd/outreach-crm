@@ -64,18 +64,23 @@ export function contractPorts(): ContractPorts {
       }
       const ou = Deno.env.get('OFFER_SMTP_USER') ?? ''
       const op = Deno.env.get('OFFER_SMTP_PASSWORD') ?? ''
+      let fallback = ou && !op ? 'the company mailbox has no password saved yet' : undefined
       if (ou && op) {
+        const from = Deno.env.get('OFFER_SMTP_FROM') || ou
         try {
-          await send(Deno.env.get('OFFER_SMTP_HOST') || 'smtp.titan.email', ou, op, Deno.env.get('OFFER_SMTP_FROM') || ou)
-          return
+          await send(Deno.env.get('OFFER_SMTP_HOST') || 'smtp.titan.email', ou, op, from)
+          return { from }
         } catch (e) {
-          console.error(`offer mailbox refused, falling back to the default sender: ${String(e instanceof Error ? e.message : e).slice(0, 200)}`)
+          fallback = `the company mailbox refused: ${String(e instanceof Error ? e.message : e).slice(0, 160)}`
+          console.error(fallback)
         }
       }
       const user = Deno.env.get('SMTP_USER') ?? ''
       const pass = Deno.env.get('SMTP_PASSWORD') ?? ''
-      if (!user || !pass) throw new Error('email is not set up (Colin runs tools\set_supabase_email.ps1 once)')
-      await send(Deno.env.get('SMTP_HOST') || 'smtp.gmail.com', user, pass, Deno.env.get('SMTP_FROM') || user)
+      if (!user || !pass) throw new Error('email is not set up (Colin runs tools/set_supabase_email.ps1 once)')
+      const from = Deno.env.get('SMTP_FROM') || user
+      await send(Deno.env.get('SMTP_HOST') || 'smtp.gmail.com', user, pass, from)
+      return { from, fallback }
     },
   }
 }
