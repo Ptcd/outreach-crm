@@ -184,7 +184,7 @@ describe('the offer from the card', () => {
 
     expect(mails).toHaveLength(1)
     const m = mails[0]
-    expect(m).toMatchObject({ to: 'dale@example.com', subject: 'Offer to purchase 2847 N Burleigh St: review and sign', fromName: 'Colin Merrill, WeLiveWI LLC', replyTo: 'colin@example.com' })
+    expect(m).toMatchObject({ to: 'dale@example.com', subject: 'Offer to purchase 2847 N Burleigh St: review and sign', fromName: 'WeLiveWI', replyTo: 'colin@example.com' })
     expect(m.text).toContain(r.links[0].url)
     expect(m.text).toMatch(/\$142,000, closing on December 12, 2026/)
     expect(m.text).toMatch(/good until November 17, 2026 at 11:59 p\.m\./)
@@ -273,7 +273,7 @@ describe('the offer from the card', () => {
     // the attachment survives the wire format
     const eml = buildMessage({ from: 'sender@example.com', ...signed }, clock)
     keep('5-signed-email.eml', eml)
-    expect(eml).toMatch(/^From: "Colin Merrill, WeLiveWI LLC" <sender@example\.com>\r\n/)
+    expect(eml).toMatch(/^From: "WeLiveWI" <sender@example\.com>\r\n/)
     expect(eml).toContain('Reply-To: <colin@example.com>')
     expect(eml).toMatch(/Content-Type: multipart\/mixed; boundary="/)
     expect(eml).toContain('Content-Disposition: attachment; filename="Signed offer - 2847 N Burleigh St.pdf"')

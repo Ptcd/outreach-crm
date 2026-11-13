@@ -261,6 +261,9 @@ const usd0 = (n: number) => n.toLocaleString('en-US', { style: 'currency', curre
 const first = (name: string) => titleCase(name.trim().split(/\s+/)[0] ?? '')
 const sender = (t: Wb11Terms) => t.buyerSigner || t.buyerName
 const senderLine = (t: Wb11Terms) => (t.buyerSigner ? `${t.buyerSigner}, ${t.buyerName}` : t.buyerName)
+/** The name a seller's inbox shows as the sender: the company's plain name, "WeLiveWI" for "WeLiveWI LLC"
+ *  (Colin 2026-11-12: not "Colin Merrill, WeLiveWI LLC"). The email itself is still signed by the person. */
+export const mailFromName = (t: Wb11Terms) => t.buyerName.replace(/,?\s+(L\.?L\.?C\.?|Inc\.?|Corp\.?|Co\.?|Ltd\.?)$/i, '').trim() || t.buyerName
 const phoneLine = (t: Wb11Terms) => (t.buyerPhone ? ` Questions? Call or text ${first(sender(t))} at ${t.buyerPhone}.` : '')
 
 function shell(title: string, lines: string[], button: { label: string; url: string } | null, foot: string): string {
@@ -284,7 +287,7 @@ export function linkMail(t: Wb11Terms, seller: { name: string; email: string }, 
   ]
   const foot = `${senderLine(t)}.${phoneLine(t)}`
   return {
-    to: seller.email.trim(), subject: `Offer to purchase ${t.street}: review and sign`, fromName: senderLine(t), replyTo: t.buyerEmail,
+    to: seller.email.trim(), subject: `Offer to purchase ${t.street}: review and sign`, fromName: mailFromName(t), replyTo: t.buyerEmail,
     text: [...lines.slice(0, 3), `Open the offer: ${url}`, lines[3], '', foot].join('\n\n'),
     html: shell(`Offer to purchase ${where}`, lines, { label: 'Review and sign the offer', url }, foot),
   }
@@ -300,7 +303,7 @@ export function signedMail(t: Wb11Terms, to: { name: string; email: string }, pd
   ]
   const foot = `${senderLine(t)}.${phoneLine(t)}`
   return {
-    to: to.email.trim(), subject: `Signed offer: ${t.street}`, fromName: senderLine(t), replyTo: t.buyerEmail,
+    to: to.email.trim(), subject: `Signed offer: ${t.street}`, fromName: mailFromName(t), replyTo: t.buyerEmail,
     text: [...lines, '', foot].join('\n\n'), html: shell(`Signed: ${where}`, lines, null, foot),
     attachments: [{ filename: `Signed offer - ${t.street.replace(/[^A-Za-z0-9 .#-]/g, '')}.pdf`, contentType: 'application/pdf', bytes: pdf }],
   }
