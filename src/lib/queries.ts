@@ -428,7 +428,12 @@ export const api = {
     supabase.rpc('call_note_confirm', { p_note_id: noteId, p_mark: mark, p_until: until, p_reason: reason }),
   logCall: (leadId: string, phone: string | null, outcome: string, note: string | null, until: string | null = null) =>
     supabase.rpc('log_call', { p_lead_id: leadId, p_phone: phone, p_outcome: outcome, p_note: note, p_when: until }),
-  // Send contract (Colin): preview / send / new_link / void / pdf / seal. Errors come back as { ok: false, reason }.
+  // the offer standards (0217): Colin's standing terms and his kept signature
+  offerStandardsSet: async (p: Record<string, unknown>): Promise<{ ok: boolean; reason?: string }> => {
+    const r = await supabase.rpc('offer_standards_set', { p })
+    return r.error ? { ok: false, reason: r.error.message } : (r.data as { ok: boolean; reason?: string })
+  },
+  // Send offer / contract: quick_preview / quick_send / preview / send / new_link / void / pdf / seal. Errors come back as { ok: false, reason }.
   contract: async (body: Record<string, unknown>): Promise<{ ok: boolean; reason?: string } & Record<string, unknown>> => {
     const r = await supabase.functions.invoke('contract', { body })
     if (r.error) return { ok: false, reason: await fnError(r.error) }
@@ -709,7 +714,25 @@ export type ContractRow = {
   voided_at: string | null; void_reason: string | null; final_path: string | null; include_recr: boolean
   terms: { price: number; closing: string; street: string }
   contract_signers: { id: string; position: number; name: string; email: string | null; phone: string | null; opened_at: string | null
-    signed_at: string | null; expires_at: string }[]
+    signed_at: string | null; expires_at: string; emailed_at?: string | null; emailed_to?: string | null }[]
+}
+
+/** The standing terms every Send offer carries (0217), and what this person may do with them. */
+export type OfferStandards = {
+  buyer_name: string; signer_name: string; signer_title: string; buyer_email: string | null; buyer_address: string | null
+  buyer_phone: string; earnest_money: number; earnest_days: number; earnest_holder: string; accept_days: number
+  proof_of_funds_days: number; included: string | null; excluded: string | null; additional: string; has_signature: boolean
+}
+export type OfferSetup = {
+  ok: boolean; reason?: string; standards: OfferStandards; signature_png: string | null; colin_number: number | null
+  can_send: boolean; can_set_price: boolean; can_edit_standards: boolean
+}
+export function useOfferSetup(leadId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['offer-setup', leadId],
+    enabled,
+    queryFn: async () => check(await supabase.rpc('offer_setup', { p_lead_id: leadId })) as OfferSetup,
+  })
 }
 
 /** Contracts on a lead, newest first, with each seller's progress. */
@@ -719,7 +742,7 @@ export function useContracts(leadId: string) {
     refetchInterval: 30_000,
     queryFn: async () =>
       check(await supabase.from('contracts')
-        .select('id, lead_id, form, status, created_at, signed_at, voided_at, void_reason, final_path, include_recr, terms, contract_signers(id, position, name, email, phone, opened_at, signed_at, expires_at)')
+        .select('id, lead_id, form, status, created_at, signed_at, voided_at, void_reason, final_path, include_recr, terms, contract_signers(id, position, name, email, phone, opened_at, signed_at, expires_at, emailed_at, emailed_to)')
         .eq('lead_id', leadId).order('created_at', { ascending: false })) as ContractRow[],
   })
 }

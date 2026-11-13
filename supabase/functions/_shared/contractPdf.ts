@@ -3,7 +3,7 @@
 // the seller's Real Estate Condition Report (Wis. Stat. 709.03) drawn from the statute text,
 // and the electronic-signature certificate. pdf-lib is passed in (npm:pdf-lib on the server,
 // node_modules in tests) so this file has no imports a Deno deploy has to resolve.
-import { PAGE_HEIGHT, WB11_BOXES, WB11_MAP, WB11_SIGN, WB11_STRIKES, type Blank } from './wb11Map.ts'
+import { PAGE_HEIGHT, WB11_BOXES, WB11_MAP, WB11_RECR_STRIKES, WB11_SIGN, WB11_STRIKES, type Blank } from './wb11Map.ts'
 import { RECR } from './recrForm.generated.ts'
 import type { RecrAnswers } from './recr.ts'
 
@@ -36,9 +36,17 @@ export type Wb11Terms = {
   sellerEmail?: string
   buyerEmail?: string
   draftedBy?: string
+  // Send offer (0217): a company buyer signs by a person; the report comes with the acceptance; the days as dates
+  buyerSigner?: string
+  buyerSignerTitle?: string
+  buyerPhone?: string
+  recrWithOffer?: boolean
+  closingOn?: string          // YYYY-MM-DD, what the card and the signing page show
+  acceptBy?: string           // YYYY-MM-DD
+  quick?: boolean
 }
 
-export type SignatureMark = { name: string; date: string; png?: Uint8Array | null }
+export type SignatureMark = { name: string; date: string; png?: Uint8Array | null; printName?: string }
 export type PropertyMeta = { street: string; muniType: string; muniName: string; county: string }
 
 const INK = [0.05, 0.1, 0.45] as const
@@ -134,14 +142,14 @@ async function drawSignature(lib: PdfLib, doc: any, page: any, f: { sig: any; re
   box: { x0: number; x1: number; line: number; dateX0: number; dateX1: number; nameX: number; nameBase: number }) {
   if (s.png?.length) {
     const img = await doc.embedPng(s.png)
-    const h = 22
-    const w = Math.min(box.x1 - box.x0 - 8, (img.width / img.height) * h)
-    page.drawImage(img, { x: box.x0 + 4, y: PAGE_HEIGHT - box.line + 1.5, width: w, height: h })
+    // as large as the room above the line allows (19pt; 240pt wide at most), keeping the drawing's shape
+    const k = Math.min(19 / img.height, Math.min(240, box.x1 - box.x0 - 8) / img.width)
+    page.drawImage(img, { x: box.x0 + 4, y: PAGE_HEIGHT - box.line + 1.5, width: img.width * k, height: img.height * k })
   } else {
     page.drawText(safeText(s.name), { x: box.x0 + 4, y: PAGE_HEIGHT - box.line + 4, size: 16, font: f.sig, color: lib.rgb(...INK) })
   }
   put(lib, page, f.reg, s.date, { p: 0, x0: box.dateX0, x1: box.dateX1, base: box.line - 1.6 })
-  put(lib, page, f.reg, s.name, { p: 0, x0: box.nameX, x1: 470, base: box.nameBase })
+  put(lib, page, f.reg, s.printName || s.name, { p: 0, x0: box.nameX, x1: 470, base: box.nameBase })
 }
 
 function watermark(lib: PdfLib, pages: any[], font: any, text: string) {
@@ -178,7 +186,14 @@ export async function fillWb11(lib: PdfLib, template: Uint8Array, t: Wb11Terms,
   put(lib, P(M.earnestAmount), f.reg, money(t.earnestMoney), M.earnestAmount)
   put(lib, P(M.earnestDays), f.reg, String(t.earnestDays ?? 5), M.earnestDays)
   putLines(lib, pages, f.reg, t.earnestHolder, M.earnestHolder)
-  put(lib, P(M.recrDate), f.reg, 'N/A', M.recrDate)
+  if (t.recrWithOffer) {
+    put(lib, P(M.recrDate), f.reg, "date of Seller's signature", M.recrDate)
+    for (const k of WB11_RECR_STRIKES) {
+      pages[k.p].drawLine({ start: { x: k.x0, y: PAGE_HEIGHT - k.y }, end: { x: k.x1, y: PAGE_HEIGHT - k.y }, thickness: 1, color: lib.rgb(...INK) })
+    }
+  } else {
+    put(lib, P(M.recrDate), f.reg, 'N/A', M.recrDate)
+  }
   if (t.inspection) {
     markBox(WB11_BOXES.inspection)
     putLines(lib, pages, f.reg, t.inspectionComponents || 'N/A', M.inspectionComponents)
@@ -187,13 +202,17 @@ export async function fillWb11(lib: PdfLib, template: Uint8Array, t: Wb11Terms,
   put(lib, P(M.proofOfFundsDays), f.reg, String(t.proofOfFundsDays ?? 7), M.proofOfFundsDays)
   putLines(lib, pages, f.reg, t.leaseTerms, M.leaseTerms)
 
-  // Additional provisions: what does not fit on lines 570-590 goes to Addendum A.
+  // Additional provisions: shrunk a little to fit lines 570-590 when that is enough; what still does not fit
+  // goes to Addendum A.
   let addendum = false
   let rest = ''
   if (t.additional?.trim()) {
     const widths = M.additional.map((x) => x.x1 - x.x0 - 4)
-    const first = wrapInto(t.additional, widths, (s) => f.reg.widthOfTextAtSize(s, 10))
-    if (first.rest) {
+    const at = (size: number) => wrapInto(t.additional!, widths, (s) => f.reg.widthOfTextAtSize(s, size))
+    const size = [10, 9.5, 9, 8.5].find((z) => !at(z).rest)
+    if (size) {
+      at(size).lines.forEach((l, i) => put(lib, pages[M.additional[i].p], f.reg, l, M.additional[i], size))
+    } else {
       const shortWidths = [...widths.slice(0, -1), widths[widths.length - 1] - 200]
       const r = wrapInto(t.additional, shortWidths, (s) => f.reg.widthOfTextAtSize(s, 10))
       r.lines.forEach((l, i) => put(lib, pages[M.additional[i].p], f.reg, l, M.additional[i]))
@@ -201,8 +220,6 @@ export async function fillWb11(lib: PdfLib, template: Uint8Array, t: Wb11Terms,
       put(lib, pages[last.p], f.reg, '(continued in Addendum A)', { ...last, x0: last.x1 - 196 })
       rest = r.rest
       addendum = true
-    } else {
-      first.lines.forEach((l, i) => put(lib, pages[M.additional[i].p], f.reg, l, M.additional[i]))
     }
   }
   if (addendum) {
@@ -368,14 +385,16 @@ export async function renderCertificate(lib: PdfLib, c: { id: string; title: str
   w.text('Each signer agreed to use electronic records and signatures (Wis. Stat. ch. 137; 15 U.S.C. 7001) before signing, '
     + 'adopted the signature shown, and was given a copy of the signed documents. The events below were recorded by the system '
     + 'at the time they happened (Central Time).', { gap: 8 })
-  w.row([{ x: 0, s: 'When', bold: true }, { x: 120, s: 'Who', bold: true }, { x: 250, s: 'What', bold: true }, { x: 400, s: 'IP / device', bold: true }])
+  w.row([{ x: 0, s: 'When', bold: true }, { x: 112, s: 'Who', bold: true }, { x: 215, s: 'What (IP address and device below)', bold: true }])
   for (const r of c.rows) {
-    w.ensure(24)
+    w.ensure(30)
     const y0 = w.y
-    w.row([{ x: 0, s: r.at }, { x: 120, s: r.who.slice(0, 26) }, { x: 400, s: (r.ip ?? '').slice(0, 30) }], 8)
+    w.row([{ x: 0, s: r.at }, { x: 112, s: r.who.slice(0, 22) }], 8)
     w.y = y0
-    w.text(r.what, { indent: 250, size: 8, gap: 0 })
-    if (r.device) w.text(r.device.slice(0, 160), { indent: 250, size: 6.5, gray: true, gap: 3 })
+    w.text(r.what, { indent: 215, size: 8, gap: 0 })
+    const from = [r.ip ? `IP ${r.ip.slice(0, 45)}` : '', (r.device ?? '').slice(0, 160)].filter(Boolean).join(' - ')
+    if (from) w.text(from, { indent: 215, size: 6.5, gray: true, gap: 0 })
+    w.y -= 3
   }
   w.finish()
   return doc.save()

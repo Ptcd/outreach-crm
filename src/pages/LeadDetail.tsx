@@ -109,6 +109,8 @@ export default function LeadDetail() {
         startOpen={params.get('call') === '1' || liveHere || lead.belt === 'yes_unbooked' || lead.belt === 'call_booked'} />
       {/* the package to Colin, his number and the callback (migration 0085) */}
       <DealPackage lead={lead} />
+      {/* Send offer (0217): the written offer follows the number; a caller sends at Colin's number, Colin at any */}
+      <ContractBlock lead={lead} contacts={contacts} colinHere={isOwner} />
       <History leadId={lead.id} ownerName={lead.owner_name} messages={messages} inbound={q.data.inbound}
         stageEvents={q.data.stageEvents} tasks={tasks} beltEvents={q.data.beltEvents} taskMoves={q.data.taskMoves} people={q.data.people} />
       {/* the follow-up belt (what happens next on its own) sits under the history: callers start at the Call panel */}
@@ -126,7 +128,6 @@ export default function LeadDetail() {
       </Section>
       <Tasks leadId={lead.id} tasks={tasks.filter((t) => t.source !== 'reply')} />
       <Contacts contacts={contacts} leadId={lead.id} lead={lead} />
-      {isOwner && <ContractBlock lead={lead} contacts={contacts} />}
       {isOwner && <DealBlock leadId={lead.id} />}
       <Notes lead={lead} />
       {/* older tools nobody uses day to day, folded away (Colin 2026-10-28: "theres old stuff on the card that we don't use");

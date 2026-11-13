@@ -1,6 +1,6 @@
 // DEV ONLY (npm run preview:mock): the real pages with sample data instead of Supabase, for
 // checking the phone layout. Never part of the production build.
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import type { WaitingDraft } from '../src/lib/queries'
 
 export const PAGE_SIZE = 50
@@ -133,11 +133,46 @@ const special: Record<string, (...a: unknown[]) => Promise<unknown>> = {
     : { ok: false, reason: 'Preview mode: no server.' }),
 }
 export const api = new Proxy({}, { get: (_t, k: string) => special[k] ?? done }) as Record<string, (...a: unknown[]) => Promise<{ error: null; data: { outcome: string } }>>
-export const useContracts = () => ok([{ id: 'K1', lead_id: 'L1', form: 'WB-11 10-1-2026', status: 'signed', created_at: ago(900), signed_at: ago(30),
+const offerSetupSample = () => ok({ ok: true, signature_png: null, colin_number: 139500, can_send: true, can_set_price: true, can_edit_standards: true,
+  standards: { buyer_name: 'WeLiveWI LLC', signer_name: 'Colin Merrill', signer_title: 'Authorized Representative', buyer_email: 'colin@example.com',
+    buyer_address: null, buyer_phone: '(262) 999-6513', earnest_money: 500, earnest_days: 5, earnest_holder: 'Knight Barry Title', accept_days: 5,
+    proof_of_funds_days: 7, included: null, excluded: null, additional: '1. CLOSING COSTS. Buyer shall pay all closing costs.', has_signature: false } })
+const contractsSample = () => ok([{ id: 'K1', lead_id: 'L1', form: 'WB-11 10-1-2026', status: 'signed', created_at: ago(900), signed_at: ago(30),
   voided_at: null, void_reason: null, final_path: 'K1/signed.pdf', include_recr: true, terms: { price: 182500, closing: 'November 20, 2026', street: '2847 N Burleigh St' },
   contract_signers: [{ id: 'S1', position: 1, name: 'Dale Novak', email: 'dale.novak@example.com', phone: '4145550177', opened_at: ago(60), signed_at: ago(45), expires_at: ago(-20000) },
     { id: 'S2', position: 2, name: 'Rita Novak', email: null, phone: null, opened_at: ago(40), signed_at: ago(30), expires_at: ago(-20000) }] }])
+
+// Send offer end to end (npm run e2e:offer): open the app once with ?e2e=1 and the offer screens talk to the local
+// rig (scripts/e2e-offer.ts: the real server logic on a throwaway database, email captured) instead of sample data.
+const E2E = (() => {
+  try {
+    if (new URLSearchParams(location.search).get('e2e') === '1') localStorage.setItem('wpie.e2e', '1')
+    if (new URLSearchParams(location.search).get('e2e') === '0') localStorage.removeItem('wpie.e2e')
+    return localStorage.getItem('wpie.e2e') === '1' ? 'http://127.0.0.1:5198' : null
+  } catch { return null }
+})()
+const post = async (path: string, body: unknown = {}) =>
+  (await fetch(`${E2E}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json()
+if (E2E) {
+  Object.assign(special, {
+    contract: (b: unknown) => post('/functions/v1/contract', b),
+    contractSign: (b: unknown) => post('/functions/v1/contract-sign', b),
+    offerStandardsSet: async (p: unknown) => { const r = await post('/rpc/offer_standards_set', { p }); return r.error ? { ok: false, reason: r.error.message } : r.data },
+    contactAdd: (_lead: unknown, kind: unknown, value: unknown, person_name: unknown, note: unknown) => post('/rpc/contact_add', { kind, value, person_name, note }),
+  })
+}
+const useOfferSetupLive = () => useQuery({ queryKey: ['offer-setup', 'e2e'], queryFn: async () => (await post('/rpc/offer_setup')).data })
+const useContractsLive = () => useQuery({ queryKey: ['contracts', 'e2e'], refetchInterval: 3000, queryFn: () => post('/e2e/contracts') })
+export const useOfferSetup = E2E ? useOfferSetupLive : offerSetupSample
+export const useContracts = E2E ? useContractsLive : contractsSample
 export const usePhoneLookup = (d: string) => ok(d.replace(/\D/g, '').length >= 3 ? [
   { lead_id: 'L1', owner_name: 'DALE NOVAK', property_address: '2847 N Burleigh St', municipality: 'Milwaukee', lane: 'hold', stage: 'reply_received', phone: '4145550177', person_name: 'DALE NOVAK', blocked: false, exact: false },
   { lead_id: 'L2', owner_name: 'RITA SCHMIDT', property_address: 'W220 N1765 Pewaukee Rd', municipality: 'Pewaukee', lane: 'flip', stage: 'follow_up', phone: '2625550177', person_name: null, blocked: false, exact: false }] : [])
 export const useHotAlerts = () => ok([{ id: 'H1', created_at: ago(9), body: "Yes it's still mine. What would you pay?", alert1_at: ago(9), alert2_at: null, called_at: null, is_test: false, phone10: '4145550177' }])
+
+// hooks the app gained after this preview was last touched: empty answers, so the pages still load
+export const callTranscript = async () => ''
+export const useCallNotes = () => ok([])
+export const useOfferSettings = () => ok(null)
+export const usePlannedToMyCards = () => ok([])
+export const useTextsLive = () => ok([])

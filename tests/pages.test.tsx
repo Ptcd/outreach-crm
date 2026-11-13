@@ -44,6 +44,10 @@ vi.mock('@/lib/queries', () => ({
     next_step_kind: null, suggested_mark: 'not_now', suggested_until: '2027-01-05T18:00:00Z', suggested_reason: null, facts_written: [],
     logged_before: null, confirmed_at: null, confirmed_by: null, confirmed_mark: null, created_at: '2026-10-22T15:27:00Z' }], pending: 0 }),
   useHotAlerts: () => ok([{ id: 'H1', created_at: '2026-10-22T15:10:00Z', body: 'yes still mine', alert1_at: '2026-10-22T15:10:30Z', alert2_at: null, called_at: null, is_test: false, phone10: '4145550101' }]),
+  useOfferSetup: () => ok({ ok: true, signature_png: null, colin_number: 139500, can_send: true, can_set_price: true, can_edit_standards: true,
+    standards: { buyer_name: 'WeLiveWI LLC', signer_name: 'Colin Merrill', signer_title: 'Authorized Representative', buyer_email: 'colin@example.com',
+      buyer_address: null, buyer_phone: '(262) 999-6513', earnest_money: 500, earnest_days: 5, earnest_holder: 'Knight Barry Title', accept_days: 5,
+      proof_of_funds_days: 7, included: null, excluded: null, additional: '1. CLOSING COSTS. Buyer shall pay all closing costs.', has_signature: false } }),
   useContracts: () => ok([{ id: 'K1', lead_id: 'L1', form: 'WB-11 10-1-2026', status: 'sent', created_at: '2026-10-21T19:00:00Z', signed_at: null,
     voided_at: null, void_reason: null, final_path: null, include_recr: true, terms: { price: 182500, closing: 'November 20, 2026', street: '100 N Main St' },
     contract_signers: [{ id: 'S1', position: 1, name: 'Jane Roe', email: null, phone: null, opened_at: '2026-10-21T20:00:00Z', signed_at: null, expires_at: '2026-11-04T19:00:00Z' }] }]),
@@ -177,7 +181,7 @@ describe('pages render', () => {
     expect(screen.getByText(/Can you email me/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Send an email' })).toBeTruthy()
     expect(screen.queryByText('Mailed')).toBeNull()
-    expect(screen.getByText('Contract (WB-11)')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Offer' })).toBeTruthy()
     expect(screen.getByText('Out for signature')).toBeTruthy()
     expect(screen.getByText(/opened/)).toBeTruthy()
     expect(screen.getByRole('button', { name: 'New signing link' })).toBeTruthy()
@@ -219,15 +223,58 @@ describe('pages render', () => {
     expect(screen.getAllByText(/From the call: 2 - A reason and a date or event/).length).toBeGreaterThan(0)
   })
 
-  it('the seller signing page shows the terms, consent, all 62 condition questions, and locks Sign until done', async () => {
+  it('the seller signing page walks three steps: the offer, the 62 condition questions a section at a time, the signature', async () => {
     at('/sign/tok', '/sign/:token', <SignContract />)
     expect(await screen.findByText('$182,500')).toBeTruthy()
     expect(screen.getByText(/No financing contingency/)).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Read the full Offer (PDF)' }).getAttribute('href')).toBe('https://x/offer.pdf')
-    expect(screen.getByText(/I agree to use electronic records and signatures/)).toBeTruthy()
-    expect(screen.getAllByRole('radiogroup')).toHaveLength(62)
-    expect((screen.getByRole('button', { name: 'Accept and sign' }) as HTMLButtonElement).disabled).toBe(true)
-    expect(screen.getByText(/Answer every question/)).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Download' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Accept and sign' })).toBeNull()      // nothing to sign on the first screen
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    // the state condition report: six sections, each locked until every question in it has an answer
+    let seen = 0
+    for (let sec = 0; sec < 6; sec++) {
+      const next = () => screen.getByRole('button', { name: sec === 5 ? 'Continue to sign' : 'Next section' }) as HTMLButtonElement
+      seen += screen.getAllByRole('radiogroup').length
+      expect(next().disabled).toBe(true)
+      fireEvent.click(screen.getByRole('button', { name: /^No to all \d+$/ }))
+      if (sec === 0) {
+        // a Yes asks for its explanation before the section lets go
+        fireEvent.click(within(screen.getByRole('radiogroup', { name: 'B1' })).getByRole('radio', { name: 'Yes' }))
+        expect(next().disabled).toBe(true)
+        fireEvent.change(screen.getByLabelText(/Explain each/), { target: { value: 'Roof leaks over the porch.' } })
+      }
+      if (sec === 5) {
+        expect(next().disabled).toBe(true)
+        fireEvent.change(screen.getByLabelText(/^G6\./), { target: { value: '12' } })
+        fireEvent.change(screen.getByLabelText(/^G7\./), { target: { value: '0' } })
+      }
+      expect(next().disabled).toBe(false)
+      fireEvent.click(next())
+    }
+    expect(seen).toBe(62)
+
+    // the signature: the name is filled in, today's date is already there, and it stays locked until both boxes are ticked
+    expect((screen.getByLabelText('Your full legal name') as HTMLInputElement).value).toBe('Jane Roe')
+    expect(screen.getByText('Date')).toBeTruthy()
+    // draw it or type it: typed shows the name as the signature
+    fireEvent.click(screen.getByRole('tab', { name: 'Type it' }))
+    expect(screen.getByRole('tab', { name: 'Type it' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getAllByText('Jane Roe').length).toBeGreaterThan(0)
+    const sign = screen.getByRole('button', { name: 'Accept and sign' }) as HTMLButtonElement
+    expect(sign.disabled).toBe(true)
+    fireEvent.click(screen.getByLabelText(/I agree to use electronic records and signatures/))
+    expect(sign.disabled).toBe(true)
+    fireEvent.click(screen.getByLabelText(/I accept the Offer and sign it/))
+    expect(sign.disabled).toBe(false)
+  })
+
+  it('Send offer on the card: the email, the price and the closing date, and nothing else to type', async () => {
+    at('/lead/L1', '/lead/:id', <LeadDetail />)
+    // an offer is already out on this card in the sample data: no second one
+    expect(screen.queryByRole('button', { name: 'Send offer' })).toBeNull()
+    expect(screen.getByText('Out for signature')).toBeTruthy()
   })
 
   it('Approvals shows the switch, the pause, bulk buttons and each text', () => {

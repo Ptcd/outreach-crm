@@ -9,6 +9,7 @@ import { WB11_B64 } from './wb11Template.generated.ts'
 import { notifyEveryone } from './notify.ts'
 import { notifyDeps } from './notifyDeno.ts'
 import type { Rpc } from './sending.ts'
+import { sendMail } from './smtp.ts'
 
 export const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -43,13 +44,21 @@ export function contractPorts(): ContractPorts {
         if (r.error || !r.data) throw new Error(`storage: ${r.error?.message ?? 'missing'}`)
         return new Uint8Array(await r.data.arrayBuffer())
       },
-      signedUrl: async (path, seconds) => {
-        const r = await bucket().createSignedUrl(path, seconds)
+      signedUrl: async (path, seconds, downloadAs) => {
+        const r = await bucket().createSignedUrl(path, seconds, downloadAs ? { download: downloadAs } : undefined)
         if (r.error || !r.data) throw new Error(`storage: ${r.error?.message ?? 'no url'}`)
         return r.data.signedUrl
       },
     },
     notify: async (m) => { await notifyEveryone(deps, m) },
+    // the same Gmail sender the app's other emails use (tools\set_supabase_email.ps1)
+    mail: async (m) => {
+      const user = Deno.env.get('SMTP_USER') ?? ''
+      const pass = Deno.env.get('SMTP_PASSWORD') ?? ''
+      if (!user || !pass) throw new Error('email is not set up (Colin runs tools\\set_supabase_email.ps1 once)')
+      const conn = await Deno.connectTls({ hostname: Deno.env.get('SMTP_HOST') || 'smtp.gmail.com', port: 465 })
+      await sendMail(conn, { user, pass }, { from: Deno.env.get('SMTP_FROM') || user, ...m })
+    },
   }
 }
 

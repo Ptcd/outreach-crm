@@ -7,7 +7,13 @@ export interface SmtpConn {
   read(buf: Uint8Array): Promise<number | null>
   close(): void
 }
-export interface Mail { from: string; to: string; subject: string; text: string; html: string }
+export interface Attachment { filename: string; contentType: string; bytes: Uint8Array }
+export interface Mail {
+  from: string; to: string; subject: string; text: string; html: string
+  fromName?: string            // shown as the sender; "WPIE" when not given
+  replyTo?: string
+  attachments?: Attachment[]   // sent as multipart/mixed around the text + html
+}
 export interface SmtpAuth { user: string; pass: string }
 
 const enc = new TextEncoder()
@@ -24,15 +30,27 @@ function b64Body(s: string): string {
   return (b64(s).match(/.{1,76}/g) ?? []).join('\r\n')
 }
 
+/** Bytes as base64 wrapped at 76 columns (57 bytes a line), built in chunks so a 1 MB PDF does not blow the stack. */
+function b64Bytes(bytes: Uint8Array): string {
+  const lines: string[] = []
+  for (let i = 0; i < bytes.length; i += 57) lines.push(btoa(String.fromCharCode(...bytes.subarray(i, i + 57))))
+  return lines.join('\r\n')
+}
+
+const plain = (s: string) => s.replace(/["\\\r\n<>]/g, '').trim()
+const word = (s: string) => (/^[\x20-\x7e]*$/.test(s) ? `"${s}"` : `=?UTF-8?B?${b64(s)}?=`)
+
 export function buildMessage(m: Mail, now = new Date(), boundary = `wpie${now.getTime().toString(36)}`): string {
-  return [
-    `From: WPIE <${m.from}>`,
+  const name = plain(m.fromName ?? '')
+  const head = [
+    `From: ${name ? word(name) : 'WPIE'} <${m.from}>`,
     `To: <${m.to}>`,
+    ...(m.replyTo ? [`Reply-To: <${plain(m.replyTo)}>`] : []),
     `Subject: =?UTF-8?B?${b64(m.subject)}?=`,
     `Date: ${now.toUTCString()}`,
     'MIME-Version: 1.0',
-    `Content-Type: multipart/alternative; boundary="${boundary}"`,
-    '',
+  ]
+  const alt = [
     `--${boundary}`,
     'Content-Type: text/plain; charset=UTF-8',
     'Content-Transfer-Encoding: base64',
@@ -44,6 +62,31 @@ export function buildMessage(m: Mail, now = new Date(), boundary = `wpie${now.ge
     '',
     b64Body(m.html),
     `--${boundary}--`,
+  ]
+  if (!m.attachments?.length) {
+    return [...head, `Content-Type: multipart/alternative; boundary="${boundary}"`, '', ...alt, ''].join('\r\n')
+  }
+  const mixed = `${boundary}x`
+  return [
+    ...head,
+    `Content-Type: multipart/mixed; boundary="${mixed}"`,
+    '',
+    `--${mixed}`,
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    '',
+    ...alt,
+    ...m.attachments.flatMap((a) => {
+      const fn = plain(a.filename).replace(/[^\x20-\x7e]/g, '_') || 'file'
+      return [
+        `--${mixed}`,
+        `Content-Type: ${plain(a.contentType)}; name="${fn}"`,
+        'Content-Transfer-Encoding: base64',
+        `Content-Disposition: attachment; filename="${fn}"`,
+        '',
+        b64Bytes(a.bytes),
+      ]
+    }),
+    `--${mixed}--`,
     '',
   ].join('\r\n')
 }
@@ -67,7 +110,16 @@ export async function sendMail(conn: SmtpConn, auth: SmtpAuth, m: Mail): Promise
       pending += dec.decode(buf.subarray(0, n))
     }
   }
-  const send = (s: string) => conn.write(enc.encode(s + '\r\n'))
+  // a socket write may take only part of a large message (a PDF attachment): keep going until it is all sent
+  const writeAll = async (bytes: Uint8Array) => {
+    let off = 0
+    while (off < bytes.length) {
+      const n = await conn.write(bytes.subarray(off))
+      if (!n) throw new Error('SMTP connection stopped taking data')
+      off += n
+    }
+  }
+  const send = (s: string) => writeAll(enc.encode(s + '\r\n'))
   try {
     await reply(220)
     await send('EHLO wpie'); await reply(250)
@@ -78,7 +130,7 @@ export async function sendMail(conn: SmtpConn, auth: SmtpAuth, m: Mail): Promise
     await send(`RCPT TO:<${m.to}>`); await reply(250)
     await send('DATA'); await reply(354)
     const body = buildMessage(m).split('\r\n').map((l) => (l.startsWith('.') ? '.' + l : l)).join('\r\n')
-    await conn.write(enc.encode(body + '\r\n.\r\n')); await reply(250)
+    await writeAll(enc.encode(body + '\r\n.\r\n')); await reply(250)
     await send('QUIT')
   } finally {
     conn.close()

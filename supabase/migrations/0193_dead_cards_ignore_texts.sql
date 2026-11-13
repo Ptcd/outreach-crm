@@ -147,3 +147,4 @@ begin
   return jsonb_build_object('ok', true, 'belt', p_belt, 'step', step, 'next_stop_at', st.at, 'next_stop_who', st.who, 'say', st.say);
 end $function$
 
+;

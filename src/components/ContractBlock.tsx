@@ -7,11 +7,14 @@ import { ConfirmButton } from '@/components/ui/confirm'
 import { SignaturePad } from '@/components/SignaturePad'
 import { api, useContracts, useDeals, type ContractRow } from '@/lib/queries'
 import { fmtDateTime, fmtPhone } from '@/lib/format'
+import { SendOfferButton, ShareLink } from '@/components/SendOffer'
+import { sellersFrom } from '@/lib/offer'
 import type { Contact, Lead } from '@/lib/types'
 
-// "Send contract": the official WB-11, filled from the lead and Colin's terms, signed by Colin, with a
-// private signing link per seller. Colin sends the link himself (text or email from his phone).
-// Nothing here suggests a price: the offer is whatever Colin types.
+// The offer on the card. "Send offer" (SendOffer.tsx, 0217) is the two-click way: the standing terms, Colin's kept
+// signature, the link emailed to the seller. "Custom terms" is Colin's long form, every blank typed by him.
+// Below them, each offer's progress: emailed, opened, signed, and the PDFs.
+// Nothing here suggests a price: the offer is Colin's number.
 
 const DEFAULTS_KEY = 'wpie-offer-defaults'
 type Defaults = { buyerName: string; buyerAddress: string; buyerEmail: string; earnestHolder: string; earnestMoney: string; additional: string }
@@ -26,21 +29,22 @@ function saveDefaults(d: Defaults) {
 const long = (d: Date) => d.toLocaleDateString('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' })
 const isoDay = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'America/Chicago' })
 const fromIsoDay = (s: string) => (s ? long(new Date(`${s}T12:00:00`)) : '')
-const titleCase = (s: string) => s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/\bLlc\b/g, 'LLC')
-
-function sellersFrom(owner: string): { name: string; email: string; phone: string }[] {
-  const parts = owner.split(/\s+(?:&|AND)\s+/i).map((p) => p.trim()).filter(Boolean).slice(0, 2)
-  return (parts.length ? parts : [owner]).map((n) => ({ name: titleCase(n), email: '', phone: '' }))
-}
-
-export function ContractBlock({ lead, contacts }: { lead: Lead; contacts: Contact[] }) {
+export function ContractBlock({ lead, contacts, colinHere }: { lead: Lead; contacts: Contact[]; colinHere: boolean }) {
   const q = useContracts(lead.id)
   const [writing, setWriting] = useState(false)
   const active = q.data?.find((c) => c.status === 'sent')
+  const idle = !writing && !active
   return (
-    <Section title="Contract (WB-11)" right={!writing && !active ? <Button size="sm" onClick={() => setWriting(true)}>Write an offer</Button> : undefined}>
+    <Section title="Offer" right={(
+      <div className="flex items-center gap-1">
+        {idle && colinHere && <Button size="sm" variant="ghost" onClick={() => setWriting(true)}>Custom terms</Button>}
+        <SendOfferButton lead={lead} contacts={contacts} disabled={lead.stage === 'dnc'} hideButton={!idle} />
+      </div>
+    )}>
       <ErrorNote error={q.error} />
-      {q.data?.length === 0 && !writing && <Empty>No contract yet.</Empty>}
+      {q.data?.length === 0 && !writing && (
+        <Empty>No offer yet. Send offer emails the seller the Wisconsin WB-11, already signed by the buyer, to sign on their phone.</Empty>
+      )}
       <div className="space-y-3">
         {q.data?.map((c) => <ContractCard key={c.id} c={c} />)}
       </div>
@@ -85,14 +89,25 @@ function ContractCard({ c }: { c: ContractRow }) {
             <span className="font-medium">{s.name}</span>{' '}
             {s.signed_at ? <Badge tone="good">signed {fmtDateTime(s.signed_at)}</Badge>
               : s.opened_at ? <Badge tone="info">opened {fmtDateTime(s.opened_at)}</Badge>
+              : s.emailed_at ? <Badge tone="warn">emailed {fmtDateTime(s.emailed_at)}, not opened</Badge>
               : <Badge>not opened</Badge>}
+            {s.emailed_to && !s.signed_at && <span className="ml-1 text-xs text-muted-foreground">{s.emailed_to}</span>}
             {c.status === 'sent' && !s.signed_at && (
               <div className="mt-1">
                 {links[s.id] ? <ShareLink url={links[s.id]} name={s.name} phone={s.phone} email={s.email} /> : (
-                  <Button size="sm" variant="outline" disabled={busy} onClick={async () => {
-                    const r = await run({ action: 'new_link', signer_id: s.id })
-                    if (r.ok && typeof r.url === 'string') setLinks((l) => ({ ...l, [s.id]: r.url as string }))
-                  }}>New signing link</Button>
+                  <div className="flex flex-wrap gap-2">
+                    {s.email && (
+                      <Button size="sm" variant="outline" disabled={busy} onClick={async () => {
+                        const r = await run({ action: 'new_link', signer_id: s.id, email: true })
+                        if (r.ok) setMsg(typeof r.emailed_to === 'string' ? `A fresh link was emailed to ${r.emailed_to}.` : `The email did not go: ${String(r.email_error ?? 'unknown')}.`)
+                        if (r.ok && typeof r.emailed_to !== 'string' && typeof r.url === 'string') setLinks((l) => ({ ...l, [s.id]: r.url as string }))
+                      }}>Email it again</Button>
+                    )}
+                    <Button size="sm" variant="outline" disabled={busy} onClick={async () => {
+                      const r = await run({ action: 'new_link', signer_id: s.id })
+                      if (r.ok && typeof r.url === 'string') setLinks((l) => ({ ...l, [s.id]: r.url as string }))
+                    }}>New signing link</Button>
+                  </div>
                 )}
               </div>
             )}
@@ -109,25 +124,7 @@ function ContractCard({ c }: { c: ContractRow }) {
         )}
       </div>
       {c.void_reason && <p className="mt-1 text-xs text-muted-foreground">Withdrawn: {c.void_reason}</p>}
-      {msg && <p className="mt-2 text-sm text-red-700">{msg}</p>}
-    </div>
-  )
-}
-
-function ShareLink({ url, name, phone, email }: { url: string; name: string; phone?: string | null; email?: string | null }) {
-  const [copied, setCopied] = useState(false)
-  const first = name.split(/\s+/)[0]
-  const text = `Hi ${first}, here is the offer to sign on your phone: ${url}`
-  return (
-    <div className="space-y-2 rounded-md bg-muted p-2">
-      <p className="break-all text-xs">{url}</p>
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => { void navigator.clipboard?.writeText(url).then(() => setCopied(true)) }}>{copied ? 'Copied' : 'Copy link'}</Button>
-        {phone && <a className="inline-flex h-9 items-center rounded-md border bg-background px-3 text-sm" href={`sms:${phone}?&body=${encodeURIComponent(text)}`}>Text from my phone</a>}
-        {email && <a className="inline-flex h-9 items-center rounded-md border bg-background px-3 text-sm" href={`mailto:${email}?subject=${encodeURIComponent('Offer to sign')}&body=${encodeURIComponent(text)}`}>Email it</a>}
-        {typeof navigator.share === 'function' && <Button size="sm" variant="outline" onClick={() => void navigator.share({ text, url }).catch(() => undefined)}>Share</Button>}
-      </div>
-      <p className="text-xs text-muted-foreground">Works for 14 days. Only this link opens the offer for {name}.</p>
+      {msg && <p className="mt-2 text-sm text-muted-foreground">{msg}</p>}
     </div>
   )
 }

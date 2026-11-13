@@ -56,6 +56,13 @@ export const WB11_STRIKES = [
   { p: 1, x0: 322.8, x1: 385.6, y: 102.6 },  // (drafting Firm)
 ] as const
 
+/** Lines 107-108, struck when the seller's condition report is completed WITH the acceptance (so it was not
+ *  "received by Buyer prior to Buyer signing this Offer"): the blank then reads "date of Seller's signature". */
+export const WB11_RECR_STRIKES = [
+  { p: 1, x0: 351.0, x1: 575.9, y: 656.4 },  // which was received by Buyer prior to Buyer signing
+  { p: 1, x0: 36.0, x1: 97.3, y: 668.9 },    // this Offer and
+] as const
+
 /** Signature lines on page 11: the (x) line, its date, and "Print Name Here ►". */
 export const WB11_SIGN = {
   buyer: { p: 10, line: 492.1, x0: 50, x1: 475, dateX0: 480, dateX1: 576, nameX: 126, nameBase: 513.7 },     // 632-634

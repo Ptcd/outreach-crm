@@ -129,3 +129,18 @@
   .text-xs { font-size: 0.875rem; line-height: 1.25rem; }
   .text-\[11px\], .text-\[10px\] { font-size: 0.8125rem; }
 }
+
+/* Send offer (0217): the sheet slides up, the backdrop fades, the "sent" tick draws itself. */
+@keyframes offer-sheet-in { from { opacity: 0; transform: translateY(24px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes offer-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes offer-pop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes offer-draw { to { stroke-dashoffset: 0; } }
+.offer-sheet { animation: offer-sheet-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.offer-backdrop { animation: offer-fade-in 0.18s ease-out; }
+.offer-pop { animation: offer-pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+.offer-tick { stroke-dasharray: 32; stroke-dashoffset: 32; animation: offer-draw 0.4s 0.25s ease-out forwards; }
+.offer-step { animation: offer-sheet-in 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .offer-sheet, .offer-backdrop, .offer-pop, .offer-step { animation: none; }
+  .offer-tick { animation: none; stroke-dashoffset: 0; }
+}

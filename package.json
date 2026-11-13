@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:release-candidate": "vitest run tests/releaseCandidateJourney.test.ts tests/humanCallProviderGate.test.ts tests/sellerAppointmentShift.test.ts tests/dayInLifeThalia.test.ts tests/dayInLifeAdil.test.ts tests/dayInLifeColin.test.ts tests/callQueueSettings.test.tsx tests/incomingCall.test.tsx",
     "db:local": "node scripts/local-db.mjs",
-    "preview:mock": "vite --config vite.preview.config.ts"
+    "preview:mock": "vite --config vite.preview.config.ts",
+    "e2e:offer": "vite-node scripts/e2e-offer.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",

@@ -154,7 +154,7 @@ describe('send contract', () => {
     expect(notes[1]).toMatch(/^Offer signed by every seller\. Sealed PDF SHA-256 [0-9a-f]{64}\.$/)
 
     // Sealing again is a no-op; the signed link still opens and offers the signed copy.
-    expect(await seal(ports(), sent.id)).toEqual({ ok: true, path: c.final_path })
+    expect(await seal(ports(), sent.id)).toEqual({ ok: true, path: c.final_path, copies: [] })
     const after = await openForSigner(ports(), dale)
     expect(after.ok && after.view.final_url).toMatch(/signed-/)
     expect(pushes).toHaveLength(1)
