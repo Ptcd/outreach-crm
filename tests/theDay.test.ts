@@ -107,7 +107,7 @@ describe('the day', () => {
   it('the queue refuses a second name, a first text with no name, and what the records forbid', async () => {
     const ph = await phoneOf(C.best)
     expect(await queue(C.best, ph, 'Hi Pat, this is Thalia. Are you the current owner of 109 Test St? Reply STOP to opt out.'))
-      .toMatchObject({ status: 'refused', reason: expect.stringContaining('speaks as Tyler, not Thalia') })
+      .toMatchObject({ status: 'refused', reason: expect.stringContaining('hears from Tyler, not Thalia') })
     expect(await queue(C.best, ph, 'Hi Pat, are you the current owner of 109 Test St? Reply STOP to opt out.'))
       .toMatchObject({ status: 'refused', reason: expect.stringContaining('says who is writing') })
     expect(await queue(C.weak, await phoneOf(C.weak), 'Hi Wendy, this is Thalia. Are you the current owner of 102 Test St? Reply STOP to opt out.'))
@@ -141,9 +141,27 @@ describe('the day', () => {
     expect(await queue(C.best, ph, 'Hi Pat, Tyler again about 109 Test St. Still the owner there? Reply STOP to opt out.', 2, later))
       .toMatchObject({ status: 'refused', reason: expect.stringContaining('carries no STOP line') })
     expect(await queue(C.best, ph, 'Hi Pat, Thalia again about 109 Test St. Still the owner there?', 2, later))
-      .toMatchObject({ status: 'refused', reason: expect.stringContaining('speaks as Tyler') })
+      .toMatchObject({ status: 'refused', reason: expect.stringContaining('hears from Tyler') })
     expect(await queue(C.best, ph, 'Hi Pat, Tyler again about 109 Test St. Still the owner there? Just checking I have the right place.', 2, later))
       .toMatchObject({ status: 'queued' })
+  })
+
+  it('the name follows the person to another card, and the intro is only for the first text to a person (0221, Colin 2026-11-10)', async () => {
+    const ph = await phoneOf(C.best)
+    // Pat's second property, a new card on Thalia's pile, with the same phone: Pat hears from Tyler there too
+    const second = await card(112, { owner: 'PAT A BEST', address: '112 Other St', lockedTo: 'thalia', phone: ph })
+    await fit(112, 'ok', { tier: 'C' })
+    expect(await one<string>('public.card_voice($1)', [second])).toBe('Tyler')
+    expect(await one<boolean>('public.card_texted_before($1)', [second])).toBe(true)
+    // a first text on that card needs no intro (Pat has met Tyler), and may not introduce Thalia
+    expect(await one<string | null>(`public.text_rule_problem($1, 'Hi Pat, also wanted to ask about 112 Other St. Is that one yours too? Reply STOP to opt out.', 1, $2)`,
+      [second, NOW])).toBeNull()
+    expect(await one<string | null>(`public.text_rule_problem($1, 'Hi Pat, this is Thalia. Is 112 Other St yours too? Reply STOP to opt out.', 1, $2)`, [second, NOW]))
+      .toContain('hears from Tyler, not Thalia')
+    // someone nobody has texted still gets the intro on their first text
+    expect(await one<boolean>('public.card_texted_before($1)', [C.good])).toBe(false)
+    expect(await one<string | null>(`public.text_rule_problem($1, 'Hi Sam, are you the current owner of 101 Test St? Reply STOP to opt out.', 1, $2)`, [C.good, NOW]))
+      .toContain('says who is writing')
   })
 
   it('the clock: the evening report goes on the desk once, flagged when the new people are about to run out', async () => {
