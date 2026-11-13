@@ -176,6 +176,8 @@ describe('on the real migrations', () => {
     db = new PGlite()
     await db.exec(SUPABASE_STUB)
     await db.exec(MIGRATION)
+    // these tests predate the day (0219): they queue texts on bare cards, so the rule gate is off here; tests/theDay.test.ts has it on
+    await db.exec("update public.campaign_control set day_rules_on = false where id = 1")
     await db.exec(`insert into public.team_members (email, role, person, display_name) values ('colin@example.com', 'owner', 'colin', 'Colin')`)
   })
 

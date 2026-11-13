@@ -25,6 +25,8 @@ beforeAll(async () => {
   db = new PGlite()
   await db.exec(SUPABASE_STUB)
   await db.exec(MIGRATION)
+  // the rule gate of the day (0219) is tested in tests/theDay.test.ts; these cards carry no record verdict
+  await db.exec("update public.campaign_control set day_rules_on = false where id = 1")
 })
 
 describe('people and interests', () => {
