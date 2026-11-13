@@ -16,6 +16,7 @@ import {
   type ContractPorts, type OfferContext, type OutMail,
 } from '../supabase/functions/_shared/contracts'
 import { buildMessage } from '../supabase/functions/_shared/smtp'
+import { handleContract } from '../supabase/functions/_shared/contractApi'
 import type { Rpc } from '../supabase/functions/_shared/sending'
 
 const MIGRATIONS_DIR = path.resolve(__dirname, '../supabase/migrations')
@@ -189,6 +190,7 @@ describe('the offer from the card', () => {
     expect(m.text).toMatch(/\$142,000, closing on December 12, 2026/)
     expect(m.text).toMatch(/good until November 17, 2026 at 11:59 p\.m\./)
     expect(m.html).toContain(`href="${r.links[0].url}"`)
+    expect(m.text).toMatch(/Colin Merrill, WeLiveWI LLC\. Questions\? Call or text Colin at \(262\) 999-6513\./)   // sent by Colin: his name
     expect(m.attachments).toBeUndefined()
     keep('3-link-email.html', m.html)
     keep('3-link-email.eml', buildMessage({ from: 'sender@example.com', ...m }, T0))
@@ -243,13 +245,17 @@ describe('the offer from the card', () => {
     if (!r.ok) throw new Error(r.reason)
     expect((await one<{ price: number }>(`select (terms->>'price')::numeric::float8 as price from public.contracts`)).price).toBe(139500)
     expect(mails.map((m) => m.to)).toEqual(['dale@example.com', 'rita@example.com'])
+    // sent by a caller: the caller's name, never Colin's, in the email and on the signing page; Colin still signs the form
+    expect(mails[0].text).toMatch(/Thalia, WeLiveWI LLC\. Questions\? Call or text Thalia at \(262\) 999-6513\./)
+    expect(mails[0].text).not.toMatch(/Colin/)
+    expect(mails[0].html).not.toMatch(/Colin/)
     const [dale, rita] = r.links.map((l) => tokenOf(l.url))
 
     clock = new Date('2026-11-13T15:00:00Z')
     const v = await openForSigner(ports(), dale, '1.2.3.4', 'Dale phone')
     if (!v.ok) throw new Error(v.reason)
     expect(v.view.offer_download_url).toMatch(/download=Offer%20to%20purchase\.pdf/)
-    expect(v.view.terms).toMatchObject({ buyerSigner: 'Colin Merrill', buyerPhone: '(262) 999-6513' })
+    expect(v.view.terms).toMatchObject({ buyerSigner: 'Colin Merrill', buyerPhone: '(262) 999-6513', sentBy: 'Thalia' })
     const s1 = await signAsSeller(ports(), { token: dale, consent: true, name: 'Dale R. Novak', recr: fullRecr(), ip: '1.2.3.4', ua: 'Dale phone' })
     expect(s1).toMatchObject({ ok: true, allSigned: false, copies: [] })
     mails.length = 0
@@ -262,6 +268,8 @@ describe('the offer from the card', () => {
     expect(mails.map((m) => m.to)).toEqual(['dale@example.com', 'rita@example.com', 'colin@example.com'])
     const signed = mails[0]
     expect(signed.subject).toBe('Signed offer: 2847 N Burleigh St')
+    expect(signed.text).toMatch(/Thalia, WeLiveWI LLC\./)
+    expect(signed.text).not.toMatch(/Colin/)
     expect(signed.attachments).toHaveLength(1)
     expect(signed.attachments![0]).toMatchObject({ filename: 'Signed offer - 2847 N Burleigh St.pdf', contentType: 'application/pdf' })
     const final = files.get((await one<{ final_path: string }>(`select final_path from public.contracts`)).final_path)!
@@ -286,6 +294,26 @@ describe('the offer from the card', () => {
     expect(pushes).toHaveLength(1)
     const notes = (await db.query<{ body: string }>(`select body from public.messages where body like 'Signed offer emailed%'`)).rows
     expect(notes).toHaveLength(3)
+  })
+})
+
+describe('the shared login', () => {
+  it('a phone set to a caller sends as that caller: at Colin\'s number, under the name sellers know them by', async () => {
+    await colinTypes(139500)
+    const body = { action: 'quick_send', as_person: 'adil', price: 150000, closing_on: '2026-12-12', sellers: [{ name: 'Dale Novak', email: 'dale@example.com' }] }
+    // a typed price is refused: the caller's rule applies even though the login is Colin's
+    const no = await handleContract(ports(), await ctxFor('colin@example.com'), body, {})
+    expect(no.body).toMatchObject({ ok: false, reason: expect.stringMatching(/goes out at Colin's number/) })
+    const r = await handleContract(ports(), await ctxFor('colin@example.com'), { ...body, price: undefined }, {})
+    expect(r.body).toMatchObject({ ok: true })
+    expect(mails).toHaveLength(1)
+    expect(mails[0].text).toMatch(/Tyler, WeLiveWI LLC\. Questions\? Call or text Tyler at/)
+    expect(mails[0].text).not.toMatch(/Colin|Adil/)
+    expect(mails[0].text).toMatch(/\$139,500/)
+    expect((await one<{ body: string }>(`select body from public.messages where body like 'Offer (WB-11%'`)).body).toBe('Offer (WB-11 10-1-2026) sent for signature by Tyler.')
+    // Muse's own login is refused outright
+    const muse = await handleContract(ports(), await ctxFor('colin.merrill1+muse@gmail.com'), body, {})
+    expect(muse).toMatchObject({ status: 403 })
   })
 })
 

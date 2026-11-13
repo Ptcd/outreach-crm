@@ -93,6 +93,7 @@ export function checkTerms(raw: Record<string, unknown>): { terms: Wb11Terms; pr
     buyerSigner: str(raw.buyerSigner, 80).trim() || undefined,
     buyerSignerTitle: str(raw.buyerSignerTitle, 60).trim() || undefined,
     buyerPhone: str(raw.buyerPhone, 30).trim() || undefined,
+    sentBy: str(raw.sentBy, 80).trim() || undefined,
     recrWithOffer: raw.recrWithOffer === true || undefined,
     closingOn: /^\d{4}-\d{2}-\d{2}$/.test(str(raw.closingOn, 10)) ? str(raw.closingOn, 10) : undefined,
     acceptBy: /^\d{4}-\d{2}-\d{2}$/.test(str(raw.acceptBy, 10)) ? str(raw.acceptBy, 10) : undefined,
@@ -252,15 +253,20 @@ export async function quickSend(ports: ContractPorts, ctx: OfferContext, ask: Qu
   const q = quickTerms({ standards: ctx.standards!, lead: ctx.lead! }, { ...ask, price: g.price }, now)
   if (q.problems.length) return { ok: false as const, reason: q.problems.join(' ') }
   if (!ports.mail) return { ok: false as const, reason: 'Email is not set up, so the offer cannot be emailed.' }
-  return sendOffer(ports, { leadId: ctx.lead!.id, terms: q.raw, includeRecr: q.includeRecr, sellers: ask.sellers,
+  // Colin sends under his full name; a caller under the name sellers know them by (Adil is Tyler)
+  const sentBy = ctx.me!.role === 'owner' ? ctx.standards!.signer_name : ctx.me!.display_name
+  return sendOffer(ports, { leadId: ctx.lead!.id, terms: { ...q.raw, sentBy }, includeRecr: q.includeRecr, sellers: ask.sellers,
     buyerSignature: ctx.standards!.signature_png, expires: q.expires, emailLinks: true, ...by })
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const usd0 = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: n % 1 ? 2 : 0 })
 const first = (name: string) => titleCase(name.trim().split(/\s+/)[0] ?? '')
-const sender = (t: Wb11Terms) => t.buyerSigner || t.buyerName
-const senderLine = (t: Wb11Terms) => (t.buyerSigner ? `${t.buyerSigner}, ${t.buyerName}` : t.buyerName)
+// The person a seller is dealing with is whoever sent the offer (Colin 2026-11-12: "other people are going to be
+// sending these so show their name not mine when sent by them"). The contract itself is still signed by the
+// company's signer; this is only the name in the email and on the signing page.
+const sender = (t: Wb11Terms) => t.sentBy || t.buyerSigner || t.buyerName
+const senderLine = (t: Wb11Terms) => (sender(t) !== t.buyerName ? `${sender(t)}, ${t.buyerName}` : t.buyerName)
 /** The name a seller's inbox shows as the sender: the company's plain name, "WeLiveWI" for "WeLiveWI LLC"
  *  (Colin 2026-11-12: not "Colin Merrill, WeLiveWI LLC"). The email itself is still signed by the person. */
 export const mailFromName = (t: Wb11Terms) => t.buyerName.replace(/,?\s+(L\.?L\.?C\.?|Inc\.?|Corp\.?|Co\.?|Ltd\.?)$/i, '').trim() || t.buyerName
@@ -419,7 +425,7 @@ export type OpenView = {
 
 export async function openForSigner(ports: ContractPorts, token: string, ip?: string | null, ua?: string | null): Promise<Result<{ view: OpenView }>> {
   const now = (ports.now ?? (() => new Date()))()
-  if (!/^[A-Za-z0-9_-]{30,60}$/.test(token)) return { ok: false, reason: 'This link is not valid. Ask Colin for a new one.' }
+  if (!/^[A-Za-z0-9_-]{30,60}$/.test(token)) return { ok: false, reason: 'This link is not valid. Ask us for a new one.' }
   const r = await ports.rpc('contract_open', { p_token_hash: await hashToken(token), p_ip: ip ?? null, p_ua: ua ?? null, p_now: now.toISOString() })
   const d = r.data as (Record<string, unknown> & { ok: boolean; reason?: string }) | null
   if (r.error || !d?.ok) return { ok: false, reason: d?.reason ?? 'Something went wrong. Try again in a minute.' }

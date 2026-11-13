@@ -14,7 +14,7 @@ type View = {
   contract_id: string; status: string; form: string; include_recr: boolean; recr: RecrAnswers | null; buyer_name: string
   terms: { street: string; muniName: string; county: string; price: number; earnestMoney: number; earnestHolder: string; closing: string
     bindingDeadline: string; inspection: boolean; inspectionDays?: number; proofOfFundsDays?: number; included?: string; additional?: string
-    buyerSigner?: string; buyerPhone?: string; earnestDays?: number }
+    buyerSigner?: string; buyerPhone?: string; earnestDays?: number; sentBy?: string }
   signer: { name: string; position: number; signed_at: string | null }
   others: { name: string; signed: boolean }[]; offer_url: string; final_url: string | null
   offer_download_url?: string; final_download_url?: string | null
@@ -62,7 +62,8 @@ export default function SignContract() {
     return () => { if (wasDark) root.classList.add('dark'); document.title = title }
   }, [])
 
-  const who = view?.terms.buyerSigner ?? 'Colin Merrill'
+  // the person who sent it (a caller's own name when they sent it); before the offer loads, nobody is named
+  const who = view?.terms.sentBy ?? view?.terms.buyerSigner ?? view?.buyer_name ?? ''
   const phone = view?.terms.buyerPhone ?? '(262) 999-6513'
   return (
     <div className="min-h-dvh bg-gradient-to-b from-[hsl(245_60%_97%)] to-background text-base">
@@ -71,7 +72,7 @@ export default function SignContract() {
           <img src="/icon.svg" alt="" className="h-8 w-8" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">Offer to purchase</p>
-            <p className="truncate text-xs text-muted-foreground">Sent by {who}{view ? `, ${view.buyer_name}` : ''}</p>
+            <p className="truncate text-xs text-muted-foreground">{view ? `Sent by ${[who, view.buyer_name].filter((x, i, all) => x && all.indexOf(x) === i).join(', ')}` : 'WeLiveWI'}</p>
           </div>
           <a href={`tel:${phone.replace(/\D/g, '')}`} className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border bg-card px-3 text-sm font-semibold">
             <Phone className="h-4 w-4" aria-hidden /><span className="hidden sm:inline">{phone}</span><span className="sm:hidden">Call</span>
@@ -83,7 +84,7 @@ export default function SignContract() {
         {error && (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-900">
             <p className="font-semibold">{error}</p>
-            <p className="mt-1 text-sm">Call or text {who} at {phone} and he will send a fresh link.</p>
+            <p className="mt-1 text-sm">Call or text us at {phone} and we will send a fresh link.</p>
           </div>
         )}
         {view && <Signing view={view} token={token} who={who} phone={phone} />}

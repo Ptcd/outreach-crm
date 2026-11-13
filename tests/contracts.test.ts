@@ -186,7 +186,7 @@ describe('send contract', () => {
     clock = T0
 
     expect((await rpc('contract_void', { p_id: sent.id, p_reason: 'seller sold to someone else', p_actor: 'Colin' })).data).toEqual({ ok: true })
-    expect(await openForSigner(ports(), freshToken)).toMatchObject({ ok: false, reason: 'Colin withdrew this offer.' })
+    expect(await openForSigner(ports(), freshToken)).toMatchObject({ ok: false, reason: 'This offer was withdrawn.' })
     expect(await signAsSeller(ports(), { token: freshToken, consent: true, name: 'Dale' })).toMatchObject({ ok: false })
   })
 

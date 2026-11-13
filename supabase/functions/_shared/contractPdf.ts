@@ -40,6 +40,7 @@ export type Wb11Terms = {
   buyerSigner?: string
   buyerSignerTitle?: string
   buyerPhone?: string
+  sentBy?: string             // the person who pressed Send: the name a seller sees and is told to call
   recrWithOffer?: boolean
   closingOn?: string          // YYYY-MM-DD, what the card and the signing page show
   acceptBy?: string           // YYYY-MM-DD
