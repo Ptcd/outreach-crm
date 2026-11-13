@@ -52,6 +52,14 @@ export default function SignContract() {
     })
   }, [token])
 
+  // the seller's page is always the light one, whatever theme this browser last picked in the app
+  useEffect(() => {
+    const root = document.documentElement
+    const wasDark = root.classList.contains('dark')
+    root.classList.remove('dark')
+    return () => { if (wasDark) root.classList.add('dark') }
+  }, [])
+
   const who = view?.terms.buyerSigner ?? 'Colin Merrill'
   const phone = view?.terms.buyerPhone ?? '(262) 999-6513'
   return (
