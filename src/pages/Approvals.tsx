@@ -11,6 +11,7 @@ import { useAuth } from '@/providers/AuthProvider'
 import { useColinHere } from '@/components/OnPhonePicker'
 import { TouchSwitches } from '@/components/TouchSwitches'
 import { RecordsBatches } from '@/components/RecordsBatches'
+import { OffersToOk } from '@/components/OffersToOk'
 import type { CampaignControl, OpenerDecision, PlannedOpener } from '@/lib/types'
 
 const DECISION_LABEL: Record<OpenerDecision, string> = { pending: 'Waiting', approved: 'Approved', skipped: 'Skipped' }
@@ -49,6 +50,7 @@ export default function Approvals() {
   return (
     <div className="space-y-4 pb-36 sm:pb-0">
       <h1 className="text-2xl font-bold tracking-tight">Texts to approve</h1>
+      {isOwner && <OffersToOk />}
       <SendingPanel canDecide={isOwner} />
       <TouchSwitches canDecide={isOwner} />
       {isOwner && <RecordsBatches />}

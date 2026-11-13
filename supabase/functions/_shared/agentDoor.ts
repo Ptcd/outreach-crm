@@ -77,7 +77,8 @@ export const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05']
 
 export const TEXTING_RULES = [
   "One name per seller, first person (\"I\"), and it follows the person across all their cards and numbers (Colin 2026-11-10): the voice the day's list gives for the card. Someone nobody has texted speaks with the caller the card belongs to (Thalia, or Tyler on Adil's cards); anyone we have texted keeps the name they saw last. The door refuses a text or a reply signed with another name. The intro (\"this is Thalia\") goes on the first text to a person and nowhere else: not on a follow-up, not on a first text to that person's next number. That person is one local buyer of houses; never name a business, company, team or \"investors\".",
-  'Never say "cash" or "as-is" (carriers flag it). A price or a dollar figure may be in a text: Colin removed the no-price rule on 2026-11-08, and the door no longer refuses a figure, a $ or the word offer. The door does not check the figure: what you offer follows the instructions Colin gave you. Never invent or guess one.',
+  'Never say "cash" or "as-is" (carriers flag it). A dollar figure may be in a text only when Colin has OK\'d that figure for that card (Colin 2026-11-13: "Muse needs to check with me first"): the door refuses any other figure of $1,000 or more, however it is written ($85,000, 85k, 85 thousand). The figure comes from the offer path (offer_worklist), never from you: never invent, guess or round one.',
+  "The offer by text (Colin 2026-11-13, on his rule of Nov 8 and 9): the offer is 65% of the after-repair value minus repairs, to the nearest $100; a counter may be taken up to 70% of the value minus repairs. Repairs are the items the seller named (offer_worklist lists each with its dollars), else $15, $30 or $60 a square foot for light, medium or heavy, from their words. The server does the arithmetic from what you record (offer_update) and puts the figure in front of Colin; you text it only after he OKs it, and every counter goes back to him before you answer it. Fewer than three sold comps, or a vague answer on the condition, is no number. A seller's number above what the house is worth fixed up is retail: no number. Colin sends the written offer from the card; you never send or promise one. Read offer_worklist at the start of every session and after replies_waiting: each row is one card with its one next step, whose step it is and when it is due. A step of yours that runs late is posted to you on the desk.",
   "A first text to a number ends with a way out that contains the word STOP, for example \"Reply STOP to opt out.\" A follow-up (steps 2-5) carries NO STOP line (Colin 2026-11-10) and the door refuses one that does; a reply never needs one. Tag each arm of a follow-up test with its own variant code so test_results can tell them apart.",
   "The day: the server builds one list a day from the whole store (7 AM Central, topped up hourly, never Sunday) and ready_to_text IS that list, in order: real need first (tier A to D, a sale date nearest first). Each row gives the phone to text and the voice to sign. The list is a floor of new people, then every follow-up that is due (2 and 3, then 4 and 5), then more new people, up to the daily cap. Write and queue it top to bottom; the_day.left_to_write says what is left. A card is on the list only if the records allow it: the door refuses a text to a card that is weak (a want, one year of tax), listed on the MLS, over the value cap, inside 14 days of a sheriff sale, thin or underwater on equity, or not judged by the laptop in the last week, and says which. Do not hold or park cards to manage the list; a card you think is wrong gets mark_card and a note.",
   'A first text only asks a simple question about the property (is it still yours / are you the right person to ask about <address>). No pitch until they answer.',
@@ -87,8 +88,8 @@ export const TEXTING_RULES = [
   'Texts go out 10 AM to 7 PM in the recipient\'s time zone, never on Sunday, and share one daily limit with the laptop\'s own texts. Queue them and the server sends them in that window.',
   'Replies: you answer them now (replies_waiting, then send_reply), on the same thread. Read the whole conversation and the card first. One reply per text from them; never a first text or follow-up (queue_texts) to someone who has texted back.',
   'A thread a caller has taken over is theirs: send_reply is refused with the person\'s name (Thalia or Adil has this thread). Say nothing further on that phone until it is handed back; the card is still yours to read.',
-  'Power hour (weekdays 4 to 6 PM Central): read replies_waiting every few minutes. A reply with any interest at all ("maybe", "what would you pay", "depends", a question about selling, "call me") goes to call_next with their words and the number they texted from, and you do NOT text them back: the caller phones them next (Rick: interest means a call, not more texts). If the call does not reach them, their reply is still waiting for you: answer it then. Not interest (STOP, no, wrong number, not the owner, an older or grieving owner): handle it as usual.',
-  'In a reply: your job is to learn why they would sell, the condition, the timing, who signs and their number, then book a call with Colin.',
+  'Power hour (weekdays 4 to 6 PM Central): read replies_waiting every few minutes. A seller who asks what we would pay, or says yes to selling, stays with you by text (Colin 2026-11-13): the offer path takes them to a number with no call (offer_open, then offer_worklist). call_next is only for a seller who asks for a call ("call me", "can someone call"), with their words and the number they texted from; then you do NOT text them back, the caller phones them next, and if the call does not reach them their reply is still yours to answer. A thread a caller takes over belongs to that caller. Not interest (STOP, no, wrong number, not the owner, an older or grieving owner): handle it as usual.',
+  'In a reply: the number comes first when they ask for one. The offer path gives the one next step for each such seller: one question about the condition (the big items only), the comp, the number Colin OKs, and after they answer it, who signs and the email for the papers. Before they ask, your job is to learn whether they would sell and why. A bare "yes" to "are you the owner" is an owner confirmed, not interest: ask whether they would consider selling. Book a call with Colin only when the seller asks to talk to someone.',
   "Booking: open_slots gives Colin's real open times (his calendar and his hours). Offer two or three, book_slot the one they pick with the 4 pillars, and confirm the time in your reply. Never promise a time you did not book.",
   "Phone calls: the card's call_notes say what was said on each recorded call (summary, the 4 pillars and who signs, outcome, next step, the mark the caller confirmed). Read them before you text: never ask again what they already told us on the phone, and follow the next step they agreed to.",
   'A card is one property; the people on it (people[] on every card) each have a role, a status, their own address and their own phones. Text a person (interest_id), on one of their numbers. Never text a person who is not active. One person on a card at a time: the next person gets a first text only after the one you texted is closed (deceased, dnc, wrong_person) or every first text to them bounced.',
@@ -345,6 +346,29 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
     inputSchema: { type: 'object', properties: { lead_id: S('card id'), other_id: S('the other card id'),
       kind: S('same_person | other_property | estate_contact | shared_phone | occupant | co_owner | related'), note: S('what connects them') },
       required: ['lead_id', 'other_id', 'kind'] } },
+  { role: 'sender', name: 'offer_worklist',
+    description: 'Every open offer by text, one row per card, each with its ONE next step (next.step and next.say), whose step it is (you, Colin, the seller, a caller), when it is due, whether it is late, and the gate that blocks a number. yours[] comes first: do each one. Also the call tasks past their time that nobody dialed on cards where the seller wrote back, and the rule with every repair item and its dollars. Read it at the start of every session and after replies_waiting.',
+    inputSchema: { type: 'object', properties: {} } },
+  { role: 'sender', name: 'offer_open',
+    description: 'Put a card on the offer path: the seller asked what we would pay, or said yes to selling. A text that plainly asks for a number opens one by itself, so read offer_worklist first. Give their words. The worklist then walks it: the one condition question, the comp, Colin\'s OK, the number.',
+    inputSchema: { type: 'object', properties: { lead_id: S('card id'), words: S('what the seller wrote that opens this'),
+      trigger: S('asked_number | yes_to_selling | other'), phone: S('the number the thread is on') }, required: ['lead_id', 'words'] } },
+  { role: 'sender', name: 'offer_update',
+    description: 'Record what you learned or did on an open offer; the server recomputes the numbers and the next step and returns the row. Send any of: condition_asked (true once you texted the condition question); condition_words (their answer, in their words) together with repair_items (roof, furnace, foundation, plumbing, electrical, water, fire, kitchen, bath, floors, windows, sewer, cleanout, cosmetic) or, when they named no items, repair_level (light | medium | heavy); the comp: arv, arv_basis, comps[] and sqft of the house; what they told you: need, their_number, their_words, flexible, timeline, occupancy, signers, seller_email; their answer to our number: response (accepted | counter | no) with response_words and, for a counter, counter_number; answer (your reply to a question Colin asked on this offer). You never send a figure of ours: the rule computes it and Colin OKs it.',
+    inputSchema: { type: 'object', properties: { offer_id: S('the offer (or give lead_id)'), lead_id: S('the card, when you do not have the offer id'),
+      condition_asked: { type: 'boolean' }, condition_words: S('their answer on the condition, in their words'),
+      repair_items: { type: 'array', items: { type: 'string' }, description: 'the big items they named' }, repair_level: S('light | medium | heavy, only when they named no items'),
+      arv: { type: 'number', description: 'after-repair value, dollars' }, arv_basis: S('how you got it: which sales, which sources, adjustments'),
+      comps: { type: 'array', items: { type: 'object' }, description: 'each: address, sold_price, sold_date, sqft, beds, baths, distance, url, note' },
+      sqft: { type: 'integer', description: 'the house, square feet' },
+      need: S('why they would sell, in their words'), their_number: { type: 'number', description: 'the figure they named, dollars' },
+      their_words: S('how they said it and where the figure came from'), flexible: S('firm | flexible | unknown'), timeline: S('when they want it done'),
+      occupancy: S('who lives there'), signers: S('everyone who signs'), seller_email: S('the email the papers go to'),
+      response: S('accepted | counter | no: their answer to the number Colin OK\'d'), response_words: S('what they wrote'),
+      counter_number: { type: 'number', description: 'their counter, dollars' }, answer: S('your answer to a question Colin asked on this offer') } } },
+  { role: 'sender', name: 'offer_close',
+    description: 'Close an offer with no deal. why: retail (their number is above what it is worth fixed up), no_comp_set, vague_condition, silent, declined, passed (Colin passed), records (listed, a sale inside 14 days, underwater, out of area), caller_took_it, not_selling, under_contract, or other with a note. Then give the card its disposition with mark_card.',
+    inputSchema: { type: 'object', properties: { offer_id: S('the offer'), why: S('the reason code'), note: S('a few words') }, required: ['offer_id', 'why'] } },
   { role: 'sender', name: 'todays_queue', description: 'Every text planned for a day (default today), from you and from the laptop, with its status.',
     inputSchema: { type: 'object', properties: { date: S('YYYY-MM-DD') } } },
   { role: 'sender', name: 'withdraw_texts', description: 'Pull texts that have not gone yet.',
@@ -591,6 +615,21 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       const name = await db.records('text_rule_problem', { p_lead_id: String(args.lead_id ?? ''), p_body: body, p_step: 0 })
       if (typeof name === 'string' && name) return { value: { status: 'refused', reason: name }, isError: true }
       return { value: await db.sendReply({ lead_id: String(args.lead_id ?? ''), phone: String(args.phone ?? ''), body }, agent.name) }
+    }
+    case 'offer_worklist': return { value: await db.records('agent_offer_worklist', {}) }
+    case 'offer_open': {
+      const r = await db.records('agent_offer_open', { p_lead_id: String(args.lead_id ?? ''), p_trigger: String(args.trigger ?? 'yes_to_selling'),
+        p_words: String(args.words ?? ''), p_phone: String(args.phone ?? ''), p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'offer_update': {
+      const r = await db.records('agent_offer_update', { p: args, p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'offer_close': {
+      const r = await db.records('agent_offer_close', { p_offer_id: String(args.offer_id ?? ''), p_why: String(args.why ?? ''),
+        p_note: args.note ? String(args.note) : null, p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
     }
     case 'todays_queue': return { value: await db.queue(typeof args.date === 'string' ? args.date : null) }
     case 'withdraw_texts': {
