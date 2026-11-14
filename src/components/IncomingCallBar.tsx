@@ -33,8 +33,10 @@ export function IncomingCallBar() {
   }
 
   return (
+    // a solid band in both themes: under .dark the app turns bg-emerald-50 into a 14% tint (index.css), and on a bar
+    // fixed over the menu that is see-through, so the menu read through it and the call was easy to miss (2026-11-14)
     <div role="alert" aria-live="assertive"
-      className="pt-safe fixed inset-x-0 top-0 z-50 border-b-4 border-emerald-500 bg-emerald-50 shadow-lg">
+      className="pt-safe fixed inset-x-0 top-0 z-50 border-b-4 border-emerald-500 bg-[#ecfdf5] shadow-2xl dark:bg-[#06281d]">
       <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
         <PhoneIncoming className="h-7 w-7 shrink-0 animate-pulse text-emerald-700" aria-hidden />
         <div className="min-w-0 flex-1">
