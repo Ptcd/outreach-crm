@@ -432,6 +432,17 @@ type Json = Record<string, unknown>
 const ok = (id: unknown, result: unknown) => ({ jsonrpc: '2.0', id, result })
 const fail = (id: unknown, code: number, message: string) => ({ jsonrpc: '2.0', id, error: { code, message } })
 const textResult = (v: unknown, isError = false) => ({ content: [{ type: 'text', text: JSON.stringify(v, null, 1) }], isError })
+/** What is waiting on this agent that it has not looked at (0225): its offer steps and unread desk posts, put first
+ *  in the answers it reads every few minutes. Never fails the call it rides on. */
+async function withAttention(db: DoorDb, agent: string, value: Record<string, unknown>): Promise<Record<string, unknown>> {
+  try {
+    const a = await db.records('agent_attention', { p_agent: agent })
+    return a && typeof a === 'object' ? { attention: a, ...value } : value
+  } catch {
+    return value
+  }
+}
+
 const int = (v: unknown, d: number, max: number) => Math.max(1, Math.min(max, Number.isFinite(Number(v)) && v !== null && v !== undefined ? Math.floor(Number(v)) : d))
 
 export async function callTool(name: string, args: Json, agent: Agent, db: DoorDb): Promise<{ value: unknown; isError?: boolean }> {
@@ -519,7 +530,7 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       return { value: r, isError: r?.ok === false }
     }
     case 'texting_rules': return { value: { rules: TEXTING_RULES, status: await db.status() } }
-    case 'sending_status': return { value: await db.status() }
+    case 'sending_status': return { value: await withAttention(db, agent.name, await db.status()) }
     case 'ready_to_text':
       return { value: await db.readyToText({ limit: int(args.limit, 50, 300), followups: !!args.followups, all_sources: !!args.all_sources }) }
     case 'store_cards':
@@ -681,7 +692,7 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
     }
     case 'pause_sending': return { value: await db.pause(String(args.reason ?? '').trim() || 'paused by the sender agent', agent.name) }
     case 'resume_sending': return { value: await db.resume(agent.name) }
-    case 'text_results': return { value: await db.results(int(args.hours, 24, 168)) }
+    case 'text_results': return { value: await withAttention(db, agent.name, await db.results(int(args.hours, 24, 168))) }
     case 'test_results': return { value: await db.testResults(int(args.days, 14, 90), int(args.step, 1, 5)) }
     case 'text_templates': return { value: await db.textTemplates() }
     case 'set_text_template': {
