@@ -321,6 +321,20 @@ describe('cap and pace', () => {
   })
 })
 
+describe('one owner with two cards (0235)', () => {
+  it('a number on two cards of the same owner is texted, once', async () => {
+    const a = await lead()
+    const b = await lead({ phone: a.phone })
+    await db.query(`update public.leads set owner_name = 'Verlon D. Foy Jr.' where id = any($1::uuid[])`, [[a.id, b.id]])
+    const first = await opener(a)
+    expect(await claim(T('15:05'))).toMatchObject({ outcome: 'send' })
+    await db.query(`update public.planned_openers set send_status = 'sent', sent_at = now() where id = $1`, [first])
+    const second = await opener(b)
+    expect(await claim(T('15:06'))).toMatchObject({ outcome: 'skipped', reason: 'owner_already_texted' })
+    expect(await status(second)).toEqual({ send_status: 'skipped', send_reason: 'owner_already_texted' })
+  })
+})
+
 describe('per-text checks (each one skips the text for good)', () => {
   const cases: [string, () => Promise<string>, string][] = [
     ['STOP list', async () => { const l = await lead(); await db.query(`insert into public.suppressed_phones (phone10, reason) values ($1, 'stop')`, [l.phone]); return opener(l) }, 'phone_suppressed'],
