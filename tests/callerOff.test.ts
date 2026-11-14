@@ -71,6 +71,27 @@ describe('a caller who is off', () => {
     expect(await block(thalias2)).toBeNull()
   })
 
+  it('standing days off: every Saturday and Sunday, and a text carried over onto one is withdrawn by the day\u2019s first build (0238)', async () => {
+    const sat = '2026-11-21T16:00:00Z'       // Saturday 10:00 AM Central
+    const fri = '2026-11-20T16:00:00Z'
+    const blockAt = async (lead: string, at: string) => (await rows<{ block: string | null }>(`select block from public.text_pool($1) where lead_id = $2`, [at, lead]))[0].block
+    await db.exec(`update public.text_fitness set as_of = '2026-11-20'`)
+    // a text waiting for Saturday on her card, queued before anyone said she is off
+    const q = await one<{ status: string }>(`public.agent_queue_text($1, $2, $3, 1, null, 'Muse', $4)`,
+      [thalias2, await phoneOf(thalias2), 'Hi Todd, this is Thalia. Are you the current owner of 202 Off St? Reply STOP to opt out.', sat])
+    expect(q.status).toBe('queued')
+    expect(await one<Record<string, unknown>>(`public.caller_off_weekly_set('thalia', '{6,7}', 'weekends')`)).toMatchObject({ ok: true, person: 'thalia', days: [6, 7] })
+    expect(await blockAt(thalias, sat)).toBe('caller_off_today')
+    expect(await blockAt(thalias, fri)).toBeNull()
+    expect(await blockAt(tylers, sat)).toBeNull()
+    await one('public.text_day_build($1)', [sat])
+    expect(await status(thalias2)).toEqual({ send_status: 'withdrawn', send_reason: "the card's caller is off that day" })
+    expect((await rows<{ lead_id: string }>(`select lead_id from public.text_day where day = '2026-11-21'`)).map((r) => r.lead_id)).toEqual([tylers])
+    expect(await one<Record<string, unknown>>(`public.caller_off_weekly_set('thalia', '{8}')`)).toMatchObject({ ok: false })
+    expect(await one<Record<string, unknown>>(`public.caller_off_weekly_set('thalia', '{}')`)).toMatchObject({ ok: true, days: [] })
+    expect(await blockAt(thalias, sat)).toBeNull()
+  })
+
   it('takes Tyler by either name and nobody else', async () => {
     expect(await one<Record<string, unknown>>(`public.caller_off_set('Tyler', '2026-11-19')`)).toMatchObject({ ok: true, person: 'adil' })
     expect(await one<Record<string, unknown>>(`public.caller_off_set('colin', '2026-11-19')`)).toMatchObject({ ok: false })
