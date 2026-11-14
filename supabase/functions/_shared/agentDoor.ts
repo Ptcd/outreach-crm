@@ -176,6 +176,18 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
   { role: 'intake', name: 'set_package_value', description: 'Write the after-repair value (ARV) for a package: the dollar value, the basis in one or two sentences (which sales, which sources, adjustments), and the comps (address, sold_price, sold_date, sqft, beds, baths, distance, url, note). Colin checks it on the card before he prices. Never a purchase number.',
     inputSchema: { type: 'object', properties: { package_id: S('the package'), arv: { type: 'number', description: 'after-repair value, dollars' },
       basis: S('how you got it'), comps: { type: 'array', items: { type: 'object' } } }, required: ['package_id', 'arv', 'basis'] } },
+  { role: 'intake', name: 'court_rows_deposit',
+    description: 'Hand court filings you have banked to the laptop, which ties each one to a parcel from the statewide parcel records (you never look up assessor data and you never load these rows as cards). kind: eviction, money_judgment or divorce. Up to 500 rows a call; the same county + case_number is the same row, so sending it again corrects it while it waits. An eviction row needs county, case_number, the address and city of the property (where the tenant lives), and should carry plaintiff (the landlord), filed, class_code and status; the tenant is record only. A money_judgment row needs county, case_number and the defendant (the debtor) or the caption "X vs. Y", and should carry plaintiff, filed, class_code, amount and status. A row with something missing comes back refused with the reason and is not stored. Each night the laptop writes the result on every row: court_rows_status.',
+    inputSchema: { type: 'object', properties: { kind: S('eviction | money_judgment | divorce'),
+      rows: { type: 'array', maxItems: 500, items: { type: 'object', properties: { county: S('the county of the case'), case_number: S('e.g. 2026SC007476'),
+        filed: S('YYYY-MM-DD'), class_code: S('the class code as the court prints it'), caption: S('the caption, "X vs. Y"'), status: S('open, closed, ...'),
+        plaintiff: S('who filed'), defendant: S('who it was filed against'), address: S('eviction: the property street address'), city: S('eviction: the property city'),
+        zip: S('ZIP'), amount: { type: 'number', description: 'dollars, if any' }, extra: { type: 'object', description: 'anything else worth keeping with the row' } },
+        required: ['county', 'case_number'] } } }, required: ['kind', 'rows'] } },
+  { role: 'intake', name: 'court_rows_status',
+    description: 'What became of the court rows you deposited: counts by kind (waiting, matched, unmatched, ambiguous), how many properties the matched rows landed on, why rows did not match, and counts by county. rows: true adds the rows themselves (filter with kind, state, county; page with after = the updated_at of the last row you saw; limit up to 500).',
+    inputSchema: { type: 'object', properties: { kind: S('eviction | money_judgment | divorce'), state: S('waiting | matched | unmatched | ambiguous | skipped'), county: S('one county'),
+      rows: { type: 'boolean' }, after: S('ISO time: rows updated after this'), limit: { type: 'integer' } } } },
   { role: 'intake', name: 'handoff_deposit',
     description: 'Hand a set of verified rows to the loading agent in one deposit, with no row data on the desk. First call: title (what the rows are), instructions (how to load them, once, for the whole set) and rows[]. Each row: key (your own id for the row; the same key is the same row, so sending it again replaces it while it waits), prospect (exactly what add_prospects takes for one prospect: address, owner_name or interests[], city, county, zip, parcel, mailing, reasons[], notes, phones) and optionally caller (thalia or tyler: who a NEW card goes to) and note. Up to 250 rows a call: send the rest with the batch_id you got back. final: true on the last call makes the batch ready to load. Then post ONE line on the desk naming the batch, never the rows.',
     inputSchema: { type: 'object', properties: { batch_id: S('the batch to add to (from your first call); leave out to start a new one'), title: S('what these rows are, for a new batch'),
@@ -464,6 +476,11 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
     case 'find_prospects':
       return { value: await db.findProspects({ address: args.address as string, phone: args.phone as string, name: args.name as string,
         lead_id: args.lead_id as string, only_agent: !!args.only_agent, limit: int(args.limit, 20, 100) }) }
+    case 'court_rows_deposit': {
+      const r = await db.records('agent_court_rows_deposit', { p: { kind: args.kind, rows: Array.isArray(args.rows) ? args.rows : [] }, p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'court_rows_status': return { value: await db.records('agent_court_rows_status', { p: args, p_agent: agent.name }) }
     case 'handoff_deposit': {
       const r = await db.records('agent_handoff_deposit', { p: args, p_agent: agent.name }) as Json
       return { value: r, isError: r?.ok === false }
