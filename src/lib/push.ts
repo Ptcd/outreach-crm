@@ -52,6 +52,16 @@ export async function sendTestNotification(): Promise<string> {
   return parts.join('; ')
 }
 
+/** A test call to this person's phone, the way a seller's call reaches it (functions/ring-test): in `delay` seconds
+ *  the phone is buzzed and the app is rung for 45 seconds. Time to shut the app first. */
+export async function startRingTest(delay = 10): Promise<string> {
+  const r = await supabase.functions.invoke('ring-test', { body: { delay } })
+  if (r.error) throw new Error(r.error.message)
+  const d = r.data as { ok?: boolean; error?: string }
+  if (!d?.ok) throw new Error(d?.error ?? 'The test call could not be started')
+  return `A test call will reach this phone in ${delay} seconds and ring for 45. Close the app now to test it shut: the phone buzzes "Test call is calling now", tap Answer.`
+}
+
 // Chrome on Android offers "Install" through this event; keep it for our own button.
 type InstallPrompt = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> }
 let deferred: InstallPrompt | null = null

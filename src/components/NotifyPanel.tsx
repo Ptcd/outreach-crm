@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
-  canPromptInstall, enablePush, isInstalled, onInstallChange, promptInstall, pushState, sendTestNotification, type PushState,
+  canPromptInstall, enablePush, isInstalled, onInstallChange, promptInstall, pushState, sendTestNotification, startRingTest, type PushState,
 } from '@/lib/push'
 import { useAuth } from '@/providers/AuthProvider'
 
@@ -53,6 +53,8 @@ export function NotifyPanel() {
         {state === 'denied' && <span>Notifications are blocked. Chrome ⋮ &gt; Settings &gt; Notifications (or the lock icon) &gt; allow this site.</span>}
         {state === 'unsupported' && <span>This browser can&apos;t show notifications. Use Chrome on your phone.</span>}
         <Button size="sm" variant="outline" disabled={busy} onClick={() => void run(sendTestNotification)}>Send a test notification</Button>
+        {/* the whole path a seller's call takes to this phone, app open or shut (2026-11-14) */}
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => void run(() => startRingTest(10))}>Test a call to this phone</Button>
       </div>
       {msg && <p className="mt-2 text-xs font-medium">{msg}</p>}
     </div>
