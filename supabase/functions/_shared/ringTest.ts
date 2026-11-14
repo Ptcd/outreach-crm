@@ -9,7 +9,7 @@
 export const RING_TEST_WINDOW_MS = 45_000
 export const RING_TEST_SECOND_BUZZ_MS = 18_000
 export const RING_TEST_TRY_SECONDS = 20         // the longest one try rings an app that is open (the phone server's own)
-export const RING_TEST_GAP_MS = 3_000           // between tries at an app that is shut
+export const RING_TEST_GAP_MS = 2_000           // between tries at an app that is shut (the phone server's ring is 3 s)
 
 export const RING_TEST_TWIML = '<Response><Pause length="1"/><Say voice="Polly.Joanna">This is a test call. You answered it, ' +
   'so calls can reach this phone. Goodbye.</Say><Pause length="1"/></Response>'
