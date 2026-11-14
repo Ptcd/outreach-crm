@@ -58,4 +58,13 @@ describe('court rows', () => {
     expect(s.rows).toBeNull()
     expect((await status({ rows: true, state: 'matched' })).rows).toEqual([expect.objectContaining({ case_number: '2026SC007476', state: 'matched' })])
   })
+  it('a row the laptop could not tie can be corrected and waits again; Fond du Lac keeps its small du', async () => {
+    const a = await deposit('money_judgment', [{ county: 'Dane', case_number: '2026CV000975', defendant: 'Jonathan Q Debtor' },
+      { county: 'fond du lac county', case_number: '2026CV000001', defendant: 'Pat Smith' }])
+    expect(a).toMatchObject({ added: 1, updated: 1, already_answered: 0 })
+    const r = await rows<{ county: string; state: string; defendant: string; result_note: string | null }>(
+      `select county, state, defendant, result_note from public.court_rows where kind = 'money_judgment' order by case_number`)
+    expect(r).toEqual([{ county: 'Fond du Lac', state: 'waiting', defendant: 'Pat Smith', result_note: null },
+      { county: 'Dane', state: 'waiting', defendant: 'Jonathan Q Debtor', result_note: null }])
+  })
 })
