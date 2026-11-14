@@ -176,6 +176,25 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
   { role: 'intake', name: 'set_package_value', description: 'Write the after-repair value (ARV) for a package: the dollar value, the basis in one or two sentences (which sales, which sources, adjustments), and the comps (address, sold_price, sold_date, sqft, beds, baths, distance, url, note). Colin checks it on the card before he prices. Never a purchase number.',
     inputSchema: { type: 'object', properties: { package_id: S('the package'), arv: { type: 'number', description: 'after-repair value, dollars' },
       basis: S('how you got it'), comps: { type: 'array', items: { type: 'object' } } }, required: ['package_id', 'arv', 'basis'] } },
+  { role: 'intake', name: 'handoff_deposit',
+    description: 'Hand a set of verified rows to the loading agent in one deposit, with no row data on the desk. First call: title (what the rows are), instructions (how to load them, once, for the whole set) and rows[]. Each row: key (your own id for the row; the same key is the same row, so sending it again replaces it while it waits), prospect (exactly what add_prospects takes for one prospect: address, owner_name or interests[], city, county, zip, parcel, mailing, reasons[], notes, phones) and optionally caller (thalia or tyler: who a NEW card goes to) and note. Up to 250 rows a call: send the rest with the batch_id you got back. final: true on the last call makes the batch ready to load. Then post ONE line on the desk naming the batch, never the rows.',
+    inputSchema: { type: 'object', properties: { batch_id: S('the batch to add to (from your first call); leave out to start a new one'), title: S('what these rows are, for a new batch'),
+      instructions: S('how the loader should treat the set'), final: { type: 'boolean', description: 'true on the last call: the batch is ready to load' },
+      rows: { type: 'array', maxItems: 250, items: { type: 'object', properties: { key: S('your id for the row'), prospect: { type: 'object', description: 'one prospect, as add_prospects takes it' },
+        caller: S('thalia | tyler: who a new card goes to'), note: S('anything for the loader about this row') }, required: ['key', 'prospect'] } } } } },
+  { role: 'intake', name: 'handoff_batches',
+    description: 'The hand-off batches: with no batch_id, every open or recent batch with its counts (waiting, claimed, created, stacked, rejected). With batch_id: that batch, its instructions, its counts and why rows were rejected; rows: true adds each row with its status, its card (lead_id) and its reason (after and limit page through them, status filters, payload: true includes the prospect).',
+    inputSchema: { type: 'object', properties: { batch_id: S('e.g. H-12'), rows: { type: 'boolean' }, status: S('waiting | claimed | created | stacked | rejected'),
+      after: { type: 'integer', description: 'rows after this row number' }, limit: { type: 'integer' }, payload: { type: 'boolean' } } } },
+  { role: 'intake', name: 'handoff_pull',
+    description: 'Loader: claim the next rows of a ready batch to read them (default 50, at most 100; with no batch_id, the oldest batch with rows waiting). Returns the batch instructions and each row with its row_id and prospect. Rows you already hold come back first. A claim lapses after two hours. Then handoff_load loads them; handoff_reject refuses one. Do not call add_prospects for these rows.',
+    inputSchema: { type: 'object', properties: { batch_id: S('e.g. H-12'), limit: { type: 'integer' } } } },
+  { role: 'intake', name: 'handoff_load',
+    description: 'Loader: load rows of a batch into WPIE. The server puts each row through the same duplicate guard as add_prospects (one card per property: an address we already have is stacked onto its card, never duplicated), gives a NEW card to the caller the row names, and writes every result back on the row by itself. With no row_ids it loads the rows you hold, or claims and loads the next ones (limit, default 50, at most 100). Returns created / stacked / rejected with the card id per row. When the last row has a result the batch is done and its report goes on the desk by itself: post nothing more about it.',
+    inputSchema: { type: 'object', properties: { batch_id: S('e.g. H-12'), row_ids: { type: 'array', items: { type: 'string' }, description: 'only these rows' }, limit: { type: 'integer' } }, required: ['batch_id'] } },
+  { role: 'intake', name: 'handoff_reject',
+    description: 'Refuse one row of a hand-off without loading it, with the reason (the depositor reads it in handoff_batches). The depositor can use it to withdraw a row that is still waiting.',
+    inputSchema: { type: 'object', properties: { row_id: S('the row'), reason: S('why') }, required: ['row_id', 'reason'] } },
   { role: 'intake', name: 'prospect_counts', description: 'How many agent-loaded cards there are, by stage and by source.',
     inputSchema: { type: 'object', properties: {} } },
   // The data pipes' verification queue (migration 0103, Muse's pipes spec 2026-10-28). Staged parcels + signals that
@@ -434,6 +453,28 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
     case 'find_prospects':
       return { value: await db.findProspects({ address: args.address as string, phone: args.phone as string, name: args.name as string,
         lead_id: args.lead_id as string, only_agent: !!args.only_agent, limit: int(args.limit, 20, 100) }) }
+    case 'handoff_deposit': {
+      const r = await db.records('agent_handoff_deposit', { p: args, p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'handoff_batches': {
+      const r = await db.records('agent_handoff_batches', { p: args, p_agent: agent.name }) as Json
+      return { value: r, isError: !Array.isArray(r) && r?.ok === false }
+    }
+    case 'handoff_pull': {
+      const r = await db.records('agent_handoff_pull', { p_batch: args.batch_id ? String(args.batch_id) : null, p_limit: int(args.limit, 50, 100), p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'handoff_load': {
+      const ids = Array.isArray(args.row_ids) ? (args.row_ids as unknown[]).map(String).slice(0, 100) : null
+      const r = await db.records('agent_handoff_load', { p_batch: String(args.batch_id ?? ''), p_row_ids: ids && ids.length ? ids : null,
+        p_limit: int(args.limit, 50, 100), p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'handoff_reject': {
+      const r = await db.records('agent_handoff_reject', { p_row_id: String(args.row_id ?? ''), p_reason: String(args.reason ?? ''), p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
     case 'prospect_counts': return { value: await db.prospectCounts() }
     case 'phones_wanted': return { value: await db.records('agent_phones_wanted', { p_agent: agent.name, p_limit: int(args.limit, 100, 500),
       p_county: args.county ? String(args.county) : null, p_need: args.need ? String(args.need) : null, p_counts_only: args.counts_only === true }) }
