@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { CallButton, PersonalCallButton } from '@/components/CallButton'
 import { answerOf, type CallFacts } from '@/lib/callGate'
 import { firstNameOf } from '@/lib/inbox'
-import { fmtPhone } from '@/lib/format'
+import { fmtDate, fmtPhone } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Contact, Lead, Message, TwilioInbound } from '@/lib/types'
 import { isOwnersPhone } from '@/lib/phoneOrder'
@@ -57,15 +57,23 @@ export function CallPanel({ lead, contacts, inbound, replyFacts, messages }: {
   const done = pillarsDone((lead.call_facts ?? {}) as CallFacts, replyFacts)
   const first = greetedName(messages, lead.owner_name)
   const texted = !!phone && (inbound ?? []).some((t) => (phone.value_normalized ?? phone.value).replace(/\D/g, '').slice(-10) === t.from10)
+  // a date the seller gave (0229): say so on the card, where the Call button is
+  const waitUntil = lead.belt === 'not_now_dated' && lead.named_date && new Date(lead.named_date).getTime() > Date.now() ? lead.named_date : null
   const openScript = () => {
     nav({ search: '?call=1', hash: '#call-script' })
     setTimeout(() => document.getElementById('call-script')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }
   return (
     <section className="z-20 space-y-2.5 md:sticky md:top-16 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-card to-card p-4 shadow-[var(--shadow-lift)]">
+      {waitUntil && (
+        <p className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-900">
+          They asked us to check back on {fmtDate(waitUntil)}. The call goes on your list that day; nothing to do before then.
+        </p>
+      )}
       {phone ? (
         <div className="flex flex-wrap items-center gap-2">
-          <div className="min-w-0 flex-1">
+          {/* the words get the whole row on a phone, so the buttons never squeeze them to one word a line */}
+          <div className="min-w-0 flex-1 basis-full sm:basis-0">
             <p className="text-sm text-muted-foreground">Call {first || 'them'}{texted ? ' on the number they texted from' : ''}</p>
             <p className="text-lg font-semibold">{fmtPhone(phone.value)}</p>
           </div>
