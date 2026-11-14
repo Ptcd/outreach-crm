@@ -24,6 +24,7 @@ import { fmtPhone } from './format'
 import { useAuth } from '@/providers/AuthProvider'
 import type { PhoneMatch } from './queries'
 import { callAttemptKey, callerLineFor, humanCallAuthorized, humanCallProviderParams, poolLineFor } from './callAttempt'
+import { LineGroup, type CallLike, type LineResult, type LineSpec } from './lines'
 
 // The seller line the call shows (the pool's main texting number). Any number in the seller pool works;
 // pm-phone refuses one that is not ours.
@@ -60,6 +61,7 @@ export interface ActiveCall {
   inbound: boolean       // they called us
   line: string | null    // the seller number they called (inbound only)
   quiet?: boolean        // Power hour asks the outcome on its own card, so the call bar does not
+  lines?: number         // three lines at once (lib/lines): how many lines are still up
 }
 
 /** A call ringing in, before Accept / Decline. `matches` is null while the call desk is still looking. */
@@ -77,6 +79,11 @@ interface DialerApi {
   supported: boolean
   ready: boolean          // registered with Twilio: a seller's call can ring here
   start: (x: { to: string; label: string; leadId: string | null; contactId: string | null; quiet?: boolean }) => Promise<void>
+  /** Three lines at once (lib/lines): ring these cards together; the first person to pick up becomes `active`. */
+  startLines: (xs: LineSpec[], opts?: { quiet?: boolean }) => Promise<void>
+  /** Lines of the last round that did not become the call; takeLineResults hands them over once. */
+  lineResults: LineResult[]
+  takeLineResults: () => LineResult[]
   /** Settings, "Test the assistant": this browser calls the inbound assistant as a test; Muse plays the seller on the speaker. */
   testAssistant: (mode: 'known' | 'unknown') => Promise<void>
   accept: () => Promise<{ leadId: string | null; phone: string } | null>
@@ -126,6 +133,11 @@ export function DialerProvider({ children }: { children: ReactNode }) {
   const incomingRef = useRef<TwilioCall | null>(null)
   const lookupRef = useRef<Promise<PhoneMatch[]> | null>(null)
   const answeredRef = useRef(false)
+  // three lines at once: the round in progress, the two extra softphones it rings on, and what became of each line
+  const groupRef = useRef<LineGroup | null>(null)
+  const sideDevs = useRef<TwilioDevice[]>([])
+  const resultsRef = useRef<LineResult[]>([])
+  const [lineResults, setLineResults] = useState<LineResult[]>([])
   const supported = typeof window !== 'undefined' && !!navigator.mediaDevices && typeof RTCPeerConnection !== 'undefined'
   // the app's self-update (lib/appUpdate) never reloads during a call or while one is ringing in
   useEffect(() => {
@@ -142,7 +154,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
   const onIncoming = useCallback((call: TwilioCall) => {
     if (incomingRef.current) { call.reject(); return }   // one ringing in at a time
     incomingRef.current = call
-    const busy = !!callRef.current
+    const busy = !!callRef.current || !!groupRef.current
     if (busy) {   // Twilio stays quiet when a call is up: one short ring in her headset instead
       try { void new Audio('/sounds/ring.wav').play().catch(() => undefined) } catch { /* no audio here */ }
     }
@@ -226,13 +238,13 @@ export function DialerProvider({ children }: { children: ReactNode }) {
 
   // Closing or leaving the page hangs up: no call is left running in a tab nobody is looking at.
   useEffect(() => {
-    const hang = () => { callRef.current?.disconnect() }
+    const hang = () => { if (groupRef.current) groupRef.current.hangUp(); else callRef.current?.disconnect() }
     window.addEventListener('pagehide', hang)
     return () => window.removeEventListener('pagehide', hang)
   }, [])
 
   const start = useCallback<DialerApi['start']>(async ({ to, label, leadId, contactId, quiet }) => {
-    if (callRef.current || incomingRef.current) return
+    if (callRef.current || incomingRef.current || groupRef.current) return
     answeredRef.current = false
     setActive({ status: 'connecting', to, label, leadId, startedAt: null, muted: false, error: null, answered: false, inbound: false, line: null, quiet: !!quiet })
     let takeoverKey: string | null = null
@@ -290,6 +302,120 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     }
   }, [device, finish, releaseIfUnclaimed])
 
+  // ---------------------------------------------------------------- three lines at once (lib/lines)
+  // An extra softphone for the second and third line: the Voice SDK carries one outgoing call per Device. It never
+  // registers, so a seller's call still rings only on the main one.
+  const sideDevice = useCallback(async (i: number) => {
+    if (sideDevs.current[i]) return sideDevs.current[i]
+    const r = await supabase.functions.invoke('voice-token')
+    if (r.error) throw new Error(r.error.message)
+    const d = r.data as { token?: string; error?: string }
+    if (!d.token) throw new Error(d.error ?? 'No dialer token')
+    const { Device } = await import('@twilio/voice-sdk')
+    const dev = new Device(d.token, { closeProtection: true, logLevel: 'error' })
+    dev.on('tokenWillExpire', async () => {
+      const rr = await supabase.functions.invoke('voice-token')
+      const dd = rr.data as { token?: string } | null
+      if (dd?.token) dev.updateToken(dd.token)
+    })
+    sideDevs.current[i] = dev
+    return dev
+  }, [])
+
+  // One line: the same pause on the card and the same caller line as a single call (start, above), then the call.
+  // amd "1" asks the phone server to screen the line for a machine. Throws with the reason when it cannot be placed.
+  const openLine = useCallback(async (dev: TwilioDevice, x: LineSpec) => {
+    const key = callAttemptKey()
+    const begin = () => supabase.rpc('begin_human_call', { p_lead_id: x.leadId, p_phone: x.to, p_source: 'app', p_key: key })
+    let gate = await begin()
+    if (gate.error && /statement timeout|lock timeout|deadlock/i.test(gate.error.message)) {
+      await new Promise((r) => setTimeout(r, 1500))
+      gate = await begin()
+    }
+    const allowed = gate.data as { ok?: boolean; paused?: boolean; reason?: string } | null
+    if (gate.error || !humanCallAuthorized(allowed)) throw new Error(gate.error?.message ?? allowed?.reason ?? 'Call authorization is not active')
+    try {
+      const thread = await supabase.from('messages').select('direction, channel, from_number, to_number, sent_at')
+        .eq('lead_id', x.leadId).eq('channel', 'sms').order('sent_at', { ascending: false }).limit(50)
+      const pool = await supabase.from('campaign_control').select('reply_numbers').maybeSingle()
+      const cold = poolLineFor(((pool.data as { reply_numbers?: string[] } | null)?.reply_numbers) ?? [], x.to, CALLER_ID)
+      const line = callerLineFor(x.to, (thread.data ?? []) as Parameters<typeof callerLineFor>[1], cold)
+      const call = await dev.connect({ params: { ...humanCallProviderParams(x.to, line, x.leadId, key), amd: '1' } })
+      return { call, key }
+    } catch (e) {
+      releaseIfUnclaimed(x.leadId, key, errorText(e))
+      throw e
+    }
+  }, [releaseIfUnclaimed])
+
+  const startLines = useCallback<DialerApi['startLines']>(async (xs, opts) => {
+    if (callRef.current || incomingRef.current || groupRef.current || xs.length === 0) return
+    answeredRef.current = false
+    resultsRef.current = []
+    setLineResults([])
+    const first = xs[0]
+    const base = { muted: false, error: null, inbound: false, line: null, quiet: !!opts?.quiet }
+    setActive({ ...base, status: 'connecting', to: first.to, label: first.label, leadId: first.leadId, startedAt: null, answered: false, lines: xs.length })
+    const keys = new Map<string, string>()
+    const release = (leadId: string, why?: string | null) => { const k = keys.get(leadId); if (k) releaseIfUnclaimed(leadId, k, why) }
+    try {
+      const mic = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mic.getTracks().forEach((t) => t.stop())
+    } catch (e) {
+      const msg = errorText(e)
+      finish('error', /Permission|NotAllowed|microphone/i.test(msg) ? 'Allow the microphone to call from here.' : msg)
+      return
+    }
+    const g: LineGroup = new LineGroup({
+      onHear: (spec, call) => {
+        answeredRef.current = true
+        callRef.current = call as unknown as TwilioCall
+        setActive((a) => ({ ...base, ...(a ?? {}), status: 'in_call', to: spec.to, label: spec.label, leadId: spec.leadId, startedAt: Date.now(), answered: true, muted: false }))
+      },
+      onRinging: (spec) => {
+        if (groupRef.current !== g) return
+        answeredRef.current = false
+        callRef.current = null
+        setActive((a) => (a ? { ...a, status: 'ringing', to: spec.to, label: spec.label, leadId: spec.leadId, startedAt: null, answered: false } : a))
+      },
+      onResult: (r) => {
+        release(r.leadId, r.error)
+        resultsRef.current = [...resultsRef.current, r]
+        setLineResults(resultsRef.current)
+      },
+      onWinnerEnd: (spec, error) => {
+        if (groupRef.current === g) groupRef.current = null
+        release(spec.leadId, error)
+        if (error) finish('error', plainCallError(error)); else finish('ended', null)
+      },
+      onAllGone: () => {
+        if (groupRef.current === g) groupRef.current = null
+        answeredRef.current = false
+        finish('ended', null)
+      },
+      onCount: (up) => setActive((a) => (a ? { ...a, lines: up } : a)),
+    })
+    groupRef.current = g
+    await Promise.all(xs.map(async (x, i) => {
+      try {
+        const dev = i === 0 ? await device() : await sideDevice(i - 1)
+        const { call, key } = await openLine(dev, x)
+        keys.set(x.leadId, key)
+        g.add(x, call as unknown as CallLike)
+      } catch (e) {
+        g.fail(x, errorText(e))
+      }
+    }))
+    g.settle()
+  }, [device, sideDevice, openLine, finish, releaseIfUnclaimed])
+
+  const takeLineResults = useCallback(() => {
+    const out = resultsRef.current
+    resultsRef.current = []
+    setLineResults([])
+    return out
+  }, [])
+
   // Accept the ringing call: it runs in the in-call bar; the matched lead (once the lookup is back) is
   // marked called and handed to the caller so the bar can open its card.
   const accept = useCallback<DialerApi['accept']>(async () => {
@@ -302,7 +428,8 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     const line = call.customParameters.get('line') ?? null
     const digits = callerDigits(from)
     const was = callRef.current   // the call she was on: it ends, theirs is answered
-    if (was && was !== call) { callRef.current = null; was.disconnect() }
+    if (groupRef.current) { const g = groupRef.current; groupRef.current = null; callRef.current = null; g.hangUp() }
+    else if (was && was !== call) { callRef.current = null; was.disconnect() }
     answeredRef.current = true
     callRef.current = call
     setIncoming(null)
@@ -329,6 +456,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const hangUp = useCallback(() => {
+    if (groupRef.current) { groupRef.current.hangUp(); return }     // a three-line round: the call she is on, or all of them
     callRef.current?.disconnect()
     if (!callRef.current) finish('ended', null)
   }, [finish])
@@ -343,7 +471,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
 
   const dismiss = useCallback(() => setActive((a) => (a && (a.status === 'ended' || a.status === 'error') ? null : a)), [])
 
-  useEffect(() => () => { deviceRef.current?.destroy() }, [])
+  useEffect(() => () => { deviceRef.current?.destroy(); sideDevs.current.forEach((d) => { try { d.destroy() } catch { /* gone */ } }) }, [])
 
   // The test call to the assistant (2026-11-07): the same softphone, To "assistant", no card, no authorization gate; the
   // phone system puts the assistant on the line at once as a test, so the browser's speaker and microphone are the call.
@@ -366,13 +494,14 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     }
   }, [device, finish])
 
-  const value = useMemo<DialerApi>(() => ({ active, incoming, supported, ready, start, accept, decline, hangUp, toggleMute, dismiss, testAssistant }),
-    [active, incoming, supported, ready, start, accept, decline, hangUp, toggleMute, dismiss, testAssistant])
+  const value = useMemo<DialerApi>(() => ({ active, incoming, supported, ready, start, startLines, lineResults, takeLineResults, accept, decline, hangUp, toggleMute, dismiss, testAssistant }),
+    [active, incoming, supported, ready, start, startLines, lineResults, takeLineResults, accept, decline, hangUp, toggleMute, dismiss, testAssistant])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
 const NO_DIALER: DialerApi = {
   active: null, incoming: null, supported: false, ready: false, start: async () => undefined, accept: async () => null,
+  startLines: async () => undefined, lineResults: [], takeLineResults: () => [],
   decline: () => undefined, hangUp: () => undefined, toggleMute: () => undefined, dismiss: () => undefined, testAssistant: async () => undefined,
 }
 

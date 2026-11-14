@@ -6,6 +6,9 @@
 // Someone who just texted back with a bit of interest (Muse's call_next, migration 0115) comes up next: the list
 // refreshes every 30 seconds, and the card she is on never changes under her. A seller who called us and wasn't reached
 // comes before everyone (0117), with their voicemail.
+// Three lines (Colin 2026-11-13, lib/lines): with the switch on, Dial rings this card and the next two cold cards
+// together. The first person to pick up is the call and their card comes up; the other lines are hung up and logged by
+// themselves. A callback, a missed call or someone who texted back is always dialed alone.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
@@ -19,6 +22,7 @@ import { PHONE_SCRIPT } from '@/lib/callScript'
 import { supabase } from '@/lib/supabaseClient'
 import { api, useLead } from '@/lib/queries'
 import { likelyDisconnected, useDialer } from '@/lib/dialer'
+import { LINE_NOTE } from '@/lib/lines'
 import { fmtDateTime, fmtPhone } from '@/lib/format'
 
 type Item = {
@@ -73,7 +77,7 @@ export function PowerDial({ caller }: { caller: string }) {
   const qc = useQueryClient()
   const [dialList, setDialList] = useState<DialList | null>(loadDialList)
   const clearDialList = () => { try { sessionStorage.removeItem('power:list') } catch { /* fine */ } setDialList(null) }
-  const { active, incoming, start, dismiss, hangUp, supported } = useDialer()
+  const { active, incoming, start, startLines, lineResults = [], takeLineResults, dismiss, hangUp, supported } = useDialer()
   const q = useQuery({
     // a missed call has to reach the screen fast (Colin 2026-10-29: Adil could not see a seller who called back during
     // Power hour): refresh on coming back to the tab and right after a call is logged. The poll stays at 30 s and
@@ -101,6 +105,11 @@ export function PowerDial({ caller }: { caller: string }) {
   const [auto, setAuto] = useState(false)
   // hang up a call nobody answered after about five rings and log it as no answer (Twilio itself gives up at 30 s)
   const [ringLimit, setRingLimit] = useState(true)
+  // three lines at once: off until the caller switches it on, remembered on this phone
+  const [three, setThree] = useState<boolean>(() => { try { return localStorage.getItem('power:lines') === '3' } catch { return false } })
+  const setLines = (on: boolean) => { setThree(on); try { localStorage.setItem('power:lines', on ? '3' : '1') } catch { /* private window */ } }
+  const groupOn = useRef(false)                       // a three-line round is in progress, or its winner is on the call
+  const groupItems = useRef<Map<string, Item>>(new Map())
   const RING_SECONDS = 22
   const pendingNoAnswer = useRef<string | null>(null)
   const noAnswerNote = useRef<string | null>(null)
@@ -144,16 +153,84 @@ export function PowerDial({ caller }: { caller: string }) {
   const callerName = caller.charAt(0).toUpperCase() + caller.slice(1)
   const vars: Record<string, string> = cur ? { first_name: firstName(cur.owner_name) || 'there', street: street(cur.address) } : { first_name: 'there', street: 'the property' }
 
+  // the next two cold cards after this one: only people nobody is waiting on are rung alongside another line
+  const COLD = (x: Item) => x.source === 'call_list' || x.source === 'texted_silent'
+  const sideCards = useMemo(() => (three && cur && COLD(cur) ? list.slice(1).filter((x) => COLD(x) && !skipped.includes(x.lead_id)).slice(0, 2) : []),
+    [three, cur, list, skipped])
+
   const dial = useCallback(() => {
     if (!cur || !supported || live || incoming || (active && ['connecting', 'ringing', 'in_call'].includes(active.status))) return
     setErr(null)
     setCountdown(null)
     if (active) dismiss()
-    update((s) => ({ ...s, dials: s.dials + 1, started: s.started ?? Date.now() }))
     pinItem.current = cur
     setPin(cur.lead_id)
-    void start({ to: cur.phone, label: `${title(cur.owner_name)} - ${street(cur.address)}`, leadId: cur.lead_id, contactId: null, quiet: true })
-  }, [cur, supported, live, incoming, active, dismiss, start, update])
+    const label = (x: Item) => `${title(x.owner_name)} - ${street(x.address)}`
+    if (sideCards.length > 0 && startLines) {
+      void (async () => {
+        // the other two cards are held for this caller first, like the one on screen (0120): a card on someone else's
+        // screen is left out of the round
+        const held: Item[] = []
+        for (const x of sideCards) {
+          const r = await supabase.rpc('power_claim', { p_lead_id: x.lead_id })
+          if ((r.data as { ok?: boolean } | null)?.ok !== false && !r.error) held.push(x)
+        }
+        const group = [cur, ...held]
+        groupItems.current = new Map(group.map((x) => [x.lead_id, x]))
+        groupOn.current = group.length > 1
+        update((s) => ({ ...s, dials: s.dials + group.length, started: s.started ?? Date.now() }))
+        if (group.length > 1) await startLines(group.map((x) => ({ to: x.phone, label: label(x), leadId: x.lead_id })), { quiet: true })
+        else await start({ to: cur.phone, label: label(cur), leadId: cur.lead_id, contactId: null, quiet: true })
+      })()
+      return
+    }
+    groupOn.current = false
+    update((s) => ({ ...s, dials: s.dials + 1, started: s.started ?? Date.now() }))
+    void start({ to: cur.phone, label: label(cur), leadId: cur.lead_id, contactId: null, quiet: true })
+  }, [cur, supported, live, incoming, active, dismiss, start, startLines, sideCards, update])
+
+  // three lines: the card of whoever is being heard comes up (and goes back if that line was a voicemail)
+  useEffect(() => {
+    const id = active?.leadId
+    if (!groupOn.current || !id || id === pin) return
+    const it = groupItems.current.get(id)
+    if (!it) return
+    pinItem.current = it
+    setPin(id)
+  }, [active?.leadId, pin])
+
+  // three lines: every line that did not become the call is logged by itself and leaves the list. A person who was
+  // cut off as another line was answered stays at the top to be called back. A line that never rang is not a call.
+  useEffect(() => {
+    if (!lineResults.length || !takeLineResults) return
+    const rs = takeLineResults()
+    void (async () => {
+      const done: string[] = []
+      let machines = 0
+      for (const r of rs) {
+        void supabase.rpc('power_release', { p_lead_id: r.leadId })
+        if (r.outcome === 'failed' || !r.rang) { setSkipped((s) => [...s.filter((x) => x !== r.leadId), r.leadId]); continue }
+        const res = await api.logCall(r.leadId, r.to, 'no_answer', LINE_NOTE[r.outcome], null)
+        const d = res.data as { ok?: boolean; reason?: string } | null
+        if (res.error || d?.ok === false) { setErr(res.error?.message ?? d?.reason ?? 'A line was not logged'); continue }
+        if (r.outcome === 'machine') machines += 1
+        if (r.outcome !== 'dropped_after_pickup') done.push(r.leadId)
+      }
+      if (done.length || machines) update((s) => ({ ...s, done: [...s.done, ...done.filter((id) => !s.done.includes(id))], voicemails: s.voicemails + machines }))
+      void qc.invalidateQueries({ queryKey: ['tasks'] })
+    })()
+  }, [lineResults, takeLineResults, update, qc])
+
+  // three lines: a round nobody answered is over; the next card comes up (the lines were logged just above)
+  useEffect(() => {
+    if (!groupOn.current || !active || active.answered || !(active.status === 'ended' || active.status === 'error')) return
+    groupOn.current = false
+    dismiss()
+    setTalking(null)
+    setPin(null)
+    void refetch()
+    if (auto) setCountdown(2)
+  }, [active, dismiss, refetch, auto])
 
   const next = useCallback((id: string, logged: boolean) => {
     update((s) => ({ ...s, done: [...s.done, id] }))
@@ -229,7 +306,7 @@ export function PowerDial({ caller }: { caller: string }) {
     if (active.status === 'connecting' && dialedAt.current === null) dialedAt.current = Date.now()
     if (!ringLimit || !(active.status === 'connecting' || active.status === 'ringing')) return
     const left = RING_SECONDS * 1000 - (Date.now() - (dialedAt.current ?? Date.now()))
-    const t = setTimeout(() => { pendingNoAnswer.current = cur?.lead_id ?? null; hangUp() }, Math.max(0, left))
+    const t = setTimeout(() => { if (!groupOn.current) pendingNoAnswer.current = cur?.lead_id ?? null; hangUp() }, Math.max(0, left))
     return () => clearTimeout(t)
   }, [onThis, active, ringLimit, hangUp, cur])
   useEffect(() => {
@@ -273,8 +350,10 @@ export function PowerDial({ caller }: { caller: string }) {
     if (!incoming) return
     setCountdown(null)
     if (cur && onThis && active && (active.status === 'connecting' || active.status === 'ringing')) {
-      pendingNoAnswer.current = cur.lead_id
-      noAnswerNote.current = 'No answer: hung up while ringing to take a call coming in (Power hour).'
+      if (!groupOn.current) {
+        pendingNoAnswer.current = cur.lead_id
+        noAnswerNote.current = 'No answer: hung up while ringing to take a call coming in (Power hour).'
+      }
       hangUp()
     }
   }, [incoming, cur, onThis, active, hangUp])
@@ -326,6 +405,7 @@ export function PowerDial({ caller }: { caller: string }) {
         <span className="text-muted-foreground">{list.length} left{minutes ? ` · ${minutes} min` : ''}</span>
         <label className="ml-auto flex items-center gap-1.5"><input type="checkbox" checked={auto} onChange={(e) => { setAuto(e.target.checked); setCountdown(null) }} /> Auto-dial next</label>
         <label className="flex items-center gap-1.5"><input type="checkbox" checked={ringLimit} onChange={(e) => setRingLimit(e.target.checked)} /> Hang up after 5 rings</label>
+        <label className="flex items-center gap-1.5" title="Rings this card and the next two together. The first person to pick up is your call."><input type="checkbox" checked={three} onChange={(e) => setLines(e.target.checked)} data-testid="three-lines" /> 3 lines</label>
       </div>
       <ErrorNote error={q.error} />
       {incoming && <p role="status" className="rounded-lg border-2 border-emerald-400 bg-emerald-50 p-2 text-sm font-medium dark:bg-emerald-950/30">A seller is calling in: take it at the top of the screen. Power hour waits; their card opens when you answer.</p>}
@@ -400,7 +480,7 @@ export function PowerDial({ caller }: { caller: string }) {
               <Button className="h-14 flex-1 text-lg" variant="destructive" onClick={hangUp}>Hang up</Button>
             ) : (
               <Button className="h-14 flex-1 text-lg" disabled={!supported || busy} onClick={dial}>
-                {countdown !== null ? `Dialing in ${countdown}...` : `Dial ${fmtPhone(cur.phone)}`}
+                {countdown !== null ? `Dialing in ${countdown}...` : sideCards.length > 0 ? `Dial ${sideCards.length + 1} lines` : `Dial ${fmtPhone(cur.phone)}`}
               </Button>
             )}
             {countdown !== null && <Button variant="outline" className="h-14" onClick={() => setCountdown(null)}>Cancel</Button>}
