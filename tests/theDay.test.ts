@@ -176,23 +176,38 @@ describe('the day', () => {
     expect(await one<Record<string, unknown>>('public.text_day_tick($1)', ['2026-11-15T16:00:00Z'])).toMatchObject({ why: 'Sunday' })
   })
 
-  it('the backstop, when it is switched on, writes the settled wording for what nobody wrote', async () => {
+  it('the backstop, switched on, writes the day: settled wording, the sale text, spaced out, a stretch at a time (0236)', async () => {
+    const early = '2026-11-17T14:45:00Z'      // Tuesday 8:45 AM Central, 15 minutes before the sending window opens
     const tue = '2026-11-17T17:10:00Z'        // Tuesday 11:10 AM Central
     expect(await one<{ ran: boolean }>('public.text_day_backstop($1)', [tue])).toMatchObject({ ran: false })
-    await db.exec(`update public.campaign_control set day_backstop = true, daily_cap = 10 where id = 1`)
+    await db.exec(`update public.campaign_control set day_backstop = true, day_backstop_after = '08:40', daily_cap = 10, window_start = '09:00', window_end = '19:00' where id = 1`)
     await db.exec(`update public.text_fitness set as_of = '2026-11-17'`)
-    const t = await one<{ build: { listed: number }; backstop: { ran: boolean; queued: number } }>('public.text_day_tick($1)', [tue])
-    expect(t.build.listed).toBeGreaterThanOrEqual(3)
-    expect(t.backstop).toMatchObject({ ran: true })
-    const sent = await rows<{ body: string; variant: string; decided_by_name: string }>(
-      `select body, variant, decided_by_name from public.planned_openers where template_lane = 'day_backstop' order by body`)
-    expect(sent.map((s) => s.body)).toEqual([
-      'Hi Farrah, this is Thalia. Are you the current owner of 111 Test St? Reply STOP to opt out.',
+    expect((await one<{ listed: number }>('public.text_day_build($1)', [early])).listed).toBeGreaterThanOrEqual(4)
+    // four to write over nine hours: 3 minutes apart at most, and only what goes in the next 20 minutes is written now
+    expect(await one<Record<string, unknown>>('public.text_day_backstop($1)', [early])).toMatchObject({ ran: true, queued: 2, left: 2, seconds_apart: 180 })
+    const mine = () => rows<{ body: string; variant: string; template_lane: string; decided_by_name: string; at: string }>(
+      `select body, variant, template_lane, decided_by_name, to_char(scheduled_at at time zone 'UTC', 'HH24:MI:SS') as at
+         from public.planned_openers where decided_by_name = 'Muse (the day)' order by scheduled_at`)
+    let sent = await mine()
+    expect(sent.map((x) => x.at)).toEqual(['15:00:00', '15:03:00'])           // from 9:00 AM sharp
+    // a sale ahead is first on the list and gets the sale text
+    expect(sent[0]).toMatchObject({ variant: 'S', template_lane: 'sale_date',
+      body: "Hi Farrah, Thalia here about 111 Test St. I know a sale date may be coming up. If selling before then and walking away with something would help, I'd like to talk. Would you be open to that? Reply STOP to opt out." })
+    // while the server writes the day, the agent is handed only what it leaves: here the first text to someone texted before
+    const ready = await one<{ new_cards: { address: string }[] }>('public.agent_ready_to_text(50, true, true, $1)', [early])
+    expect(ready.new_cards.map((x) => x.address)).toEqual(['112 Other St'])
+    // the next tick writes the next stretch, after what is already waiting
+    const t = await one<{ backstop: Record<string, unknown> }>('public.text_day_tick($1)', [tue])
+    expect(t.backstop).toMatchObject({ ran: true, queued: 2, left: 0 })
+    sent = await mine()
+    expect(sent.map((x) => x.at).slice(2)).toEqual(['17:10:30', '17:13:30'])
+    expect(sent.filter((x) => x.template_lane === 'day_backstop').map((x) => x.body).sort()).toEqual([
       'Hi Sam, this is Thalia. Are you the current owner of 101 Test St? Reply STOP to opt out.',
       'Hi Stan, this is Thalia. Are you the current owner of 110 Test St? Reply STOP to opt out.',   // judged again, no longer stale
       'Hi there, this is Thalia. Are you the right person to ask about 6 Test St? Reply STOP to opt out.',
     ])
-    expect(sent[0]).toMatchObject({ variant: 'V4', decided_by_name: 'Muse (the day)' })
+    expect(sent[1]).toMatchObject({ variant: 'V4', decided_by_name: 'Muse (the day)' })
+    expect(await one<Record<string, unknown>>('public.text_day_backstop($1)', [tue])).toMatchObject({ ran: true, queued: 0, left: 0 })
   })
 
   it('the kill switch turns the rule gate off', async () => {
