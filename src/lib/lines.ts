@@ -12,6 +12,14 @@
 //     turns out to be a machine; if the first is a person, the second is cut off. That is the cost of three lines: it
 //     is counted (dropped_after_pickup) and the card is called back first.
 //
+// One ear, one mouth (Colin 2026-11-14: "it calls all 3 and connected all 3 to our caller instead of just 1"). The
+// caller is only ever connected to ONE line. While all three ring she hears one of them ringing, not three on top of
+// each other. Her microphone is shut to every line until one is being heard, and stays shut to all the others, so
+// nobody but the person she is talking to ever hears her; and no line but that one is ever heard by her. That used to
+// be applied once, when a line answered, to whatever sound each line had at that instant: a line whose sound arrived a
+// moment later played on. Now it is the rule for every line from the moment it is placed, and enforce() re-applies it
+// (lib/dialer calls it five times a second while a round is up).
+//
 // This file is only the deciding. It knows nothing of Twilio: lib/dialer hands it call objects.
 
 /** How long an answered line is listened to before it is taken for a person. The phone server gives its machine
@@ -90,6 +98,24 @@ export class LineGroup {
     try { m.call.disconnect() } catch { /* already gone */ }
   }
 
+  /** The one line the caller's ear is on: the line being heard (or the call itself); before anyone answers, the first
+   *  line still up, so she hears one phone ringing. */
+  private ear(): Member | null {
+    return this.winner ?? this.heard ?? this.firstUp() ?? null
+  }
+
+  /** One ear, one mouth: every line but the ear is silent to her, and her microphone is shut to every line but the one
+   *  being heard. Safe to call at any time and as often as wanted; a call that is confirmed is left to her own Mute. */
+  enforce() {
+    const ear = this.ear()
+    const mouth = this.winner ?? this.heard
+    for (const m of this.members) {
+      if (!m.up) continue
+      this.silence(m, m !== ear)
+      if (m !== mouth) { try { m.call.mute(true) } catch { /* no microphone on this line yet: the library applies it when there is */ } }
+    }
+  }
+
   get winnerSpec(): LineSpec | null { return this.winner?.spec ?? null }
   get heardCall(): CallLike | null { return this.heard?.call ?? null }
 
@@ -106,6 +132,7 @@ export class LineGroup {
     this.h.onCount?.(this.upCount())
     if (this.closed) this.hang(m)           // the caller hung up while this line was still being placed
     else if (this.winner) this.hang(m)
+    this.enforce()
   }
 
   /** A line that could not be placed at all (the safety check refused it, the device failed). */
@@ -123,15 +150,14 @@ export class LineGroup {
     m.answeredAt = this.now()
     m.rang = true
     if (this.winner) { this.hang(m); return }             // a person already has the caller: this one is cut off
-    if (this.heard) { try { m.call.mute(true) } catch { /* */ } this.silence(m, true); return }   // waits, muted, in case the first is a machine
+    if (this.heard) { this.enforce(); return }            // waits, unheard and unhearing, in case the first is a machine
     this.hear(m)
   }
 
   private hear(m: Member) {
     this.heard = m
     try { m.call.mute(false) } catch { /* */ }
-    this.silence(m, false)
-    for (const o of this.members) if (o !== m && o.up) { if (o.answeredAt !== null) { try { o.call.mute(true) } catch { /* */ } } this.silence(o, true) }
+    this.enforce()
     this.h.onHear(m.spec, m.call)
     const left = Math.max(0, SCREEN_MS - (this.now() - (m.answeredAt ?? this.now())))
     this.timer = (this.h.setTimer ?? ((fn, ms) => setTimeout(fn, ms)))(() => this.confirm(m), left)
@@ -142,6 +168,7 @@ export class LineGroup {
     this.timer = null
     if (!m.up || this.winner || this.heard !== m) return
     this.winner = m
+    this.enforce()
     for (const o of this.members) if (o !== m) this.hang(o)
   }
 
@@ -158,9 +185,10 @@ export class LineGroup {
         const next = this.members.filter((x) => x.up && x.answeredAt !== null).sort((a, b) => (a.answeredAt ?? 0) - (b.answeredAt ?? 0))[0]
         if (next) { this.hear(next); return }
         const ringing = this.firstUp()
-        if (ringing) { for (const o of this.members) if (o.up) this.silence(o, false); this.h.onRinging(ringing.spec); return }
+        if (ringing) { this.enforce(); this.h.onRinging(ringing.spec); return }
       }
     }
+    this.enforce()                          // the ringing line she was hearing ended: her ear moves to the next one
     this.maybeOver()
   }
 

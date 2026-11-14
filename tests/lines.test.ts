@@ -135,3 +135,99 @@ describe('three lines', () => {
     expect(lineOutcome({ ...base, rang: false, error: 'x' }, false, false)).toBe('failed')
   })
 })
+
+// Colin 2026-11-14: "it calls all 3 and connected all 3 to our caller instead of just 1". The caller is only ever
+// connected to one line: one line in her ear, her microphone open to that line alone.
+describe('three lines: one ear, one mouth', () => {
+  class Line extends FakeCall {
+    track: { enabled: boolean } | null = null                       // the line's sound; null until it arrives
+    getRemoteStream() { return this.track ? ({ getAudioTracks: () => [this.track] } as unknown as MediaStream) : null }
+    sound() { this.track = { enabled: true } }
+    get heardByHer() { return !!this.track && this.track.enabled }
+    get hearsHer() { return !this.muted }
+  }
+  function round() {
+    let now = 1_000
+    const timers: { fn: () => void; at: number; live: boolean }[] = []
+    const g = new LineGroup({
+      onHear: () => undefined, onRinging: () => undefined, onResult: () => undefined, onWinnerEnd: () => undefined, onAllGone: () => undefined,
+      now: () => now,
+      setTimer: (fn, ms) => { const t = { fn, at: now + ms, live: true }; timers.push(t); return t },
+      clearTimer: (h) => { (h as { live: boolean }).live = false },
+    })
+    const calls = [1, 2, 3].map((i) => { const c = new Line(); g.add({ leadId: `L${i}`, to: `414555000${i}`, label: `Card ${i}` }, c); return c })
+    g.settle()
+    const advance = (ms: number) => { now += ms; for (const t of timers) if (t.live && t.at <= now) { t.live = false; t.fn() } }
+    return { g, calls, advance }
+  }
+  const ears = (calls: { heardByHer: boolean }[]) => calls.map((c) => c.heardByHer)
+  const mouths = (calls: { hearsHer: boolean }[]) => calls.map((c) => c.hearsHer)
+
+  it('while all three ring she hears one phone ringing, not three, and her microphone is shut to all of them', () => {
+    const { g, calls } = round()
+    expect(mouths(calls)).toEqual([false, false, false])            // shut from the moment each line is placed
+    calls.forEach((c) => { c.sound(); c.emit('ringing') })          // each line's ringing arrives after it was placed
+    g.enforce()
+    expect(ears(calls)).toEqual([true, false, false])
+    expect(mouths(calls)).toEqual([false, false, false])
+    calls[0].emit('disconnect')                                     // the line she was hearing ring gives up
+    expect(ears(calls.slice(1))).toEqual([true, false])             // her ear moves to the next one
+  })
+
+  it('the line that answers is the only one she hears and the only one that hears her', () => {
+    const { calls } = round()
+    calls.forEach((c) => { c.sound(); c.emit('ringing') })
+    calls[1].emit('accept')
+    expect(ears(calls)).toEqual([false, true, false])
+    expect(mouths(calls)).toEqual([false, true, false])
+  })
+
+  it('a second and third person who pick up during the listen never hear her and are never heard, then are hung up', () => {
+    const { g, calls, advance } = round()
+    calls.forEach((c) => { c.sound(); c.emit('ringing') })
+    calls[1].emit('accept')
+    advance(1000); calls[0].emit('accept')
+    advance(1000); calls[2].emit('accept')
+    expect(ears(calls)).toEqual([false, true, false])
+    expect(mouths(calls)).toEqual([false, true, false])
+    advance(SCREEN_MS)
+    expect(g.winnerSpec?.leadId).toBe('L2')
+    expect(calls.map((c) => c.ended)).toEqual([true, false, true])
+  })
+
+  it('a line whose sound arrives after another line was answered is silenced the next time the rule is applied', () => {
+    const { g, calls } = round()
+    calls[1].sound(); calls[1].emit('ringing')
+    calls[1].emit('accept')                                         // line 2 is being heard; lines 1 and 3 have no sound yet
+    calls[0].sound(); calls[2].sound()                              // their ringing (then a voice) arrives now
+    expect(ears(calls)).toEqual([true, true, true])                 // what used to happen: all three in her ear
+    g.enforce()                                                     // lib/dialer does this five times a second
+    expect(ears(calls)).toEqual([false, true, false])
+    expect(mouths(calls)).toEqual([false, true, false])
+  })
+
+  it('once a call is confirmed her own Mute is hers: the rule never opens her microphone again', () => {
+    const { g, calls, advance } = round()
+    calls.forEach((c) => { c.sound(); c.emit('ringing') })
+    calls[0].emit('accept')
+    advance(SCREEN_MS)
+    calls[0].mute(true)                                             // she taps Mute to cough
+    g.enforce(); g.enforce()
+    expect(calls[0].muted).toBe(true)
+    expect(calls[0].heardByHer).toBe(true)
+  })
+
+  it('a voicemail hung up inside the listen: the next person who had picked up is heard and can hear her', () => {
+    const { calls, advance } = round()
+    calls.forEach((c) => { c.sound(); c.emit('ringing') })
+    calls[0].emit('accept')                                         // a voicemail
+    advance(1500); calls[2].emit('accept')                          // a person, waiting unheard
+    expect(ears(calls)).toEqual([true, false, false])
+    advance(2000); calls[0].emit('disconnect')                      // the phone server hung the machine up
+    expect(calls[2].heardByHer).toBe(true)
+    expect(calls[2].hearsHer).toBe(true)
+    expect(calls[1].heardByHer).toBe(false)
+    expect(calls[1].hearsHer).toBe(false)
+  })
+})
+

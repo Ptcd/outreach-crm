@@ -415,6 +415,9 @@ export function DialerProvider({ children }: { children: ReactNode }) {
       onCount: (up) => setActive((a) => (a ? { ...a, lines: up } : a)),
     })
     groupRef.current = g
+    // one ear, one mouth (lib/lines): re-applied five times a second while the round is up, because a line's sound
+    // can arrive after the moment the rule was last applied
+    const keep = setInterval(() => { if (groupRef.current === g) g.enforce(); else clearInterval(keep) }, 200)
     await Promise.all(xs.map(async (x, i) => {
       try {
         const dev = i === 0 ? await device() : await sideDevice(i - 1)
