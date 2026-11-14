@@ -5,6 +5,7 @@ import { useTheme } from '@/lib/theme'
 import { useAuth } from '@/providers/AuthProvider'
 import { useRepliesWaiting } from '@/lib/queries'
 import { OfflineBanner } from '@/components/OfflineBanner'
+import { CallAlertsNudge } from '@/components/CallAlertsNudge'
 import { CallBar } from '@/components/CallBar'
 import { IncomingCallBar } from '@/components/IncomingCallBar'
 import { StayAwake } from '@/components/StayAwake'
@@ -90,6 +91,7 @@ export function Layout({ children }: { children: ReactNode }) {
           </div>
         </div>
         <OfflineBanner />
+        <CallAlertsNudge />
       </header>
       <main className="mx-auto max-w-6xl px-4 py-5 sm:py-6">{children}</main>
       <IncomingCallBar />

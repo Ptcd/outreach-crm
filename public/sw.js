@@ -3,6 +3,8 @@
 // (falls back to the last copy when offline), hashed /assets/* cache-first. Data from Supabase
 // is never cached here (the app keeps its own copy of the last loaded data).
 const SHELL = 'wpie-shell-v1'
+const RING_TAG = 'wpie-call-coming-in'               // the same tag the app uses (components/IncomingCallBar)
+const RING_BUZZ = [500, 250, 500, 250, 500, 250, 900]
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(SHELL).then((c) => c.addAll(['/', '/manifest.webmanifest', '/icons/house-192.png'])).catch(() => {}))
   self.skipWaiting()
@@ -49,14 +51,19 @@ self.addEventListener('push', (event) => {
   } catch {
     data = { body: event.data ? event.data.text() : '' }
   }
-  event.waitUntil(self.registration.showNotification(data.title || 'Reply needs you', {
+  // "X is calling now" (ring-alert, url ends #ring-<call>): it stays up until tapped, buzzes like a call, carries an
+  // Answer button, and shares one tag with the app's own alert for the same call so the two never stack (2026-11-14)
+  const ring = /#ring-/.test(data.url || '')
+  const options = {
     body: data.body || '',
-    tag: data.tag || undefined,
-    renotify: Boolean(data.tag),
+    tag: ring ? RING_TAG : (data.tag || undefined),
+    renotify: ring || Boolean(data.tag),
     icon: '/icons/house-192.png',
     badge: '/icons/house-badge-96.png',      // white house on transparent: Android's status-bar icon
-    data: { url: data.url || '/inbox' },
-  }))
+    data: { url: data.url || '/inbox', ring },
+  }
+  if (ring) Object.assign(options, { requireInteraction: true, vibrate: RING_BUZZ, actions: [{ action: 'answer', title: 'Answer' }] })
+  event.waitUntil(self.registration.showNotification(data.title || 'Reply needs you', options))
 })
 
 // A tapped notification. An app that is already open is brought forward and asked to go there itself (it answers
@@ -77,7 +84,8 @@ self.addEventListener('notificationclick', (event) => {
         const ch = new MessageChannel()
         const t = setTimeout(() => resolve(false), 800)
         ch.port1.onmessage = () => { clearTimeout(t); resolve(true) }
-        try { front.postMessage({ type: 'wpie-open', url }, [ch.port2]) } catch { clearTimeout(t); resolve(false) }
+        // Answer on a ringing call's alert asks the app to answer it (components/IncomingCallBar)
+        try { front.postMessage({ type: event.action === 'answer' ? 'wpie-answer' : 'wpie-open', url }, [ch.port2]) } catch { clearTimeout(t); resolve(false) }
       })
       if (heard || ring) return
       return front.navigate(url)
