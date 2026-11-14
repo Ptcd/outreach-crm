@@ -77,8 +77,8 @@ describe('the day', () => {
       [C.weak]: 'weak_distress', [C.sale]: 'sheriff_sale_inside_14d', [C.unjudged]: 'no_record_verdict', [C.want]: 'want_not_need',
       [C.parked]: 'parked', [C.landline]: 'no_textable_phone', [C.thin]: 'equity_thin', [C.listed]: 'actively_listed', [C.stale]: 'record_verdict_stale',
     })
-    // need first: tier A, then B, then C (the one with a sale date ahead), then the agent's own card with no tier
-    expect(p.filter((r) => r.kind === 'first' && r.block === null).map((r) => r.lead_id)).toEqual([C.best, C.good, C.farSale, C.muse])
+    // a sale ahead is the first text of the day (0233); then need: tier A, then B, then the agent's own card with no tier
+    expect(p.filter((r) => r.kind === 'first' && r.block === null).map((r) => r.lead_id)).toEqual([C.farSale, C.best, C.good, C.muse])
   })
 
   it('a name fit to greet with, or "there"', async () => {
@@ -91,16 +91,16 @@ describe('the day', () => {
     const b = await one<{ built: boolean; listed: number; added: Record<string, number> }>('public.text_day_build($1)', [NOW])
     expect(b).toMatchObject({ built: true, listed: 3, added: { first_floor: 1, more_first: 2 } })
     expect(await rows(`select lead_id, kind, step, voice, ord from public.text_day where day = $1 order by ord`, [TODAY])).toEqual([
-      { lead_id: C.best, kind: 'first', step: 1, voice: 'Tyler', ord: 1 },
-      { lead_id: C.good, kind: 'first', step: 1, voice: 'Thalia', ord: 2 },
-      { lead_id: C.farSale, kind: 'first', step: 1, voice: 'Thalia', ord: 3 },
+      { lead_id: C.farSale, kind: 'first', step: 1, voice: 'Thalia', ord: 1 },
+      { lead_id: C.best, kind: 'first', step: 1, voice: 'Tyler', ord: 2 },
+      { lead_id: C.good, kind: 'first', step: 1, voice: 'Thalia', ord: 3 },
     ])
     // a second build the same morning changes nothing
     expect(await one<{ listed: number }>('public.text_day_build($1)', [NOW])).toMatchObject({ listed: 3 })
     const ready = await one<{ new_cards: { lead_id: string; voice: string; phone: string; tier: string }[]; the_day: { left_to_write: number; list_built: boolean } }>(
       'public.agent_ready_to_text(50, true, false, $1)', [NOW])
-    expect(ready.new_cards.map((c) => [c.lead_id, c.voice, c.tier])).toEqual([[C.best, 'Tyler', 'A'], [C.good, 'Thalia', 'B'], [C.farSale, 'Thalia', 'C']])
-    expect(ready.new_cards[0].phone).toBe(await phoneOf(C.best))
+    expect(ready.new_cards.map((c) => [c.lead_id, c.voice, c.tier])).toEqual([[C.farSale, 'Thalia', 'C'], [C.best, 'Tyler', 'A'], [C.good, 'Thalia', 'B']])
+    expect(ready.new_cards[1].phone).toBe(await phoneOf(C.best))
     expect(ready.the_day).toMatchObject({ list_built: true, left_to_write: 3 })
   })
 
@@ -119,7 +119,7 @@ describe('the day', () => {
     expect(await queue(C.best, ph, 'Hi Pat, this is Tyler. Are you the current owner of 109 Test St? Reply STOP to opt out.')).toMatchObject({ status: 'queued' })
     // written: it stays on the list and leaves what is left to write
     const ready = await one<{ new_cards: { lead_id: string }[]; the_day: { left_to_write: number } }>('public.agent_ready_to_text(50, true, false, $1)', [NOW])
-    expect(ready.new_cards.map((c) => c.lead_id)).toEqual([C.good, C.farSale])
+    expect(ready.new_cards.map((c) => c.lead_id)).toEqual([C.farSale, C.good])
     expect(await one<{ listed: number; not_written: number }>('public.text_day_report($1)', [NOW])).toMatchObject({ listed: 3, not_written: 2 })
   })
 
