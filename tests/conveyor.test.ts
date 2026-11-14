@@ -464,6 +464,16 @@ describe('health', () => {
     expect(h.summary).toMatch(/^All belts moving/)
   })
 
+  it('a quiet morning is not a laptop that stopped: the cycle\'s verdict push is the heartbeat (0232)', async () => {
+    await db.query(`update public.leads set synced_at = $1::timestamptz - interval '5 hours'`, [NOW])
+    await db.query(`delete from public.text_fitness`)
+    const summary = async () => (await one<{ r: { summary: string } }>(`select public.belt_health_check($1::timestamptz) as r`, [NOW])).r.summary
+    expect(await summary()).toMatch(/the laptop has not pushed in over 2 hours/)
+    await db.query(`insert into public.text_fitness (wpie_owner_id, verdict, as_of, pushed_at) values (990001, 'ok', '2026-10-22', $1::timestamptz - interval '6 minutes')`, [NOW])
+    expect(await summary()).not.toMatch(/laptop has not pushed/)
+    await db.query(`delete from public.text_fitness where wpie_owner_id = 990001`)
+  })
+
   it('the backfill puts every card on a belt from its stage, and reports where they landed', async () => {
     await db.query(`
       insert into public.leads (wpie_owner_id, owner_name, property_address, mailing_state, stage, next_action_at, hot_at) values
