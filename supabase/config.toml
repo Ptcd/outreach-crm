@@ -48,3 +48,8 @@ verify_jwt = false
 # alert secret on the URL instead (see the function). Declared here, not as a deploy flag.
 [functions.voice-agent]
 verify_jwt = false
+
+# A test call to one person's phone (0239). Called by a signed-in team member from Settings (the function checks the
+# team row itself) and by the desk through public.ring_test() with the shared secret, so no gateway check.
+[functions.ring-test]
+verify_jwt = false
