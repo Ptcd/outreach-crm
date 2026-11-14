@@ -31,8 +31,19 @@ export function IncomingCallBar() {
     setBusy(false)
     if (r?.leadId) nav(`/lead/${r.leadId}?call=1&phone=${r.phone}`)
   }
-  const takeRef = useRef(take)
-  takeRef.current = take
+  // Answer tapped on an alert, not on this screen. The app may still be coming forward, and a softphone that is told
+  // to answer before it can open the microphone drops the call for good. So: wait until the app is on screen, try the
+  // microphone first, and if that fails leave the call ringing with Answer on screen for a tap (2026-11-14).
+  const takeFromAlert = async () => {
+    for (let i = 0; i < 30 && document.visibilityState === 'hidden'; i++) await new Promise((r) => setTimeout(r, 100))
+    try {
+      const mic = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mic.getTracks().forEach((t) => t.stop())
+    } catch { return }
+    if (ringing.current) await take()
+  }
+  const takeRef = useRef(takeFromAlert)
+  takeRef.current = takeFromAlert
   // Answer was tapped on an alert before the call reached this app (it was asleep): the call is answered when it arrives
   const answerUntil = useRef(0)
 
@@ -125,6 +136,7 @@ export function IncomingCallBar() {
           {extra ? ` - ${extra} more lead${extra > 1 ? 's' : ''} with this number` : ''}
           {pick?.blocked ? ' - marked do not contact' : ''}
         </p>
+        {incoming.micError && <p role="status" className="mt-4 rounded-xl bg-red-600 p-3 text-base font-semibold text-white">{incoming.micError}</p>}
         <button type="button" disabled={busy} onClick={() => void take()}
           className="mt-6 flex h-24 w-full items-center justify-center gap-3 rounded-2xl bg-emerald-600 text-3xl font-bold text-white shadow-lg transition active:scale-[0.98] hover:bg-emerald-700 disabled:opacity-60">
           <PhoneIncoming className="h-8 w-8" aria-hidden />{onCall ? 'Hang up and answer' : 'Answer'}

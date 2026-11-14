@@ -28,6 +28,7 @@ const shown: { title: string; options: Record<string, unknown> }[] = []
 const closed = vi.fn()
 let listeners: ((e: MessageEvent) => void)[] = []
 let focused = false
+const mic = { ok: true }
 const send = (data: unknown) => { const ack = vi.fn(); listeners.forEach((f) => f({ data, ports: [{ postMessage: ack }] } as unknown as MessageEvent)); return ack }
 
 beforeEach(() => {
@@ -43,6 +44,9 @@ beforeEach(() => {
   } })
   ;(globalThis as { Notification?: unknown }).Notification = { permission: 'granted' }
   vi.spyOn(document, 'hasFocus').mockImplementation(() => focused)
+  mic.ok = true
+  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: {
+    getUserMedia: async () => { if (!mic.ok) throw new Error('NotAllowedError'); return { getTracks: () => [] } } } })
 })
 afterEach(() => { cleanup(); dialer.incoming = null; dialer.active = null; vi.clearAllMocks(); vi.restoreAllMocks(); vi.useRealTimers() })
 
@@ -93,7 +97,7 @@ describe('a call rings while the app is not in front', () => {
     let ack!: ReturnType<typeof vi.fn>
     await act(async () => { ack = send({ type: 'wpie-answer', url: 'https://app.example/today' }) })
     expect(ack).toHaveBeenCalledWith('ok')            // the service worker hears it: it never navigates the page
-    expect(dialer.accept).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(dialer.accept).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/lead/L1?call=1&phone=9209011163'))
   })
 
@@ -104,7 +108,18 @@ describe('a call rings while the app is not in front', () => {
     expect(dialer.accept).not.toHaveBeenCalled()
     dialer.incoming = ring
     await act(async () => { r.rerender(tree(<IncomingCallBar />)) })
-    expect(dialer.accept).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(dialer.accept).toHaveBeenCalledTimes(1))
+  })
+
+  it('Answer on the alert never drops the call when the microphone cannot open: it stays ringing with Answer on screen', async () => {
+    mic.ok = false
+    dialer.incoming = ring
+    render(tree(<IncomingCallBar />))
+    await act(async () => { send({ type: 'wpie-answer', url: 'https://app.example/today' }) })
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)) })
+    expect(dialer.accept).not.toHaveBeenCalled()
+    expect(dialer.decline).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Answer' })).toBeTruthy()
   })
 
   it('a tapped alert for anything else goes to its page inside the app, but nothing moves while a call rings', async () => {

@@ -71,6 +71,7 @@ export interface IncomingCall {
   matches: PhoneMatch[] | null
   lookupError: string | null
   busy: boolean          // she was on a call when it rang: Accept ends that call
+  micError?: string | null   // Answer was tapped and the microphone would not open: the call is still ringing
 }
 
 interface DialerApi {
@@ -439,6 +440,17 @@ export function DialerProvider({ children }: { children: ReactNode }) {
   const accept = useCallback<DialerApi['accept']>(async () => {
     const call = incomingRef.current
     if (!call) return null
+    // The microphone first. A softphone told to answer when it cannot open the microphone (never allowed on this
+    // phone, or the question is still on screen) drops the call for good, and the seller hears it end. So the call
+    // keeps ringing while the phone asks, and if the answer is no the screen says so instead of losing it (2026-11-14).
+    try {
+      const mic = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mic.getTracks().forEach((t) => t.stop())
+    } catch {
+      setIncoming((i) => (i && incomingRef.current === call ? { ...i, micError: 'This phone has the microphone blocked for the app. Allow it (the lock icon by the address, or the app\'s permissions), then tap Answer again.' } : i))
+      return null
+    }
+    if (incomingRef.current !== call) return null   // they hung up while the phone was asking
     incomingRef.current = null
     const lookup = lookupRef.current ?? Promise.resolve([])
     lookupRef.current = null

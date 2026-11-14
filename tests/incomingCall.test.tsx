@@ -3,7 +3,7 @@
 // names the matched owner and property, Accept opens the lead card with the call script, Decline leaves
 // the cell ringing, and a stranger's call offers the call desk's new-caller card. Pages without a
 // DialerProvider render nothing of this.
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ActiveCall, IncomingCall } from '../src/lib/dialer'
@@ -41,6 +41,19 @@ describe('a call coming in', () => {
     mount(<Layout><p>page</p></Layout>)
     expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.getByText('Ready for calls')).toBeTruthy()
+  })
+
+  it("Colin's phone bar is four tabs and More, not eleven cut to two letters (2026-11-14)", () => {
+    mount(<Layout><p>page</p></Layout>)
+    const bar = within(screen.getByRole('navigation', { name: 'Main' }))
+    expect(bar.getAllByRole('link').map((a) => a.textContent)).toEqual(['Today', 'Calls', 'Inbox', 'Approve'])
+    expect(screen.queryByRole('menu')).toBeNull()
+    fireEvent.click(bar.getByRole('button', { name: 'More' }))
+    const menu = within(screen.getByRole('menu', { name: 'More pages' }))
+    expect(menu.getAllByRole('menuitem').map((a) => a.textContent)).toEqual(['My cards', 'Texts', 'Warm', 'Pipeline', 'Scoreboard', 'Research', 'Call time'])
+    fireEvent.click(menu.getByRole('menuitem', { name: 'Pipeline' }))
+    expect(screen.getByTestId('where').textContent).toBe('/pipeline')
+    expect(screen.queryByRole('menu')).toBeNull()
   })
 
   it('names the matched owner and property while ringing; Accept opens the card with the call script', async () => {

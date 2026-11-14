@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const state = vi.hoisted(() => ({
   member: { person: 'adil', display_name: 'Tyler' } as { person: string; display_name: string } | null,
   tokens: 0,
+  micOk: true,
   tokenFails: 0,
   release: [] as (() => void)[],
   devices: [] as { handlers: Record<string, (x?: unknown) => void>; registered: number; state: string }[],
@@ -49,8 +50,11 @@ vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQue
 import { DialerProvider, useDialer } from '../src/lib/dialer'
 
 function Show() {
-  const { incoming, ready } = useDialer()
-  return <p data-testid="s">{ready ? 'ready' : 'not ready'}|{incoming ? `ringing ${incoming.from}` : 'quiet'}</p>
+  const { incoming, ready, active, accept } = useDialer()
+  return (<>
+    <p data-testid="s">{ready ? 'ready' : 'not ready'}|{incoming ? `ringing ${incoming.from}` : 'quiet'}|{incoming?.micError ? 'mic blocked' : 'mic fine'}|{active?.status ?? 'no call'}</p>
+    <button onClick={() => void accept()}>answer</button>
+  </>)
 }
 const call = (from: string) => {
   const on: Record<string, () => void> = {}
@@ -62,7 +66,8 @@ const releaseAll = async () => { await act(async () => { state.release.splice(0)
 beforeEach(() => {
   state.member = { person: 'adil', display_name: 'Tyler' }
   state.tokens = 0; state.tokenFails = 0; state.release = []; state.devices = []
-  Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia: async () => ({ getTracks: () => [] }) }, configurable: true })
+  state.micOk = true
+  Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia: async () => { if (!state.micOk) throw new Error('NotAllowedError'); return { getTracks: () => [] } } }, configurable: true })
   ;(globalThis as { RTCPeerConnection?: unknown }).RTCPeerConnection = class {}
 })
 afterEach(() => cleanup())
@@ -115,5 +120,24 @@ describe('the softphone', () => {
     const third = call('+14148996979')
     await act(async () => { state.devices[0].handlers.incoming(third) })
     expect(screen.getByTestId('s').textContent).toContain('ringing +14148996979')
+  })
+
+  it('Answer opens the microphone first: a blocked microphone leaves the call ringing and says so, never drops it', async () => {
+    render(<DialerProvider><Show /></DialerProvider>)
+    await releaseAll()
+    await waitFor(() => expect(state.devices.length).toBe(1))
+    const ring = call('+19209011163')
+    await act(async () => { state.devices[0].handlers.incoming(ring) })
+    state.micOk = false
+    await act(async () => { screen.getByRole('button', { name: 'answer' }).click() })
+    expect(ring.accept).not.toHaveBeenCalled()
+    expect(ring.reject).not.toHaveBeenCalled()
+    expect(screen.getByTestId('s').textContent).toContain('ringing +19209011163|mic blocked')
+    // allowed now: the same tap answers
+    state.micOk = true
+    await act(async () => { screen.getByRole('button', { name: 'answer' }).click() })
+    expect(ring.accept).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('s').textContent).toContain('quiet')
+    expect(screen.getByTestId('s').textContent).toContain('in_call')
   })
 })

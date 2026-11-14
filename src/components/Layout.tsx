@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
-import { NavLink } from 'react-router-dom'
-import { BarChart3, CalendarCheck, ClipboardList, CheckCheck, Clock, Flame, FolderKanban, Home, Inbox, ListChecks, LogOut, MessageSquareText, Moon, PhoneCall, Settings as SettingsIcon, Sun } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
+import { BarChart3, CalendarCheck, ClipboardList, CheckCheck, Clock, Flame, FolderKanban, Home, Inbox, ListChecks, LogOut, MessageSquareText, Moon, MoreHorizontal, PhoneCall, Settings as SettingsIcon, Sun } from 'lucide-react'
 import { useTheme } from '@/lib/theme'
 import { useAuth } from '@/providers/AuthProvider'
 import { useRepliesWaiting } from '@/lib/queries'
@@ -15,15 +15,19 @@ import { OnPhoneSwitch } from '@/components/OnPhonePicker'
 
 // a caller's nav is the five pages she works (Colin 2026-11-04: "build the full shit so the system isnt stupid anymore";
 // Thalia: "a caller's nav has Approve, Scoreboard and Pipeline"): Today, My cards, Calls, Texts, Warm. Colin keeps the rest.
-const NAV_ALL: { to: string; label: string; short?: string; icon: typeof CalendarCheck; caller?: boolean }[] = [
-  { to: '/today', label: 'Today', icon: CalendarCheck, caller: true },
+// On a phone the bar at the bottom holds at most six. Colin's eleven did not fit (2026-11-14: "Why are there so many
+// tabs at the bottom", every label cut to two letters), so his bar is the four marked `phone` and a More button that
+// opens the rest.
+const PHONE_BAR_MAX = 6
+const NAV_ALL: { to: string; label: string; short?: string; icon: typeof CalendarCheck; caller?: boolean; phone?: boolean }[] = [
+  { to: '/today', label: 'Today', icon: CalendarCheck, caller: true, phone: true },
   { to: '/mine', label: 'My cards', short: 'Mine', icon: FolderKanban, caller: true },
-  { to: '/calls', label: 'Calls', icon: PhoneCall, caller: true },
-  { to: '/inbox', label: 'Inbox', icon: Inbox },
+  { to: '/calls', label: 'Calls', icon: PhoneCall, caller: true, phone: true },
+  { to: '/inbox', label: 'Inbox', icon: Inbox, phone: true },
   { to: '/texts', label: 'Texts', icon: MessageSquareText, caller: true },
   { to: '/warm', label: 'Warm', icon: Flame, caller: true },
   { to: '/pipeline', label: 'Pipeline', short: 'Pipe', icon: ListChecks },
-  { to: '/approvals', label: 'Approve', short: 'Approve', icon: CheckCheck },
+  { to: '/approvals', label: 'Approve', short: 'Approve', icon: CheckCheck, phone: true },
   { to: '/scoreboard', label: 'Scoreboard', short: 'Score', icon: BarChart3 },
   // where every research source stands (0213, Colin 2026-11-10); Muse and the desk tick it, Colin reads it
   { to: '/research', label: 'Research', short: 'Research', icon: ClipboardList },
@@ -35,6 +39,14 @@ export function Layout({ children }: { children: ReactNode }) {
   const { member, signOut } = useAuth()
   const NAV = member?.role === 'caller' ? NAV_ALL.filter((n) => n.caller) : NAV_ALL
   const { ready } = useDialer()   // registered with Twilio: a seller's call rings in this open app
+  // the phone's bottom bar: everything when it fits, else the four marked `phone` and More
+  const crowded = NAV.length > PHONE_BAR_MAX
+  const BAR = crowded ? NAV.filter((n) => n.phone) : NAV
+  const REST = crowded ? NAV.filter((n) => !n.phone) : []
+  const [more, setMore] = useState(false)
+  const { pathname } = useLocation()
+  useEffect(() => { setMore(false) }, [pathname])
+  const inRest = REST.some((n) => pathname === n.to || pathname.startsWith(n.to + '/'))
   const w = useRepliesWaiting().data
   const waiting = (w?.drafts_waiting ?? 0) + (w?.tasks_open ?? 0)
   const badge = (to: string) => (to === '/inbox' && waiting > 0
@@ -96,8 +108,20 @@ export function Layout({ children }: { children: ReactNode }) {
       <main className="mx-auto max-w-6xl px-4 py-5 sm:py-6">{children}</main>
       <IncomingCallBar />
       <CallBar />
-      <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 grid border-t border-border/60 bg-background/85 px-1 backdrop-blur-xl md:hidden" style={{ gridTemplateColumns: `repeat(${NAV.length}, minmax(0, 1fr))` }} aria-label="Main">
-        {NAV.map((n) => (
+      {more && REST.length > 0 && (<>
+        <button type="button" aria-label="Close the menu" className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setMore(false)} />
+        <div role="menu" aria-label="More pages"
+          className="fixed inset-x-2 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-40 grid grid-cols-2 gap-1 rounded-2xl border border-border bg-background p-2 shadow-2xl md:hidden">
+          {REST.map((n) => (
+            <NavLink key={n.to} to={n.to} role="menuitem" onClick={() => setMore(false)}
+              className={({ isActive }) => cn('flex min-h-14 items-center gap-3 rounded-xl px-3 text-base font-medium', isActive ? 'bg-accent text-primary' : 'text-foreground hover:bg-muted')}>
+              <n.icon className="h-5 w-5 shrink-0" aria-hidden />{n.label}
+            </NavLink>
+          ))}
+        </div>
+      </>)}
+      <nav className="pb-safe fixed inset-x-0 bottom-0 z-30 grid border-t border-border/60 bg-background/85 px-1 backdrop-blur-xl md:hidden" style={{ gridTemplateColumns: `repeat(${BAR.length + (crowded ? 1 : 0)}, minmax(0, 1fr))` }} aria-label="Main">
+        {BAR.map((n) => (
           <NavLink
             key={n.to}
             to={n.to}
@@ -112,10 +136,19 @@ export function Layout({ children }: { children: ReactNode }) {
                 <span className="absolute -top-1 right-1 rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-sm">{waiting}</span>
               )}
             </span>
-            <span className="max-w-full truncate px-0.5">{n.short ?? n.label}</span>
+            <span className="max-w-full truncate px-0.5">{crowded ? n.label : (n.short ?? n.label)}</span>
             </>)}
           </NavLink>
         ))}
+        {crowded && (
+          <button type="button" aria-expanded={more} aria-haspopup="menu" onClick={() => setMore((m) => !m)}
+            className={cn('group flex min-h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium', more || inRest ? 'text-primary' : 'text-muted-foreground')}>
+            <span className={cn('relative flex h-8 w-12 items-center justify-center rounded-full transition-colors', more || inRest ? 'bg-accent' : 'group-hover:bg-muted')}>
+              <MoreHorizontal className="h-[22px] w-[22px]" strokeWidth={more || inRest ? 2.4 : 2} aria-hidden />
+            </span>
+            <span className="max-w-full truncate px-0.5">More</span>
+          </button>
+        )}
       </nav>
     </div>
   )
