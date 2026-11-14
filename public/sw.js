@@ -59,16 +59,28 @@ self.addEventListener('push', (event) => {
   }))
 })
 
+// A tapped notification. An app that is already open is brought forward and asked to go there itself (it answers
+// 'ok' and moves without loading the page again): loading the page hangs up the softphone, and a softphone that is
+// hung up while a seller rings ends their call (2026-11-14). An older copy of the app that does not answer is sent
+// there the old way, except for a call that is ringing ("X is calling now"), which is never reloaded.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const url = new URL((event.notification.data && event.notification.data.url) || '/inbox', self.location.origin).href
+  const data = event.notification.data || {}
+  const url = new URL(data.url || '/inbox', self.location.origin).href
+  const ring = data.ring === true || /#ring-/.test(url)
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     for (const w of windows) {
-      if (new URL(w.url).origin === self.location.origin) {
-        await w.focus()
-        return w.navigate(url)
-      }
+      if (new URL(w.url).origin !== self.location.origin) continue
+      const front = (await w.focus().catch(() => null)) || w
+      const heard = await new Promise((resolve) => {
+        const ch = new MessageChannel()
+        const t = setTimeout(() => resolve(false), 800)
+        ch.port1.onmessage = () => { clearTimeout(t); resolve(true) }
+        try { front.postMessage({ type: 'wpie-open', url }, [ch.port2]) } catch { clearTimeout(t); resolve(false) }
+      })
+      if (heard || ring) return
+      return front.navigate(url)
     }
     return self.clients.openWindow(url)
   })())

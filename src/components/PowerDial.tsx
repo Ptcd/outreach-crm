@@ -408,7 +408,7 @@ export function PowerDial({ caller }: { caller: string }) {
         <label className="flex items-center gap-1.5" title="Rings this card and the next two together. The first person to pick up is your call."><input type="checkbox" checked={three} onChange={(e) => setLines(e.target.checked)} data-testid="three-lines" /> 3 lines</label>
       </div>
       <ErrorNote error={q.error} />
-      {incoming && <p role="status" className="rounded-lg border-2 border-emerald-400 bg-emerald-50 p-2 text-sm font-medium dark:bg-emerald-950/30">A seller is calling in: take it at the top of the screen. Power hour waits; their card opens when you answer.</p>}
+      {incoming && <p role="status" className="rounded-lg border-2 border-emerald-400 bg-emerald-50 p-2 text-sm font-medium dark:bg-emerald-950/30">A seller is calling in: press the green Answer button. Power hour waits; their card opens when you answer.</p>}
       {q.isLoading && <Empty>Loading the calls...</Empty>}
       {!q.isLoading && !cur && <Empty>Nobody left to dial right now. <Button variant="link" onClick={() => void q.refetch()}>Check again</Button></Empty>}
       {cur && pin === cur.lead_id && list.slice(1).some((x) => x.source === 'replied' || x.source === 'missed_call') && (

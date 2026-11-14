@@ -48,15 +48,28 @@ describe('a call coming in', () => {
     dialer.accept.mockResolvedValue({ leadId: 'L1', phone: '4145550101' })
     mount(<IncomingCallBar />)
     const bar = screen.getByRole('alert')
-    // a solid band in dark mode too: the tinted class was see-through over the menu (2026-11-14)
-    expect(bar.className).toContain('dark:bg-[#06281d]')
-    expect(bar.className).not.toContain('bg-emerald-50')
+    // it takes over the screen, solid in dark mode too (2026-11-14: a thin see-through bar over the menu was easy to miss)
+    expect(bar.className).toContain('inset-0')
+    expect(bar.innerHTML).toContain('dark:bg-[#06281d]')
+    expect(bar.innerHTML).not.toContain('bg-emerald-50')
+    expect(document.title).toBe('CALL COMING IN')
     expect(bar.textContent).toContain('Call coming in on (262) 418-0202')
     expect(bar.textContent).toContain('JANE ROE - 100 N MAIN ST, Milwaukee')
     expect(bar.textContent).toContain('(414) 555-0101')
-    fireEvent.click(screen.getByRole('button', { name: 'Accept' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Answer' }))
     expect(dialer.accept).toHaveBeenCalledTimes(1)
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/lead/L1?call=1&phone=4145550101'))
+  })
+
+  it('gives the tab its title back when the ringing stops', () => {
+    document.title = 'WPIE'
+    dialer.incoming = { from: '+14145550101', line: null, matches: [jane], lookupError: null, busy: false }
+    const r = mount(<IncomingCallBar />)
+    expect(document.title).toBe('CALL COMING IN')
+    dialer.incoming = null
+    r.rerender(<MemoryRouter initialEntries={['/today']}><Routes><Route path="*" element={<><IncomingCallBar /><Where /></>} /></Routes></MemoryRouter>)
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(document.title).toBe('WPIE')
   })
 
   it('says it is still looking, then that a stranger is calling; Decline only rejects here', () => {
