@@ -104,6 +104,8 @@ export function IncomingCallBar() {
     document.addEventListener('visibilitychange', buzz)
     return () => {
       gone = true
+      // answered, declined or over: the phone's alert for this call stops buzzing (public/sw.js)
+      try { navigator.serviceWorker?.controller?.postMessage({ type: 'wpie-ring-stop' }) } catch { /* no service worker here */ }
       clearInterval(t); clearInterval(again)
       window.removeEventListener('focus', buzz); document.removeEventListener('visibilitychange', buzz)
       document.title = was

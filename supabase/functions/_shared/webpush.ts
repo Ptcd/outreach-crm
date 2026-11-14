@@ -65,14 +65,14 @@ export async function vapidJwt(audience: string, vapid: Vapid, now = new Date())
 }
 
 export async function sendPush(sub: PushSubscriptionKeys, message: object, vapid: Vapid, fetchFn: typeof fetch,
-  now = new Date()): Promise<PushOutcome> {
+  now = new Date(), ttl = 86400): Promise<PushOutcome> {
   try {
     const body = await encryptPayload(enc.encode(JSON.stringify(message)), sub)
     const jwt = await vapidJwt(new URL(sub.endpoint).origin, vapid, now)
     const res = await fetchFn(sub.endpoint, {
       method: 'POST',
       headers: {
-        TTL: '86400', Urgency: 'high', 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream',
+        TTL: String(ttl), Urgency: 'high', 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream',
         Authorization: `vapid t=${jwt}, k=${vapid.publicKey}`,
       },
       body,

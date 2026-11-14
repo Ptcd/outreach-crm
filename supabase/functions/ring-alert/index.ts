@@ -1,7 +1,8 @@
 // ring-alert: pm-phone calls this the moment a seller's call starts ringing a caller's app (2026-11-07; Adil in
 // Pakistan: "It rings like it's a blip ... or it doesn't ring"). It pushes "X is calling now, answer in the app" to that
 // caller's registered phones (push_subscriptions_for, 0171), so the phone buzzes even when the app is in the background,
-// and the second ring in pm-phone gives them time to open it. Called with the project's service key (the same key
+// and pm-phone keeps the seller ringing for about 45 seconds so they have time to open it (it buzzes them again half
+// way). Since 2026-11-14 Colin's devices are buzzed the same way. Called with the project's service key (the same key
 // pm-phone uses for inbound_call_ring); anything else is refused. Nothing here reaches a seller.
 import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
 import { pushToPerson } from '../_shared/notifyDeno.ts'
@@ -33,13 +34,14 @@ Deno.serve(async (req) => {
   const sid = String(body.call_sid ?? '').slice(0, 40)
   const message = {
     title: `${name} is calling now`,
-    body: `${where ? where + ' · ' : ''}${phone}. Open the app to answer; it rings twice.`,
+    body: `${where ? where + ' · ' : ''}${phone}. Tap Answer. It keeps ringing for about 40 seconds.`,
     url: card?.lead_id ? `${appUrl}/lead/${card.lead_id}` : `${appUrl}/calls`,
   }
   let pushed = 0
   const errors: string[] = []
   for (const p of persons) {
-    try { pushed += await push(p, { ...message, url: `${message.url}#ring-${sid || Date.now()}` }) }
+    // good for one minute: a ring that arrives after the call is over is worse than none
+    try { pushed += await push(p, { ...message, url: `${message.url}#ring-${sid || Date.now()}` }, { ttl: 60 }) }
     catch (e) { errors.push(`${p}: ${String(e).slice(0, 120)}`) }
   }
   return json({ ok: true, pushed, persons, errors })

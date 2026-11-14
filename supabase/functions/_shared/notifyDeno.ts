@@ -36,15 +36,16 @@ export function notifyDeps(sb: SupabaseClient, rpc: Rpc): NotifyDeps {
 }
 
 /** A push to one person's phones (0171 push_subscriptions_for): the follow-up reminders. Returns how many got through. */
-export function pushToPerson(sb: SupabaseClient): ((person: string, message: { title: string; body: string; url: string }) => Promise<number>) | null {
+export function pushToPerson(sb: SupabaseClient): ((person: string, message: { title: string; body: string; url: string }, opts?: { ttl?: number }) => Promise<number>) | null {
   const vapid = vapidFromEnv((n) => Deno.env.get(n))
   if (!vapid) return null
-  return async (person, message) => {
+  return async (person, message, opts) => {
     const r = await sb.rpc('push_subscriptions_for', { p_person: person })
     const subs = (Array.isArray(r.data) ? r.data : []) as PushSubscriptionKeys[]
     let ok = 0
     for (const sub of subs) {
-      try { await sendPush(sub, { ...message, tag: `followup:${message.url}` }, vapid, fetch); ok += 1 } catch { /* a dead subscription: the next one may work */ }
+      // opts.ttl: an alert that is only worth having now (a call ringing) is dropped by the push service after that long
+      try { await sendPush(sub, { ...message, tag: `followup:${message.url}` }, vapid, fetch, new Date(), opts?.ttl); ok += 1 } catch { /* a dead subscription: the next one may work */ }
     }
     return ok
   }

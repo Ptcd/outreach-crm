@@ -5,6 +5,22 @@
 const SHELL = 'wpie-shell-v1'
 const RING_TAG = 'wpie-call-coming-in'               // the same tag the app uses (components/IncomingCallBar)
 const RING_BUZZ = [500, 250, 500, 250, 500, 250, 900]
+// A call's alert buzzes again like a ringing phone (Colin 2026-11-14: "make it so it rings a notification on our devices
+// even when the app isn't open"): every RING_EVERY_MS, RING_REPEATS more times after the first, about 20 seconds. The
+// phone server sends a second alert half way through its 45 seconds of ringing, which starts this again. It stops the
+// moment the alert is tapped or swiped away, the app says the call was answered or ended, or the app is on screen
+// (its own call screen has Answer on it).
+const RING_EVERY_MS = 4000
+const RING_REPEATS = 5
+let ringStoppedAt = 0
+const ringNotes = () => self.registration.getNotifications({ tag: RING_TAG }).catch(() => [])
+const appInFront = async () => (await self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
+  .some((w) => w.focused && w.visibilityState === 'visible')
+self.addEventListener('message', (event) => {
+  if (!event.data || event.data.type !== 'wpie-ring-stop') return
+  ringStoppedAt = Date.now()
+  event.waitUntil(ringNotes().then((ns) => ns.forEach((n) => n.close())))
+})
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(SHELL).then((c) => c.addAll(['/', '/manifest.webmanifest', '/icons/house-192.png'])).catch(() => {}))
   self.skipWaiting()
@@ -62,8 +78,22 @@ self.addEventListener('push', (event) => {
     badge: '/icons/house-badge-96.png',      // white house on transparent: Android's status-bar icon
     data: { url: data.url || '/inbox', ring },
   }
-  if (ring) Object.assign(options, { requireInteraction: true, vibrate: RING_BUZZ, actions: [{ action: 'answer', title: 'Answer' }] })
-  event.waitUntil(self.registration.showNotification(data.title || 'Reply needs you', options))
+  if (!ring) {
+    event.waitUntil(self.registration.showNotification(data.title || 'Reply needs you', options))
+    return
+  }
+  Object.assign(options, { requireInteraction: true, vibrate: RING_BUZZ, actions: [{ action: 'answer', title: 'Answer' }] })
+  event.waitUntil((async () => {
+    const began = Date.now()
+    await self.registration.showNotification(data.title || 'A seller is calling now', options)
+    for (let i = 0; i < RING_REPEATS; i++) {
+      await new Promise((r) => setTimeout(r, RING_EVERY_MS))
+      if (ringStoppedAt >= began) return
+      if (await appInFront()) return
+      if (!(await ringNotes()).length) return          // tapped or swiped away
+      await self.registration.showNotification(data.title || 'A seller is calling now', options)
+    }
+  })())
 })
 
 // A tapped notification. An app that is already open is brought forward and asked to go there itself (it answers
@@ -75,6 +105,7 @@ self.addEventListener('notificationclick', (event) => {
   const data = event.notification.data || {}
   const url = new URL(data.url || '/inbox', self.location.origin).href
   const ring = data.ring === true || /#ring-/.test(url)
+  if (ring) ringStoppedAt = Date.now()                  // tapped: it stops buzzing
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     for (const w of windows) {
