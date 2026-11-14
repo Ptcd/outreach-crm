@@ -7,7 +7,7 @@
 // Secrets: TWILIO_ACCOUNT_SID with TWILIO_API_KEY_SID + TWILIO_API_KEY_SECRET (or TWILIO_AUTH_TOKEN), and the VAPID keys.
 import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
 import { pushToPerson } from '../_shared/notifyDeno.ts'
-import { RING_TEST_TRY_SECONDS, RING_TEST_TWIML, runRingTest, type TryStatus } from '../_shared/ringTest.ts'
+import { RING_TEST_TWIML, runRingTest, type TryStatus } from '../_shared/ringTest.ts'
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined
 
@@ -72,10 +72,10 @@ Deno.serve(async (req) => {
         body: 'A test from the desk, not a seller. Tap Answer. It keeps ringing for about 40 seconds.',
         url: `${appUrl}/today#ring-test-${id ?? Date.now()}`,
       }, { ttl: 60 }) : 0,
-      place: async () => {
+      place: async (seconds) => {
         const res = await fetch(`${api}.json`, {
           method: 'POST', headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ To: `client:${person}`, From: 'client:desk_test', Timeout: String(RING_TEST_TRY_SECONDS), Twiml: RING_TEST_TWIML }).toString(),
+          body: new URLSearchParams({ To: `client:${person}`, From: 'client:desk_test', Timeout: String(seconds), Twiml: RING_TEST_TWIML }).toString(),
         })
         if (!res.ok) return null
         return String(((await res.json()) as { sid?: string }).sid ?? '') || null

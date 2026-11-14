@@ -12,10 +12,10 @@ const dialer = {
   active: null as ActiveCall | null, incoming: null as IncomingCall | null, supported: true, ready: true,
   start: vi.fn(), accept: vi.fn(), decline: vi.fn(), hangUp: vi.fn(), toggleMute: vi.fn(), dismiss: vi.fn(),
 }
-const push = vi.hoisted(() => ({ state: 'off' as string, enable: vi.fn(async () => 'on') }))
+const push = vi.hoisted(() => ({ state: 'off' as string, enable: vi.fn(async () => 'on'), installed: false }))
 vi.mock('@/lib/supabaseClient', () => ({ supabase: {}, supabaseConfigured: true }))
 vi.mock('@/lib/dialer', async (orig) => ({ ...(await orig<typeof import('../src/lib/dialer')>()), useDialer: () => dialer }))
-vi.mock('@/lib/push', () => ({ pushState: async () => push.state, enablePush: push.enable, isInstalled: () => false }))
+vi.mock('@/lib/push', () => ({ pushState: async () => push.state, enablePush: push.enable, isInstalled: () => push.installed }))
 
 import { IncomingCallBar, RING_NOTE_TAG } from '../src/components/IncomingCallBar'
 import { CallAlertsNudge } from '../src/components/CallAlertsNudge'
@@ -32,7 +32,8 @@ const mic = { ok: true }
 const send = (data: unknown) => { const ack = vi.fn(); listeners.forEach((f) => f({ data, ports: [{ postMessage: ack }] } as unknown as MessageEvent)); return ack }
 
 beforeEach(() => {
-  shown.length = 0; listeners = []; focused = false; push.state = 'off'
+  shown.length = 0; listeners = []; focused = false; push.state = 'off'; push.installed = false
+  window.history.replaceState(null, '', '/')
   const reg = {
     showNotification: async (title: string, options: Record<string, unknown>) => { shown.push({ title, options }) },
     getNotifications: async () => [{ close: closed }],
@@ -119,6 +120,28 @@ describe('a call rings while the app is not in front', () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 30)) })
     expect(dialer.accept).not.toHaveBeenCalled()
     expect(dialer.decline).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Answer' })).toBeTruthy()
+  })
+
+  it('the app was shut and Answer on the alert opened it: the installed app answers when the call reaches it, and the mark is gone', async () => {
+    push.installed = true
+    window.history.replaceState(null, '', '/today#ring-CA1&answer=1')
+    dialer.accept.mockResolvedValue({ leadId: null, phone: '9209011163' })
+    const r = render(tree(<IncomingCallBar />))
+    expect(window.location.hash).toBe('#ring-CA1')
+    expect(dialer.accept).not.toHaveBeenCalled()
+    dialer.incoming = ring
+    await act(async () => { r.rerender(tree(<IncomingCallBar />)) })
+    await waitFor(() => expect(dialer.accept).toHaveBeenCalledTimes(1))
+  })
+
+  it('in a browser tab the same mark never answers by itself: the call screen waits for a tap', async () => {
+    window.history.replaceState(null, '', '/today#ring-CA1&answer=1')
+    const r = render(tree(<IncomingCallBar />))
+    dialer.incoming = ring
+    await act(async () => { r.rerender(tree(<IncomingCallBar />)) })
+    await act(async () => { await new Promise((x) => setTimeout(x, 30)) })
+    expect(dialer.accept).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Answer' })).toBeTruthy()
   })
 

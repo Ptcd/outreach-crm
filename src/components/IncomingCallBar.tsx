@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom'
 import { PhoneIncoming } from 'lucide-react'
 import { inboundLabel, pickInbound, useDialer } from '@/lib/dialer'
 import { fmtPhone } from '@/lib/format'
+import { isInstalled } from '@/lib/push'
 
 export const RING_NOTE_TAG = 'wpie-call-coming-in'   // public/sw.js uses the same tag for the server's "X is calling now"
 const RING_BUZZ = [500, 250, 500, 250, 500, 250, 900]
@@ -46,6 +47,14 @@ export function IncomingCallBar() {
   takeRef.current = takeFromAlert
   // Answer was tapped on an alert before the call reached this app (it was asleep): the call is answered when it arrives
   const answerUntil = useRef(0)
+  // The app was shut and Answer on the alert opened it (public/sw.js marks the address with answer=1): the same. Only
+  // in the installed app, where the phone lets a call's sound start without another tap; in a browser tab the call
+  // screen comes up and waits for one (2026-11-14: Colin's phone opened from the alert, rang twice, and was not answered).
+  useEffect(() => {
+    if (typeof window === 'undefined' || !/[#&]answer=1/.test(window.location.hash)) return
+    if (isInstalled()) answerUntil.current = Date.now() + 60_000
+    try { window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search + window.location.hash.replace(/[#&]answer=1/, '')) } catch { /* the mark stays: harmless */ }
+  }, [])
 
   // An alert that was tapped (public/sw.js). The app is already open, so the service worker asks it to act instead of
   // loading the page again: Answer on a ringing call's alert answers it; anything else goes to the alert's page, except

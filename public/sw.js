@@ -121,6 +121,8 @@ self.addEventListener('notificationclick', (event) => {
       if (heard || ring) return
       return front.navigate(url)
     }
-    return self.clients.openWindow(url)
+    // the app was shut. Answer on the alert opens it with a mark, so the app answers the call when it reaches it
+    // instead of asking for a second tap (components/IncomingCallBar; installed app only)
+    return self.clients.openWindow(event.action === 'answer' ? url + (url.includes('#') ? '&' : '#') + 'answer=1' : url)
   })())
 })

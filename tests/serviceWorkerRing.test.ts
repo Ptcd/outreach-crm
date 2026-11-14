@@ -140,7 +140,10 @@ describe('tapping an alert', () => {
   it('with the app shut it opens the app on the card; any other alert still goes to its page', async () => {
     const w = worker()
     await click(w, 'answer', { url: RING.url, ring: true })
-    expect(w.opened).toEqual([RING.url])
+    expect(w.opened).toEqual([RING.url + '&answer=1'])     // the app answers when the call reaches it
+    const plain = worker()
+    await click(plain, '', { url: RING.url, ring: true })
+    expect(plain.opened).toEqual([RING.url])
     const v = worker()
     const old = v.win({ answers: false })
     const done = click(v, '', { url: 'https://app.example/inbox' })

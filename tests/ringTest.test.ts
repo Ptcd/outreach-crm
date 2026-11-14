@@ -7,19 +7,19 @@ import { RING_TEST_WINDOW_MS, runRingTest, type TryStatus } from '../supabase/fu
 function phone(x: { opensAt: number | null; answerAfter?: number | null; refuses?: boolean; phones?: number }) {
   let now = 0
   const pushes: number[] = []
-  const placed: { sid: string; at: number; open: boolean }[] = []
+  const placed: { sid: string; at: number; open: boolean; seconds: number }[] = []
   const deps = {
     now: () => now,
     sleep: async (ms: number) => { now += ms },
     push: async () => { pushes.push(now); return x.phones ?? 1 },
-    place: async () => { const c = { sid: `CA${placed.length + 1}`, at: now, open: x.opensAt !== null && now >= x.opensAt }; placed.push(c); return c.sid },
+    place: async (seconds: number) => { const c = { sid: `CA${placed.length + 1}`, at: now, open: x.opensAt !== null && now >= x.opensAt, seconds }; placed.push(c); return c.sid },
     status: async (sid: string): Promise<{ status: TryStatus; duration: number }> => {
       const c = placed.find((p) => p.sid === sid)!
       const age = now - c.at
       if (!c.open) return { status: 'no-answer', duration: 0 }                        // no softphone: it fails at once
       if (x.refuses) return { status: 'busy', duration: 0 }
       if (x.answerAfter != null && age >= x.answerAfter) return { status: 'in-progress', duration: 0 }
-      return age >= 8000 ? { status: 'no-answer', duration: 0 } : { status: 'ringing', duration: 0 }
+      return age >= c.seconds * 1000 ? { status: 'no-answer', duration: 0 } : { status: 'ringing', duration: 0 }
     },
   }
   return { deps, pushes, placed }
@@ -35,6 +35,15 @@ describe('a test call to a phone', () => {
     expect(r.answeredAfterS).toBeGreaterThanOrEqual(12)
     expect(r.answeredAfterS).toBeLessThan(20)
     expect(r.note).toContain('Answered')
+  })
+
+  it('once the app is open a try rings it for what is left of the 45 seconds, up to 20, not eight (Colin 2026-11-14)', async () => {
+    const p = phone({ opensAt: 24_000, answerAfter: 15_000 })     // the app came up 24 s after the buzz; answered 15 s into the ring
+    const r = await runRingTest(p.deps)
+    const first = p.placed.find((c) => c.open)!
+    expect(first.seconds).toBeGreaterThanOrEqual(15)
+    expect(r.answered).toBe(true)
+    expect(p.placed.filter((c) => c.open).length).toBe(1)        // one long ring, not a string of short ones
   })
 
   it('never opened: buzzed twice, tried for the whole 45 seconds, and says the app never came up', async () => {

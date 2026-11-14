@@ -8,7 +8,7 @@
 
 export const RING_TEST_WINDOW_MS = 45_000
 export const RING_TEST_SECOND_BUZZ_MS = 18_000
-export const RING_TEST_TRY_SECONDS = 8          // how long one try rings an app that is open
+export const RING_TEST_TRY_SECONDS = 20         // the longest one try rings an app that is open (the phone server's own)
 export const RING_TEST_GAP_MS = 3_000           // between tries at an app that is shut
 
 export const RING_TEST_TWIML = '<Response><Pause length="1"/><Say voice="Polly.Joanna">This is a test call. You answered it, ' +
@@ -18,8 +18,9 @@ export type TryStatus = 'queued' | 'initiated' | 'ringing' | 'in-progress' | 'co
 export interface RingTestDeps {
   /** buzz the person's phones; returns how many phones were sent it */
   push: () => Promise<number>
-  /** place one try at the softphone; returns the phone company's call id, or null when it could not be placed */
-  place: () => Promise<string | null>
+  /** place one try at the softphone, ringing an open app for up to `seconds`; returns the phone company's call id, or
+   *  null when it could not be placed */
+  place: (seconds: number) => Promise<string | null>
   /** where that try stands, with its length in seconds once it has one */
   status: (sid: string) => Promise<{ status: TryStatus; duration: number }>
   sleep: (ms: number) => Promise<void>
@@ -47,13 +48,15 @@ export async function runRingTest(d: RingTestDeps): Promise<RingTestResult> {
       buzzedTwice = true
       out.pushed += await d.push().catch(() => 0)
     }
-    const sid = await d.place().catch(() => null)
+    // a try at a shut app fails at once whatever it is given; one that finds the app open rings it for what is left
+    const seconds = Math.max(6, Math.min(RING_TEST_TRY_SECONDS, Math.ceil((RING_TEST_WINDOW_MS - (d.now() - t0)) / 1000)))
+    const sid = await d.place(seconds).catch(() => null)
     out.tries += 1
     if (!sid) { await d.sleep(RING_TEST_GAP_MS); continue }
     // follow this try until it is over or answered (a try at an open app rings up to RING_TEST_TRY_SECONDS)
     let last: { status: TryStatus; duration: number } = { status: 'queued', duration: 0 }
     const tryStart = d.now()
-    while (d.now() - tryStart < (RING_TEST_TRY_SECONDS + 6) * 1000) {
+    while (d.now() - tryStart < (seconds + 6) * 1000) {
       await d.sleep(1000)
       last = await d.status(sid).catch(() => last)
       if (last.status === 'ringing' && d.now() - tryStart >= 2500) out.rang = true
