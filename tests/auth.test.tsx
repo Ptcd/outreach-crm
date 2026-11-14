@@ -72,6 +72,20 @@ describe('team check after sign-in', () => {
     expect(screen.getByText('TODAY PAGE')).toBeTruthy()
   })
 
+  it('asks once when the saved session and its sign-in events arrive together (2026-11-14: three answers, three softphones)', async () => {
+    let finish!: (v: Lookup) => void
+    state.lookups.push(() => new Promise<Lookup>((r) => { finish = r }))
+    mount()
+    await tick()
+    await act(async () => { state.listener!('INITIAL_SESSION', SESSION); state.listener!('SIGNED_IN', SESSION) })
+    await tick()
+    expect(state.calls).toBe(1)
+    await act(async () => finish({ data: COLIN, error: null }))
+    await tick()
+    expect(screen.getByText('TODAY PAGE')).toBeTruthy()
+    expect(state.calls).toBe(1)
+  })
+
   it('does not re-check (or flash anything) on the hourly token refresh', async () => {
     state.lookups.push(async () => ({ data: COLIN, error: null }))
     mount()

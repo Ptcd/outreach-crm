@@ -37,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(supabaseConfigured)
   const [recovering, setRecovering] = useState(false)
   const checkedFor = useRef<string | null>(null)       // the email the current member answer belongs to
+  const checkingFor = useRef<string | null>(null)      // the email a lookup is in flight for
 
   const checkMember = useCallback(async (email: string) => {
     setMemberStatus('checking')
@@ -78,9 +79,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
       setLoading(false)
-      // A token refresh (hourly) or the same login again keeps the answer we already have.
-      if (checkedFor.current === email) return
-      await checkMember(email)
+      // A token refresh (hourly) or the same login again keeps the answer we already have; one already on its way is
+      // waited for, not asked again (the saved session and its "signed in" event both arrive on a load, 2026-11-14).
+      if (checkedFor.current === email || checkingFor.current === email) return
+      checkingFor.current = email
+      try { await checkMember(email) } finally { if (checkingFor.current === email) checkingFor.current = null }
     }
     supabase.auth.getSession().then(({ data }) => {
       void load(data.session)

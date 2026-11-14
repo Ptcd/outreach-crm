@@ -129,6 +129,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
   const [incoming, setIncoming] = useState<IncomingCall | null>(null)
   const [ready, setReady] = useState(false)
   const deviceRef = useRef<TwilioDevice | null>(null)
+  const devicePending = useRef<Promise<TwilioDevice> | null>(null)
   const callRef = useRef<TwilioCall | null>(null)
   const incomingRef = useRef<TwilioCall | null>(null)
   const lookupRef = useRef<Promise<PhoneMatch[]> | null>(null)
@@ -152,7 +153,9 @@ export function DialerProvider({ children }: { children: ReactNode }) {
 
   // A seller calling in: hold the call, look the number up, and let the bar ask Accept / Decline.
   const onIncoming = useCallback((call: TwilioCall) => {
-    if (incomingRef.current) { call.reject(); return }   // one ringing in at a time
+    // one ringing in at a time. The second is left alone, never rejected: a reject tells the phone company the line is
+    // busy and ends the seller's call for every softphone under this name, the one showing Accept included (2026-11-14)
+    if (incomingRef.current) { call.ignore(); return }
     incomingRef.current = call
     const busy = !!callRef.current || !!groupRef.current
     if (busy) {   // Twilio stays quiet when a call is up: one short ring in her headset instead
@@ -181,8 +184,11 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     call.on('error', (e: { message?: string }) => { if (callRef.current === call) finish('error', plainCallError(e?.message ?? 'Call failed')); else gone() })
   }, [finish])
 
-  const device = useCallback(async () => {
-    if (deviceRef.current) return deviceRef.current
+  // One softphone, however many ask for it at once. The app used to start one for every sign-in answer that came back
+  // while the first was still fetching its pass (three on a normal load), all registered under the caller's name; a
+  // seller's call rang all three, the second and third turned it away as "already ringing", and the phone company
+  // ended the call as busy within a second, both rings (2026-11-14: every call to Tyler's and Thalia's lines that week).
+  const makeDevice = useCallback(async () => {
     const r = await supabase.functions.invoke('voice-token')
     if (r.error) throw new Error(r.error.message)
     const d = r.data as { token?: string; error?: string }
@@ -205,11 +211,23 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     await dev.register().catch(() => undefined)   // without this, calling out still works; only ringing in is lost
     return dev
   }, [onIncoming])
+  const device = useCallback((): Promise<TwilioDevice> => {
+    if (deviceRef.current) return Promise.resolve(deviceRef.current)
+    if (!devicePending.current) {
+      const p = makeDevice()
+      devicePending.current = p
+      // a pass that could not be fetched is asked for again by the next call, not remembered as the answer
+      void p.catch(() => undefined).finally(() => { if (devicePending.current === p) devicePending.current = null })
+    }
+    return devicePending.current
+  }, [makeDevice])
 
   // Registered as soon as a team member is signed in, so a seller's call can ring here; re-registered when
-  // the phone comes back online or the app comes back on screen.
+  // the phone comes back online or the app comes back on screen. Keyed on who is signed in, not on the sign-in
+  // answer itself, which arrives more than once on a load.
+  const who = member?.person ?? (member ? 'team' : null)
   useEffect(() => {
-    if (!supported || !member) return
+    if (!supported || !who) return
     let alive = true
     void device().catch(() => { if (alive) setReady(false) })
     const kick = () => {
@@ -224,7 +242,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     // dropped off re-registers before the next seller call (Adil 2026-11-07: "it rings like a blip, or it doesn't ring")
     window.addEventListener('wpie-kick-dialer', kick)
     return () => { alive = false; window.removeEventListener('online', kick); document.removeEventListener('visibilitychange', kick); window.removeEventListener('wpie-kick-dialer', kick) }
-  }, [supported, member, device])
+  }, [supported, who, device])
 
   // A call that ended or failed before pm-phone claimed it never rang anyone: un-pause its card at once.
   // The database decides (migration 0043); a call that was placed stays paused for its outcome.
