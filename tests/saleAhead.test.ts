@@ -99,6 +99,19 @@ describe('a sale ahead goes first, by itself', () => {
     expect((await one<{ b: string }>(`select public.card_record_block($1, '2026-11-17') b`, [close])).b).toBe('sheriff_sale_inside_14d')
   })
 
+  it('the sender is handed the sale text, filled in, for a card with a sale ahead (0234)', async () => {
+    const c = await card(['Sheriff sale 2026-12-22'])
+    await db.query(`update public.leads set owner_name = 'DOE, JANE Q', property_address = '12 OAK ST' where id = $1`, [c])
+    const t = async (lead: string) => (await one<{ t: string | null }>(`select public.sale_first_text($1, 'Tyler', '2026-11-17') t`, [lead])).t
+    expect(await t(c)).toBe("Hi Jane, Tyler here about 12 Oak St. I know a sale date may be coming up. If selling before then and walking away with something would help, I'd like to talk. Would you be open to that? Reply STOP to opt out.")
+    expect(await t(await card(['estate / inherited']))).toBeNull()
+    expect(await t(await card(['Sheriff sale 2026-11-24']))).toBeNull()        // inside 14 days: no text at all
+    const ready = (await one<{ r: { new_cards: { lead_id: string; sale_text: string | null }[]; the_day: { how: string } } }>(
+      `select public.agent_ready_to_text(200, true, true, $1::timestamptz) r`, [NOON])).r
+    expect(ready.new_cards.find((x) => x.lead_id === c)!.sale_text).toContain('I know a sale date may be coming up')
+    expect(ready.the_day.how).toContain('sale_text')
+  })
+
   it('an agent cannot park a card with a sale ahead on a hold', async () => {
     const soon = (await one<{ d: string }>(`select to_char((now() at time zone 'America/Chicago')::date + 30, 'YYYY-MM-DD') d`)).d
     const c = await card([`Sheriff sale ${soon}`])
