@@ -70,6 +70,27 @@ describe('a Sunday', () => {
     expect(q.status).toBe('refused')
   })
 
+  it('0242: the opened Sunday says so where the agent looks, with the replies nobody answered; a shut Sunday says nothing', async () => {
+    await db.query(`insert into public.twilio_inbound (sid, from10, to_number, body, lead_id, received_at) values ('SM0242', '4145560301', '+12625550000', 'yes', $1, '2099-11-15T15:00:00Z')`, [tylers])
+    const open = await one<{ sunday: string; replies: string }>(`public.agent_attention('Muse', $1)`, [SUN_10AM])
+    expect(open.sunday).toContain('Today is a Sunday that was opened for texting by desk')
+    expect(open.sunday).toContain('answer replies')
+    expect(open.replies).toContain('1 person texted back in the last day and has had no answer')
+    // under 20 minutes old: not yet
+    expect((await one<{ replies?: string }>(`public.agent_attention('Muse', '2099-11-15T15:10:00Z')`)).replies).toBeUndefined()
+    // the agent that does not text is told nothing
+    expect(await one<unknown>(`public.agent_attention('Muse 2', $1)`, [SUN_10AM])).toBeNull()
+    // the list the agent reads is the same people
+    const list = await one<{ reply_to: { text: string } }[]>('public.agent_replies_waiting(30)')
+    expect(list.map((r) => r.reply_to.text)).toEqual(['yes'])
+    // a Sunday that is shut: no line, and no nagging about replies that cannot be answered until Monday
+    await db.query(`update public.twilio_inbound set received_at = '2099-11-22T15:00:00Z' where sid = 'SM0242'`)
+    expect(await one<unknown>(`public.agent_attention('Muse', $1)`, [NEXT_SUN])).toBeNull()
+    // Monday: the reply is owed again
+    expect((await one<{ replies: string }>(`public.agent_attention('Muse', '2099-11-23T16:00:00Z')`)).replies).toContain('1 person')
+    await db.query(`delete from public.twilio_inbound where sid = 'SM0242'`)
+  })
+
   it('closes itself: Monday the rule is back, the held numbers are ready, and the next Sunday is shut', async () => {
     await one('public.text_day_tick($1)', [MON_1204AM])
     expect(await noSundays()).toBe(true)
