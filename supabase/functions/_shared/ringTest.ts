@@ -75,6 +75,6 @@ export async function runRingTest(d: RingTestDeps): Promise<RingTestResult> {
     : out.refused ? 'The app turned the call away (busy). It rang but was declined, or the softphone refused it.'
     : out.rang ? 'The app was open and rang, but nobody answered.'
     : out.pushed > 0 ? 'The phone was buzzed, but the app was never opened: no softphone came up in 45 seconds.'
-    : 'No phone has call alerts turned on for this person, and no app was open: nothing could ring.'
+    : 'No phone took the alert for this person (call alerts are off, or the phone refused it), and no app was open: nothing could ring.'
   return out
 }

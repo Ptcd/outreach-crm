@@ -45,7 +45,8 @@ export function pushToPerson(sb: SupabaseClient): ((person: string, message: { t
     let ok = 0
     for (const sub of subs) {
       // opts.ttl: an alert that is only worth having now (a call ringing) is dropped by the push service after that long
-      try { await sendPush(sub, { ...message, tag: `followup:${message.url}` }, vapid, fetch, new Date(), opts?.ttl); ok += 1 } catch { /* a dead subscription: the next one may work */ }
+      // counted only when the phone's push service took it: a refused one used to count as sent (2026-11-14)
+      try { if ((await sendPush(sub, { ...message, tag: `followup:${message.url}` }, vapid, fetch, new Date(), opts?.ttl)).ok) ok += 1 } catch { /* a dead subscription: the next one may work */ }
     }
     return ok
   }

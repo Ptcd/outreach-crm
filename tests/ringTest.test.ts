@@ -76,6 +76,6 @@ describe('a test call to a phone', () => {
   it('no phone with alerts on and no app open: says nothing could ring', async () => {
     const r = await runRingTest(phone({ opensAt: null, phones: 0 }).deps)
     expect(r.pushed).toBe(0)
-    expect(r.note).toBe('No phone has call alerts turned on for this person, and no app was open: nothing could ring.')
+    expect(r.note).toBe('No phone took the alert for this person (call alerts are off, or the phone refused it), and no app was open: nothing could ring.')
   })
 })
