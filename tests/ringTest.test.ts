@@ -46,6 +46,14 @@ describe('a test call to a phone', () => {
     expect(p.placed.filter((c) => c.open).length).toBe(1)        // one long ring, not a string of short ones
   })
 
+  it('an app that comes up late, 37 seconds after the buzz, still gets a full ring and can be answered (Tyler 2026-11-14)', async () => {
+    const p = phone({ opensAt: 37_000, answerAfter: 14_000 })
+    const r = await runRingTest(p.deps)
+    expect(p.placed.find((c) => c.open)!.seconds).toBe(20)
+    expect(r.answered).toBe(true)
+    expect(r.answeredAfterS).toBeGreaterThanOrEqual(37)
+  })
+
   it('never opened: buzzed twice, tried for the whole 45 seconds, and says the app never came up', async () => {
     const p = phone({ opensAt: null })
     const r = await runRingTest(p.deps)

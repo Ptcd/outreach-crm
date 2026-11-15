@@ -48,8 +48,10 @@ export async function runRingTest(d: RingTestDeps): Promise<RingTestResult> {
       buzzedTwice = true
       out.pushed += await d.push().catch(() => 0)
     }
-    // a try at a shut app fails at once whatever it is given; one that finds the app open rings it for what is left
-    const seconds = Math.max(6, Math.min(RING_TEST_TRY_SECONDS, Math.ceil((RING_TEST_WINDOW_MS - (d.now() - t0)) / 1000)))
+    // a try at a shut app fails at once whatever it is given; one that finds the app open rings it the full time, even
+    // past the 45 seconds (Tyler's app came up 37 seconds after the buzz and the test gave up eight seconds later): the
+    // window is how long a shut app is waited for, not how long an open one rings
+    const seconds = RING_TEST_TRY_SECONDS
     const sid = await d.place(seconds).catch(() => null)
     out.tries += 1
     if (!sid) { await d.sleep(RING_TEST_GAP_MS); continue }
