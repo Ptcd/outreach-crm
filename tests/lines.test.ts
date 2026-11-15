@@ -163,15 +163,15 @@ describe('three lines: one ear, one mouth', () => {
   const ears = (calls: { heardByHer: boolean }[]) => calls.map((c) => c.heardByHer)
   const mouths = (calls: { hearsHer: boolean }[]) => calls.map((c) => c.hearsHer)
 
-  it('while all three ring she hears one phone ringing, not three, and her microphone is shut to all of them', () => {
+  it('while all three ring she hears none of the lines (the app plays one ring of its own) and her microphone is shut to all', () => {
     const { g, calls } = round()
     expect(mouths(calls)).toEqual([false, false, false])            // shut from the moment each line is placed
     calls.forEach((c) => { c.sound(); c.emit('ringing') })          // each line's ringing arrives after it was placed
     g.enforce()
-    expect(ears(calls)).toEqual([true, false, false])
+    expect(ears(calls)).toEqual([false, false, false])              // not three phones ringing on top of each other
     expect(mouths(calls)).toEqual([false, false, false])
-    calls[0].emit('disconnect')                                     // the line she was hearing ring gives up
-    expect(ears(calls.slice(1))).toEqual([true, false])             // her ear moves to the next one
+    calls[0].emit('disconnect')
+    expect(ears(calls.slice(1))).toEqual([false, false])
   })
 
   it('the line that answers is the only one she hears and the only one that hears her', () => {

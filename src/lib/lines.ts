@@ -13,8 +13,8 @@
 //     is counted (dropped_after_pickup) and the card is called back first.
 //
 // One ear, one mouth (Colin 2026-11-14: "it calls all 3 and connected all 3 to our caller instead of just 1"). The
-// caller is only ever connected to ONE line. While all three ring she hears one of them ringing, not three on top of
-// each other. Her microphone is shut to every line until one is being heard, and stays shut to all the others, so
+// caller is only ever connected to ONE line. While all three ring she hears none of them (three phones ringing on top of
+// each other was the first thing wrong): lib/dialer plays one ordinary ring of its own instead. Her microphone is shut to every line until one is being heard, and stays shut to all the others, so
 // nobody but the person she is talking to ever hears her; and no line but that one is ever heard by her. That used to
 // be applied once, when a line answered, to whatever sound each line had at that instant: a line whose sound arrived a
 // moment later played on. Now it is the rule for every line from the moment it is placed, and enforce() re-applies it
@@ -98,10 +98,10 @@ export class LineGroup {
     try { m.call.disconnect() } catch { /* already gone */ }
   }
 
-  /** The one line the caller's ear is on: the line being heard (or the call itself); before anyone answers, the first
-   *  line still up, so she hears one phone ringing. */
+  /** The one line the caller's ear is on: the line being heard (or the call itself). Before anyone answers it is on
+   *  none of them: the app plays its own ring (lib/dialer), because a line's own ringing is only sometimes there. */
   private ear(): Member | null {
-    return this.winner ?? this.heard ?? this.firstUp() ?? null
+    return this.winner ?? this.heard ?? null
   }
 
   /** One ear, one mouth: every line but the ear is silent to her, and her microphone is shut to every line but the one

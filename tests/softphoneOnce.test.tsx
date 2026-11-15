@@ -15,6 +15,8 @@ const state = vi.hoisted(() => ({
   tokenFails: 0,
   release: [] as (() => void)[],
   devices: [] as { handlers: Record<string, (x?: unknown) => void>; registered: number; state: string }[],
+  out: [] as { on: Record<string, (x?: unknown) => void> }[],          // calls placed out
+  tone: { plays: 0, playing: false, src: '' },
 }))
 
 vi.mock('@twilio/voice-sdk', () => ({
@@ -27,6 +29,11 @@ vi.mock('@twilio/voice-sdk', () => ({
     async register() { this.registered += 1; this.state = 'registered'; this.handlers.registered?.() }
     updateToken() {}
     destroy() {}
+    async connect() {
+      const c = { on: {} as Record<string, (x?: unknown) => void> }
+      state.out.push(c)
+      return { on: (ev: string, f: (x?: unknown) => void) => { c.on[ev] = f }, disconnect() {}, mute() {}, isMuted: () => false, parameters: {}, customParameters: new Map() }
+    }
   },
 }))
 vi.mock('@/lib/supabaseClient', () => ({
@@ -41,7 +48,11 @@ vi.mock('@/lib/supabaseClient', () => ({
         state.release.push(() => resolve(fail ? { data: null, error: { message: 'no signal' } } : { data: { token: 'tok' }, error: null }))
       }),
     },
-    rpc: async () => ({ data: [], error: null }),
+    rpc: async (fn: string) => (fn === 'begin_human_call' ? { data: { ok: true, paused: true }, error: null } : { data: [], error: null }),
+    from: () => {
+      const q = { select: () => q, eq: () => q, order: () => q, limit: async () => ({ data: [], error: null }), maybeSingle: async () => ({ data: { reply_numbers: [] }, error: null }) }
+      return q
+    },
   },
 }))
 vi.mock('@/providers/AuthProvider', () => ({ useAuth: () => ({ member: state.member }) }))
@@ -50,8 +61,9 @@ vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQue
 import { DialerProvider, useDialer } from '../src/lib/dialer'
 
 function Show() {
-  const { incoming, ready, active, accept } = useDialer()
+  const { incoming, ready, active, accept, start } = useDialer()
   return (<>
+    <button onClick={() => void start({ to: '+14145550101', label: 'JANE ROE', leadId: '11111111-1111-4111-8111-111111111111', contactId: null })}>dial</button>
     <p data-testid="s">{ready ? 'ready' : 'not ready'}|{incoming ? `ringing ${incoming.from}` : 'quiet'}|{incoming?.micError ? 'mic blocked' : 'mic fine'}|{active?.status ?? 'no call'}</p>
     <button onClick={() => void accept()}>answer</button>
   </>)
@@ -65,7 +77,14 @@ const releaseAll = async () => { await act(async () => { state.release.splice(0)
 
 beforeEach(() => {
   state.member = { person: 'adil', display_name: 'Tyler' }
-  state.tokens = 0; state.tokenFails = 0; state.release = []; state.devices = []
+  state.tokens = 0; state.tokenFails = 0; state.release = []; state.devices = []; state.out = []
+  state.tone = { plays: 0, playing: false, src: '' }
+  ;(globalThis as { Audio?: unknown }).Audio = class {
+    loop = false; currentTime = 0
+    constructor(src: string) { state.tone.src = src }
+    play() { state.tone.plays += 1; state.tone.playing = true; return Promise.resolve() }
+    pause() { state.tone.playing = false }
+  }
   state.micOk = true
   Object.defineProperty(navigator, 'mediaDevices', { value: { getUserMedia: async () => { if (!state.micOk) throw new Error('NotAllowedError'); return { getTracks: () => [] } } }, configurable: true })
   ;(globalThis as { RTCPeerConnection?: unknown }).RTCPeerConnection = class {}
@@ -139,5 +158,40 @@ describe('the softphone', () => {
     expect(ring.accept).toHaveBeenCalledTimes(1)
     expect(screen.getByTestId('s').textContent).toContain('quiet')
     expect(screen.getByTestId('s').textContent).toContain('in_call')
+  })
+
+  // Tyler 2026-11-14: "when calling out the phone doesn't make a ringing noise like normal it's just silent then
+  // someone answers". The phone network only sometimes sends its own ringing; when it does not, the app plays one.
+  it('a call out that rings with a silent line plays the ring of the app itself, and stops the moment it is answered', async () => {
+    render(<DialerProvider><Show /></DialerProvider>)
+    await releaseAll()
+    await waitFor(() => expect(state.devices.length).toBe(1))
+    await act(async () => { screen.getByRole('button', { name: 'dial' }).click() })
+    await waitFor(() => expect(state.out.length).toBe(1))
+    expect(state.tone.plays).toBe(0)                                  // still connecting: nothing yet
+    await act(async () => { state.out[0].on.ringing(false) })        // ringing, and the line carries no sound of its own
+    expect(screen.getByTestId('s').textContent).toContain('ringing')
+    expect(state.tone.src).toBe('/sounds/ringback.wav')
+    expect(state.tone.playing).toBe(true)
+    await act(async () => { state.out[0].on.accept() })
+    expect(screen.getByTestId('s').textContent).toContain('in_call')
+    expect(state.tone.playing).toBe(false)
+  })
+
+  it('a line that brings its own ringing is left alone: the app adds none; and a ring that ends unanswered stops too', async () => {
+    render(<DialerProvider><Show /></DialerProvider>)
+    await releaseAll()
+    await waitFor(() => expect(state.devices.length).toBe(1))
+    await act(async () => { screen.getByRole('button', { name: 'dial' }).click() })
+    await waitFor(() => expect(state.out.length).toBe(1))
+    await act(async () => { state.out[0].on.ringing(true) })         // the network is sending its own ringing (or a message)
+    expect(state.tone.plays).toBe(0)
+    await act(async () => { state.out[0].on.disconnect() })
+    await act(async () => { screen.getByRole('button', { name: 'dial' }).click() })
+    await waitFor(() => expect(state.out.length).toBe(2))
+    await act(async () => { state.out[1].on.ringing(false) })
+    expect(state.tone.playing).toBe(true)
+    await act(async () => { state.out[1].on.disconnect() })          // nobody picked up
+    expect(state.tone.playing).toBe(false)
   })
 })

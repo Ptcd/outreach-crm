@@ -147,6 +147,24 @@ export function DialerProvider({ children }: { children: ReactNode }) {
       (!!active && ['connecting', 'ringing', 'in_call'].includes(active.status)) || !!incoming
   }, [active, incoming])
 
+  // The ring she hears while a call out is ringing (Tyler 2026-11-14: "when calling out the phone doesn't make a
+  // ringing noise like normal it's just silent then someone answers"). The phone network only sometimes sends its own
+  // ringing down the line; when it does not, the phone library says so and leaves the sound to the app, which never
+  // played one. Now the app plays an ordinary ring (public/sounds/ringback.wav) whenever a call out is ringing and the
+  // line itself is silent, and stops the moment it is answered or over. A three-line round always uses this ring: the
+  // lines themselves are silent until one is answered (lib/lines).
+  const toneRef = useRef<HTMLAudioElement | null>(null)
+  const ownRing = useRef(false)           // this call's ringing is the app's to play
+  const ringOut = !!active && !active.inbound && active.status === 'ringing'
+  useEffect(() => {
+    if (!ringOut || !ownRing.current || typeof Audio === 'undefined') return
+    const tone = toneRef.current ?? (toneRef.current = new Audio('/sounds/ringback.wav'))
+    tone.loop = true
+    try { tone.currentTime = 0 } catch { /* not loaded yet */ }
+    void tone.play()?.catch?.(() => undefined)
+    return () => { try { tone.pause() } catch { /* */ } }
+  }, [ringOut])
+
   const finish = useCallback((status: CallStatus, error: string | null) => {
     callRef.current = null
     setActive((a) => (a ? { ...a, status, error, answered: answeredRef.current } : a))
@@ -265,6 +283,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
   const start = useCallback<DialerApi['start']>(async ({ to, label, leadId, contactId, quiet }) => {
     if (callRef.current || incomingRef.current || groupRef.current) return
     answeredRef.current = false
+    ownRing.current = false
     setActive({ status: 'connecting', to, label, leadId, startedAt: null, muted: false, error: null, answered: false, inbound: false, line: null, quiet: !!quiet })
     let takeoverKey: string | null = null
     try {
@@ -294,7 +313,8 @@ export function DialerProvider({ children }: { children: ReactNode }) {
       const line = callerLineFor(to, (thread.data ?? []) as Parameters<typeof callerLineFor>[1], cold)
       const call = await dev.connect({ params: humanCallProviderParams(to, line, leadId, takeoverKey) })
       callRef.current = call
-      call.on('ringing', () => setActive((a) => (a ? { ...a, status: 'ringing' } : a)))
+      // hasEarlyMedia false: the line is silent while it rings, so the app plays the ring (set before the status flips)
+      call.on('ringing', (hasEarlyMedia?: boolean) => { ownRing.current = hasEarlyMedia !== true; setActive((a) => (a ? { ...a, status: 'ringing' } : a)) })
       call.on('accept', () => {
         answeredRef.current = true
         setActive((a) => (a ? { ...a, status: 'in_call', startedAt: Date.now() } : a))
@@ -393,6 +413,7 @@ export function DialerProvider({ children }: { children: ReactNode }) {
       },
       onRinging: (spec) => {
         if (groupRef.current !== g) return
+        ownRing.current = true               // three lines are silent until one is answered: the app plays the ring
         answeredRef.current = false
         callRef.current = null
         setActive((a) => (a ? { ...a, status: 'ringing', to: spec.to, label: spec.label, leadId: spec.leadId, startedAt: null, answered: false } : a))
