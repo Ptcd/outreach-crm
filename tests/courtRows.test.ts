@@ -67,4 +67,27 @@ describe('court rows', () => {
     expect(r).toEqual([{ county: 'Fond du Lac', state: 'waiting', defendant: 'Pat Smith', result_note: null },
       { county: 'Dane', state: 'waiting', defendant: 'Jonathan Q Debtor', result_note: null }])
   })
+
+  it('0241: a guardianship has a way in, and a joint divorce petition is told how to come in', async () => {
+    const g = await deposit('guardianship', [
+      { county: 'Waukesha', case_number: '2026GN000123', filed: '2026-10-30', defendant: 'Roe, Jane A', plaintiff: 'Roe, Mark (guardian)', status: 'Open' },
+      { county: 'Waukesha', case_number: '2026GN000124', caption: 'In the Matter of the Guardianship of John Q. Doe' },
+      { county: 'Waukesha', case_number: '2026GN000125', plaintiff: 'Somebody' },
+      { county: 'Waukesha', case_number: '2026PR000126', defendant: 'Wrong Case Type' },
+    ])
+    expect(g).toMatchObject({ ok: true, added: 2 })
+    expect(g.refused.map((r) => r.reason)).toEqual([expect.stringContaining('the person the guardianship is for'), expect.stringContaining('has GN in it')])
+    expect((g as unknown as { next: string }).next).toMatch(/no text and no paid trace/)
+    expect(await rows(`select case_number, plaintiff, defendant, state from public.court_rows where kind = 'guardianship' order by case_number`)).toEqual([
+      { case_number: '2026GN000123', plaintiff: 'Roe, Mark (guardian)', defendant: 'Roe, Jane A', state: 'waiting' },
+      { case_number: '2026GN000124', plaintiff: null, defendant: null, state: 'waiting' }])
+    expect((await status({ kind: 'guardianship' })).by_kind.guardianship).toMatchObject({ rows: 2, waiting: 2 })
+
+    // a joint petition has no respondent: refused with the way to send it, then taken that way
+    const d = await deposit('divorce', [{ county: 'Dane', case_number: '2026FA000777', plaintiff: 'Smith, Ann' }])
+    expect(d.refused[0].reason).toMatch(/co-petitioner in defendant/)
+    const d2 = await deposit('divorce', [{ county: 'Dane', case_number: '2026FA000777', plaintiff: 'Smith, Ann', defendant: 'Smith, Bob', caption: 'Joint petition: Smith, Ann and Smith, Bob' }])
+    expect(d2).toMatchObject({ ok: true, added: 1, refused: [] })
+    expect((await deposit('probate', [])).reason).toMatch(/divorce or guardianship/)
+  })
 })
