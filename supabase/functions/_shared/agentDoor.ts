@@ -362,13 +362,14 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
     description: 'Two cards for one property: keep one, close the duplicate. Refused unless they share a parcel or the same address and municipality, and refused when the duplicate has a texting thread, a promised callback or a deal (then link_cards same_person and keep both). Phones, people, reasons and notes the kept card lacks move over; a do-not-contact on the duplicate makes the kept card do-not-contact too; the duplicate closes as a duplicate with its open tasks, and the two are linked. A reason is required.',
     inputSchema: { type: 'object', properties: { keep_lead_id: S('the card to keep'), drop_lead_id: S('the duplicate to close'), reason: S('why they are one property') }, required: ['keep_lead_id', 'drop_lead_id', 'reason'] } },
   // The Research Board (0213; Colin 2026-11-10 through desk posts 174/175): where every research source stands, one page
-  // in WPIE that Muse and the desk both tick and Colin only reads.
+  // in WPIE that Muse and the desk both tick and Colin only reads. Weekly since 0248 (Colin 2026-11-17): a job with two
+  // whole weeks and no tick is Behind, texted to Colin every Monday and put in agent_attention until it is ticked.
   { role: 'any', name: 'research_board',
-    description: 'The Research Board: the 20 source jobs in priority order with their status note and monthly ticks Nov 2026 to Oct 2027, and the 21 buy-box counties with their five legs (foreclosure_cv, probate_pr, tax, need_signal, sale_refresh). A tick means the job ran end to end that month: pull, verification, cards in WPIE. In progress is a status note, not a tick.',
+    description: 'The Research Board: the 20 source jobs in priority order with their status note and WEEKLY ticks (weeks are named by their Monday, newest first), and the 21 buy-box counties with their five legs (foreclosure_cv, probate_pr, tax, need_signal, sale_refresh). A tick means the job ran end to end that week: pull, verification, cards in WPIE. In progress is a status note, not a tick. Every job is expected every week; each job carries last_done (the last week it ran), weeks_missed (whole weeks since with no tick) and behind (two or more: Colin is texted the list every Monday).',
     inputSchema: { type: 'object', properties: {} } },
   { role: 'any', name: 'research_board_set',
-    description: 'Tick a job for a month (done true only when the cycle ran end to end that month; false to untick), add a note on that month, and/or set the job status note. job is the number (1-20) or key (foreclosure_cv, sale_refresh, post_sale_rechecks, probate_pr, tax_delinquent, evictions, bankruptcy, money_judgments, divorce_fa, guardianship_gn, water_shutoff, fire_damage, vacant_registry, code_raze, stage_d_verification, name_to_parcel, rod_mortgages, deed_pulls, phone_tracing, mls_comps). month is any date in that month.',
-    inputSchema: { type: 'object', properties: { job: S('job number or key'), month: S('YYYY-MM-DD, any day of the month'), done: { type: 'boolean' }, note: S('a note on that month'), status: S('the job status note, replaces the old one') }, required: ['job'] } },
+    description: 'Tick a job for a week (done true only when the cycle ran end to end that week; false to untick), add a note on that week, and/or set the job status note. Tick each job every week it ran: a week with nothing to do (no sale to recheck, no deed triggered) is ticked with a note saying so, and a job that could not run gets a status saying what blocks it, never a tick. job is the number (1-20) or key (foreclosure_cv, sale_refresh, post_sale_rechecks, probate_pr, tax_delinquent, evictions, bankruptcy, money_judgments, divorce_fa, guardianship_gn, water_shutoff, fire_damage, vacant_registry, code_raze, stage_d_verification, name_to_parcel, rod_mortgages, deed_pulls, phone_tracing, mls_comps). week is any date in the week being ticked (Monday to Sunday, Central); leave it out for this week. The board no longer has months.',
+    inputSchema: { type: 'object', properties: { job: S('job number or key'), week: S('YYYY-MM-DD, any day of the week being ticked; omit for this week'), done: { type: 'boolean' }, note: S('a note on that week: what ran'), status: S('the job status note, replaces the old one') }, required: ['job'] } },
   { role: 'any', name: 'research_board_county_set',
     description: 'Tick one leg for one buy-box county (done true/false, optional note). legs: foreclosure_cv, probate_pr, tax, need_signal, sale_refresh.',
     inputSchema: { type: 'object', properties: { county: S('buy-box county name'), leg: S('foreclosure_cv | probate_pr | tax | need_signal | sale_refresh'), done: { type: 'boolean' }, note: S('optional') }, required: ['county', 'leg', 'done'] } },
@@ -664,7 +665,9 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
     }
     case 'research_board': return { value: await db.records('research_board', {}) }
     case 'research_board_set': {
-      const r = await db.records('agent_research_set', { p_job: String(args.job ?? ''), p_month: args.month ? String(args.month) : null,
+      // 0248: a month is refused, not guessed at. "2026-11-01" would tick a week in October.
+      if (args.month && !args.week) return { value: { ok: false, reason: 'the board is weekly now (2026-11-17): pass week (any date in the week the job ran) or leave it out for this week; there is no month' }, isError: true }
+      const r = await db.records('agent_research_set', { p_job: String(args.job ?? ''), p_week: args.week ? String(args.week) : null,
         p_done: typeof args.done === 'boolean' ? args.done : null, p_note: args.note ? String(args.note) : null, p_status: args.status ? String(args.status) : null, p_agent: agent.name }) as Json
       return { value: r, isError: r?.ok === false }
     }

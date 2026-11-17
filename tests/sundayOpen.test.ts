@@ -85,7 +85,9 @@ describe('a Sunday', () => {
     expect(list.map((r) => r.reply_to.text)).toEqual(['yes'])
     // a Sunday that is shut: no line, and no nagging about replies that cannot be answered until Monday
     await db.query(`update public.twilio_inbound set received_at = '2099-11-22T15:00:00Z' where sid = 'SM0242'`)
-    expect(await one<unknown>(`public.agent_attention('Muse', $1)`, [NEXT_SUN])).toBeNull()
+    // (this clock is in 2099, so the Research Board's behind line, 0248, is there; it is not what this test is about)
+    const shut = await one<Record<string, unknown> | null>(`public.agent_attention('Muse', $1)`, [NEXT_SUN])
+    expect(Object.keys(shut ?? {}).filter((k) => k !== 'research')).toEqual([])
     // Monday: the reply is owed again
     expect((await one<{ replies: string }>(`public.agent_attention('Muse', '2099-11-23T16:00:00Z')`)).replies).toContain('1 person')
     await db.query(`delete from public.twilio_inbound where sid = 'SM0242'`)
