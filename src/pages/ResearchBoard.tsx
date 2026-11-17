@@ -15,7 +15,7 @@ type County = { county: string; legs: Record<string, Tick> }
 type Board = { months: string[]; jobs: Job[]; legs: string[]; counties: County[]; as_of: string }
 
 const LEG_LABEL: Record<string, string> = { foreclosure_cv: 'Foreclosure CV', probate_pr: 'Probate PR', tax: 'Tax', need_signal: 'Need signal', sale_refresh: 'Sale date' }
-const monthLabel = (iso: string) => new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+const monthLabel = (iso: string) => new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })   // "Nov 2026": "Nov 26" read as the 26th
 
 function TickCell({ t, title }: { t: Tick | undefined; title: string }) {
   const label = t ? `${title}: ${t.done ? 'done' : 'not done'}${t.note ? ` - ${t.note}` : ''}${t.by ? ` (${t.by})` : ''}` : `${title}: nothing recorded`
@@ -45,7 +45,7 @@ export default function ResearchBoard() {
       {b && b.jobs.length === 0 && <Empty>No jobs on the board yet.</Empty>}
       {b && b.jobs.length > 0 && (
         <>
-          <Section title={`Source jobs (${done} of ${b.jobs.length} done for ${monthLabel(b.months[0])})`}>
+          <Section title={`Source jobs (${done} of ${b.jobs.length} ticked for ${monthLabel(b.months[0])})`}>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
