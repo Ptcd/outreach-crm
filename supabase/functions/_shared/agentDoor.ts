@@ -413,6 +413,11 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
 ]
 TOOLS.push(...CALENDAR_TOOLS)
 
+/** 2026-11-16: this refusal used to end "write as Colin, one person", left from the days every text went out as Colin.
+ * After three refused drafts an agent did what it said and signed a reply "Colin Merrill" in a thread that spoke as
+ * Tyler (desk 287). A wording refusal never says who to write as: the thread's name is the thread's name. */
+export const BUSINESS_WORDING = 'sounds like a business: write as one person, in the name this thread already uses (never change who is speaking)'
+
 /** The wording check for a reply (no STOP line needed in the middle of a conversation). */
 export function replyProblem(body: string): string | null {
   const b = (body ?? '').trim()
@@ -420,7 +425,7 @@ export function replyProblem(body: string): string | null {
   if (b.length > 480) return 'over 480 characters'
   if (/\bcash\b/i.test(b)) return 'no "cash" in a text'
   if (/https?:\/\/|www\./i.test(b)) return 'no links'
-  if (/\b(llc|inc|company|investors?|our team)\b/i.test(b)) return 'sounds like a business: write as Colin, one person'
+  if (/\b(llc|inc|company|investors?|our team)\b/i.test(b)) return BUSINESS_WORDING
   return null
 }
 
@@ -436,7 +441,7 @@ export function textProblem(body: string, step = 1): string | null {
   if (/\bcash\b/i.test(b)) return 'no "cash" in a text'
   if (/\bas[\s-]?is\b/i.test(b)) return '"as-is" is flagged by carriers'
   if (/https?:\/\/|www\./i.test(b)) return 'no links'
-  if (/\b(llc|inc|company|investors?|our team)\b/i.test(b)) return 'sounds like a business: write as Colin, one person'
+  if (/\b(llc|inc|company|investors?|our team)\b/i.test(b)) return BUSINESS_WORDING
   return null
 }
 
