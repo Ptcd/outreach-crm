@@ -54,12 +54,12 @@ Deno.serve(async (req) => {
       const r = await rpc('alert_email_recipients', {})
       return Array.isArray(r.data) ? (r.data as { person: string; email: string }[]) : []
     } } : null
-    const hot = await runHotAlerts({ rpc, send: pmPhoneSender((n) => Deno.env.get(n), fetch), push: hotPush(sb), email: hotEmail,
+    const hot = await runHotAlerts({ rpc, send: pmPhoneSender((n) => Deno.env.get(n), fetch), push: hotPush(sb), email: hotEmail, tell: deps.tell,
       appUrl: Deno.env.get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com' }).catch((e) => ({ error: String(e).slice(0, 200) }))
     // packages (migration 0085): the email to Colin with everything, and the "number ready" push for the callback
-    const packages = await runPackageMail(deps, rpc, async (m) => {
+    const packages = await runPackageMail(deps, rpc, async (m, leadId) => {
       const s: NotifySummary = { drafts: 0, reminders: 0, tasks: 0, pushes_ok: 0, pushes_failed: 0, emails: 0, email_errors: [] }
-      await pushAll(deps, m, s)
+      await pushAll(deps, m, s, { lead: leadId })
     }).catch((e) => ({ error: String(e).slice(0, 200) }))
     // offers by text (migration 0223): a number waiting for Colin's OK, and a seller's yes waiting for the written offer
     const offers = await runOfferPings(deps, rpc).catch((e) => ({ error: String(e).slice(0, 200) }))

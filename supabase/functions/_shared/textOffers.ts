@@ -50,7 +50,7 @@ export async function runOfferPings(deps: NotifyDeps, rpc: Rpc): Promise<{ asks:
   if (r.error) return { ...out, error: r.error.message.slice(0, 200) }
   for (const p of ((r.data as Ping[] | null) ?? [])) {
     const s: NotifySummary = { drafts: 0, reminders: 0, tasks: 0, pushes_ok: 0, pushes_failed: 0, emails: 0, email_errors: [] }
-    await pushAll(deps, offerPingMessage(p, deps.appUrl), s).catch(() => null)
+    await pushAll(deps, offerPingMessage(p, deps.appUrl), s, { lead: p.lead_id }).catch(() => null)
     if (p.kind !== 'reminder' && deps.email && deps.emailTo) {
       try { await deps.email({ to: deps.emailTo, ...offerPingEmail(p, deps.appUrl) }); out.emails++ } catch { /* the push and the screen still carry it */ }
     }

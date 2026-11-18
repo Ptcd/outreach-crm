@@ -69,6 +69,7 @@ vi.mock('@/lib/queries', () => ({
   useTouchTemplates: () => ok([]),
   usePipelineCounts: () => ok([{ stage: 'colin_call', lane: 'hold', county: 'Milwaukee', n: 1 }, { stage: 'postcard_mailed', lane: 'flip', county: 'Racine', n: 4999 }]),
   useLeads: () => ok({ rows: [lead], count: 1 }),
+  useCardNotYours: () => ok(null),      // 0249: this login may work the card
   useLead: () => ok({
     lead,
     contacts: [{ id: 'C1', lead_id: 'L1', kind: 'phone', value: '4145550101', value_normalized: '4145550101', person_name: 'JANE ROE', line_type: 'mobile', dnc_vendor: false, dnc_scrub: 'unknown', suppressed: true, dnc_app: false, source: 'fiverr', status: 'ok', note: null }],

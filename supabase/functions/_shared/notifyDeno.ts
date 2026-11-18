@@ -4,10 +4,28 @@
 // (email; SMTP_HOST defaults to smtp.gmail.com). A missing group just turns that channel off.
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.56.1'
 import type { HotPush } from './hotLeads.ts'
-import type { NotifyDeps } from './notify.ts'
+import type { NotifyDeps, PersonSub, Tell, TellOf } from './notify.ts'
 import type { Rpc } from './sending.ts'
 import { sendMail } from './smtp.ts'
 import { sendPush, vapidFromEnv, type PushSubscriptionKeys } from './webpush.ts'
+
+/** Every registered phone with whose it is (0249). If that cannot be read, no phone: an alert that cannot be aimed is
+ * not sent to everyone. */
+async function peopleSubs(sb: SupabaseClient): Promise<PersonSub[]> {
+  const r = await sb.rpc('push_subscriptions_people', {})
+  return !r.error && Array.isArray(r.data) ? (r.data as PersonSub[]) : []
+}
+
+/** Who is told about a card (0249 card_tell / draft_card_tell). If the rule cannot be read, the owners only. */
+export function cardTell(rpc: Rpc): TellOf {
+  return async (card) => {
+    if (!card.lead && !card.draft) return { everyone: true, people: [] }
+    const r = card.lead ? await rpc('card_tell', { p_lead_id: card.lead }) : await rpc('draft_card_tell', { p_draft_id: card.draft })
+    const d = r.data as { everyone?: boolean; people?: string[] } | null
+    if (r.error || !d || typeof d !== 'object') return { everyone: false, people: [], ownersOnly: true } as Tell
+    return { everyone: d.everyone === true, people: Array.isArray(d.people) ? d.people : [] }
+  }
+}
 
 export function notifyDeps(sb: SupabaseClient, rpc: Rpc): NotifyDeps {
   const get = (n: string) => Deno.env.get(n)
@@ -20,10 +38,8 @@ export function notifyDeps(sb: SupabaseClient, rpc: Rpc): NotifyDeps {
     rpc,
     appUrl: get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com',
     emailTo: get('NOTIFY_EMAIL_TO') || null,
-    subscriptions: async () => {
-      const r = await sb.from('push_subscriptions').select('endpoint, p256dh, auth')
-      return (r.data ?? []) as PushSubscriptionKeys[]
-    },
+    tell: cardTell(rpc),
+    subscriptions: () => peopleSubs(sb),
     push: vapid ? (sub, message) => sendPush(sub, message, vapid, fetch) : null,
     email: user && pass
       ? async (m) => {
@@ -57,10 +73,7 @@ export function hotPush(sb: SupabaseClient): HotPush | null {
   const vapid = vapidFromEnv((n) => Deno.env.get(n))
   if (!vapid) return null
   return {
-    subscriptions: async () => {
-      const r = await sb.from('push_subscriptions').select('endpoint, p256dh, auth')
-      return (r.data ?? []) as PushSubscriptionKeys[]
-    },
+    subscriptions: () => peopleSubs(sb),
     push: (sub, message) => sendPush(sub, message, vapid, fetch),
   }
 }

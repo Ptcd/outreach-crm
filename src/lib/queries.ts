@@ -207,6 +207,20 @@ export function useLeads(f: LeadFilter, workingStages: LeadStage[]) {
 }
 
 // ------------------------------------------------------------ Lead detail
+// 0249: null when this login may work the card; otherwise the words that say whose it is. The server refuses the
+// text, the dial and the take-over the same way; this is so the page says so before anyone types.
+export function useCardNotYours(id: string, on: boolean) {
+  return useQuery({
+    queryKey: ['card_not_yours', id],
+    enabled: on && !!id,
+    queryFn: async () => {
+      const r = await supabase.rpc('card_not_yours', { p_lead_id: id })
+      if (r.error) throw new Error(r.error.message)
+      return (r.data as string | null) ?? null
+    },
+  })
+}
+
 export function useLead(id: string) {
   return useQuery({
     queryKey: ['lead', id],

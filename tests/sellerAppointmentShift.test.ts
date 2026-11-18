@@ -48,6 +48,9 @@ beforeEach(async () => {
       values ('${LEAD}', 902, 'JANE ROE', '100 N MAIN ST, Milwaukee', 'Milwaukee', 'WI', 'flip', 'opener_sent');
     insert into public.contacts (lead_id, kind, value, value_normalized, line_type)
       values ('${LEAD}', 'phone', '4145550177', '4145550177', 'mobile');
+    -- a new card is split to one caller or the other; these tests dial as Thalia, and since 0249 only a card's own
+    -- caller dials it
+    update public.leads set locked_to = 'thalia', locked_at = now() where id = '${LEAD}';
   `)
 })
 
@@ -243,6 +246,8 @@ describe('recovery queue', () => {
 
 describe('simulated Thalia → Adil → Colin shift', () => {
   it('waits for the exact follow-up before takeover, then creates one Colin-owned visit', async () => {
+    // Adil's card: Thalia logs a call that reached her, Adil makes the dated call (0249: only a card's caller dials it)
+    await db.exec(`update public.leads set locked_to = 'adil', locked_at = now() where id = '${LEAD}'`)
     await as(THALIA, () => db.query(`select public.log_call($1, '4145550177', 'not_now', 'call after the move',
       '2099-11-05T18:00:00Z'::timestamptz)`, [LEAD]))
     expect(await one<{ belt: string; named: string }>(`

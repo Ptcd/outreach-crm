@@ -10,7 +10,8 @@
 // Alerts may quote the seller. Texts about the system itself (ops_claim) go to Colin only.
 import type { Rpc } from './sending.ts'
 import * as B from './replyBrain.generated.ts'
-import type { PushOutcome, PushSubscriptionKeys } from './webpush.ts'
+import type { PushOutcome } from './webpush.ts'
+import { mayTell, type PersonSub, type Tell, type TellOf } from './notify.ts'
 
 // When is a reply hot (Colin 2026-10-22, on a bare "Yes" that only confirmed ownership: "we don't
 // even know that they want to sell")? Only when it shows they would sell:
@@ -139,8 +140,8 @@ export function digestPush(list: DigestRow[], appUrl: string): PushMessage {
 export type AlertSend = (text: string, to?: string) => Promise<{ ok: boolean; sid?: string | null; error?: string }>
 
 export interface HotPush {
-  subscriptions: () => Promise<PushSubscriptionKeys[]>
-  push: (sub: PushSubscriptionKeys, message: object) => Promise<PushOutcome>
+  subscriptions: () => Promise<PersonSub[]>
+  push: (sub: PersonSub, message: object) => Promise<PushOutcome>
 }
 
 export interface HotSummary { alerts: number; second_alerts: number; digest: number; errors: string[]; off?: string; ops?: number
@@ -169,24 +170,26 @@ export function alertEmail(text: string, message: PushMessage): { subject: strin
   }
 }
 
-/** Alert what is due (first alerts, 15-minute repeats, the 7 PM list): texts to Colin and to every
- * member with a phone on file, a push to every registered phone, and an email to every member with an
- * alert email, at the same moments. */
+/** Alert what is due (first alerts, 15-minute repeats, the 7 PM list): a text to Colin, and to the people the card
+ * is told to (0249 card_tell: its caller and the owners; everyone only when the card has no caller) a text to their
+ * alert phone, a push to their registered phones and an email to their alert address, at the same moments.
+ * George White, 2026-11-17: a hot alert on Thalia's card reached Tyler, who texted her seller from it. */
 export async function runHotAlerts(opts: { rpc: Rpc; send: AlertSend | null; appUrl: string; now?: () => Date; push?: HotPush | null
-  email?: HotEmail | null }): Promise<HotSummary> {
+  email?: HotEmail | null; tell?: TellOf | null }): Promise<HotSummary> {
   const s: HotSummary = { alerts: 0, second_alerts: 0, digest: 0, errors: [], member_texts: 0, pushes_ok: 0, pushes_failed: 0, emails: 0 }
   const push = opts.push ?? null
   // Nothing that could reach anyone: leave the alerts unclaimed so they go out once a channel exists.
-  const subs = push ? await push.subscriptions().catch(() => [] as PushSubscriptionKeys[]) : []
+  const subs = push ? await push.subscriptions().catch(() => [] as PersonSub[]) : []
   const mails: EmailMember[] = opts.email ? await opts.email.recipients().catch(() => [] as EmailMember[]) : []
   if (!opts.send && !subs.length && !mails.length) { s.off = push ? 'ALERT_SECRET not set and no phone registered' : 'ALERT_SECRET not set'; return s }
   const now = (opts.now ?? (() => new Date()))()
   const members: Member[] = opts.send ? await membersWithPhones(opts.rpc) : []
   const err = (r: { error?: string }, fallback: string) => String(r.error ?? fallback).slice(0, 200)
 
-  const fanOut = async (text: string, message: PushMessage, memberTexts = true) => {
+  const fanOut = async (text: string, message: PushMessage, memberTexts = true, tell: Tell | null = null) => {
     if (memberTexts) {
       for (const m of members) {
+        if (!mayTell(m, tell)) continue
         const r = await opts.send!(text, m.phone).catch((e) => ({ ok: false, error: String(e) }))
         if (r.ok) s.member_texts += 1
         else s.errors.push(`${m.person}: ${err(r, 'not sent')}`)
@@ -195,6 +198,7 @@ export async function runHotAlerts(opts: { rpc: Rpc; send: AlertSend | null; app
     if (opts.email) {
       const mail = alertEmail(text, message)
       for (const m of mails) {
+        if (!mayTell(m, tell)) continue
         try {
           await opts.email.send({ to: m.email, ...mail })
           s.emails = (s.emails ?? 0) + 1
@@ -205,6 +209,7 @@ export async function runHotAlerts(opts: { rpc: Rpc; send: AlertSend | null; app
     }
     if (push) {
       for (const sub of subs) {
+        if (!mayTell(sub, tell)) continue
         const r = await push.push(sub, message).catch(() => ({ ok: false, gone: false, status: null }))
         if (r.ok) s.pushes_ok += 1
         else s.pushes_failed += 1
@@ -229,7 +234,8 @@ export async function runHotAlerts(opts: { rpc: Rpc; send: AlertSend | null; app
       if (a.n === 2) s.second_alerts += 1
       else s.alerts += 1
     }
-    await fanOut(text, alertPush(a, opts.appUrl), !HANDOFF_RE.test(a.body))
+    const tell = a.lead_id && opts.tell ? await opts.tell({ lead: a.lead_id }) : null
+    await fanOut(text, alertPush(a, opts.appUrl), !HANDOFF_RE.test(a.body), tell)
   }
   // Texts about the system itself (e.g. follow-ups paused by their opt-out brake): Colin only.
   if (opts.send) {

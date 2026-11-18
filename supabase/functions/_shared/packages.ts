@@ -118,7 +118,7 @@ export type PackageSummary = { emailed: number; failed: number; ready_pings: num
 
 /** Email new packages to Colin; push "Colin wants to walk it" to the caller once he decides (migration 0114: no number
  *  on the phone), and "walk it or pass, by" to Colin for a callback coming up (within 3 hours, or past) he has not decided. */
-export async function runPackageMail(deps: NotifyDeps, rpc: Rpc, fanOut?: (m: { title: string; body: string; url: string; tag: string }) => Promise<unknown>): Promise<PackageSummary> {
+export async function runPackageMail(deps: NotifyDeps, rpc: Rpc, fanOut?: (m: { title: string; body: string; url: string; tag: string }, leadId?: string | null) => Promise<unknown>): Promise<PackageSummary> {
   const s: PackageSummary = { emailed: 0, failed: 0, ready_pings: 0, number_due_pings: 0, answers_pings: 0 }
   if (deps.email && deps.emailTo) {
     const r = await rpc('package_mail_claim', { p_limit: 5 })
@@ -142,21 +142,21 @@ export async function runPackageMail(deps: NotifyDeps, rpc: Rpc, fanOut?: (m: { 
       await fanOut({ title: passed ? `Colin passed: ${x.property_address ?? 'a package'}` : `Colin wants to walk it: ${x.property_address ?? 'a package'}`,
         body: passed ? 'Close politely at the callback you promised (the words are on the card).'
           : x.callback_at ? 'On the callback you promised: the yes-or-no question, then book his walk.' : 'Call them back and book his walk.',
-        url: `${deps.appUrl.replace(/\/$/, '')}/lead/${x.lead_id}#package`, tag: `package-${x.lead_id}` }).catch(() => null)
+        url: `${deps.appUrl.replace(/\/$/, '')}/lead/${x.lead_id}#package`, tag: `package-${x.lead_id}` }, x.lead_id).catch(() => null)
       s.ready_pings++
     }
     const due = await rpc('package_number_due_claim', {})
     for (const x of ((due.data as { lead_id: string; property_address: string | null; callback_at: string }[] | null) ?? [])) {
       await fanOut({ title: `Walk it or pass, by ${clock(x.callback_at)}: ${x.property_address ?? 'a package'}`,
         body: 'Thalia promised this callback and you have not decided yet. Decide on the card, or she calls on time and sets a new callback.',
-        url: `${deps.appUrl.replace(/\/$/, '')}/lead/${x.lead_id}#package`, tag: `package-due-${x.lead_id}` }).catch(() => null)
+        url: `${deps.appUrl.replace(/\/$/, '')}/lead/${x.lead_id}#package`, tag: `package-due-${x.lead_id}` }, x.lead_id).catch(() => null)
       s.number_due_pings++
     }
     // the caller's answers to Colin's "ask first" questions (0122)
     const ans = await rpc('package_answers_claim', {})
     for (const x of ((ans.data as { lead_id: string; property_address: string | null }[] | null) ?? [])) {
       await fanOut({ title: `Answers in: ${x.property_address ?? 'a package'}`, body: 'The caller asked your questions. Walk it or pass, on the card.',
-        url: `${deps.appUrl.replace(/\/$/, '')}/lead/${x.lead_id}#package`, tag: `package-answers-${x.lead_id}` }).catch(() => null)
+        url: `${deps.appUrl.replace(/\/$/, '')}/lead/${x.lead_id}#package`, tag: `package-answers-${x.lead_id}` }, x.lead_id).catch(() => null)
       s.answers_pings++
     }
   }

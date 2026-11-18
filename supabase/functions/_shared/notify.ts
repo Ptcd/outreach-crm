@@ -21,9 +21,24 @@ export interface ClaimedDraft {
   thread: { who: 'us' | 'them'; body: string; at: string }[]
 }
 
+/** Who is told about a card (0249 card_tell): everyone when it has no caller; otherwise only the people named (the
+ * owners, the card's caller or whoever covers for them today, a caller holding a task on it). ownersOnly: the rule
+ * could not be read, so only the owners are told: an alert must never reach the other caller by accident. */
+export type Tell = { everyone: boolean; people: string[]; ownersOnly?: boolean }
+export type TellOf = (card: { lead?: string | null; draft?: string | null }) => Promise<Tell>
+/** A registered phone and whose it is (0249 push_subscriptions_people). */
+export type PersonSub = PushSubscriptionKeys & { person?: string | null; role?: string | null }
+export function mayTell(who: { person?: string | null; role?: string | null }, tell: Tell | null | undefined): boolean {
+  if (!tell || tell.everyone) return true
+  if (tell.ownersOnly) return who.role === 'owner'
+  return !!who.person && tell.people.includes(who.person)
+}
+
 export interface NotifyDeps {
   rpc: Rpc
-  subscriptions: () => Promise<PushSubscriptionKeys[]>
+  /** who is told about a card; absent = everyone (tests, and anything that is not about a card) */
+  tell?: TellOf
+  subscriptions: () => Promise<PersonSub[]>
   push: ((sub: PushSubscriptionKeys, message: object) => Promise<PushOutcome>) | null
   email: ((m: Omit<Mail, 'from'>) => Promise<void>) | null
   emailTo: string | null
@@ -93,9 +108,12 @@ ${why ? `<p style="color:#555">Why it needs you: ${esc(why)}</p>` : ''}
   return { subject, text, html }
 }
 
-export async function pushAll(deps: NotifyDeps, message: object, s: NotifySummary) {
+export async function pushAll(deps: NotifyDeps, message: object, s: NotifySummary, card?: { lead?: string | null; draft?: string | null }) {
   if (!deps.push) return
+  // an alert about a card goes to its caller and the owners only (0249); anything else to every phone
+  const tell = card && (card.lead || card.draft) && deps.tell ? await deps.tell(card) : null
   for (const sub of await deps.subscriptions()) {
+    if (!mayTell(sub, tell)) continue
     const r = await deps.push(sub, message)
     if (r.ok) s.pushes_ok += 1
     else s.pushes_failed += 1
@@ -117,14 +135,15 @@ export async function runNotifications(deps: NotifyDeps): Promise<NotifySummary>
     for (const d of (r.data as ClaimedDraft[]) ?? []) {
       if (kind === 'first') s.drafts += 1
       else s.reminders += 1
-      await pushAll(deps, pushMessage(d, deps.appUrl), s)
+      const tell = deps.tell ? await deps.tell({ draft: d.id }) : null
+      await pushAll(deps, pushMessage(d, deps.appUrl), s, { draft: d.id })
       if (kind === 'first' && deps.email) {
         // Colin's address from the env, plus every member with an alert email on file (Settings page,
         // migration 0028): the callers approve drafts too (Colin 2026-10-22).
         const to = new Set<string>()
         if (deps.emailTo) to.add(deps.emailTo.toLowerCase())
         const r = await deps.rpc('alert_email_recipients', {}).catch(() => ({ data: null, error: null }))
-        for (const m of (Array.isArray(r.data) ? r.data : []) as { email?: string }[]) if (m.email) to.add(m.email.toLowerCase())
+        for (const m of (Array.isArray(r.data) ? r.data : []) as { person?: string; email?: string }[]) if (m.email && mayTell(m, tell)) to.add(m.email.toLowerCase())
         for (const addr of to) {
           try {
             await deps.email({ to: addr, ...emailFor(d, deps.appUrl) })
@@ -149,7 +168,7 @@ export async function runNotifications(deps: NotifyDeps): Promise<NotifySummary>
         body: `${name}${t.property_address ? `, ${t.property_address}` : ''}: "${snippet(t.quote, 70)}"`,
         url: `${deps.appUrl.replace(/\/$/, '')}${t.lead_id ? `/lead/${t.lead_id}` : '/today'}#task-${t.id}`,
         tag: `task-${t.id}`,
-      }, s)
+      }, s, { lead: t.lead_id })
     }
   }
   return s

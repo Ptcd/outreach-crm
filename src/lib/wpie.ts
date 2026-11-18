@@ -185,6 +185,19 @@ export const PEOPLE: { id: 'colin' | 'adil' | 'thalia'; label: string }[] = [
   { id: 'colin', label: 'Colin' },
   { id: 'thalia', label: 'Thalia' },
 ]
+/** The callers: a card belongs to one of them (0148, 0249). */
+export const CALLER_IDS: readonly string[] = ['thalia', 'adil']
+/** Whose card it is: locked_to when that is a caller, else assigned_to when that is a caller (public.card_caller, 0249). */
+export function cardCallerOf(l: { locked_to?: string | null; assigned_to?: string | null }): string | null {
+  const is = (p?: string | null): p is string => !!p && CALLER_IDS.includes(p)
+  return is(l.locked_to) ? l.locked_to : is(l.assigned_to) ? l.assigned_to : null
+}
+/** A caller's lists never show the other caller's cards (0249; Colin 2026-11-17). `caller` is the card's caller, or
+ * undefined while that is still being read: then the row waits, it is not shown. */
+export function mineOrNobodys(me: string | null, caller: string | null | undefined): boolean {
+  if (!me) return true
+  return caller !== undefined && (caller === null || caller === me)
+}
 export function personLabel(p: string | null | undefined): string {
   return PEOPLE.find((x) => x.id === p)?.label ?? (p || '')
 }

@@ -9,6 +9,7 @@ import { api, usePlannedToMyCards, useTextsLive, useWrite, type GoingOut, type L
 import { useAuth } from '@/providers/AuthProvider'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabaseClient'
+import { cardCallerOf, mineOrNobodys } from '@/lib/wpie'
 import { fmtDateTime, fmtPhone, fullAddress } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -36,9 +37,9 @@ function useCardOwners(ids: string[]) {
     queryFn: async () => {
       const out: Record<string, string | null> = {}
       for (let i = 0; i < ids.length; i += 500) {
-        const r = await supabase.from('leads').select('id, locked_to').in('id', ids.slice(i, i + 500))
+        const r = await supabase.from('leads').select('id, locked_to, assigned_to').in('id', ids.slice(i, i + 500))
         if (r.error) throw new Error(r.error.message)
-        for (const l of (r.data ?? []) as { id: string; locked_to: string | null }[]) out[l.id] = l.locked_to
+        for (const l of (r.data ?? []) as { id: string; locked_to: string | null; assigned_to: string | null }[]) out[l.id] = cardCallerOf(l)
       }
       return out
     },
@@ -53,6 +54,8 @@ export default function Texts() {
   const q = useTextsLive(336)
   const owners = useCardOwners(Array.from(new Set((q.data ?? []).map((t) => t.lead_id).filter((x): x is string => !!x))))
   const onMyCard = (t: LiveThread) => !!t.lead_id && owners.data?.[t.lead_id] === me
+  // a caller never sees the texts on the other caller's cards (0249; Colin 2026-11-17): theirs, and cards with no caller
+  const all = (q.data ?? []).filter((t) => !isCaller || !t.lead_id || mineOrNobodys(me, owners.data ? owners.data[t.lead_id] ?? null : undefined))
   const [chip, setChip] = useState<Chip>(isCaller ? 'my_cards' : 'waiting')
   // texts going out to my cards, today and yesterday (Colin 2026-11-07: "make sure he can see all those texts going out")
   const going = usePlannedToMyCards(me, isCaller)
@@ -67,14 +70,14 @@ export default function Texts() {
     const s = search.trim().toLowerCase(); const sd = s.replace(/\D/g, '')
     const hit = (t: LiveThread) => !s || (sd.length >= 3 && t.phone10.includes(sd))
       || [t.owner_name, t.address, t.municipality, t.last_in.body, t.last_out?.body].filter((x): x is string => !!x).join(' ').toLowerCase().includes(s)
-    return (q.data ?? []).filter((t) => hit(t) && (
+    return all.filter((t) => hit(t) && (
       chip === 'all' ? true : chip === 'mine' ? t.owner === me : chip === 'my_cards' ? onMyCard(t) : (t.unanswered && !t.last_in.opt_out)))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q.data, chip, me, owners.data, search])
-  const waiting = (q.data ?? []).filter((t) => t.unanswered && !t.last_in.opt_out).length
-  const mine = (q.data ?? []).filter((t) => t.owner === me).length
-  const myCards = (q.data ?? []).filter(onMyCard).length
-  const myWaiting = (q.data ?? []).filter((t) => onMyCard(t) && t.unanswered && !t.last_in.opt_out).length
+  const waiting = all.filter((t) => t.unanswered && !t.last_in.opt_out).length
+  const mine = all.filter((t) => t.owner === me).length
+  const myCards = all.filter(onMyCard).length
+  const myWaiting = all.filter((t) => onMyCard(t) && t.unanswered && !t.last_in.opt_out).length
 
   return (
     <div className="space-y-4">
@@ -88,8 +91,8 @@ export default function Texts() {
       <Input placeholder="Find a name, address, phone, or words in a text" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search texts" />
       <div className="sticky top-0 z-10 -mx-1 flex gap-2 overflow-x-auto bg-background/95 px-1 py-2 backdrop-blur" role="tablist" aria-label="Filter">
         {((isCaller
-          ? [['my_cards', `My cards (${myCards}${myWaiting ? `, ${myWaiting} waiting` : ''})`], ['due', `Follow-ups due (${dueRows.length}${dueOverdue ? `, ${dueOverdue} overdue` : ''})`], ['going_out', `Going out (${goingRows.length}${goingWaiting ? `, ${goingWaiting} still to send` : ''})`], ['all', `All (${(q.data ?? []).length})`]]
-          : [['waiting', `Waiting on us (${waiting})`], ['due', `Follow-ups due (${dueRows.length})`], ['all', `All (${(q.data ?? []).length})`], ['mine', `Taken over (${mine})`], ['going_out', `Going out (${goingRows.length})`]]) as [Chip, string][]).map(([id, label]) => (
+          ? [['my_cards', `My cards (${myCards}${myWaiting ? `, ${myWaiting} waiting` : ''})`], ['due', `Follow-ups due (${dueRows.length}${dueOverdue ? `, ${dueOverdue} overdue` : ''})`], ['going_out', `Going out (${goingRows.length}${goingWaiting ? `, ${goingWaiting} still to send` : ''})`], ['all', `All (${all.length})`]]
+          : [['waiting', `Waiting on us (${waiting})`], ['due', `Follow-ups due (${dueRows.length})`], ['all', `All (${all.length})`], ['mine', `Taken over (${mine})`], ['going_out', `Going out (${goingRows.length})`]]) as [Chip, string][]).map(([id, label]) => (
           <button key={id} role="tab" aria-selected={chip === id} onClick={() => setChip(id)}
             className={cn('h-11 shrink-0 rounded-full border px-4 text-sm', chip === id ? 'border-primary bg-primary text-primary-foreground' : 'bg-background')}>
             {label}

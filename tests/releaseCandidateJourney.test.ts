@@ -87,6 +87,12 @@ describe('release-candidate seller journey', () => {
       p_lead_id: LEAD, p_key: 'manual_journey_001', p_now: '2026-11-12T16:01:00Z',
     }))).toMatchObject({ ok: true, paused: false })
 
+    // the card is Thalia's: Adil's dial is refused until Colin moves it to him (0249)
+    expect(await as(db, ADIL, () => rpc<{ ok: boolean; reason: string }>(db, 'begin_human_call', {
+      p_lead_id: LEAD, p_phone: '4145550177', p_source: 'app', p_key: 'app_journey_000',
+      p_now: '2026-11-13T16:00:00Z',
+    }))).toMatchObject({ ok: false, reason: expect.stringMatching(/^This is Thalia's card\./) })
+    expect(await as(db, COLIN, () => rpc(db, 'card_reassign', { p_lead_id: LEAD, p_person: 'adil', p_why: 'Adil makes the app call' }))).toMatchObject({ ok: true })
     expect(await as(db, ADIL, () => rpc(db, 'begin_human_call', {
       p_lead_id: LEAD, p_phone: '4145550177', p_source: 'app', p_key: 'app_journey_002',
       p_now: '2026-11-13T16:00:00Z',
