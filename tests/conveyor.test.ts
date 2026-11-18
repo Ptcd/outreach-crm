@@ -118,15 +118,16 @@ describe('the belt table', () => {
     expect(STOP_OUTCOMES.map((o) => o.id)).toContain('no_answer')
   })
 
-  it('every template is Colin in the first person with the STOP line and passes the price block', async () => {
+  it('every template is Colin in the first person, has no STOP line (0251: the line goes on a first text only) and passes the price block', async () => {
     const rows = (await db.query<{ key: string; wording: string; enabled: boolean }>(`select key, wording, enabled from public.touch_templates`)).rows
     expect(rows.length).toBeGreaterThanOrEqual(14)
     for (const r of rows) {
       expect(r.enabled).toBe(false)                                        // every switch starts OFF
       const t = r.wording.replace('{street}', 'N Main St').replace('{time}', '2:00 PM').replace('{event}', 'the tenant moving out')
         .replace('{condition}', 'the tenant moving out').replace('{name}', 'your sister').replace('{said}', 'the roof quote')
-      expect(t).toMatch(/STOP/)
+      expect(t).not.toMatch(/STOP/i)
       expect(t).toMatch(/Colin/)
+      expect(t).toMatch(/[.?!]$/)                                          // the line came off cleanly
       expect(t).not.toMatch(/\b(cash|offer|investor|contract|Merrill Holdings|Sam|postcard|urgent|last chance|deadline)\b/i)
       expect(findPriceOrOffer(t)).toEqual([])
       const g = guardDraft(t, { companyName: 'Merrill Holdings', maxChars: 480 })
@@ -485,5 +486,11 @@ describe('health', () => {
     expect(r.placed).toEqual({ cold_texts: 2, questions_quiet: 1, call_booked: 1, dnc: 1, dead: 1, '(none: postcard_mailed)': 1, yes_unbooked: 1 })
     expect(r.no_stop).toBe(0)
     expect((await one<{ belt: string; named_date: string }>(`select belt, named_date::text from public.leads where wpie_owner_id = 3`)).belt).toBe('call_booked')
+  })
+})
+
+describe('the opt-out line is on a first text only (0251, Colin 2026-11-18)', () => {
+  it('a template cannot be saved with a STOP line again', async () => {
+    await expect(db.query(`update public.touch_templates set wording = wording || ' Reply STOP to opt out.' where key = 'reminder_visit'`)).rejects.toThrow(/touch_templates_no_stop_line/)
   })
 })
