@@ -159,7 +159,7 @@ describe('the belts move cards', () => {
     expect(l).toMatchObject({ belt: 'yes_unbooked', belt_step: 1, unanswered_count: 0, stage: 'reply_received' })
     expect(l.next_stop_say).toBe('You asked for a call about 100 N Main St')
     expect(beltLine({ belt: 'yes_unbooked', belt_step: 1, next_stop_who: 'thalia_call', next_stop_at: l.next_stop_at, next_stop_say: l.next_stop_say }, 4))
-      .toMatch(/^On belt: Said yes, not booked · stop 1 of 4 · next: Thalia or Adil calls .* · say: "You asked for a call about 100 N Main St"$/)
+      .toMatch(/^On belt: Said yes, not booked · stop 1 of 4 · next: The card's caller calls .* · say: "You asked for a call about 100 N Main St"$/)
     const t = await openTasks()
     expect(t).toHaveLength(1)
     // the stop is the card's caller's (locked_to, 0148/0168), not the weekday shift's

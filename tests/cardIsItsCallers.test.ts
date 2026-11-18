@@ -291,4 +291,20 @@ describe('the database hides the other caller\'s card', () => {
        and p.prosrc !~ 'card_guard|card_not_yours')`)
     expect(open ?? []).toEqual([])
   })
+  it("the belt's caller call is the card's caller's: Tyler reads 'Your call' on his card, Colin reads 'Tyler's call', nobody reads Thalia (0252)", async () => {
+    await as(null)
+    await db.query(`update public.leads set belt = 'yes_unbooked', next_stop_at = '2026-11-20T16:00:00Z', next_stop_who = 'thalia_call',
+      next_stop_say = 'You asked for a call about 3 TEST CT' where id = $1`, [TYLERS])
+    await as('adil@example.com')
+    const his = (await one<Json>(`public.card_brief('${TYLERS}')`)).next_plain as string
+    expect(his).toMatch(/^Your call Fri Nov 20, 10:00 AM/)
+    expect(his).not.toMatch(/Thalia/)
+    await as('colin@example.com')
+    const colins = (await one<Json>(`public.card_brief('${TYLERS}')`)).next_plain as string
+    expect(colins).toMatch(/^Tyler's call Fri Nov 20, 10:00 AM/)
+    expect(colins).not.toMatch(/Thalia/)
+    // the lists hand in no name: a caller still reads 'Your call', anyone else 'The caller's call'
+    expect(await one<string>(`public.next_plain('yes_unbooked', '2026-11-20T16:00:00Z', 'thalia_call', null, null, null, 'adil')`)).toMatch(/^Your call /)
+    expect(await one<string>(`public.next_plain('yes_unbooked', '2026-11-20T16:00:00Z', 'thalia_call', null, null, null, 'colin')`)).toMatch(/^The caller's call /)
+  })
 })
