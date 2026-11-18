@@ -843,6 +843,7 @@ describe('on the real migrations', () => {
     const a = await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify(p)])
     await db.exec(`insert into public.team_members (email, role, person, display_name) values ('adil@example.com', 'caller', 'adil', 'Adil') on conflict do nothing`)
     await db.exec(`insert into public.team_members (email, role, person, display_name) values ('thalia@example.com', 'caller', 'thalia', 'Thalia') on conflict do nothing`)
+    await db.query(`update public.leads set locked_to = 'adil', locked_at = now() where id = $1`, [a.lead_id])   // Adil's card (0250)
     await db.query(`insert into public.tasks (lead_id, due_at, kind, owner, note) values ($1, '2026-10-27T21:30:00Z', 'callback', 'adil', 'Callback promised')`, [a.lead_id])
     const tue430 = '2026-10-27T21:25:00Z'   // Tuesday 4:25 PM CT, five minutes before the promised callback
     const queueFor = async (email: string) => {
@@ -859,9 +860,9 @@ describe('on the real migrations', () => {
     expect(await r(`public.log_call($1, '4145550555', 'reached_no_decision', 'talked, thinking it over')`, [a.lead_id])).toMatchObject({ ok: true })
     expect(await one(`select locked_to::text from public.leads where id = $1`, [a.lead_id])).toEqual({ locked_to: 'adil' })
     expect(await queueFor('thalia@example.com')).toEqual([])             // still not Thalia's (the card is in Colin's call stage now, so nobody's Power hour)
-    // a later contact by Thalia does not move the lock
+    // Thalia cannot log a call on Adil's card at all (0250: one owner), so the lock cannot move
     await db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify({ sub: '00000000-0000-0000-0000-00000000000c', email: 'thalia@example.com' })])
-    await r(`public.log_call($1, '4145550555', 'not_now', 'said call in spring', '2027-03-01T18:00:00Z')`, [a.lead_id])
+    await expect(r(`public.log_call($1, '4145550555', 'not_now', 'said call in spring', '2027-03-01T18:00:00Z')`, [a.lead_id])).rejects.toThrow(/This is Adil's card\./)
     expect(await one(`select locked_to::text from public.leads where id = $1`, [a.lead_id])).toEqual({ locked_to: 'adil' })
     // the seller calling in rings Adil, not the shift; a missed call is Adil's
     expect(await r(`public.inbound_call_ring('4145550555', '2026-10-27T15:00:00Z'::timestamptz)`)).toMatchObject({ ring: ['adil'], locked_to: 'adil', return_call: false })   // Tuesday 10 AM would be Thalia's shift

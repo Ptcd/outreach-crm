@@ -33,6 +33,8 @@ async function card(name: string, street: string, propertyId: number | null) {
   const lead = (await r(`public.agent_add_prospect($1::jsonb, 'Muse intake')`, [JSON.stringify({ owner_name: name, owner_type: 'individual',
     address: street, city: 'Waukesha', phones: [{ number: '414556' + String(Math.floor(1000 + Math.random() * 8999)), name }] })])).lead_id as string
   if (propertyId != null) await db.query(`update public.leads set wpie_property_id = $2 where id = $1`, [lead, propertyId])
+  // Thalia's card (0250: a caller works only their own)
+  await db.query(`update public.leads set locked_to = 'thalia', locked_at = now() where id = $1`, [lead])
   return lead
 }
 
@@ -171,6 +173,7 @@ describe('the exit anchor', () => {
     await db.exec(`insert into public.team_members (email, role, person, display_name) values ('adil@example.com', 'caller', 'adil', 'Adil') on conflict do nothing`)
     const ADIL = { sub: '00000000-0000-0000-0000-0000000000a2', email: 'adil@example.com' }
     const lead = await card('LEE LOCKED', '52 Anchor Test St', 9012)
+    await db.query(`update public.leads set locked_to = 'adil', locked_at = now() where id = $1`, [lead])     // Adil's card
     await db.exec(`insert into public.property_values (wpie_property_id, building_sqft) values (9012, 1000); insert into public.property_comps (wpie_property_id, median_ppsf, n_comps, confidence, tier, window_months) values (9012, 150.000000, 6, 'high', 'radius', 12)`)
     for (const [k, v] of [['quick_roof', 'old'], ['quick_hvac', 'new'], ['quick_kb', 'original'], ['quick_big', 'no']])
       await as(ADIL, () => r(`public.call_answer($1, $2, $3::jsonb)`, [lead, k, JSON.stringify({ choices: [v] })]))

@@ -41,28 +41,28 @@ export default function LeadDetail() {
   const isCaller = member?.role === 'caller'   // a caller's way back is My cards, never the pipeline (2026-11-04)
   const [params] = useSearchParams()
   const dialer = useDialer()
-  // a card is its caller's (0249; Colin 2026-11-17 on George White's card, Thalia's, which Tyler texted from an alert):
-  // the other caller gets whose it is and nothing else. The server refuses the text and the dial the same way.
+  // a card has one owner (0249, 0250; Colin 2026-11-17: "Cards should have one fucking owner end to end the other
+  // caller shouldn't see it"). The other caller gets whose it is and nothing of the seller; the database returns them
+  // nothing for it either, and every card action refuses.
   const wall = useCardNotYours(id, isCaller)
 
-  if (q.isLoading || (isCaller && wall.isLoading)) return <Empty>Loading...</Empty>
-  if (q.error) return <ErrorNote error={q.error} />
+  if (isCaller && wall.isLoading) return <Empty>Loading...</Empty>
   if (isCaller && wall.error) return <ErrorNote error={wall.error} />
-  if (!q.data) return <Empty>Lead not found.</Empty>
-  const { lead, contacts, messages, tasks, gates, milestones } = q.data
   if (isCaller && wall.data) {
     return (
       <div className="space-y-4">
         <Link to="/mine" className="inline-flex min-h-11 items-center text-sm underline">Back to My cards</Link>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight">{lead.owner_name}</h1>
-        {fullAddress(lead) && <p className="mt-0.5 text-base font-medium text-muted-foreground">{fullAddress(lead)}</p>}
         <div role="alert" className="rounded-md border-2 border-amber-400 bg-amber-50 p-3 text-sm text-amber-950">
           <p className="font-semibold">{wall.data}</p>
-          <p>Nothing on this card is yours to do, so it is not shown. Do not call or text this seller.</p>
+          <p>It is not shown to you. Do not call or text this seller.</p>
         </div>
       </div>
     )
   }
+  if (q.isLoading) return <Empty>Loading...</Empty>
+  if (q.error) return <ErrorNote error={q.error} />
+  if (!q.data) return <Empty>Lead not found.</Empty>
+  const { lead, contacts, messages, tasks, gates, milestones } = q.data
   const facts = q.data.facts ?? {}
   const replyTasks = tasks.filter((t) => t.source === 'reply' && !t.done_at)
   const liveHere = !!dialer.active && dialer.active.leadId === lead.id

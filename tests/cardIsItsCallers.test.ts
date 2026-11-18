@@ -1,5 +1,7 @@
-// 0249 (Colin 2026-11-17, George White's card): a card is its caller's. An alert about a card goes to its caller and the
-// owners only, and the other caller cannot text, dial or take over its thread. On the real migrations.
+// 0249, 0250 (Colin 2026-11-17, George White's card: "Cards should have one fucking owner end to end the other caller
+// shouldn't see it"). An alert about a card goes to its caller and the owners only; the other caller cannot read it in
+// the database, find it in a list, or text, dial, log or note it; lock, assignment and open tasks name one caller.
+// No exceptions: not a day off, not a task. On the real migrations.
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { PGlite } from '@electric-sql/pglite'
@@ -94,18 +96,14 @@ describe('whose card it is', () => {
 describe('who is told about a card', () => {
   it('its caller and the owners; everyone only when it has no caller', async () => {
     const g = await one<Json>(`public.card_tell($1, $2)`, [GEORGE, NOW])
-    expect(g).toMatchObject({ everyone: false, card_caller: 'thalia', covering: false })
+    expect(g).toMatchObject({ everyone: false, card_caller: 'thalia' })
     expect([...g.people].sort()).toEqual(['colin', 'muse', 'thalia'])       // the owners are Colin and Muse
     expect(await one<Json>(`public.card_tell($1, $2)`, [NOBODY, NOW])).toEqual({ everyone: true })
     expect(await one<Json>(`public.card_tell(null, $1)`, [NOW])).toEqual({ everyone: true })
   })
-  it('the other caller when its caller is off today, and a caller who holds a task on it', async () => {
+  it('nobody covers: the same people when its caller is off today', async () => {
     await db.exec(`insert into public.caller_off (person, day, note, set_by) values ('thalia', date '2026-11-17', 'off', 'desk')`)
-    const off = await one<Json>(`public.card_tell($1, $2)`, [GEORGE, NOW])
-    expect(off.covering).toBe(true)
-    expect([...off.people].sort()).toEqual(['adil', 'colin', 'muse'])
-    await db.exec(`delete from public.caller_off; insert into public.tasks (lead_id, due_at, kind, owner, note, source, title) values ('${GEORGE}', now(), 'call', 'adil', 'Colin gave Tyler this call', 'power_hour', 'Call George')`)
-    expect([...(await one<Json>(`public.card_tell($1, $2)`, [GEORGE, NOW])).people].sort()).toEqual(['adil', 'colin', 'muse', 'thalia'])
+    expect([...(await one<Json>(`public.card_tell($1, $2)`, [GEORGE, NOW])).people].sort()).toEqual(['colin', 'muse', 'thalia'])
   })
   it('every registered phone is known by whose it is', async () => {
     expect((await subs()).map((s) => `${s.person}:${s.role}`).sort()).toEqual(['adil:caller', 'colin:owner'])
@@ -146,12 +144,12 @@ describe('the hot alert that started this', () => {
     expect(pushed.sort()).toEqual(['https://push.example/colin', 'https://push.example/tyler'])
     expect(mailed.sort()).toEqual(['adil@example.com', 'thalia@example.com'])
   })
-  it('reaches Tyler when Thalia is off today', async () => {
+  it('does not reach Tyler when Thalia is off today either', async () => {
     await db.exec(`insert into public.caller_off (person, day, note, set_by) values ('thalia', date '2026-11-17', 'off', 'desk')`)
     await hot(GEORGE)
     await run()
-    expect(pushed.sort()).toEqual(['https://push.example/colin', 'https://push.example/tyler'])
-    expect(mailed).toEqual(['adil@example.com'])
+    expect(pushed).toEqual(['https://push.example/colin'])
+    expect(mailed).toEqual(['thalia@example.com'])
   })
   it('any other push about a card follows the same rule, and the owners only when the rule cannot be read', async () => {
     const sent: string[] = []
@@ -170,7 +168,7 @@ describe('the hot alert that started this', () => {
 })
 
 describe('the other caller cannot work the card', () => {
-  const words = /This is Thalia's card\. Only Thalia or Colin calls or texts it\./
+  const words = /This is Thalia's card\. Only Thalia and Colin see it or work it\./
   it('says whose it is to Tyler, and nothing to Thalia, Colin or the system', async () => {
     await as('adil@example.com')
     expect(await one<string | null>(`public.card_not_yours($1)`, [GEORGE])).toMatch(words)
@@ -200,14 +198,97 @@ describe('the other caller cannot work the card', () => {
     await as('colin@example.com')
     expect(await one<string | null>(`public.card_not_yours($1)`, [TYLERS])).toBeNull()
   })
-  it('lets Tyler work it when Thalia is off today, or when he holds a task on it', async () => {
+  it('no exceptions: not when Thalia is off today, and a task for Tyler on her card becomes hers', async () => {
     await db.exec(`insert into public.caller_off (person, day, note, set_by) values ('thalia', (now() at time zone 'America/Chicago')::date, 'off', 'desk')`)
     await as('adil@example.com')
-    expect(await one<string | null>(`public.card_not_yours($1)`, [GEORGE])).toBeNull()
+    expect(await one<string | null>(`public.card_not_yours($1)`, [GEORGE])).toMatch(words)
     await as(null)
-    await db.exec(`delete from public.caller_off; insert into public.tasks (lead_id, due_at, kind, owner, note, source, title) values ('${GEORGE}', now(), 'call', 'adil', 'Colin gave Tyler this call', 'power_hour', 'Call George')`)
+    await db.exec(`delete from public.caller_off; insert into public.tasks (lead_id, due_at, kind, owner, note, source, title) values ('${GEORGE}', now(), 'call', 'adil', 'the laptop call list gave Tyler this call', 'call_list', 'Call George')`)
+    expect(await one<string>(`(select owner::text from public.tasks where lead_id = '${GEORGE}' and done_at is null)`)).toBe('thalia')
     await as('adil@example.com')
-    expect(await one<string | null>(`public.card_not_yours($1)`, [GEORGE])).toBeNull()
-    expect((await one<Json>(`public.begin_human_call($1, '6125550177', 'app', 'key-tyler-0002', now())`, [GEORGE])).ok).toBe(true)
+    expect(await one<string | null>(`public.card_not_yours($1)`, [GEORGE])).toMatch(words)
+    expect((await one<Json>(`public.begin_human_call($1, '6125550177', 'app', 'key-tyler-0002', now())`, [GEORGE])).ok).toBe(false)
+  })
+})
+
+describe('one owner', () => {
+  it('lock and assignment never name two callers, and a card that moves takes its open tasks along', async () => {
+    await db.exec(`update public.leads set assigned_to = 'adil' where id = '${GEORGE}'`)
+    expect(await one<string>(`(select assigned_to::text from public.leads where id = '${GEORGE}')`)).toBe('thalia')
+    await db.exec(`insert into public.tasks (lead_id, due_at, kind, owner, note, source, title) values ('${GEORGE}', now(), 'callback', 'thalia', 'Callback promised', 'belt', 'Call George')`)
+    await as('colin@example.com')
+    expect(await one<Json>(`public.card_reassign($1, 'adil', 'Colin moved it')`, [GEORGE])).toMatchObject({ ok: true })
+    await as(null)
+    expect(await one<Json>(`(select jsonb_build_object('locked', locked_to::text, 'assigned', assigned_to::text) from public.leads where id = '${GEORGE}')`)).toEqual({ locked: 'adil', assigned: 'adil' })
+    expect(await one<string[]>(`(select array_agg(distinct owner::text) from public.tasks where lead_id = '${GEORGE}' and done_at is null)`)).toEqual(['adil'])
+    await db.exec(`update public.leads set locked_to = 'thalia', locked_at = now() where id = '${GEORGE}'`)                  // and back, by any write
+    expect(await one<string[]>(`(select array_agg(distinct owner::text) from public.tasks where lead_id = '${GEORGE}' and done_at is null)`)).toEqual(['thalia'])
+    expect(await one<string>(`(select assigned_to::text from public.leads where id = '${GEORGE}')`)).toBe('thalia')
+  })
+  it('a card a caller makes from an incoming call is theirs', async () => {
+    await as('adil@example.com')
+    const made = await one<Json>(`public.new_caller('4145550909', 'Pat Newcaller')`)
+    await as(null)
+    expect(await one<string>(`public.card_caller($1)::text`, [made.lead_id])).toBe('adil')
+  })
+})
+
+describe('the database hides the other caller\'s card', () => {
+  // as the app reads it: the login's own role, the read rules in force
+  const read = async <T>(email: string, sql: string, params: unknown[] = []) => {
+    await as(email); await db.exec('set role authenticated')
+    try { return (await db.query<T>(sql, params)).rows } finally { await db.exec('reset role'); await as(null) }
+  }
+  const count = async (email: string, table: string) => (await read<{ n: number }>(email, `select count(*)::int n from public.${table} where lead_id = $1`, [GEORGE]))[0].n
+  it('Tyler reads nothing of George: not the card, its texts, phones, tasks or drafts', async () => {
+    await db.exec(`insert into public.tasks (lead_id, due_at, kind, owner, note, source, title) values ('${GEORGE}', now(), 'call', 'thalia', 'x', 'belt', 'Call George')`)
+    expect(await read('adil@example.com', `select id from public.leads where id = $1`, [GEORGE])).toEqual([])
+    for (const t of ['messages', 'contacts', 'tasks', 'reply_drafts', 'belt_events', 'hot_alerts'])
+      expect(await count('adil@example.com', t), t).toBe(0)
+    expect((await read<{ id: string }>('adil@example.com', `select id from public.leads where id = $1`, [TYLERS])).length).toBe(1)
+    expect((await read<{ id: string }>('adil@example.com', `select id from public.leads where id = $1`, [NOBODY])).length).toBe(1)
+  })
+  it('Thalia and Colin read all of it', async () => {
+    for (const who of ['thalia@example.com', 'colin@example.com']) {
+      expect((await read(who, `select id from public.leads where id = $1`, [GEORGE])).length, who).toBe(1)
+      expect(await count(who, 'messages'), who).toBeGreaterThan(0)
+      expect(await count(who, 'contacts'), who).toBe(1)
+    }
+    expect((await read('colin@example.com', `select id from public.leads`)).length).toBeGreaterThanOrEqual(3)
+  })
+  it('Tyler cannot change it either', async () => {
+    await read('adil@example.com', `update public.leads set notes = 'mine now' where id = $1`, [GEORGE])
+    expect((await one<string | null>(`(select notes from public.leads where id = '${GEORGE}')`)) ?? '').not.toMatch(/mine now/)
+  })
+  it('the lists leave it out: a phone search, the live texts, My cards', async () => {
+    await db.exec(`insert into public.twilio_inbound (sid, from10, body, lead_id, received_at) values ('SM-in-george', '6125550177', 'Yes I will sell it', '${GEORGE}', now())`)
+    await as('adil@example.com')
+    expect(await one<Json[]>(`public.phone_lookup('6125550177')`)).toEqual([])
+    expect((await one<Json[]>(`public.texts_live(48, 80)`)).filter((t) => t.lead_id === GEORGE)).toEqual([])
+    expect(JSON.stringify(await one<Json>(`public.my_piles()`))).not.toContain(GEORGE)
+    await as('thalia@example.com')
+    expect((await one<Json[]>(`public.phone_lookup('6125550177')`)).map((x) => x.lead_id)).toEqual([GEORGE])
+    expect((await one<Json[]>(`public.texts_live(48, 80)`)).filter((t) => t.lead_id === GEORGE).length).toBe(1)
+  })
+  it('every card action refuses Tyler: a call logged, a note, a follow-up, a move', async () => {
+    const words = /This is Thalia's card\./
+    await as('adil@example.com')
+    await expect(db.query(`select public.log_call($1, '6125550177', 'interested', 'talked to him', null)`, [GEORGE])).rejects.toThrow(words)
+    await expect(db.query(`select public.note_add($1, 'my note')`, [GEORGE])).rejects.toThrow(words)
+    await expect(db.query(`select public.followup_set($1, now() + interval '1 day', 'call', 'call him')`, [GEORGE])).rejects.toThrow(words)
+    await expect(db.query(`select public.belt_event($1, 'move', '{"belt":"dead"}'::jsonb, 'adil', now())`, [GEORGE])).rejects.toThrow(words)
+    await expect(db.query(`select public.card_brief($1)`, [GEORGE])).rejects.toThrow(words)
+    await as('thalia@example.com')
+    expect((await db.query(`select public.note_add($1, 'her note')`, [GEORGE])).rows.length).toBe(1)
+  })
+  it('no card action a caller login can run is left without the check', async () => {
+    // a later migration that rewrites one of these from an old copy drops the check: this is what catches it
+    const open = await one<string[] | null>(`(select array_agg(p.proname order by p.proname) from pg_proc p
+      join pg_namespace ns on ns.oid = p.pronamespace join pg_language l on l.oid = p.prolang
+     where ns.nspname = 'public' and l.lanname = 'plpgsql' and p.prosecdef and 'p_lead_id' = any (p.proargnames)
+       and has_function_privilege('authenticated', p.oid, 'execute')
+       and p.proname not in ('card_not_yours', 'card_guard', 'lock_card_to', 'card_reassign')
+       and p.prosrc !~ 'card_guard|card_not_yours')`)
+    expect(open ?? []).toEqual([])
   })
 })

@@ -175,12 +175,14 @@ describe('human call takeover', () => {
 
   it('revalidates caller ownership and the exact destination on an active retry', async () => {
     await begin('personal', 'authority_retry_001')
-    await db.query(`update public.leads set assigned_to = 'adil' where id = $1`, [LEAD])
+    // the card moves to Adil mid-call (0250: one owner; lock and assignment move together): her retry is refused
+    await db.query(`update public.leads set locked_to = 'adil' where id = $1`, [LEAD])
+    expect(await one<{ a: string }>(`select assigned_to::text a from public.leads where id = $1`, [LEAD])).toEqual({ a: 'adil' })
     expect(await begin('personal', 'authority_retry_001')).toMatchObject({
-      ok: false, paused: true, reason: 'the card assignment changed after authorization',
+      ok: false, paused: true, reason: expect.stringMatching(/^This is Adil's card\./),
     })
 
-    await db.query(`update public.leads set assigned_to = 'thalia' where id = $1`, [LEAD])
+    await db.query(`update public.leads set locked_to = 'thalia' where id = $1`, [LEAD])
     await db.query(`insert into public.contacts (lead_id, kind, value, value_normalized, line_type)
       values ($1, 'phone', '4145550188', '4145550188', 'mobile')`, [LEAD])
     const changed = await as(THALIA, async () => (await one<{ r: Record<string, unknown> }>(
@@ -246,14 +248,14 @@ describe('recovery queue', () => {
 
 describe('simulated Thalia → Adil → Colin shift', () => {
   it('waits for the exact follow-up before takeover, then creates one Colin-owned visit', async () => {
-    // Adil's card: Thalia logs a call that reached her, Adil makes the dated call (0249: only a card's caller dials it)
-    await db.exec(`update public.leads set locked_to = 'adil', locked_at = now() where id = '${LEAD}'`)
     await as(THALIA, () => db.query(`select public.log_call($1, '4145550177', 'not_now', 'call after the move',
       '2099-11-05T18:00:00Z'::timestamptz)`, [LEAD]))
     expect(await one<{ belt: string; named: string }>(`
       select belt, to_char(named_date at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') named from public.leads where id = $1`, [LEAD]))
       .toEqual({ belt: 'not_now_dated', named: '2099-11-05T16:00:00Z' })
 
+    // Colin moves the card to Adil, who makes the dated call (0250: only a card's caller works it)
+    await db.exec(`update public.leads set locked_to = 'adil', locked_at = now() where id = '${LEAD}'`)
     const early = await as(ADIL, async () => (await one<{ r: Record<string, unknown> }>(
       `select public.begin_human_call($1, '4145550177', 'personal', 'adil_scheduled_001', '2100-01-01T00:00:00Z') r`, [LEAD])).r)
     expect(early).toMatchObject({ ok: false, paused: false, reason: 'the seller asked us to wait until the scheduled date' })

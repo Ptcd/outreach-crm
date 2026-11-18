@@ -24,6 +24,8 @@ beforeAll(async () => {
       ('${STOP_LEAD}', 'phone', '4145550181', '4145550181', 'mobile', 'ok'),
       ('${STOP_LEAD}', 'phone', '2625550182', '2625550182', 'landline', 'ok'),
       ('${RACE_LEAD}', 'phone', '4145550183', '4145550183', 'mobile', 'ok');
+    -- Thalia's cards (0250: a caller works only their own)
+    update public.leads set locked_to = 'thalia', locked_at = now();
   `)
 })
 

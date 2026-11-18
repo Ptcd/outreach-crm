@@ -25,6 +25,8 @@ beforeAll(async () => {
       ('${LEAD}', 'phone', '4145550177', '4145550177', 'mobile', 'ok'),
       ('${STOP_FIRST}', 'phone', '4145550188', '4145550188', 'mobile', 'ok'),
       ('${CLAIM_FIRST}', 'phone', '4145550199', '4145550199', 'mobile', 'ok');
+    -- a new card is split to one caller or the other; this journey starts as Thalia's (0250: one owner, no exceptions)
+    update public.leads set locked_to = 'thalia', locked_at = now();
   `)
 })
 
@@ -107,6 +109,8 @@ describe('release-candidate seller journey', () => {
     await as(db, ADIL, () => rpc(db, 'log_call', {
       p_lead_id: LEAD, p_phone: '4145550177', p_outcome: 'interested', p_note: 'Ready for Colin',
     }))
+    // back to Thalia for her call questions and the hand-off (0250: only the card's caller works it)
+    expect(await as(db, COLIN, () => rpc(db, 'card_reassign', { p_lead_id: LEAD, p_person: 'thalia', p_why: 'Thalia finishes it' }))).toMatchObject({ ok: true })
     const answer = (choices: string[], text?: string, number?: string) => ({ choices, ...(text ? { text } : {}), ...(number ? { number } : {}) })
     for (const [key, value] of Object.entries({
       motivation: answer(['moving'], 'moving near family'), timeline: answer(['under_30']),

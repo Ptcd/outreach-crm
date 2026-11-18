@@ -17,6 +17,8 @@ beforeAll(async () => {
     values ('${LEAD}', 88, 'DALE NOVAK', '220 S Water St', 'Milwaukee', 'hold', 'opener_queued');
     insert into public.contacts (lead_id, kind, value, value_normalized, line_type, status)
     values ('${LEAD}', 'phone', '4145550188', '4145550188', 'mobile', 'ok');
+    -- Adil's card (0250: a caller works only their own)
+    update public.leads set locked_to = 'adil', locked_at = now() where id = '${LEAD}';
   `)
 })
 

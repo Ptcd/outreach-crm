@@ -94,15 +94,9 @@ describe('which threads are live', () => {
 })
 
 describe('who is told', () => {
-  it('a caller who is off today: the other caller is told, and it says whose card it is', async () => {
+  it('a caller who is off today: nobody else is told, the card has one owner (0250)', async () => {
     await db.query(`insert into public.caller_off (person, day, note, set_by) values ('adil', ($1::timestamptz at time zone 'America/Chicago')::date, 'test', 'desk')`, [NOON])
-    const out = await claim()
-    expect(out).toHaveLength(1)
-    expect(out[0]).toMatchObject({ lead_id: C.tyler, person: 'thalia', card_caller: 'adil', card_caller_name: 'Tyler' })
-    const m = liveThreadMessage(out[0], 'https://app.example/')
-    expect(m.title).toBe(`Texting now: Tylers, ${out[0].address} (Tyler's card, off today)`)
-    expect(m.url).toBe(`https://app.example/lead/${C.tyler}`)
-    expect(m.body).toContain('"oh ok, I might sell"')
+    expect((await claim()).filter((t) => t.lead_id === C.tyler)).toHaveLength(0)
   })
 })
 
@@ -118,10 +112,10 @@ describe('the sender', () => {
     const s = await runLiveThreadAlerts({ rpc, appUrl: 'https://app.example', now: () => new Date(NOON),
       push: async (person, m) => { pushes.push({ person, title: m.title }); return person === 'thalia' ? 1 : 0 },
       email: async (m) => { mails.push({ to: m.to, subject: m.subject }) } })
-    expect(s).toMatchObject({ threads: 2, pushes: 2, emails: 2, nothing: 0 })
+    expect(s).toMatchObject({ threads: 1, pushes: 1, emails: 1, nothing: 0 })      // Tyler is off: his card's thread waits for him
     expect(pushes.every((p) => p.person === 'thalia')).toBe(true)
     expect(mails.every((m) => m.to === 'thalia-alerts@example.com')).toBe(true)
-    expect(await one<number>(`(select count(*)::int from public.live_thread_alerts where reached = 2)`)).toBe(2)
+    expect(await one<number>(`(select count(*)::int from public.live_thread_alerts where reached = 2)`)).toBe(1)
     const again = await runLiveThreadAlerts({ rpc, appUrl: 'https://app.example', now: () => new Date(NOON), push: async () => 1, email: null })
     expect(again.threads).toBe(0)
   })
