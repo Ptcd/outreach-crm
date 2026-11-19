@@ -7,6 +7,7 @@ import { handleMessage, keyFrom, keyFromUrl, SCOPES, type Agent, type DoorDb, ty
 import { approveReply } from '../_shared/replyAgent.ts'
 import { senderEnv, twilioPort, type Rpc } from '../_shared/sending.ts'
 import { bookSlot, cancelBooking, connect, findSlots, type Cal } from '../_shared/calendar.ts'
+import { LINK_SECONDS, shapeCardFiles } from '../_shared/cardFiles.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -77,6 +78,11 @@ Deno.serve(async (req) => {
       }
       return { ok: true, status: 'asked', ready_in: 'about 10 minutes: the laptop sends the file up on its next pass. Call records_file_get again with the same reply_id and name.' }
     },
+    // the files on a card (0256): the database gives the contracts whole; a path leaves here only as a 10-minute link
+    cardFiles: async (a) => shapeCardFiles(await rpc('agent_card_files', { p_lead_id: a.lead_id, p_contract_id: a.contract_id }), async (path) => {
+      const link = await sb.storage.from('contracts').createSignedUrl(path, LINK_SECONDS)
+      return link.error ? null : link.data.signedUrl
+    }),
     dueToday: () => rpc('agent_due_today', {}) as Promise<unknown[]>,
     markCard: (m, a) => rpc('agent_mark_card', { p_lead_id: m.lead_id, p_mark: m.mark, p_reason: m.reason, p_date: m.date, p_phone: m.phone, p_agent: a }) as Promise<Record<string, unknown>>,
     markPerson: (m, a) => rpc('agent_mark_person', { p_lead_id: m.lead_id, p_mark: m.mark, p_interest_id: m.interest_id, p_phone: m.phone, p_reason: m.reason, p_agent: a }) as Promise<Record<string, unknown>>,

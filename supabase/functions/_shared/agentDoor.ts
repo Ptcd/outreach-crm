@@ -42,6 +42,8 @@ export interface DoorDb {
   recordsFileUpload?(a: { request_id: string; filename: string; portal: string | null; number: string | null; note: string | null }, agent: string): Promise<Record<string, unknown>>
   recordsFileDone?(file_id: string, agent: string): Promise<Record<string, unknown>>
   recordsFileGet?(reply_id: string, name: string, agent: string): Promise<Record<string, unknown>>
+  /** the files on a card (0256): every contract whole, in plain words, with a short-lived link to the PDF */
+  cardFiles?(a: { lead_id: string | null; contract_id: string | null }): Promise<Record<string, unknown>>
   addProspect(p: Record<string, unknown>, agent: string): Promise<Record<string, unknown>>
   findProspects(f: { address?: string; phone?: string; name?: string; lead_id?: string; only_agent?: boolean; limit: number }): Promise<unknown[]>
   prospectCounts(): Promise<Record<string, unknown>>
@@ -318,6 +320,11 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
   { role: 'records', name: 'records_mark', description: 'Update a request after reading a reply or a bounce: status (acknowledged, replied, received, no_records, needs_payment, denied, bounced, skip, draft), a note, received_date, records_through (the last date the records cover: the next re-request starts the day after), next_due (received and no_records default to the cadence_days of the request), a corrected to_email, and reply_id to mark that reply handled.',
     inputSchema: { type: 'object', properties: { request_id: S('the request'), status: S('new status'), note: S('what happened'), received_date: S('YYYY-MM-DD'),
       records_through: S('date the records cover through'), next_due: S('YYYY-MM-DD'), to_email: S('corrected address'), reply_id: S('the reply this handles') }, required: ['request_id'] } },
+  // 0256 (Muse, desk 311, 2026-11-19, from Colin: "Muse must be able to read ALL files stored in WPIE"): the documents
+  // on a card. Contracts are the only files a card holds; records attachments have records_file_get.
+  { role: 'any', name: 'card_files',
+    description: "Read the documents stored on a card. Today that is its contracts (offers sent for signature and signed offers). For each one: status, who signed and when, `terms` (every filled term: price, closing date, earnest money and who holds it, proof of funds, inspection, and `additional`, the added provisions word for word, which say who pays which closing cost and what the contingencies are), `in_plain_words` (the same as sentences, including whether a title company is named), `condition_report` (the seller's yes answers with their explanations), and `pdf.url`, a link to the whole PDF good for 10 minutes (the signed one when it is signed). Also `deal`: the price, closing date and the title company Colin has put on the deal, if any. Read this before you ask Colin or anyone outside what a contract says. Read only: it changes nothing, and it is not a way to send, change or void a contract. Attachments on records replies are read with records_file_get.",
+    inputSchema: { type: 'object', properties: { lead_id: S('the card'), contract_id: S('one contract, when you have its id (find_prospects gives it); lead_id is then not needed') } } },
   { role: 'any', name: 'due_today',
     description: 'Every card whose time has come, oldest first, each with the whole card and why it was waiting: check_back (a dated not-now, a hold, an estate or family wait whose date arrived), booked_call / booked_visit (today), call_due / text_due (a stop the team or you owes), contract_waiting (a contract sent and not signed, with who still has to sign). days_late says how overdue. Also `stuck`: the safety net, cards that would otherwise be lost: no_next_step (a warm card with no date), reply_unanswered (2+ hours), unlogged_call, text_stale (planned, never went), unknown_caller (a text from a phone no card has), dormant_replied (put to sleep after they replied). Read both lists every morning and act on each one: a text, a mark_card, or tell Colin. Nothing on either list may stay there two days running.',
     inputSchema: { type: 'object', properties: {} } },
@@ -662,6 +669,16 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
     case 'merge_cards': {
       const r = await db.records('agent_merge_cards', { p_keep_lead_id: String(args.keep_lead_id ?? ''), p_drop_lead_id: String(args.drop_lead_id ?? ''), p_why: args.reason ? String(args.reason) : null, p_agent: agent.name }) as Json
       return { value: r, isError: r?.ok === false }
+    }
+    case 'card_files': {
+      if (!db.cardFiles) return { value: { ok: false, reason: 'reading files is not available here' }, isError: true }
+      const lead = args.lead_id ? String(args.lead_id) : null
+      const contract = args.contract_id ? String(args.contract_id) : null
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      if (!lead && !contract) return { value: { ok: false, reason: 'name a card (lead_id) or a contract (contract_id)' }, isError: true }
+      if ((lead && !uuid.test(lead)) || (contract && !uuid.test(contract))) return { value: { ok: false, reason: 'lead_id and contract_id are ids as find_prospects gives them' }, isError: true }
+      const r = await db.cardFiles({ lead_id: lead, contract_id: contract })
+      return { value: r, isError: (r as Json)?.ok === false }
     }
     case 'research_board': return { value: await db.records('research_board', {}) }
     case 'research_board_set': {
