@@ -1,7 +1,8 @@
 // 0253 (Colin 2026-11-19, the morning after 991 Howard St was signed: "Probably gotta build out the system for
 // everything post offer signing now?"). A signature opens a track of dated steps from the contract's own terms, gives
 // Colin one task (the next step due), and stops the selling: the belt ends, the caller's open tasks close, a waiting
-// belt text is withdrawn. The track is Colin's: a caller cannot read it or tick it. On the real migrations.
+// belt text is withdrawn. The track is Colin's: a caller cannot read it or tick it. 0255: so is the card. On the real
+// migrations.
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { PGlite } from '@electric-sql/pglite'
@@ -88,8 +89,20 @@ describe('the closing track', () => {
     const colin = (await asUser<{ r: Json }>('colin@example.com', `select public.card_brief($1) as r`, [ESTATE]))[0].r
     expect(colin.next_plain).toBe('Under contract at $60,000, closing Dec 18. Next: Pick the title company and send them the signed contract, by Thu Nov 19.')
     expect(colin.mine_next.note).toBeNull()   // Colin's own note to self, not the closing task said twice
-    const tyler = (await asUser<{ r: Json }>('adil@example.com', `select public.card_brief($1) as r`, [ESTATE]))[0].r
-    expect(tyler.next_plain).toBe('Under contract, closing Dec 18. Colin has it from here: no more calls or texts to sell.')
+
+    // 0255 (Colin 2026-11-19: "the card should move to me"): the signed card is Colin's. Tyler's login no longer
+    // reads it, its alerts go to the owners only, and the seller's call rings Colin. The deal keeps whose card it was.
+    const [own] = await rows<Json>(`select locked_to::text, assigned_to::text from public.leads where id = $1`, [ESTATE])
+    expect(own).toEqual({ locked_to: 'colin', assigned_to: 'colin' })
+    expect((await rows<Json>(`select caller_was::text from public.deals where lead_id = $1`, [ESTATE]))[0].caller_was).toBe('adil')
+    expect(await asUser('adil@example.com', `select id from public.leads where id = $1`, [ESTATE])).toEqual([])
+    expect((await asUser<Json>('colin@example.com', `select id from public.leads where id = $1`, [ESTATE])).length).toBe(1)
+    await expect(asUser('adil@example.com', `select public.card_brief($1)`, [ESTATE])).rejects.toThrow(/Colin's card/)
+    expect((await rows<Json>(`select public.card_tell($1) t`, [ESTATE]))[0].t).toEqual({ everyone: false, card_caller: null, people: ['colin', 'muse'] })   // the owners; no caller
+    expect((await rows<Json>(`select body from public.messages where lead_id = $1 and body like 'Card moved%'`, [ESTATE])).map((m) => m.body))
+      .toEqual(['Card moved to Colin from Tyler: the offer is signed.'])
+    await db.query(`insert into public.contacts (lead_id, kind, value, value_normalized) values ($1, 'phone', '(920) 555-0142', '9205550142')`, [ESTATE])
+    expect((await rows<Json>(`select public.inbound_call_ring('9205550142') r`))[0].r).toMatchObject({ ring: ['colin'], locked_to: 'colin', return_call: false })
   })
 
   it('an ordinary card has no probate steps, and a named title company is in the first step', async () => {
@@ -138,5 +151,10 @@ describe('the closing track', () => {
     expect((await task(ESTATE)).done).toBe(false)
     await asUser('colin@example.com', `update public.deals set status = 'dead' where lead_id = $1`, [ESTATE])
     expect((await task(ESTATE)).done).toBe(true)
+    // the deal fell through: Colin hands the card back, and it is Tyler's to read and work again
+    expect(await asUser('adil@example.com', `select id from public.leads where id = $1`, [ESTATE])).toEqual([])
+    await asUser('colin@example.com', `select public.card_reassign($1, 'adil', 'the deal fell through')`, [ESTATE])
+    expect((await asUser<Json>('adil@example.com', `select id from public.leads where id = $1`, [ESTATE])).length).toBe(1)
+    expect((await rows<Json>(`select public.card_caller($1)::text c`, [ESTATE]))[0].c).toBe('adil')
   })
 })

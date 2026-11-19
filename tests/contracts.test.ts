@@ -152,7 +152,10 @@ describe('send contract', () => {
     expect(kinds).toEqual(['buyer_signed', 'created', 'created', 'opened', 'consented', 'recr', 'signed', 'opened', 'consented', 'signed', 'sealed'])
     const notes = (await db.query<{ body: string }>(`select body from public.messages order by sent_at`)).rows.map((r) => r.body)
     expect(notes[0]).toBe('Offer (WB-11 10-1-2026) sent for signature by Colin.')
-    expect(notes[1]).toMatch(/^Offer signed by every seller\. Sealed PDF SHA-256 [0-9a-f]{64}\.$/)
+    // 0255: the signature moves the card to Colin, and the card's thread says so
+    expect(notes.slice(1).sort()[0]).toBe('Card moved to Colin: the offer is signed.')
+    expect(notes.slice(1).sort()[1]).toMatch(/^Offer signed by every seller\. Sealed PDF SHA-256 [0-9a-f]{64}\.$/)
+    expect(notes.length).toBe(3)
 
     // Sealing again is a no-op; the signed link still opens and offers the signed copy.
     expect(await seal(ports(), sent.id)).toEqual({ ok: true, path: c.final_path, copies: [] })

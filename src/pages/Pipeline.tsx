@@ -81,6 +81,7 @@ export default function Pipeline() {
           <option value="all">Everyone&apos;s cards</option>
           <option value="thalia">Thalia&apos;s cards</option>
           <option value="adil">Adil&apos;s cards</option>
+          {!me && <option value="colin">Colin&apos;s cards</option>}
         </Select>
         <Select value={filter.belt} onChange={(e) => set({ belt: e.target.value })} aria-label="Belt">
           <option value="all">Every belt</option>
