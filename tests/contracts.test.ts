@@ -144,7 +144,8 @@ describe('send contract', () => {
       .toEqual({ status: 'signed_to_title', contract_date: '2026-10-22' })
     expect((await one<{ stage: string }>(`select stage::text from public.leads`)).stage).toBe('under_contract')
     const task = await one<{ title: string; owner: string; source: string; done_at: null }>(`select title, owner::text, source, done_at from public.tasks`)
-    expect(task).toEqual({ title: 'Contract + deposit to title today: 2847 N Burleigh St', owner: 'colin', source: 'contract', done_at: null })
+    // 0253: the one task is the first step of the closing track
+    expect(task).toEqual({ title: 'Closing: Signed contract to Knight Barry Title, Milwaukee: 2847 N Burleigh St', owner: 'colin', source: 'closing', done_at: null })
     expect(pushes).toEqual([{ title: 'Contract signed: 2847 N Burleigh St', tag: expect.any(String),
       body: 'Every seller signed. Contract + earnest money to Knight Barry Title, Milwaukee today.', url: `https://deals.example.com/lead/${LEAD}` }])
     const kinds = (await db.query<{ kind: string }>(`select kind from public.contract_events order by at, id`)).rows.map((r) => r.kind)

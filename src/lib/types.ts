@@ -200,6 +200,29 @@ export interface Deal {
   contract_date: string | null
   close_date: string | null
   notes: string | null
+  // the closing track (0253): filled from the signed contract, the title company typed by Colin
+  price?: number | null
+  closing_on?: string | null
+  title_company?: string | null
+  title_contact?: string | null
+  title_phone?: string | null
+  title_email?: string | null
+}
+
+/** One dated step between a signed offer and the closing (0253). Colin's only. */
+export interface ClosingStep {
+  id: string
+  deal_id: string
+  lead_id: string
+  key: string
+  label: string
+  why: string | null
+  sort: number
+  due_on: string | null
+  done_at: string | null
+  done_by: string | null
+  skipped: boolean
+  note: string | null
 }
 
 export interface PlannedOpener {

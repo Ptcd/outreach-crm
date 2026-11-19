@@ -79,6 +79,7 @@ vi.mock('@/lib/queries', () => ({
   }),
   useReplyTasks: () => ok([{ id: 'T9', lead_id: 'L1', due_at: '2026-10-21T16:00:00Z', kind: 'email', owner: 'adil', done_at: null, note: null, created_at: '2026-10-21T16:00:00Z', source: 'reply', title: 'Email them the info they asked for', quote: 'Can you email me at jane@example.com?', email_to: 'jane@example.com', phone10: '4145550101', lead }]),
   useDeals: () => ok([]),
+  useClosingSteps: () => ok([]),
   usePlannedOpeners: () => ok([{ id: 'P1', plan_date: '2026-10-22', wpie_owner_id: 2, attempt: 1, lead_id: 'L1', lane: 'flip', template_lane: 'llc', variant: 'A', phone: '+14145550200', body: 'Hi, this is Colin Merrill with Merrill Holdings.', segments: 2, scheduled_at: '2026-10-22T15:00:00Z', owner_name: 'ACME LLC', property_address: '200 S OAK AV', decision: 'pending', decided_by_name: null, decided_at: null, decision_note: null, send_status: 'planned', send_reason: null, claimed_at: null, sent_at: null, error_code: null }]),
   useOtherDrafts: () => ok([{ id: 'D9', inbound_sid: 'SMd9', phone10: '2625550111', our_number: '+12624180202', lead_id: null,
     inbound_body: 'wrong number', inbound_at: '2026-10-21T17:00:00Z', intent: 'wrong_number', kind: 'routine', outcome: 'wrong_number',

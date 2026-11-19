@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from './supabaseClient'
 import type {
-  BeltEvent, BeltHealth, CampaignControl, Contact, Deal, FollowupDebt, GateScore, Lead, LeadStage, Message, Milestone, MilestoneKind,
+  BeltEvent, BeltHealth, CampaignControl, ClosingStep, Contact, Deal, FollowupDebt, GateScore, Lead, LeadStage, Message, Milestone, MilestoneKind,
   OpenerDecision, Person, PlannedOpener, ReplyDraft, ReplyThread, ScoreboardWeek, SellerRecovery, SignalWeek, Task, TouchTemplate, TwilioInbound, TaskMove } from './types'
 import type { InboxLead } from './inbox'
 
@@ -302,6 +302,18 @@ export function useDeals(leadId: string, enabled: boolean) {
   })
 }
 
+/** The closing track of a card (0253): the dated steps after a signed offer, in the order they are due. Colin's only:
+ * a caller's login reads nothing here. */
+export function useClosingSteps(leadId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['closing_steps', leadId],
+    enabled,
+    queryFn: async () =>
+      check(await supabase.from('closing_steps').select('*').eq('lead_id', leadId)
+        .order('due_on', { ascending: true, nullsFirst: false }).order('sort')) as ClosingStep[],
+  })
+}
+
 /** Every write goes through here so the right screens refresh afterwards. */
 export function useWrite<TArgs>(fn: (args: TArgs) => PromiseLike<{ error: { message: string } | null }>, invalidate: string[][]) {
   const qc = useQueryClient()
@@ -363,6 +375,11 @@ export const api = {
   addGate: (row: Omit<GateScore, 'id' | 'total' | 'suggested_decision' | 'at'>) => supabase.from('gate_scores').insert(row),
   addMilestone: (lead_id: string, kind: MilestoneKind) => supabase.from('lead_milestones').insert({ lead_id, kind }),
   removeMilestone: (id: number) => supabase.from('lead_milestones').delete().eq('id', id),
+  // the closing track (0253): tick a step, move its date, skip it, note it; add a step of Colin's own
+  closingStepSet: (id: string, x: { done?: boolean; skipped?: boolean; due?: string | null; note?: string | null }) =>
+    supabase.rpc('closing_step_set', { p_step_id: id, p_done: x.done ?? null, p_skipped: x.skipped ?? null, p_due: x.due ?? null, p_note: x.note ?? null }),
+  closingStepAdd: (dealId: string, label: string, due: string | null) =>
+    supabase.rpc('closing_step_add', { p_deal_id: dealId, p_label: label, p_due: due }),
   saveDeal: (row: Partial<Deal> & { lead_id: string }) =>
     row.id ? supabase.from('deals').update(row).eq('id', row.id) : supabase.from('deals').insert(row),
   decideOpener: (id: string, decision: OpenerDecision, name: string, note: string | null) =>

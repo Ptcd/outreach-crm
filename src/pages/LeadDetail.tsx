@@ -8,6 +8,7 @@ import { GateChecklist, type GateSave } from '@/components/GateChecklist'
 import { EmailComposer } from '@/components/EmailComposer'
 import { ReplyTaskCard } from '@/components/ReplyTaskCard'
 import { ContractBlock } from '@/components/ContractBlock'
+import { ClosingTrack } from '@/components/ClosingTrack'
 import { CallScript } from '@/components/CallScript'
 import { HotBanner } from '@/components/HotBanner'
 import { gateFromCall, stopsFromCall, type CallFacts } from '@/lib/callGate'
@@ -128,6 +129,8 @@ export default function LeadDetail() {
       <DealPackage lead={lead} />
       {/* Send offer (0217): the written offer follows the number; a caller sends at Colin's number, Colin at any */}
       <ContractBlock lead={lead} contacts={contacts} colinHere={isOwner} />
+      {/* the closing track (0253): what happens between a signed offer and the closing; Colin's only */}
+      {isOwner && <ClosingTrack lead={lead} />}
       <History leadId={lead.id} ownerName={lead.owner_name} messages={messages} inbound={q.data.inbound}
         stageEvents={q.data.stageEvents} tasks={tasks} beltEvents={q.data.beltEvents} taskMoves={q.data.taskMoves} people={q.data.people} />
       {/* the follow-up belt (what happens next on its own) sits under the history: callers start at the Call panel */}
