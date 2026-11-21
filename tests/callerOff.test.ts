@@ -92,6 +92,34 @@ describe('a caller who is off', () => {
     expect(await blockAt(thalias, sat)).toBeNull()
   })
 
+  it('no text goes out in an off caller\'s name, whoever owns the card now (0272, Colin 2026-11-21)', async () => {
+    // a card Tyler owns whose thread started as Thalia, before the card became his
+    const moved = await card(211, 'NED MOVEDCARD', 'adil')
+    const tylersOwn = await card(212, 'OWEN TYLERTHREAD', 'adil')
+    const sent = (lead: string, body: string, when: string) => db.query(
+      `insert into public.messages (lead_id, direction, channel, body, status, provider_sid, sent_at, to_number)
+       values ($1, 'out', 'sms', $2, 'delivered', $3, $4, '+14145560000')`, [lead, body, `SM${lead.slice(-6)}${when.slice(8, 10)}`, when])
+    await sent(moved, 'Hi Ned, this is Thalia. Are you the current owner of 211 Off St? Reply STOP to opt out.', '2026-11-03T16:00:00Z')
+    await sent(tylersOwn, 'Hi Owen, this is Tyler. Are you the current owner of 212 Off St? Reply STOP to opt out.', '2026-11-03T16:00:00Z')
+    await db.query(`delete from public.caller_off`); await db.query(`delete from public.caller_off_weekly`)
+    expect((await rows<{ lead_id: string }>(`select lead_id from public.text_name_off($1)`, [TODAY]))).toEqual([])   // nobody is off: nothing is held
+    await one(`public.caller_off_set('Thalia', $1, 'not working today')`, [TODAY])
+    expect((await rows<{ lead_id: string; name: string }>(`select lead_id, name from public.text_name_off($1)`, [TODAY]))).toEqual([{ lead_id: moved, name: 'Thalia' }])
+    const blocks = await rows<{ lead_id: string; block: string | null }>(`select lead_id, block from public.text_pool($1) where lead_id = any($2::uuid[])`, [NOW, [moved, tylersOwn]])
+    expect(blocks.filter((b) => b.lead_id === moved).every((b) => b.block === 'name_off_today')).toBe(true)
+    expect(blocks.filter((b) => b.lead_id === tylersOwn).every((b) => b.block === null)).toBe(true)
+    // a later text in Tyler's name: the thread has moved on, and it is his to text again
+    await sent(moved, 'Hi Ned, Tyler here about 211 Off St. Still thinking it over?', '2026-11-10T16:00:00Z')
+    expect((await rows(`select lead_id from public.text_name_off($1)`, [TODAY]))).toEqual([])
+    // a text already waiting in her name on his card is withdrawn by the sweep
+    await db.query(`delete from public.messages where lead_id = $1 and body like '%Tyler here%'`, [moved])
+    await db.query(`insert into public.planned_openers (plan_date, wpie_owner_id, attempt, lead_id, lane, phone, body, send_status, step)
+                    values ($1, 211, 2, $2, 'agent', '4145560211', 'Hi Ned, this is Thalia. Still thinking about 211 Off St?', 'planned', 2)`, [TODAY, moved])
+    expect(await one<number>(`public.caller_off_sweep($1)`, [TODAY])).toBeGreaterThanOrEqual(1)
+    expect(await status(moved)).toEqual({ send_status: 'withdrawn', send_reason: 'it goes out in the name of a caller who is off that day' })
+    await db.query(`delete from public.caller_off`)
+  })
+
   it('takes Tyler by either name and nobody else', async () => {
     expect(await one<Record<string, unknown>>(`public.caller_off_set('Tyler', '2026-11-19')`)).toMatchObject({ ok: true, person: 'adil' })
     expect(await one<Record<string, unknown>>(`public.caller_off_set('colin', '2026-11-19')`)).toMatchObject({ ok: false })
