@@ -21,6 +21,8 @@ import { cn } from '@/lib/utils'
 type Brief = {
   ok: boolean; reason?: string
   lane: string | null; say_next: string | null; next_plain: string | null
+  /** 0266: the number for the call from Muse's comp, the moment a seller says yes; null when the card has no yes waiting */
+  call_sheet?: string | null
   mine_next: { task_id: string; due_at: string | null; kind: string; note: string | null; owner: string | null; source: string | null } | null
   why: { reasons: string[] | null; motivation: string[] | null; last_words: string | null; last_call: string | null; promise: string | null }
   touches: { at: string; channel: string; direction: string; status: string; body: string | null }[]
@@ -110,6 +112,15 @@ export function CardBrief({ lead, tasks }: { lead: Lead; tasks: Task[] }) {
               ? `${b.mine_next.owner === me ? 'Your' : `${personLabel(b.mine_next.owner ?? 'colin')}'s`} ${b.mine_next.kind === 'callback' ? 'callback' : b.mine_next.kind} ${fmtDateTime(b.mine_next.due_at)}${b.mine_next.note ? `: ${b.mine_next.note}` : ''}. `
               : ''}
             <span className={cn(b.mine_next && 'font-normal text-muted-foreground')}>{b.next_plain}</span>
+          </p>
+        )}
+        {/* 0266 (Colin 2026-11-20): they said yes. The number to call with is Muse's comp, here the moment it is in */}
+        {b?.call_sheet && (
+          <p role="note" aria-label="The number for this call"
+            className={cn('mt-1.5 rounded-md border p-2 text-sm font-medium',
+              /give none|no value yet|is working out/.test(b.call_sheet) ? 'border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100'
+                : 'border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100')}>
+            {b.call_sheet.replace(/^NUMBER: /, '')}
           </p>
         )}
         {booked && <div className="mt-1"><WalkControl leadId={lead.id} kind={booked} /></div>}
