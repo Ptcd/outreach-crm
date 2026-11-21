@@ -377,6 +377,13 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
   { role: 'any', name: 'research_board_set',
     description: 'Tick a job for a week (done true only when the cycle ran end to end that week; false to untick), add a note on that week, and/or set the job status note. Tick each job every week it ran: a week with nothing to do (no sale to recheck, no deed triggered) is ticked with a note saying so, and a job that could not run gets a status saying what blocks it, never a tick. job is the number (1-20) or key (foreclosure_cv, sale_refresh, post_sale_rechecks, probate_pr, tax_delinquent, evictions, bankruptcy, money_judgments, divorce_fa, guardianship_gn, water_shutoff, fire_damage, vacant_registry, code_raze, stage_d_verification, name_to_parcel, rod_mortgages, deed_pulls, phone_tracing, mls_comps). week is any date in the week being ticked (Monday to Sunday, Central); leave it out for this week. The board no longer has months.',
     inputSchema: { type: 'object', properties: { job: S('job number or key'), week: S('YYYY-MM-DD, any day of the week being ticked; omit for this week'), done: { type: 'boolean' }, note: S('a note on that week: what ran'), status: S('the job status note, replaces the old one') }, required: ['job'] } },
+  // 0258 (Muse, desk 323, 2026-11-20, from Colin): how to run each board job, kept in WPIE beside the board.
+  { role: 'any', name: 'category_instructions',
+    description: 'The category instructions: one how-to-run document for each Research Board job, kept in WPIE beside the board. With no job: the folder (every job, whether its document is written, its version, who wrote it last and when). With job (number 1-20 or key): that document whole, with its version. Read the document for a category before you work it; it is the standing method, and it outranks the one-line job text on the board. Colin reads and edits the same documents on the Research page.',
+    inputSchema: { type: 'object', properties: { job: S('job number (1-20) or key, e.g. money_judgments; leave out for the folder') } } },
+  { role: 'any', name: 'category_instructions_set',
+    description: 'Write the instructions document for one Research Board job. Send the WHOLE document as body (it replaces the current one; every version is kept). Pass base_version, the version you read, so an edit someone else made in between is not buried: the write is then refused and you read again. Plain text or Markdown, up to 200,000 characters. This is the method for the category, written to be followed by another agent with no other context. It is not the weekly tick or the status note (research_board_set), and a ruling by Colin goes in with its date and his words.',
+    inputSchema: { type: 'object', required: ['job', 'body'], properties: { job: S('job number (1-20) or key'), body: S('the whole document'), base_version: { type: 'integer', description: 'the version you read (0 when none was written); recommended' } } } },
   { role: 'any', name: 'research_board_county_set',
     description: 'Tick one leg for one buy-box county (done true/false, optional note). legs: foreclosure_cv, probate_pr, tax, need_signal, sale_refresh.',
     inputSchema: { type: 'object', properties: { county: S('buy-box county name'), leg: S('foreclosure_cv | probate_pr | tax | need_signal | sale_refresh'), done: { type: 'boolean' }, note: S('optional') }, required: ['county', 'leg', 'done'] } },
@@ -686,6 +693,19 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       if (args.month && !args.week) return { value: { ok: false, reason: 'the board is weekly now (2026-11-17): pass week (any date in the week the job ran) or leave it out for this week; there is no month' }, isError: true }
       const r = await db.records('agent_research_set', { p_job: String(args.job ?? ''), p_week: args.week ? String(args.week) : null,
         p_done: typeof args.done === 'boolean' ? args.done : null, p_note: args.note ? String(args.note) : null, p_status: args.status ? String(args.status) : null, p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'category_instructions': {
+      const job = args.job === undefined || args.job === null || String(args.job).trim() === '' ? null : String(args.job)
+      if (!job) return { value: { ok: true, folder: await db.records('research_docs_index', {}) } }
+      const r = await db.records('research_doc', { p_job: job }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'category_instructions_set': {
+      const body = typeof args.body === 'string' ? args.body : ''
+      if (!args.job || !body.trim()) return { value: { ok: false, reason: 'pass job (number or key) and body (the whole document)' }, isError: true }
+      const base = typeof args.base_version === 'number' && Number.isInteger(args.base_version) ? args.base_version : null
+      const r = await db.records('agent_research_doc_set', { p_job: String(args.job), p_body: body, p_agent: agent.name, p_base_version: base }) as Json
       return { value: r, isError: r?.ok === false }
     }
     case 'research_board_county_set': {

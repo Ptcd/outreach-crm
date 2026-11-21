@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // The Research page reads weeks (0248): which week it is, who ran, who is behind, in words a phone shows without scrolling.
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -17,7 +17,19 @@ const board = {
   ],
   legs: ['tax'], counties: [{ county: 'Dane', legs: {} }], as_of: '2026-12-01T15:00:00Z',
 }
-vi.mock('@/lib/supabaseClient', () => ({ supabase: { rpc: vi.fn(async () => ({ data: board, error: null })) }, supabaseConfigured: true }))
+// 0258: the category instructions sit on the same page: the folder, and one document read on a tap
+const folder = [
+  { id: 8, key: 'money_judgments', category: 'Need-signal', job: 'Pre-lien money judgments', written: true, chars: 1200, version: 3, updated_at: '2026-11-20T18:00:00Z', updated_by: 'Muse' },
+  { id: 9, key: 'divorce_fa', category: 'Need-signal', job: 'Divorce filings (FA).', written: false, chars: 0, version: 0, updated_at: null, updated_by: null },
+]
+const saved: Record<string, unknown>[] = []
+vi.mock('@/lib/supabaseClient', () => ({ supabase: { rpc: vi.fn(async (fn: string, args?: Record<string, unknown>) => {
+  if (fn === 'research_docs_index') return { data: folder, error: null }
+  if (fn === 'research_doc') return { data: { ok: true, ...folder[0], body: 'Read this whole document before touching the category.' }, error: null }
+  if (fn === 'research_doc_save') { saved.push(args ?? {}); return { data: { ok: true, version: 4 }, error: null } }
+  return { data: board, error: null }
+}) }, supabaseConfigured: true }))
+vi.mock('@/providers/AuthProvider', () => ({ useAuth: () => ({ isOwner: true }) }))
 
 import ResearchBoard, { standing } from '@/pages/ResearchBoard'
 
@@ -35,6 +47,17 @@ describe('the Research page, weekly', () => {
     expect(screen.getByText('Behind: 3 weeks with no tick (never ticked)')).toBeTruthy()
     expect(document.body.textContent).not.toMatch(/Nov 26\b/)                // the label that read as a day
     expect(screen.getAllByRole('columnheader').map((h) => h.textContent).slice(0, 6)).toEqual(['#', 'Job', 'Nov 30', 'Nov 23', 'Nov 16', 'Nov 9'])
+  })
+  it('lists the category instructions, opens one on a tap, and Colin can edit and save it against the version he read', async () => {
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ResearchBoard /></QueryClientProvider>)
+    expect(await screen.findByText('Category instructions (1 of 2 written)')).toBeTruthy()
+    expect(screen.getByText('not written')).toBeTruthy()
+    fireEvent.click(screen.getByText('Pre-lien money judgments'))
+    expect(await screen.findByText('Read this whole document before touching the category.')).toBeTruthy()
+    fireEvent.click(screen.getByText('Edit'))
+    fireEvent.change(screen.getByLabelText('Instructions for Need-signal'), { target: { value: 'New method.' } })
+    fireEvent.click(screen.getByText('Save'))
+    await vi.waitFor(() => expect(saved).toEqual([{ p_job: 'money_judgments', p_body: 'New method.', p_base_version: 3 }]))
   })
   it('a board with no weeks yet (an old server) still renders', () => {
     expect(standing({ last_done: null, weeks_missed: undefined, behind: undefined }, '')).toEqual({ tone: 'ok', text: 'Not ticked yet this week (never ticked)' })

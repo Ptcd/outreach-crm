@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Empty, ErrorNote, Section } from '@/components/ui/form'
 import { supabase } from '@/lib/supabaseClient'
+import { CategoryInstructions } from '@/components/CategoryInstructions'
 import { cn } from '@/lib/utils'
 
 // The Research Board (0213; Colin 2026-11-10 through Muse's desk posts 174 and 175): where every research source stands,
@@ -104,6 +105,7 @@ export default function ResearchBoard() {
               </table>
             </div>
           </Section>
+          <CategoryInstructions />
           <Section title="Counties">
             <div className="overflow-x-auto">
               <table className="text-sm">
