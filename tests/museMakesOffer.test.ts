@@ -50,7 +50,7 @@ beforeAll(async () => {
   await db.exec(`insert into public.team_members (email, role, person, display_name) values
     ('colin@example.com', 'owner', 'colin', 'Colin'), ('thalia@example.com', 'caller', 'thalia', 'Thalia') on conflict do nothing`)
   await db.exec(`update public.campaign_control set day_rules_on = false where id = 1`)
-  for (const k of ['waiting', 'fresh', 'counter', 'asked', 'passed', 'thin', 'retail', 'off']) C[k] = await card(k.toUpperCase() + ' OWNER')
+  for (const k of ['waiting', 'fresh', 'counter', 'asked', 'passed', 'thin', 'retail', 'off', 'colins', 'trailer', 'under']) C[k] = await card(k.toUpperCase() + ' OWNER')
 }, 120_000)
 
 describe('the switch is off until someone says who and why', () => {
@@ -91,6 +91,23 @@ describe('on: the rule answers', () => {
     expect(r.offer!.next.say).toContain('$111,400')
     expect(r.offer!.numbers.figures_you_may_text).toEqual([111400])
     expect(await one<string>(`(select notes from public.leads where id = $1)`, [C.fresh])).toContain("the rule OK'd $111,400")
+  })
+  it('the deal sheet outranks the rule: Colin\'s own number, or a property the formula does not fit, waits for his tap (0271)', async () => {
+    // Colin put 20,000 to 25,000 on this card himself; the rule's 111,400 is above it
+    await db.query(`insert into public.deal_sheets (lead_id, colin_open, colin_top) values ($1, 20000, 25000)`, [C.colins])
+    const a = await update({ offer_id: (await open(C.colins, 'what would you pay')).offer!.offer_id, ...FULL })
+    expect(a.offer!.next).toMatchObject({ step: 'colin', who: 'colin' })
+    expect(a.offer!.numbers.figures_you_may_text).toEqual([])
+    expect(await problem(C.colins, 'We could do $111,400.')).toContain('Colin has not OK')
+    // a manufactured home: the sheet's gate sends it to Colin, so the rule does not OK it either
+    const b = await update({ offer_id: (await open(C.trailer, 'make me an offer')).offer!.offer_id, ...FULL, property_kind: 'manufactured' })
+    expect(b.offer!.next).toMatchObject({ step: 'colin', who: 'colin' })
+    expect((await offer(C.trailer)).ok_by).toBeNull()
+    // his number is at or above the rule's figure: nothing to protect, and the rule goes on as before
+    await db.query(`insert into public.deal_sheets (lead_id, colin_open, colin_top) values ($1, 115000, 125000)`, [C.under])
+    const c = await update({ offer_id: (await open(C.under, 'what is your number')).offer!.offer_id, ...FULL })
+    expect(c.offer!.next).toMatchObject({ step: 'send_number', who: 'muse' })
+    await db.query(`delete from public.text_offers where lead_id = $1`, [C.under])   // keeps the later counts of what Colin is told as they were
   })
   it('the seller\'s own number under the rule\'s offer is the figure', async () => {
     const o = (await open(C.off, 'what is your offer')).offer!
