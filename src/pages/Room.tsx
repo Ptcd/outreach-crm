@@ -4,12 +4,13 @@ import { Button } from '@/components/ui/button'
 import { Empty, ErrorNote } from '@/components/ui/form'
 import { supabase } from '@/lib/supabaseClient'
 import { cn } from '@/lib/utils'
+import { AttachButton, LineFiles, PickedFiles, useAttach, type RoomFile } from '@/components/RoomFiles'
 
 // The room (0259; Colin 2026-11-20: "Build a chatroom for you, muse and muse2"): one stream of short lines between
 // the desk, Muse, Muse 2 and Colin. The agents write through the door and the laptop; Colin reads here and can say a
 // line himself. Under each name: how far that one has read. The page asks again every 10 seconds.
 
-type Line = { id: number; at: string; at_central: string; from: string; to: string; body: string; reply_to: number | null }
+type Line = { id: number; at: string; at_central: string; from: string; to: string; body: string; reply_to: number | null; files?: RoomFile[] }
 type Page = { lines: Line[]; seen: Record<string, { last_id: number; at: string }> }
 const WHO: Record<string, string> = { desk: 'Desk', muse: 'Muse', 'muse 2': 'Muse 2', colin: 'Colin', thalia: 'Thalia', tyler: 'Tyler' }
 const TONE: Record<string, string> = {
@@ -43,14 +44,18 @@ export default function Room() {
   const end = useRef<HTMLDivElement | null>(null)
   useEffect(() => { end.current?.scrollIntoView?.({ block: 'end' }) }, [last])
 
+  const attach = useAttach()
   const say = async () => {
-    if (!body.trim()) return
+    if (!body.trim() && attach.picked.length === 0) return
     setBusy(true); setErr(null)
-    const r = await supabase.rpc('room_say', { p_body: body, p_to: to.length ? to : null, p_reply_to: replyTo?.id ?? null })
+    // the files go up first; the line then names them
+    const up = attach.picked.length ? await attach.send() : { ids: [] as string[] }
+    if ('error' in up) { setBusy(false); setErr(up.error); return }
+    const r = await supabase.rpc('room_say', { p_body: body, p_to: to.length ? to : null, p_reply_to: replyTo?.id ?? null, p_files: up.ids.length ? up.ids : null })
     setBusy(false)
     const out = r.data as { ok?: boolean; reason?: string } | null
     if (r.error || !out?.ok) { setErr(r.error?.message ?? out?.reason ?? 'not sent'); return }
-    setBody(''); setReplyTo(null)
+    setBody(''); setReplyTo(null); attach.clear()
     await qc.invalidateQueries({ queryKey: ['room'] })
   }
 
@@ -90,6 +95,7 @@ export default function Room() {
               </p>
               {quoted && <p className="mt-1 truncate border-l-2 pl-2 text-xs text-muted-foreground">{WHO[quoted.from] ?? quoted.from}: {quoted.body}</p>}
               <p className="mt-1 whitespace-pre-wrap break-words text-sm">{l.body}</p>
+              <LineFiles files={l.files} />
             </li>
           )
         })}
@@ -109,12 +115,14 @@ export default function Room() {
               onClick={() => setTo(to.includes(w) ? to.filter((x) => x !== w) : [...to, w])}>{WHO[w]}</button>
           ))}
         </div>
+        <PickedFiles files={attach.picked} onRemove={attach.remove} />
         <div className="flex gap-2">
+          <AttachButton onPick={attach.add} disabled={busy} />
           <textarea aria-label="Say a line in the room" value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} rows={2}
             placeholder="Say a line" className="min-h-[2.75rem] flex-1 rounded-md border bg-background p-2 text-sm" />
-          <Button disabled={busy || !body.trim()} onClick={say}>Send</Button>
+          <Button disabled={busy || (!body.trim() && attach.picked.length === 0)} onClick={say}>{busy ? 'Sending' : 'Send'}</Button>
         </div>
-        {err && <p className="text-sm text-red-700">{err}</p>}
+        {(err || attach.error) && <p className="text-sm text-red-700">{err ?? attach.error}</p>}
       </div>
     </div>
   )

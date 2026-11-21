@@ -8,6 +8,7 @@ import { approveReply } from '../_shared/replyAgent.ts'
 import { senderEnv, twilioPort, type Rpc } from '../_shared/sending.ts'
 import { bookSlot, cancelBooking, connect, findSlots, type Cal } from '../_shared/calendar.ts'
 import { LINK_SECONDS, shapeCardFiles } from '../_shared/cardFiles.ts'
+import { ROOM_LINK_SECONDS, roomFileUpload, withFileLinks, type RoomFilePorts } from '../_shared/roomFiles.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -31,6 +32,17 @@ Deno.serve(async (req) => {
     const r = await sb.rpc(fn, args)
     if (r.error) throw new Error(r.error.message)
     return r.data
+  }
+  const roomPorts: RoomFilePorts = {
+    rpc: (fn, args) => rpc(fn, args),
+    uploadUrl: async (path) => {
+      const r = await sb.storage.from('room').createSignedUploadUrl(path, { upsert: true })
+      return r.error || !r.data ? null : { url: r.data.signedUrl, token: r.data.token }
+    },
+    link: async (path) => {
+      const r = await sb.storage.from('room').createSignedUrl(path, ROOM_LINK_SECONDS)
+      return r.error || !r.data ? null : r.data.signedUrl
+    },
   }
   const db: DoorDb = {
     addProspect: (p, a) => rpc('agent_add_prospect', { p, p_agent: a }) as Promise<Record<string, unknown>>,
@@ -78,6 +90,9 @@ Deno.serve(async (req) => {
       }
       return { ok: true, status: 'asked', ready_in: 'about 10 minutes: the laptop sends the file up on its next pass. Call records_file_get again with the same reply_id and name.' }
     },
+    // files in the room (0264): the database says who may have what; the bucket is reached only from here
+    roomFileUpload: (who, x) => roomFileUpload(roomPorts, who, x),
+    roomFileLinks: (who, read) => withFileLinks(roomPorts, who, read),
     // the files on a card (0256): the database gives the contracts whole; a path leaves here only as a 10-minute link
     cardFiles: async (a) => shapeCardFiles(await rpc('agent_card_files', { p_lead_id: a.lead_id, p_contract_id: a.contract_id }), async (path) => {
       const link = await sb.storage.from('contracts').createSignedUrl(path, LINK_SECONDS)
