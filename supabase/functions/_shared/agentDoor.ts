@@ -372,6 +372,10 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
   { role: 'any', name: 'reassign_card',
     description: 'Give a card to Thalia or Tyler (person: thalia | adil; Tyler is adil in the app). The open calls and callbacks on the card go with it. A reason is required and goes on the card. Colin owns no cards and none are moved to him.',
     inputSchema: { type: 'object', properties: { lead_id: S('card id'), person: S('thalia | adil'), reason: S('why it moves') }, required: ['lead_id', 'person', 'reason'] } },
+  // 0265 (Colin 2026-11-20, the callers' help line: "ask for more leads"): more cards for a caller who asks, by need
+  { role: 'any', name: 'call_list_top_up',
+    description: 'A caller asked for more cards to call (in the room, or their list ran out): make sure their list holds `count` strong cards that have not been dialed today. caller: thalia or tyler. The cards are picked by need, the same ranking as a best-first day: a sheriff sale 14 or more days ahead soonest first, then how many kinds of need are stacked (tier A, B, C), then the kind (foreclosure, estate, court debt, two or more tax years). Only the caller\u2019s own cards with a phone that may be dialed, nothing in the records against them, not held, fewer than three dials this week, nobody reached in two weeks. Tier D is never added. Nothing is closed; the rest of their list moves behind. Returns how many are on the list, how many were added, the split by tier and the top fifteen. Then tell the caller in the room, by name (chat_post to: [thalia] or [tyler]). If fewer came back than asked, that is every strong card they have left today: say so; do not pad the list with add_call_task.',
+    inputSchema: { type: 'object', required: ['caller'], properties: { caller: S('thalia or tyler'), count: { type: 'integer', description: 'how many strong uncalled cards the list should hold (default 40, at most 150)' } } } },
   { role: 'any', name: 'add_call_task',
     description: 'Put a card on its caller Power hour list as a call task (source power_hour). Rules in the function: a sheriff sale is callable only 14 or more days out (sale_date is refused inside the window, and the title and note carry the sale date and the last call day); the card must be live, must have a caller (its locked_to, or owner when it has none, which then locks the card), and must have a dialable phone, else the queue would never show the task; a card marked elderly, grief or taken over by a caller is refused; a card you held (belt hold_not_now) loses the hold date, because the queue hides a card until that date, while the hold and its reason stay; a date set by the seller or Colin is never overridden. One open list task per card: a second call returns the existing one. rank orders the list that day (lower first) and is written as call list (#rank) in the note; without rank the task is due now.',
     inputSchema: { type: 'object', properties: { lead_id: S('card id'), sale_date: S('YYYY-MM-DD sheriff sale date when there is one'), reason: S('why the caller should dial it'),
@@ -734,6 +738,11 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       if ((lead && !uuid.test(lead)) || (contract && !uuid.test(contract))) return { value: { ok: false, reason: 'lead_id and contract_id are ids as find_prospects gives them' }, isError: true }
       const r = await db.cardFiles({ lead_id: lead, contract_id: contract })
       return { value: r, isError: (r as Json)?.ok === false }
+    }
+    case 'call_list_top_up': {
+      const r = await db.records('agent_list_top_up', { p_person: String(args.caller ?? ''), p_count: args.count === undefined || args.count === null ? 40 : int(args.count, 40, 150),
+        p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
     }
     case 'research_board': return { value: await db.records('research_board', {}) }
     case 'research_board_set': {
