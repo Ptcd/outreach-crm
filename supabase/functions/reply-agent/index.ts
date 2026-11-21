@@ -14,6 +14,7 @@ import { pmPhoneSender, pmPhoneWhatsApp, runHotAlerts } from '../_shared/hotLead
 import { runMissedCallAlerts } from '../_shared/missedCalls.ts'
 import { runFollowupReminders, runWeeklyDigest } from '../_shared/followupAlerts.ts'
 import { runLiveThreadAlerts } from '../_shared/liveThreads.ts'
+import { runYesReadyAlerts } from '../_shared/yesReady.ts'
 import { metaWhatsAppSender } from '../_shared/metaWhatsApp.ts'
 import { hotPush, notifyDeps, pushToPerson } from '../_shared/notifyDeno.ts'
 import { senderEnv, twilioPort, type Rpc } from '../_shared/sending.ts'
@@ -77,14 +78,17 @@ Deno.serve(async (req) => {
     // a seller texting back and forth right now: the card's caller is told, once an hour per card (0246)
     const live = await runLiveThreadAlerts({ rpc, push: pushToPerson(sb), email: deps.email, appUrl: Deno.env.get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com' })
       .catch((e) => ({ error: String(e).slice(0, 200) }))
+    // a said-yes card whose prices or story just landed: its caller is told it is ready to call (0269)
+    const yesReady = await runYesReadyAlerts({ rpc, push: pushToPerson(sb), email: deps.email, appUrl: Deno.env.get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com' })
+      .catch((e) => ({ error: String(e).slice(0, 200) }))
     // a rested card wakes on its own when its day comes (0186): the lists already treat it as awake, this tidies the row
     const woke = await rpc('wake_rested', { p_now: new Date().toISOString() }).then((r) => (r.error ? { error: r.error.message.slice(0, 200) } : Number(r.data ?? 0)))
     if (typeof woke === 'number' && woke > 0) console.log(`wake_rested: ${woke} card(s) back`)
     // Monday 8 AM Central: each caller's week in one push and one email (0187)
     const digest = await runWeeklyDigest({ rpc, push: pushToPerson(sb), email: deps.email, appUrl: Deno.env.get('NOTIFY_APP_URL') || 'https://deals.junkcarsmequon.com' })
       .catch((e) => ({ error: String(e).slice(0, 200) }))
-    await rpc('note_agent_run', { p_summary: { ...summary, notified, hot_alerts: hot, packages, offers, voicemails, missed_calls: missed, reminders, live_threads: live, woke, digest, drafter: key ? 'claude' : 'none (ANTHROPIC_API_KEY not set)' } })
-    return Response.json({ ...summary, notified, hot_alerts: hot, packages, offers, voicemails, missed_calls: missed, reminders, live_threads: live, woke, digest })
+    await rpc('note_agent_run', { p_summary: { ...summary, notified, hot_alerts: hot, packages, offers, voicemails, missed_calls: missed, reminders, live_threads: live, yes_ready: yesReady, woke, digest, drafter: key ? 'claude' : 'none (ANTHROPIC_API_KEY not set)' } })
+    return Response.json({ ...summary, notified, hot_alerts: hot, packages, offers, voicemails, missed_calls: missed, reminders, live_threads: live, yes_ready: yesReady, woke, digest })
   } catch (e) {
     await rpc('note_agent_run', { p_summary: { error: String(e instanceof Error ? e.message : e).slice(0, 300) } })
     return Response.json({ error: String(e) }, { status: 500 })

@@ -93,6 +93,7 @@ export const TEXTING_RULES = [
   'Never pressure an older or grieving owner. STOP is final: an opted-out phone can never be texted again.',
   'Follow-ups (steps 2-5) go only to people who never answered, at least 3 days apart; the sequence the team uses is days 1, 3, 10, 17, 24.',
   'Texts go out 10 AM to 7 PM in the recipient\'s time zone, never on Sunday, and share one daily limit with the laptop\'s own texts. Queue them and the server sends them in that window. The one exception to Sunday: a Sunday Colin opened. On that day sending_status and text_results carry attention.sunday, and the list, the queue and replies all run as on a weekday; a Sunday with no attention.sunday is shut.',
+  'Every scheduled run starts with live_work (Colin 2026-11-21). When it returns cards, a seller has said yes and a caller is waiting on you: do the comp, the street look and your prices, and the story for each, as its packet says, before the replies and before anything else.',
   'Replies: you answer them now (replies_waiting, then send_reply), on the same thread. Read the whole conversation and the card first. One reply per text from them; never a first text or follow-up (queue_texts) to someone who has texted back.',
   'A thread a caller has taken over is theirs: send_reply is refused with the person\'s name (Thalia or Adil has this thread). Say nothing further on that phone until it is handed back; the card is still yours to read.',
   'Power hour (weekdays 4 to 6 PM Central): read replies_waiting every few minutes. A seller who asks what we would pay, or says yes to selling, stays with you by text (Colin 2026-11-13): the offer path takes them to a number with no call (offer_open, then offer_worklist). call_next is only for a seller who asks for a call ("call me", "can someone call"), with their words and the number they texted from; then you do NOT text them back, the caller phones them next, and if the call does not reach them their reply is still yours to answer. A thread a caller takes over belongs to that caller. Not interest (STOP, no, wrong number, not the owner, an older or grieving owner): handle it as usual.',
@@ -378,6 +379,9 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
     inputSchema: { type: 'object', required: ['caller'], properties: { caller: S('thalia or tyler'), count: { type: 'integer', description: 'how many strong uncalled cards the list should hold (default 40, at most 150)' } } } },
   // 0267 (Colin 2026-11-20: "figure out the story of what's going on with the house ahead of time and then make a
   // detailed script like I got for the Jason call where I got a contract"): the story, what is owed, and the words
+  { role: 'any', name: 'live_work',
+    description: 'CALL THIS FIRST IN EVERY SCHEDULED RUN (Colin 2026-11-21). It says whether a seller who said yes is waiting on you. Nothing live is one short line: carry on. Something live returns the cards, the newest yes first, each with what is still owed on it (comp, call_prices, brief) and what to do, and the packet: the instructions for the whole job. Do those cards before anything else in the run. When your prices land on a card, and again when its story lands, the server tells the card\u2019s caller on their phone: you post nothing. Every other tool result also says so when one is waiting (attention.live).',
+    inputSchema: { type: 'object', properties: {} } },
   { role: 'any', name: 'call_briefs_wanted',
     description: 'The cards a person is about to phone that need the story and a script from you, the most pressing first: a seller who just said yes (due 30 minutes after the yes; the comp comes first), and any card Colin or a caller asked for. Each row has the card, the caller, why it is wanted, when it is due, the reasons on the card, the seller\u2019s last words, what the records already hold (value, tax owed and years, judgment, the mortgage estimate, the last sale) and the comp if it is in. Every tool you call tells you when some are waiting (attention.briefs). Write each with call_brief_set.',
     inputSchema: { type: 'object', properties: { limit: { type: 'integer', description: 'how many (default 20)' } } } },
@@ -761,6 +765,7 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
         p_agent: agent.name }) as Json
       return { value: r, isError: r?.ok === false }
     }
+    case 'live_work': return { value: await db.records('agent_live_work', {}) }
     case 'call_briefs_wanted': return { value: await db.records('agent_call_briefs_wanted', { p_limit: args.limit === undefined || args.limit === null ? 20 : int(args.limit, 20, 50) }) }
     case 'call_brief_set': {
       const r = await db.records('agent_call_brief_set', { p: args, p_agent: agent.name }) as Json
