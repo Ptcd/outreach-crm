@@ -54,7 +54,7 @@ describe('a yes gets a comp, and the caller gets the number', () => {
     // the belt writes the caller's call task: it starts with the sheet
     await db.query(`insert into public.tasks (lead_id, due_at, kind, owner, source, title, note) values ($1, now(), 'call', 'adil', 'belt', 'Said yes, not booked: stop 1 of 4', 'Say: You asked for a call about 1208 RACINE ST. Call (262) 555-0101 (mobile)')`, [YES])
     const note = await taskNote(YES)
-    expect(note).toMatch(/^NUMBER: Muse is working out the value now\. It will be on this card by \d{1,2}:\d\d [AP]M\. Calling before then: get the story and their number, and give none\.\nSay: You asked for a call about 1208 RACINE ST/)
+    expect(note).toMatch(/^NUMBER: Muse is working out the value now\. It will be on this card by \d{1,2}:\d\d [AP]M\. Calling before then: get the story and their number, and give none\.\nSTORY: Muse is writing the story and a script for this call, on the card by \d{1,2}:\d\d [AP]M\.\nSay: You asked for a call about 1208 RACINE ST/)   // 0267: the story is asked for too
     // ten minutes on with no comp: the card says so
     expect(await one<string>(`public.yes_call_sheet($1, now() + interval '12 minutes')`, [YES])).toMatch(/^NUMBER: no value yet \(it was due .*\)\. Call for the story and their number, and give none\.$/)
   })
@@ -64,13 +64,15 @@ describe('a yes gets a comp, and the caller gets the number', () => {
     expect(r.ok).toBe(true)
     // 65% and 70% of 210,000, less 15 / 30 / 60 a square foot on 1,400 sq ft
     const sheet = 'NUMBER: Value fixed up $210,000 (Muse, 3 sold comps). Ask what shape it is in, then use that row. Light repairs: open $115,500, top $126,000. Medium repairs: open $94,500, top $105,000. Heavy repairs: open $52,500, top $63,000.'
-    expect(await taskNote(YES)).toBe(sheet + '\nSay: You asked for a call about 1208 RACINE ST. Call (262) 555-0101 (mobile)')
+    const lines = (await taskNote(YES)).split('\n')
+    expect([lines[0], lines[2]]).toEqual([sheet, 'Say: You asked for a call about 1208 RACINE ST. Call (262) 555-0101 (mobile)'])
+    expect(lines[1]).toMatch(/^STORY: Muse is writing the story/)
     const brief = (await asUser<{ r: Json }>('adil@example.com', `select public.card_brief($1) as r`, [YES]))[0].r
     expect(brief.call_sheet).toBe(sheet)
     // the seller says what is wrong: one opening, one top, and the line is replaced, not stacked
     await svc(`public.agent_offer_update($1::jsonb, 'Muse')`, [JSON.stringify({ lead_id: YES, condition_words: 'roof leaks, furnace is dead', repair_items: ['roof', 'furnace'] })])
     const after = await taskNote(YES)
-    expect(after).toMatch(/^NUMBER: Value fixed up \$210,000 \(Muse, 3 sold comps\)\. Open at \$117,000, top \$127,500 \(repairs \$19,500: what the seller named: furnace \$9,500, roof \$10,000\)\.\nSay: You asked/)
+    expect(after).toMatch(/^NUMBER: Value fixed up \$210,000 \(Muse, 3 sold comps\)\. Open at \$117,000, top \$127,500 \(repairs \$19,500: what the seller named: furnace \$9,500, roof \$10,000\)\.\nSTORY: [^\n]*\nSay: You asked/)
     expect(after.match(/NUMBER:/g)).toHaveLength(1)
   })
 
@@ -78,11 +80,13 @@ describe('a yes gets a comp, and the caller gets the number', () => {
     await db.exec(`update public.leads set belt = 'yes_unbooked', belt_step = 1 where id = '${THIN}'`)
     await db.query(`insert into public.tasks (lead_id, due_at, kind, owner, source, title, note) values ($1, now(), 'call', 'adil', 'belt', 'Said yes, not booked: stop 1 of 4', 'Say: You asked for a call about 9 FAR RD.')`, [THIN])
     await svc(`public.agent_offer_update($1::jsonb, 'Muse')`, [JSON.stringify({ lead_id: THIN, arv: 150000, arv_basis: 'two sales, both a mile off', comps: comps(2), sqft: 1100 })])
-    expect(await taskNote(THIN)).toBe('NUMBER: only 2 sold comps near this house, not enough to offer from. Call for the story and their number, and give none.\nSay: You asked for a call about 9 FAR RD.')
+    const thin = (await taskNote(THIN)).split('\n')
+    expect([thin[0], thin.at(-1)]).toEqual(['NUMBER: only 2 sold comps near this house, not enough to offer from. Call for the story and their number, and give none.', 'Say: You asked for a call about 9 FAR RD.'])
     expect((await one<Json>(`public.text_offer_view((select t from public.text_offers t where lead_id = $1), now())`, [THIN])).step).toBe('comp')   // still Muse's: add comps or close
     await svc(`public.agent_offer_close((select id from public.text_offers where lead_id = $1), 'no_comp_set', 'nothing sold nearby', 'Muse')`, [THIN])
     expect(await one<string | null>(`public.yes_call_sheet($1)`, [THIN])).toBeNull()
-    expect(await taskNote(THIN)).toBe('Say: You asked for a call about 9 FAR RD.')
+    expect(await taskNote(THIN)).not.toMatch(/NUMBER:/)                              // the number line goes; the story line stays while Muse writes it
+    expect((await taskNote(THIN)).split('\n').at(-1)).toBe('Say: You asked for a call about 9 FAR RD.')
     // a second yes on a card whose offer is already open does not open another
     await db.exec(`update public.leads set belt = 'call_missed' where id = '${YES}'; update public.leads set belt = 'yes_unbooked' where id = '${YES}';`)
     expect(await one<number>(`(select count(*)::int from public.text_offers where lead_id = $1)`, [YES])).toBe(1)

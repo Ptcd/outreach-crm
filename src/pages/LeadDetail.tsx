@@ -29,6 +29,7 @@ import { DEAL_STATUS_LABEL, MILESTONES, PEOPLE, SELLER_FACTS, STAGES, STAGE_LABE
 import { useAuth } from '@/providers/AuthProvider'
 import { NextStep } from '@/components/NextStep'
 import { CardBrief } from '@/components/CardBrief'
+import { CallBrief } from '@/components/CallBrief'
 import { handoffToColin } from '@/lib/apiExtra'
 import { BELT_LABEL, type Belt } from '@/lib/belts'
 import { useColinHere } from '@/components/OnPhonePicker'
@@ -118,6 +119,7 @@ export default function LeadDetail() {
       {/* the card in plain words (0186): what happens next, what to say, why, the touches, a rest, heads-ups; above
           everything a caller reads after the call (Thalia 2026-11-04: "the one thing I must do is below everything") */}
       <CardBrief lead={lead} tasks={tasks} />
+      <CallBrief leadId={lead.id} />
       <CallNotes leadId={lead.id} messages={messages} />
       <TextThread leadId={lead.id} phone={bestPhone(contacts, q.data.inbound, lead.owner_name)} messages={messages} inbound={q.data.inbound}
         closed={lead.stage === 'dnc'} />
