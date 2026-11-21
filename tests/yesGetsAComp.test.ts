@@ -59,21 +59,53 @@ describe('a yes gets a comp, and the caller gets the number', () => {
     expect(await one<string>(`public.yes_call_sheet($1, now() + interval '12 minutes')`, [YES])).toMatch(/^NUMBER: no value yet \(it was due .*\)\. Call for the story and their number, and give none\.$/)
   })
 
-  it('when the comp lands the task and the card carry an opening and a top for light, medium and heavy repairs', async () => {
+  it('the value alone gives the caller no number: the prices are Muse\'s, from a look at the house (0268)', async () => {
     const r = await svc<Json>(`public.agent_offer_update($1::jsonb, 'Muse')`, [JSON.stringify({ lead_id: YES, arv: 210000, arv_basis: 'three sold within half a mile, 90 days', comps: comps(3), sqft: 1400 })])
     expect(r.ok).toBe(true)
-    // 65% and 70% of 210,000, less 15 / 30 / 60 a square foot on 1,400 sq ft
-    const sheet = 'NUMBER: Value fixed up $210,000 (Muse, 3 sold comps). Ask what shape it is in, then use that row. Light repairs: open $115,500, top $126,000. Medium repairs: open $94,500, top $105,000. Heavy repairs: open $52,500, top $63,000.'
+    expect(r.offer.next).toMatchObject({ step: 'call_prices', who: 'muse', gate: 'the prices for the call' })
+    expect(r.offer.next.say).toMatch(/Look at the house on Street View/)
+    const waiting = 'NUMBER: Value fixed up $210,000 (Muse, 3 sold comps, 1,400 sq ft). Muse has not put its prices by condition on this card yet. Call for the story, the condition and their number, and give none.'
+    expect((await taskNote(YES)).split('\n')[0]).toBe(waiting)
+    const upd = async (body: Json) => svc<Json>(`public.agent_offer_update($1::jsonb, 'Muse')`, [JSON.stringify({ lead_id: YES, ...body })])
+    const street = { image_date: 'June 2023', seen: [{ item: 'roof', cost: 12000, note: 'shingles curling, a tarp on the back slope' }], notes: 'lawn kept, cars in the drive' }
+    const light = { inside: 'Inside light', repairs: 33000, repairs_basis: 'roof 12,000 + paint and floors at $15 a sq ft', open: 103500, top: 114000 }
+    const heavy = { inside: 'Inside heavy', repairs: 96000, repairs_basis: 'roof 12,000 + a full gut at $60 a sq ft', open: 40500, top: 51000 }
+    // prices with no look at the house, a look with no date, one row only: each is refused with the reason
+    expect((await upd({ call_prices: [light, heavy] })).reason).toMatch(/^send street: what you saw of the house on Street View/)
+    expect((await upd({ street: { seen: [] }, call_prices: [light, heavy] })).reason).toMatch(/^street\.image_date/)
+    expect((await upd({ street, call_prices: [light] })).reason).toMatch(/^call_prices is two to five rows \(you sent 1\)/)
+    // what shows from the street is in every row
+    expect((await upd({ street, call_prices: [{ ...light, repairs: 8000 }, heavy] })).reason)
+      .toBe('the row "Inside light" has repairs of $8,000, less than what you saw from the street ($12,000: roof). What shows from the street is in every row')
+    // and no top above Colin's standing most for those repairs
+    expect((await upd({ street, call_prices: [{ ...light, top: 120000 }, heavy] })).reason)
+      .toBe('the row "Inside light": a top of $120,000 is above the most Colin\'s rule allows for those repairs (70% of $210,000 minus $33,000 = $114,000)')
+    expect((await taskNote(YES)).split('\n')[0]).toBe(waiting)
+    const ok = await upd({ street, call_prices: [light, heavy, { inside: 'Fire or foundation', repairs: 160000, repairs_basis: 'roof 12,000 + structural', no_offer: true }] })
+    expect(ok.ok).toBe(true)
+    expect(ok.offer.next.step).not.toBe('call_prices')
+    expect(ok.offer.comp.call_prices).toHaveLength(3)
+    const sheet = 'NUMBER: Value fixed up $210,000 (Muse, 3 sold comps, 1,400 sq ft). From the street (picture from June 2023): roof (shingles curling, a tarp on the back slope). That is already in every row. Ask what shape the inside is in, then use that row. Inside light: open $103,500, top $114,000 (repairs $33,000). Inside heavy: open $40,500, top $51,000 (repairs $96,000). Fire or foundation: no offer (repairs $160,000 eat it).'
     const lines = (await taskNote(YES)).split('\n')
     expect([lines[0], lines[2]]).toEqual([sheet, 'Say: You asked for a call about 1208 RACINE ST. Call (262) 555-0101 (mobile)'])
     expect(lines[1]).toMatch(/^STORY: Muse is writing the story/)
     const brief = (await asUser<{ r: Json }>('adil@example.com', `select public.card_brief($1) as r`, [YES]))[0].r
     expect(brief.call_sheet).toBe(sheet)
-    // the seller says what is wrong: one opening, one top, and the line is replaced, not stacked
-    await svc(`public.agent_offer_update($1::jsonb, 'Muse')`, [JSON.stringify({ lead_id: YES, condition_words: 'roof leaks, furnace is dead', repair_items: ['roof', 'furnace'] })])
+    // what the seller names by text still gives the rule's figure for a text; the caller's sheet stays Muse's rows, one line
+    const named = await upd({ condition_words: 'roof leaks, furnace is dead', repair_items: ['roof', 'furnace'] })
+    expect(named.offer.numbers).toMatchObject({ offer: 117000, most: 127500 })
     const after = await taskNote(YES)
-    expect(after).toMatch(/^NUMBER: Value fixed up \$210,000 \(Muse, 3 sold comps\)\. Open at \$117,000, top \$127,500 \(repairs \$19,500: what the seller named: furnace \$9,500, roof \$10,000\)\.\nSTORY: [^\n]*\nSay: You asked/)
+    expect(after.split('\n')[0]).toBe(sheet)
     expect(after.match(/NUMBER:/g)).toHaveLength(1)
+    // a new value: prices worked from the old one do not stand
+    const revalued = await upd({ arv: 190000, arv_basis: 'a fourth sale closed lower', comps: comps(4) })
+    expect(revalued.offer.comp.call_prices).toBeNull()
+    expect((await taskNote(YES)).split('\n')[0]).toMatch(/^NUMBER: Value fixed up \$190,000 \(Muse, 4 sold comps, 1,400 sq ft\)\. Open at /)
+    // no picture of the house: said so, and the caller is told nothing outside is priced in
+    const blind = await upd({ street: { no_view: true, why: 'a private road, the nearest picture is 400 feet off' },
+      call_prices: [{ inside: 'Inside light', repairs: 21000, repairs_basis: '$15 a sq ft', open: 102500, top: 112000 }, { inside: 'Inside heavy', repairs: 84000, repairs_basis: '$60 a sq ft', open: 39500, top: 49000 }] })
+    expect(blind.ok).toBe(true)
+    expect((await taskNote(YES)).split('\n')[0]).toMatch(/No street picture of this house \(a private road, the nearest picture is 400 feet off\), so nothing outside is priced in: ask about the roof and the outside too\. Ask what shape the inside is in/)
   })
 
   it('fewer sold comps than the rule needs is no number; a card with no yes waiting has no sheet; a closed offer clears the task', async () => {
