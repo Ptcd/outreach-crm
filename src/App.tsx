@@ -9,6 +9,7 @@ import Today from '@/pages/Today'
 import Warm from '@/pages/Warm'
 import Pipeline from '@/pages/Pipeline'
 import MyCards from '@/pages/MyCards'
+import Room from '@/pages/Room'
 import LeadDetail from '@/pages/LeadDetail'
 import Approvals from '@/pages/Approvals'
 import Inbox from '@/pages/Inbox'
@@ -97,6 +98,7 @@ export default function App() {
         <Route path="/approvals" element={colinOnly(<Approvals />)} />
         <Route path="/scoreboard" element={colinOnly(<Scoreboard />)} />
         <Route path="/research" element={colinOnly(<ResearchBoard />)} />
+        <Route path="/room" element={colinOnly(<Room />)} />
         <Route path="/call-time" element={<CallTime />} />
         <Route path="*" element={<Navigate to="/today" replace />} />
       </Routes>

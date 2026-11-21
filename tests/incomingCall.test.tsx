@@ -50,7 +50,7 @@ describe('a call coming in', () => {
     expect(screen.queryByRole('menu')).toBeNull()
     fireEvent.click(bar.getByRole('button', { name: 'More' }))
     const menu = within(screen.getByRole('menu', { name: 'More pages' }))
-    expect(menu.getAllByRole('menuitem').map((a) => a.textContent)).toEqual(['My cards', 'Texts', 'Warm', 'Pipeline', 'Scoreboard', 'Research', 'Call time'])
+    expect(menu.getAllByRole('menuitem').map((a) => a.textContent)).toEqual(['My cards', 'Texts', 'Warm', 'Pipeline', 'Scoreboard', 'Research', 'Room', 'Call time'])
     fireEvent.click(menu.getByRole('menuitem', { name: 'Pipeline' }))
     expect(screen.getByTestId('where').textContent).toBe('/pipeline')
     expect(screen.queryByRole('menu')).toBeNull()
