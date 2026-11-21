@@ -184,7 +184,8 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
     description: 'Hand court filings you have banked to the laptop, which ties each one to a parcel from the statewide parcel records (you never look up assessor data and you never load these rows as cards). kind: eviction, money_judgment, divorce or guardianship. Up to 500 rows a call; the same county + case_number is the same row, so sending it again corrects it while it waits. An eviction row needs county, case_number, the address and city of the property (where the tenant lives), and should carry plaintiff (the landlord), filed, class_code and status; the tenant is record only. A money_judgment row needs county, case_number and the defendant (the debtor) or the caption "X vs. Y", and should carry plaintiff, filed, class_code, amount and status. A divorce row needs the other spouse in defendant (or the caption); a joint petition has no respondent, so the co-petitioner goes in defendant and the caption is "Joint petition: A and B" (divorce rows are banked only: there is no rule for them yet). A guardianship row (case type GN) needs the person the guardianship is for in defendant (or the caption, "In the Matter of the Guardianship of X"; initials only cannot be tied to a house), and should carry the guardian or petitioner in plaintiff, filed and status; a guardianship is worked by a person only: never a text, never a paid trace, Colin calls the guardian. A row with something missing comes back refused with the reason and is not stored. Each night the laptop writes the result on every row: court_rows_status.',
     inputSchema: { type: 'object', properties: { kind: S('eviction | money_judgment | divorce | guardianship'),
       rows: { type: 'array', maxItems: 500, items: { type: 'object', properties: { county: S('the county of the case'), case_number: S('e.g. 2026SC007476'),
-        filed: S('YYYY-MM-DD'), class_code: S('the class code as the court prints it'), caption: S('the caption, "X vs. Y"'), status: S('open, closed, ...'),
+        filed: S('YYYY-MM-DD'), class_code: S('the class code as the court prints it'),
+        docketed: { type: 'boolean', description: 'money_judgment only: true when the row comes from the court docketed-judgments report (searched by docket date). It then counts as a money judgment whatever its case type (SC, TJ, FJ, CF, FA ...) and needs no class code; put the docket date in filed and the judgment amount in amount. Leave it out for a row read off a case filing.' }, caption: S('the caption, "X vs. Y"'), status: S('open, closed, ...'),
         plaintiff: S('who filed'), defendant: S('who it was filed against'), address: S('eviction: the property street address'), city: S('eviction: the property city'),
         zip: S('ZIP'), amount: { type: 'number', description: 'dollars, if any' }, extra: { type: 'object', description: 'anything else worth keeping with the row' } },
         required: ['county', 'case_number'] } } }, required: ['kind', 'rows'] } },
@@ -508,7 +509,14 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       return { value: await db.findProspects({ address: args.address as string, phone: args.phone as string, name: args.name as string,
         lead_id: args.lead_id as string, only_agent: !!args.only_agent, limit: int(args.limit, 20, 100) }) }
     case 'court_rows_deposit': {
-      const r = await db.records('agent_court_rows_deposit', { p: { kind: args.kind, rows: Array.isArray(args.rows) ? args.rows : [] }, p_agent: agent.name }) as Json
+      // a row from the court's docketed-judgments report says docketed: true (2026-11-20): it rides in the row's extra,
+      // and the laptop then counts it as a money judgment whatever its case type
+      const rows = (Array.isArray(args.rows) ? args.rows : []).map((x: unknown) => {
+        const row = x as Json
+        return row && typeof row === 'object' && row.docketed === true
+          ? { ...row, extra: { ...(row.extra && typeof row.extra === 'object' ? row.extra as Json : {}), docketed: true } } : x
+      })
+      const r = await db.records('agent_court_rows_deposit', { p: { kind: args.kind, rows }, p_agent: agent.name }) as Json
       return { value: r, isError: r?.ok === false }
     }
     case 'court_rows_status': return { value: await db.records('agent_court_rows_status', { p: args, p_agent: agent.name }) }
