@@ -42,9 +42,36 @@ describe('court rows', () => {
       { county: 'Dane', case_number: '2026CV000976' }])
     expect(a).toMatchObject({ ok: true, added: 1 })
     expect(a.refused[0].reason).toContain('defendant')
-    expect((await deposit('probate', [])).reason).toContain('kind is')
+    expect((await deposit('bankruptcy', [])).reason).toContain('kind is')
     expect((await deposit('money_judgment', [{ county: 'Dane', case_number: '2026CV000977', defendant: 'X Y', filed: 'last week' }])).ok).toBe(false)
     expect(await one<number>(`(select count(*)::int from public.court_rows where case_number = '2026CV000977')`)).toBe(0)
+  })
+  it('takes foreclosure, probate and tax-warrant rows, each with its own case type (0274)', async () => {
+    const f = await deposit('foreclosure', [
+      { county: 'Brown', case_number: '2026CV000991', class_code: '30404', plaintiff: 'Lakeside Bank', defendant: 'Denu, Christin J', filed: '2026-11-17', amount: 88210.4 },
+      { county: 'Brown', case_number: '2026SC000991', defendant: 'A Person' },                                  // not a CV case
+      { county: 'Brown', case_number: '2026CV000992', class_code: '30301 Money Judgment', defendant: 'A Person' },   // a CV case of another class
+      { county: 'Brown', case_number: '2026CV000993' },                                                          // nobody named
+    ])
+    expect(f).toMatchObject({ ok: true, added: 1 })
+    expect(f.refused.map((r) => r.reason)).toEqual([expect.stringContaining('has CV in it'), expect.stringContaining('class code 30404'), expect.stringContaining('needs the defendant')])
+    const p = await deposit('probate', [
+      { county: 'Rock', case_number: '2026PR000123', defendant: 'Denu, Christin J', plaintiff: 'Denu, Mark', filed: '2026-11-16' },
+      { county: 'Rock', case_number: '2026IN000045', caption: 'In the Matter of the Estate of Mary Smith' },
+      { county: 'Rock', case_number: '2026CV000123', defendant: 'Someone' },
+      { county: 'Rock', case_number: '2026PR000124' },
+    ])
+    expect(p).toMatchObject({ ok: true, added: 2 })
+    expect(p.refused.map((r) => r.reason)).toEqual([expect.stringContaining('has PR (or IN'), expect.stringContaining('the person who died')])
+    const t = await deposit('tax_warrant', [{ county: 'Dane', case_number: '2026TW000045', defendant: 'Jane Roe', plaintiff: 'Department of Revenue', amount: 8123.5 },
+      { county: 'Dane', case_number: '2026CV000046', defendant: 'Jane Roe' }])
+    expect(t).toMatchObject({ ok: true, added: 1 })
+    expect(t.refused[0].reason).toContain('has TW in it')
+    const st = await status()
+    expect(st.by_kind.foreclosure).toMatchObject({ waiting: 1 })
+    expect(st.by_kind.probate).toMatchObject({ waiting: 2 })
+    expect(st.by_kind.tax_warrant).toMatchObject({ waiting: 1 })
+    await db.query(`delete from public.court_rows where kind in ('foreclosure', 'probate', 'tax_warrant')`)
   })
   it('once the laptop has answered a row, a second deposit leaves it alone, and the status shows the result', async () => {
     await db.query(`update public.court_rows set state = 'matched', parcel_id = '4971256000', matched_owner = 'RAMIRO BUSTOS', result_note = 'the address is one parcel', result_at = now()
@@ -88,6 +115,6 @@ describe('court rows', () => {
     expect(d.refused[0].reason).toMatch(/co-petitioner in defendant/)
     const d2 = await deposit('divorce', [{ county: 'Dane', case_number: '2026FA000777', plaintiff: 'Smith, Ann', defendant: 'Smith, Bob', caption: 'Joint petition: Smith, Ann and Smith, Bob' }])
     expect(d2).toMatchObject({ ok: true, added: 1, refused: [] })
-    expect((await deposit('probate', [])).reason).toMatch(/divorce or guardianship/)
+    expect((await deposit('bankruptcy', [])).reason).toMatch(/divorce, guardianship, foreclosure, probate or tax_warrant/)
   })
 })
