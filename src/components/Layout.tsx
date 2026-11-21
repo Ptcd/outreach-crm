@@ -32,7 +32,8 @@ const NAV_ALL: { to: string; label: string; short?: string; icon: typeof Calenda
   // where every research source stands (0213, Colin 2026-11-10); Muse and the desk tick it, Colin reads it
   { to: '/research', label: 'Research', short: 'Research', icon: ClipboardList },
   // the room (0259, Colin 2026-11-20): the desk, Muse and Muse 2 talking; Colin reads it and can say a line
-  { to: '/room', label: 'Room', short: 'Room', icon: MessagesSquare },
+  // on Colin's phone bar (2026-11-20: "I want access to the chat with you and the muses"): one tap, not under More
+  { to: '/room', label: 'Room', short: 'Room', icon: MessagesSquare, phone: true },
   // call time, Sat-Fri, per caller (Colin 2026-11-06); a caller sees only her own week
   { to: '/call-time', label: 'Call time', short: 'Time', icon: Clock, caller: true },
 ]
