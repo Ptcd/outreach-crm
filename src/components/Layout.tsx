@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { HelpLink } from '@/pages/Help'
 import { NavLink, useLocation } from 'react-router-dom'
 import { BarChart3, CalendarCheck, ClipboardList, CheckCheck, Clock, Flame, FolderKanban, Home, Inbox, ListChecks, LogOut, MessageSquareText, MessagesSquare, Moon, MoreHorizontal, PhoneCall, Settings as SettingsIcon, Sun } from 'lucide-react'
 import { useTheme } from '@/lib/theme'
@@ -92,6 +93,8 @@ export function Layout({ children }: { children: ReactNode }) {
               </span>
             )}
             {member?.role === 'caller' && <span className="hidden text-muted-foreground sm:inline">{member?.display_name}</span>}
+            {/* a caller asks Muse, the desk or Colin for help (0263): in the header, so the callers' bar keeps its six pages */}
+            {member?.role === 'caller' && <HelpLink />}
             <StayAwake />
             <OnPhoneSwitch />
             <ThemeButton />

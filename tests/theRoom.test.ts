@@ -74,9 +74,9 @@ describe('the room', () => {
     expect((await call(muse, 'chat_post', { body: '  ' })).isError).toBe(true)
     const long = await call(muse, 'chat_post', { body: 'x'.repeat(2001) })
     expect(long.value.reason).toMatch(/too long for the room/)
-    expect((await call(muse, 'chat_post', { body: 'hello', to: ['thalia'] })).value.reason).toMatch(/nobody in the room is called "thalia"/)
+    expect((await call(muse, 'chat_post', { body: 'hello', to: ['bob'] })).value.reason).toMatch(/nobody in the room is called "bob"/)
     // a key that is none of the four: the database refuses it, and the door does not even list the tools to it
-    expect((await call(dots, 'chat_post', { body: 'hello' })).value.reason).toBe('the room is the desk, Muse, Muse 2 and Colin')
+    expect((await call(dots, 'chat_post', { body: 'hello' })).value.reason).toBe('the room is the desk, Muse, Muse 2, Colin and the callers')
     expect((await call(dots, 'chat_read')).isError).toBe(true)
     const chat = { name: 'chat_read', role: 'channel' }
     expect([toolAllowed(dots, chat), toolAllowed(muse, chat), toolAllowed(muse2, chat)]).toEqual([false, true, true])
@@ -96,5 +96,52 @@ describe('the room', () => {
     await expect(asUser('adil@example.com', `select public.room_say('hi')`)).rejects.toThrow(/only Colin/)
     await expect(asUser('adil@example.com', `select public.room_post('desk', 'hi')`)).rejects.toThrow(/permission denied/)
     expect(await asUser('adil@example.com', `select id from public.room_messages`)).toEqual([])
+  })
+
+  // 0263 (Colin 2026-11-20: "give Tyler and thalia access to the chat too so they can ask for help"). A caller is in the
+  // room through a line of their own: what they wrote and what was written to them by name, nothing else.
+  it('a caller asks for help and sees only their own line: not the room, not the other caller', async () => {
+    await db.exec(`insert into public.team_members (email, role, person, display_name) values ('thalia@example.com', 'caller', 'thalia', 'Thalia')
+                   on conflict (email) do update set role = excluded.role, person = excluded.person, display_name = excluded.display_name;`)
+    const mine = async (email: string) => (await asUser<{ r: Json }>(email, `select public.room_mine(100) as r`))[0].r
+    // nothing of the agents' traffic is Tyler's to read, though the room is full of it
+    expect((await mine('adil@example.com')).lines).toEqual([])
+    await call(muse2, 'chat_read')                                                 // Muse 2 is up to date before the callers write
+    const q = (await asUser<{ r: Json }>('adil@example.com', `select public.room_ask('The Huss card shows two numbers. Which one do I call?') as r`))[0].r
+    expect(q).toMatchObject({ ok: true, to: 'muse, desk' })                        // named nobody: Muse and the desk
+    await asUser('thalia@example.com', `select public.room_ask('Is Sutton still mine to call tonight?')`)
+
+    // the agents see both questions, marked as a caller's, and the tool tells Muse on its next call
+    const seen = (await call(muse, 'chat_read')).value.lines.filter((l: Json) => l.from_caller)
+    expect(seen.map((l: Json) => [l.from, l.for_you])).toEqual([['tyler', true], ['thalia', true]])
+    expect((await svc<Json | null>(`public.agent_attention('Muse 2')`))?.room).toBeUndefined()     // not Muse 2's to answer
+
+    // Muse answers Tyler by name; a line that names nobody stays the agents'
+    const a = await call(muse, 'chat_post', { body: 'Call the 262 number: the other one is his brother.', to: ['tyler'], reply_to: q.id })
+    expect(a.value).toMatchObject({ ok: true, to: 'tyler' })
+    await call(muse, 'chat_post', { body: 'Restack for Thalia is done: Sutton first.' })
+    expect((await asUser<{ n: number }>('adil@example.com', `select public.room_mine_unread() as n`))[0].n).toBe(1)
+    const t = await mine('adil@example.com')
+    expect(t.you).toBe('tyler')
+    expect(t.lines.map((l: Json) => [l.from, l.body])).toEqual([
+      ['tyler', 'The Huss card shows two numbers. Which one do I call?'], ['muse', 'Call the 262 number: the other one is his brother.']])
+    expect((await asUser<{ n: number }>('adil@example.com', `select public.room_mine_unread() as n`))[0].n).toBe(0)   // reading it clears the badge
+    // Thalia sees her own question and nothing of Tyler's thread
+    const th = await mine('thalia@example.com')
+    expect(th.lines.map((l: Json) => l.body)).toEqual(['Is Sutton still mine to call tonight?'])
+    expect(JSON.stringify(th)).not.toMatch(/Huss|262 number|Restack/)
+
+    // a caller cannot write to the other caller, cannot answer a line they cannot see, and cannot read the tables
+    expect((await svc<Json>(`public.room_post('adil', 'hey', array['thalia'], null)`)).reason).toMatch(/does not write to the other caller/)
+    const hidden = (await svc<{ id: number }[]>(`(select jsonb_agg(jsonb_build_object('id', id)) from public.room_messages where author = 'thalia')`))[0].id
+    expect((await svc<Json>(`public.room_post('adil', 'me too', null, $1)`, [hidden])).reason).toMatch(/not in the room/)
+    expect(await asUser('adil@example.com', `select id from public.room_messages`)).toEqual([])
+    await expect(asUser('adil@example.com', `select public.room_page(10)`)).rejects.toThrow(/Colin/)
+    // Colin sees all of it on his page and can write to a caller; Colin has no help line of his own
+    const page = (await asUser<{ r: Json }>('colin@example.com', `select public.room_page(100) as r`))[0].r
+    expect(page.lines.filter((l: Json) => l.from_caller).length).toBe(2)
+    expect((await asUser<{ r: Json }>('colin@example.com', `select public.room_say('Tyler: good catch on Huss.', array['tyler']) as r`))[0].r).toMatchObject({ ok: true, to: 'tyler' })
+    expect((await mine('adil@example.com')).lines.at(-1)).toMatchObject({ from: 'colin', body: 'Tyler: good catch on Huss.' })
+    await expect(asUser('colin@example.com', `select public.room_mine(10)`)).rejects.toThrow(/callers' help line/)
   })
 })

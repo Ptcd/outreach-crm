@@ -10,6 +10,7 @@ import Warm from '@/pages/Warm'
 import Pipeline from '@/pages/Pipeline'
 import MyCards from '@/pages/MyCards'
 import Room from '@/pages/Room'
+import Help from '@/pages/Help'
 import LeadDetail from '@/pages/LeadDetail'
 import Approvals from '@/pages/Approvals'
 import Inbox from '@/pages/Inbox'
@@ -99,6 +100,8 @@ export default function App() {
         <Route path="/scoreboard" element={colinOnly(<Scoreboard />)} />
         <Route path="/research" element={colinOnly(<ResearchBoard />)} />
         <Route path="/room" element={colinOnly(<Room />)} />
+        {/* a caller's own line into the room (0263); Colin has the whole room */}
+        <Route path="/help" element={caller ? <Help /> : <Navigate to="/room" replace />} />
         <Route path="/call-time" element={<CallTime />} />
         <Route path="*" element={<Navigate to="/today" replace />} />
       </Routes>

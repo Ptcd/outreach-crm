@@ -11,14 +11,18 @@ import { cn } from '@/lib/utils'
 
 type Line = { id: number; at: string; at_central: string; from: string; to: string; body: string; reply_to: number | null }
 type Page = { lines: Line[]; seen: Record<string, { last_id: number; at: string }> }
-const WHO: Record<string, string> = { desk: 'Desk', muse: 'Muse', 'muse 2': 'Muse 2', colin: 'Colin' }
+const WHO: Record<string, string> = { desk: 'Desk', muse: 'Muse', 'muse 2': 'Muse 2', colin: 'Colin', thalia: 'Thalia', tyler: 'Tyler' }
 const TONE: Record<string, string> = {
   desk: 'border-sky-300 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/30',
   muse: 'border-violet-300 bg-violet-50 dark:border-violet-900 dark:bg-violet-950/30',
   'muse 2': 'border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30',
   colin: 'border-emerald-300 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30',
+  thalia: 'border-rose-300 bg-rose-50 dark:border-rose-900 dark:bg-rose-950/30',
+  tyler: 'border-rose-300 bg-rose-50 dark:border-rose-900 dark:bg-rose-950/30',
 }
 const OTHERS = ['desk', 'muse', 'muse 2']
+// who a line can be written to: the callers too (0263). A caller sees only lines written to them by name.
+const TO = [...OTHERS, 'thalia', 'tyler']
 
 export default function Room() {
   const qc = useQueryClient()
@@ -55,6 +59,7 @@ export default function Room() {
       <h1 className="text-2xl font-bold tracking-tight">Room</h1>
       <p className="text-sm text-muted-foreground">
         The desk, Muse and Muse 2 talking to each other in short lines. You can read it and say a line. Reports and decisions still go on the desk.
+        Thalia and Tyler ask for help here from their Help page: each of them sees only their own questions and the lines written to them by name.
       </p>
       <div className="flex flex-wrap gap-2 text-xs">
         {OTHERS.map((w) => {
@@ -99,7 +104,7 @@ export default function Room() {
         )}
         <div className="flex flex-wrap gap-1 text-xs" role="group" aria-label="Who the line is for">
           <button type="button" aria-pressed={to.length === 0} className={cn('rounded border px-2 py-1', to.length === 0 && 'bg-foreground text-background')} onClick={() => setTo([])}>Everyone</button>
-          {OTHERS.map((w) => (
+          {TO.map((w) => (
             <button key={w} type="button" aria-pressed={to.includes(w)} className={cn('rounded border px-2 py-1', to.includes(w) && 'bg-foreground text-background')}
               onClick={() => setTo(to.includes(w) ? to.filter((x) => x !== w) : [...to, w])}>{WHO[w]}</button>
           ))}
