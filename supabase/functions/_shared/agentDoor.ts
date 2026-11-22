@@ -149,9 +149,11 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
   // night the laptop lists every owner it would text tomorrow if it had a number; Muse claims a batch, traces the owner,
   // and loads the phones with add_prospects naming wpie_owner_id. The laptop copies the phones over within ten minutes.
   { role: 'intake', name: 'phones_wanted',
-    description: 'Owners the laptop would text tomorrow if it had a phone: your batch to trace, real need first (two or more years of tax behind, or a foreclosure, estate, probate, inheritance, court-debt, code or vacancy record), then the most years behind. Each comes with wpie_owner_id, the owner, mailing address, property, parcel, county, reasons, tax_years, need, why, est_value and existing_card. Claiming holds the rows for you for two days. When you find numbers, load them with add_prospects and pass wpie_owner_id on the prospect: the card is then keyed to the laptop\'s owner and the laptop texts it from the next plan. No number found: just leave the row; nothing to mark. counts_only=true returns only the counts (open, real need, yours, by county).',
+    description: 'Owners the laptop would text tomorrow if it had a phone: your batch to trace, real need first (two or more years of tax behind, or a foreclosure, estate, probate, inheritance, court-debt, code or vacancy record), then the most years behind. Each comes with wpie_owner_id, the owner, mailing address, property, parcel, county, reasons, tax_years, need, why, est_value and existing_card. Claiming holds the rows for you for two days. When you find numbers, load them with add_prospects and pass wpie_owner_id on the prospect: the card is then keyed to the laptop\'s owner and the laptop texts it from the next plan. No number found: call this tool again with no_number = the wpie_owner_id values you traced and found nothing for (and a note: the source you used); they are not handed out again for 30 days, and that call returns only how many were marked. counts_only=true returns only the counts (open, real need, yours, tried with no number, by county).',
     inputSchema: { type: 'object', properties: { limit: { type: 'integer', maximum: 500, description: 'owners per batch (default 100)' },
-      county: S('one county'), need: S('real need | less motivated'), counts_only: { type: 'boolean' } } } },
+      county: S('one county'), need: S('real need | less motivated'), counts_only: { type: 'boolean' },
+      no_number: { type: 'array', items: { type: 'integer' }, description: 'wpie_owner_id values you traced and found no number for: marks them and returns the count, pulls nothing' },
+      note: S('with no_number: where you looked') } } },
   // The laptop's list of parcels whose equity is unknown (app 0195; Colin 2026-11-07: "figure out the equity these people
   // have before we waste time on outreach" ... "wire it up, muse can do anything on a browser"). Every night the laptop
   // lists the open cards whose equity grade is unknown or estimated; Muse claims a batch, reads the county's FREE public
@@ -604,8 +606,15 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       return { value: r, isError: r?.ok === false }
     }
     case 'prospect_counts': return { value: await db.prospectCounts() }
-    case 'phones_wanted': return { value: await db.records('agent_phones_wanted', { p_agent: agent.name, p_limit: int(args.limit, 100, 500),
-      p_county: args.county ? String(args.county) : null, p_need: args.need ? String(args.need) : null, p_counts_only: args.counts_only === true }) }
+    case 'phones_wanted': {
+      // 0298 (Muse 2, desk 364): owners traced with no number found are marked, so the next batch does not hand them back
+      if (Array.isArray(args.no_number)) {
+        const r = await db.records('agent_phones_wanted_none', { p_agent: agent.name, p_ids: args.no_number, p_note: args.note ? String(args.note) : null }) as Json
+        return { value: r, isError: r?.ok === false }
+      }
+      return { value: await db.records('agent_phones_wanted', { p_agent: agent.name, p_limit: int(args.limit, 100, 500),
+        p_county: args.county ? String(args.county) : null, p_need: args.need ? String(args.need) : null, p_counts_only: args.counts_only === true }) }
+    }
     case 'mortgages_wanted': return { value: await db.records('agent_mortgages_wanted', { p_agent: agent.name, p_limit: int(args.limit, 50, 200),
       p_county: args.county ? String(args.county) : null, p_counts_only: args.counts_only === true }) }
     case 'mortgage_add': {
