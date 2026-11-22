@@ -455,7 +455,7 @@ function SendPackage({ lead, last, onDone }: { lead: Lead; last: Pkg | null; onD
             The promised callback, when Colin passed: &quot;Hi, it&apos;s [your name]. My partner and I went over everything, and we&apos;re not the right fit for this one right now. I didn&apos;t want to leave you waiting. If anything changes, keep this number.&quot; Then mark the callback Done.
           </blockquote>
         )}
-        <p className="text-muted-foreground">After a good first call: everything you learned goes to Colin in one email. Never a number on the phone.{Object.values(fromCall.fields).some(Boolean) ? ' The answers you tapped in the call script are already filled in; check them and add the rest.' : ''}</p>
+        <p className="text-muted-foreground">After a good first call: everything you learned goes to Colin in one email. The only number you say is the Deal sheet&apos;s.{Object.values(fromCall.fields).some(Boolean) ? ' The answers you tapped in the call script are already filled in; check them and add the rest.' : ''}</p>
         <Button onClick={() => setOpen(true)}>Send package to Colin</Button>
       </div>
     )

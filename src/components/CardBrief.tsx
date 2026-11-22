@@ -55,6 +55,12 @@ function touchLine(t: Brief['touches'][number]): string {
   return (t.body ?? '').replace(/\s+/g, ' ').trim()
 }
 
+/** The task's own note, unless the line after it already says the same thing (0294: it was printed twice). */
+const taskNoteShown = (note: string | null | undefined, nextPlain: string | null | undefined) => {
+  const t = plainTaskNote(note).replace(/[.\s]+$/, '')
+  return t && !(nextPlain ?? '').toLowerCase().includes(t.toLowerCase()) ? t : ''
+}
+
 export function CardBrief({ lead, tasks }: { lead: Lead; tasks: Task[] }) {
   const { member, isOwner } = useAuth()
   const me = member?.person ?? null
@@ -110,7 +116,7 @@ export function CardBrief({ lead, tasks }: { lead: Lead; tasks: Task[] }) {
         {b && (
           <p className="mt-0.5 text-base font-medium">
             {b.mine_next
-              ? `${b.mine_next.owner === me ? 'Your' : `${personLabel(b.mine_next.owner ?? 'colin')}'s`} ${b.mine_next.kind === 'callback' ? 'callback' : b.mine_next.kind} ${fmtDateTime(b.mine_next.due_at)}${plainTaskNote(b.mine_next.note) ? `: ${plainTaskNote(b.mine_next.note).replace(/[.\s]+$/, '')}` : ''}. `
+              ? `${b.mine_next.owner === me ? 'Your' : `${personLabel(b.mine_next.owner ?? 'colin')}'s`} ${b.mine_next.kind === 'callback' ? 'callback' : b.mine_next.kind} ${fmtDateTime(b.mine_next.due_at)}${taskNoteShown(b.mine_next.note, b.next_plain) ? `: ${taskNoteShown(b.mine_next.note, b.next_plain)}` : ''}. `
               : ''}
             <span className={cn(b.mine_next && 'font-normal text-muted-foreground')}>{b.next_plain}</span>
           </p>
@@ -175,7 +181,7 @@ export function CardBrief({ lead, tasks }: { lead: Lead; tasks: Task[] }) {
           {b.planned.length > 0 && (
             <ul className="mt-1 space-y-0.5 text-sm">
               {b.planned.map((p) => (
-                <li key={`${p.at}-${p.what}`}><span className="font-medium">Next:</span> {fmtDateTime(p.at)} · {p.what === 'belt' ? 'the machine' : p.what}{p.who ? ` (${personLabel(p.who.replace(/_call|_visit/, ''))})` : ''}{plainTaskNote(p.words) ? `: ${plainTaskNote(p.words)}` : ''}</li>
+                <li key={`${p.at}-${p.what}`}><span className="font-medium">Next:</span> {fmtDateTime(p.at)} · {p.what === 'belt' ? 'the machine' : p.what}{p.who ? ` (${personLabel(p.who === 'thalia_call' ? (b.locked_to ?? 'thalia') : p.who.replace(/_call|_visit/, ''))})` : ''}{plainTaskNote(p.words) ? `: ${plainTaskNote(p.words)}` : ''}</li>
               ))}
             </ul>
           )}

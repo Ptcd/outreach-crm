@@ -184,3 +184,68 @@ describe('the deal sheet', () => {
     await expect(asUser(THALIA, `select count(*) from public.deal_sheets`)).rejects.toThrow(/permission denied/)
   })
 })
+
+// 0294, 0295 (Colin 2026-11-22, 226 60th Ave, Somers: "you'll see how Tyler can't figure out wtf is going on"). The
+// sheet ended in a bold walk-away total with no number of ours; the caller texted it to the seller as an offer.
+describe('the sheet says what to do about price', () => {
+  const SOMERS = '00000000-0000-0000-0000-00000000d005'
+  const work = async (lead = SOMERS) => (await db.query<{ r: Json }>(`select public.deal_sheet_work($1) as r`, [lead])).rows[0].r
+
+  it('every stage carries one plain line; with no number it says not to say or text a price', async () => {
+    await db.query(`insert into public.leads (id, wpie_owner_id, owner_name, lane, stage, property_address, municipality, county, mailing_state, locked_to, assigned_to)
+                    values ($1, 9705, 'NOT AVAILABLE', 'flip', 'reply_received', '226 TEST AVE', 'Somers', 'Kenosha', 'WI', 'adil', 'adil')`, [SOMERS])
+    await offer(SOMERS, { arv: 395000, comps: comps([373750, 383000, 432000]), rows: ROWS(20000, 85000) })
+    await brief(SOMERS, [{ kind: 'mortgage', creditor: 'unknown', amount: null, basis: 'deed index not searched', follows_house: 'yes' }], 0, 0)
+    const w = await work()
+    expect(w).toMatchObject({ stage: 'needs_owed', number: null })
+    expect(w.verdict.say).toBe('You have no number for this house. Do not say or text any price.')
+    expect(w.verdict.next).toMatch(/Ask what is owed \(step 3\)/)
+    // a card with a number says the number
+    const h = await work(HOWARD)
+    expect(h.stage).toBe('ready')
+    expect(h.verdict.say).toBe(`Your number is $${Number(h.number).toLocaleString('en-US')}. Say it once, on a call, after step 5.`)
+  })
+
+  it('what the seller texted counts: a number over the finished price means no number, whatever is owed', async () => {
+    await db.query(`insert into public.reply_drafts (lead_id, phone10, inbound_at, kind, status, facts)
+                    values ($1, '2625550100', now(), 'routine', 'sent', $2::jsonb)`,
+      [SOMERS, JSON.stringify({ price_expectation: '$500,000', condition: '2 new bathrooms, new kitchen', decision_makers: 'Only her on title', occupancy: 'owner' })])
+    const w = await work()
+    expect(w).toMatchObject({ stage: 'apart', number: null, theirs: { number: 500000, number_from: 'text' } })
+    expect(w.verdict.say).toBe('You have no number for this house. Do not say or text any price.')
+    expect(w.verdict.next).toMatch(/They want \$500,000\. Finished, houses like it sell for about \$395,000/)
+    expect(w.verdict.next).toMatch(/rest the card/)
+    expect(w.texted).toMatchObject({ condition: '2 new bathrooms, new kitchen', who_signs: 'Only her on title' })
+    // a floor under the finished price, said on a call, takes the card back to the sheet's own arithmetic
+    await db.query(`insert into public.deal_sheets (lead_id, facts) values ($1, '{"floor": 150000}'::jsonb)
+                    on conflict (lead_id) do update set facts = excluded.facts`, [SOMERS])
+    expect((await work()).stage).toBe('needs_owed')
+  })
+
+  it('money as people write it: "$500,000", "140k", "1.2 million"; a bare small figure is not guessed at', async () => {
+    const m = async (s: string) => (await db.query<{ v: string | null }>(`select public.money_said($1) as v`, [s])).rows[0].v
+    expect(Number(await m('$500,000'))).toBe(500000)
+    expect(Number(await m('about 140k'))).toBe(140000)
+    expect(Number(await m('$1.2 million'))).toBe(1200000)
+    expect(await m('3 bed, 2 bath')).toBeNull()
+    expect(await m('make me an offer')).toBeNull()
+  })
+
+  it('a call script that gives the caller a price is refused: the number is the Deal sheet\'s alone', async () => {
+    const owed = [{ kind: 'mortgage', creditor: 'unknown', amount: null, basis: 'deed index not searched', follows_house: 'yes' }]
+    const body = (money: string) => ({ lead_id: SOMERS, owed, unknowns: ['the mortgage'], sources: 'tax roll',
+      story: 'The person who answered says she owns the house and lives in it. Nothing on record presses a sale. The mortgage is not known.',
+      script: `**Open**\n"Hi, this is the caller, I texted you about the house. Can I ask a few quick questions first?"\n${'Ask who is on the title and who decides. '.repeat(8)}\n**Money**\n${money}\n**Close**\nBook a time.` })
+    const set = async (money: string) => (await db.query<{ r: Json }>(`select public.agent_call_brief_set($1::jsonb, 'Grok') as r`, [JSON.stringify(body(money))])).rows[0].r
+    const bad = await set('Cosmetic only: open $236,800, no higher than $256,500.')
+    expect(bad.ok).toBe(false)
+    expect(bad.reason).toMatch(/gives the caller a price/)
+    expect(bad.reason).toMatch(/Deal sheet/)
+    // what is owed, the finished price and the seller's own number may stay
+    const ok = await set('She has said she wants $500,000. Finished, it sells for about $395,000. Your number is the one on the Deal sheet; if it shows none, give none.')
+    expect(ok.ok).toBe(true)
+    const packet = (await db.query<{ body: string }>(`select body from public.live_work_packet limit 1`)).rows[0].body
+    expect(packet).not.toMatch(/use the rows you stored in call_prices/)
+    expect(packet).toMatch(/name NO price of ours/)
+  })
+})

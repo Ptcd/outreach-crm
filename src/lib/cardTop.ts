@@ -11,11 +11,14 @@ const cap = (w: string) => (KEEP_UPPER.test(w) ? w.toUpperCase().replace(/^JR$/,
   : w.split(/([-'])/).map((p) => (p.length > 1 || /[a-z]/i.test(p) ? p[0].toUpperCase() + p.slice(1).toLowerCase() : p)).join(''))
 const title = (s: string) => s.split(/\s+/).filter(Boolean).map(cap).join(' ')
 
+/** What a county roll prints when it gives no owner (Kenosha's "NOT AVAILABLE"): not a name to show or to say. */
+export const NO_NAME = /^(not available|unavailable|unknown|unknown owner|owner unknown|current owner|current resident|n\/?a|none|no name)$/i
+
 /** The owner as a person would say it: "THOMPSON, RUSSEL J / HUTH, RACHAEL L" -> "Russel J Thompson and Rachael L Huth".
  *  A name with no comma keeps its order (a roll's "BLAISDELL KAREN" may be either way round); a company keeps its words. */
 export function displayOwner(owner: string | null | undefined): string {
   const s = (owner ?? '').trim()
-  if (!s) return ''
+  if (!s || NO_NAME.test(s)) return ''
   if (COMPANY.test(s) && !/,/.test(s)) return title(s)
   const people = s.split(/\s*(?:\/|&|\band\b|;)\s*/i).map((p) => p.trim()).filter(Boolean)
   const said = people.map((p) => {
@@ -66,6 +69,9 @@ export function plainTaskNote(note: string | null | undefined): string {
   return (note ?? '')
     .replace(/^\s*(Muse( 2)?|Grok|Desk)\s*(\([^)]*\))?\s*\d{4}-\d{2}-\d{2}\s*:\s*/i, '')
     .replace(/A logged call closes this task\.*/gi, '')
+    .replace(/STORY:[\s\S]*?read them before you dial\.?/i, '')
+    .replace(/\bCall(?:\s*\(?\d{3}\)?[ .-]?\d{3}[ .-]?\d{4}\s*(?:\([a-z ]+\))?[,.]?)+/gi, '')
+    .replace(/\bSay:\s*/g, '')
     .replace(/call list \(#\d+\)/gi, '')
     .replace(/Dial \(?\d{3}\)?[ .-]?\d{3}[ .-]?\d{4}\.?/gi, '')
     .replace(/(Estate \/ owner died|Foreclosure|Back taxes|Probate \/ estate|Sheriff sale|Code case|Eviction|Judgment)\s*:[^.;]*[.;]?/gi, '')

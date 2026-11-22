@@ -56,7 +56,10 @@ describe('the deal sheet on the card', () => {
       expect(screen.getByText(t)).toBeTruthy()
     const math = screen.getByLabelText("The seller's math").textContent!
     expect(math).toContain('What it sells for finished$200,000')
-    expect(math).toContain('What they would walk away withNothing')
+    expect(math).toContain('What they would keep if they fixed it up and sold it with an agentNothing')
+    // 0294: the top of the sheet says the number, and the math says it is not our offer
+    expect(screen.getByLabelText('What to do about price').textContent).toContain('Your number is $39,000. Say it once, on a call, after step 5.')
+    expect(screen.getByText(/It is not our offer\. Never say or text it as a price\./)).toBeTruthy()
     expect(screen.getByText(/11 Near St sold for \$200,000 in May 2026/)).toBeTruthy()
     expect(screen.getByText(/I don't see how selling it puts money in your pocket/)).toBeTruthy()
     expect(document.body.textContent).not.toMatch(/most we can pay|\$59,000|\$79,500|Yours only/)
@@ -92,7 +95,9 @@ describe('the deal sheet on the card', () => {
   it('a card the formula does not fit: no number for the caller, one box to ask Colin', async () => {
     current = base({ stage: 'colin_prices', number: null, steps: [], limit: null, kind: null, why: 'No formula number: it is a manufactured home.' })
     show()
-    expect(await screen.findByText(/Colin prices this one\./)).toBeTruthy()
+    const top = (await screen.findByLabelText('What to do about price')).textContent!
+    expect(top).toContain('You have no number for this house. Do not say or text any price.')
+    expect(top).toContain('None of them is our offer.')
     expect(screen.queryByLabelText('The number to say')).toBeNull()
     fireEvent.change(screen.getByLabelText('What to ask Colin'), { target: { value: 'he wants a number today' } })
     fireEvent.click(screen.getByText('Send to Colin'))

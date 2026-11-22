@@ -2,6 +2,7 @@
 -- also saves audio, deletes Twilio's copy after the notes are done and archives other recordings after 14 days, so it
 -- wakes as well when audio is waiting to be saved or Twilio still holds a saved copy, and once an hour regardless.
 do $$ declare c text; begin
+  if to_regclass('cron.job') is null then return; end if;      -- no scheduler here (a test database)
   select command into c from cron.job where jobname = 'wpie-call-notes-sweep';
   if c is null then raise notice 'no sweep job'; return; end if;
   if c not like '%audio_saved_at%' then

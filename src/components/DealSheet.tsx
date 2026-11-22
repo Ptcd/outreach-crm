@@ -18,7 +18,7 @@ type Owed = { kind?: string; creditor?: string | null; amount?: number | null; b
 type SaidEvent = { at: string; by: string | null; number: number; response: string; words: string | null; counter: number | null }
 export type Sheet = {
   lead_id: string; mode: 'off' | 'owner' | 'on'; owner: boolean
-  stage: 'ready' | 'needs_value' | 'needs_owed' | 'colin_prices' | 'no_fit' | 'no_number' | 'passed'
+  stage: 'ready' | 'needs_value' | 'needs_owed' | 'colin_prices' | 'no_fit' | 'no_number' | 'passed' | 'apart'
   kind: 'nothing_left' | 'some_left' | 'a_lot' | null; why: string | null; source: 'math' | 'colin' | 'their_floor' | 'agent'
   missing: { what: string; who: string }[]; property_kind: string; gate?: string[]
   math: { finished: number | null; needs: number | null; needs_for: string | null; needs_assumed: boolean; selling_costs: number | null
@@ -26,7 +26,10 @@ export type Sheet = {
   rows: Row[]; inside: number | null; comps: { address: string; sold_price: number; sold_date: string | null }[]; sold_comps: number
   owed: Owed[]; brief_ready: boolean; number: number | null; steps: number[]; limit: number | null
   ceiling?: number | null; rule_opening?: number | null; gap?: number | null
-  theirs: { number: number | null; floor: number | null; owed_said: number | null }
+  theirs: { number: number | null; floor: number | null; owed_said: number | null; number_from?: 'call' | 'text' | null }
+  // 0294: the one thing to do about price, in plain words, and what the seller already texted
+  verdict?: { say: string | null; next: string | null }
+  texted?: { condition?: string | null; who_signs?: string | null; lives_there?: string | null }
   facts: Record<string, unknown>; said: SaidEvent[]
   colin: { open: number | null; top: number | null; note: string | null; pass: boolean; at: string | null; asked_at: string | null; asked_words: string | null }
   owner_name: string | null; address: string | null; caller: string | null
@@ -123,6 +126,18 @@ export function DealSheet({ leadId }: { leadId: string }) {
   const absent = f.decides === 'absent'
   const m = s.math
   const comp = s.comps[0]
+  // the top line: with a number, the one to say now (it moves up a step after a no); with none, the server's plain words
+  const NO_NUMBER = 'You have no number for this house. Do not say or text any price.'
+  const verdictSay = s.stage !== 'ready' ? (s.verdict?.say ?? NO_NUMBER)
+    : agreed != null ? `They said yes to ${usd(agreed)}. Send the offer now.`
+    : absent ? 'No number today: the other person who decides is not on the call.'
+    : current != null ? `Your number is ${usd(current)}. Say it once, on a call, after step 5.`
+    : 'No further number. Anything more is Colin’s.'
+  const verdictNext = s.stage !== 'ready' ? (s.verdict?.next ?? s.why)
+    : agreed != null ? 'Send offer is below. Stay on the call until it comes back signed.'
+    : absent ? 'Book the call with both of them on the line.'
+    : current != null ? 'Walk steps 1 to 5 with them first. One number, one reason, then wait. Never text it.'
+    : 'Use Ask Colin at the bottom of this sheet.'
   const record = async (response: string) => {
     if (current == null) return
     const ok = await run('deal_sheet_said', { p_number: current, p_response: response, p_words: words || null, p_counter: response === 'counter' ? num(counter) : null })
@@ -141,16 +156,14 @@ export function DealSheet({ leadId }: { leadId: string }) {
         {s.kind === 'a_lot' && <Badge tone="warn">They keep the difference</Badge>}
       </div>
 
-      {s.stage !== 'ready' && (
-        <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm dark:bg-amber-950/30">
-          {s.stage === 'needs_value' && <p><strong>No number yet.</strong> Waiting on Muse: {s.missing[0]?.what}. Call for the story and their number, and give none.</p>}
-          {s.stage === 'needs_owed' && <p><strong>No number yet.</strong> Ask what is owed (step 3), then tap their answer. The number comes from it.</p>}
-          {s.stage === 'colin_prices' && <p><strong>Colin prices this one.</strong> {s.why} Give no number. Use &quot;Ask Colin&quot; below if they want one now.</p>}
-          {s.stage === 'no_fit' && <p><strong>No number.</strong> {s.why}</p>}
-          {s.stage === 'no_number' && <p><strong>No number from us.</strong> {s.why}</p>}
-          {s.stage === 'passed' && <p><strong>Colin passed.</strong> {s.why} Close it kindly.</p>}
-        </div>
-      )}
+      {/* 0294 (Colin 2026-11-22, 226 60th Ave: "Tyler can't figure out wtf is going on"): the first thing on the sheet is
+          what to do about price, in one line a person cannot misread. Tyler took the seller's walk-away total for the
+          offer and texted it. */}
+      <div className={cn('mt-2 rounded-md border-2 p-3', s.stage === 'ready' ? 'border-primary' : 'border-red-400 bg-red-50 dark:bg-red-950/30')} aria-label="What to do about price">
+        <p className="text-lg font-bold leading-snug">{verdictSay}</p>
+        {verdictNext && <p className="mt-1 text-sm">{verdictNext}</p>}
+        {s.stage !== 'ready' && <p className="mt-1 text-sm font-semibold">Every dollar figure below is the seller&apos;s side of the math. None of them is our offer.</p>}
+      </div>
 
       <ol className="mt-3 space-y-2">
         <Step n={1} title="Their number, and where it came from">
@@ -158,7 +171,7 @@ export function DealSheet({ leadId }: { leadId: string }) {
           <div className="flex flex-wrap items-center gap-2">
             <Input className="h-9 w-36" inputMode="numeric" placeholder={s.theirs.number ? usd(s.theirs.number) : 'Their number'} value={theirs} onChange={(e) => setTheirs(e.target.value)} aria-label="Their number" />
             <Button size="sm" variant="outline" disabled={busy || !num(theirs)} onClick={async () => { if (await fact('their_number', num(theirs))) setTheirs('') }}>Save</Button>
-            {s.theirs.number != null && <span className="text-xs text-muted-foreground">On the card: {usd(s.theirs.number)}</span>}
+            {s.theirs.number != null && <span className="text-xs text-muted-foreground">{s.theirs.number_from === 'text' ? 'They texted' : 'On the card'}: {usd(s.theirs.number)}</span>}
           </div>
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Where their number came from">
             {SOURCES.map((x) => <button key={x} type="button" className={chip(f.their_source === x)} disabled={busy} onClick={() => fact('their_source', f.their_source === x ? null : x)}>{x}</button>)}
@@ -168,6 +181,7 @@ export function DealSheet({ leadId }: { leadId: string }) {
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Who decides">
             {DECIDES.map(([id, label]) => <button key={id} type="button" className={chip(f.decides === id)} disabled={busy} onClick={() => fact('decides', f.decides === id ? null : id)}>{label}</button>)}
           </div>
+          {s.texted?.who_signs && <p className="text-xs text-muted-foreground">They texted: {s.texted.who_signs}</p>}
           {absent && <p className="rounded border border-amber-300 bg-amber-50 p-2 text-sm dark:bg-amber-950/30"><strong>No number today.</strong> &quot;When are you both free? I&apos;ll call then.&quot; Book the call with both on the line.</p>}
         </Step>
 
@@ -180,6 +194,7 @@ export function DealSheet({ leadId }: { leadId: string }) {
           {s.rows.length > 0 && (
             <>
               <p className="text-xs font-semibold uppercase text-muted-foreground">From what they said, the inside is</p>
+              {s.texted?.condition && <p className="text-xs text-muted-foreground">They texted: {s.texted.condition}</p>}
               <div className="flex flex-wrap gap-1.5" role="group" aria-label="The shape of the inside">
                 {s.rows.map((r) => <button key={r.i} type="button" disabled={busy} className={chip(!m.needs_assumed && s.inside === r.i)} onClick={() => run('deal_sheet_inside', { p_row: r.i })}>{r.inside} · {usd(r.repairs)}</button>)}
               </div>
@@ -226,9 +241,12 @@ export function DealSheet({ leadId }: { leadId: string }) {
                 <tr><td>What selling it costs <span className="text-xs text-muted-foreground">({m.cost_words})</span></td><td className="text-right tabular-nums">- {usd(m.selling_costs)}</td></tr>
                 <tr><td>Owed, paid at closing{!m.owed_known && <span className="text-xs text-amber-700"> (not confirmed)</span>}</td><td className="text-right tabular-nums">- {usd(m.to_clear)}</td></tr>
                 {m.other_owed > 0 && <tr><td>Other claims on what is left</td><td className="text-right tabular-nums">- {usd(m.other_owed)}</td></tr>}
-                <tr className="border-t font-semibold"><td>What they would walk away with</td><td className="text-right tabular-nums">{m.walk_away != null && m.walk_away <= 0 ? 'Nothing' : usd(m.walk_away)}</td></tr>
+                <tr className="border-t font-semibold"><td>What they would keep if they fixed it up and sold it with an agent{!m.owed_known && <span className="font-normal text-amber-700"> (before what they owe, not known yet)</span>}</td><td className="text-right tabular-nums">{m.walk_away != null && m.walk_away <= 0 ? 'Nothing' : usd(m.walk_away)}</td></tr>
               </tbody>
             </table>
+          )}
+          {m.finished != null && m.needs != null && (
+            <p className="rounded border border-red-300 bg-red-50 px-2 py-1.5 text-sm font-semibold text-red-800 dark:bg-red-950/30 dark:text-red-200">That last line is their side of the math. It is not our offer. Never say or text it as a price.</p>
           )}
           {s.kind === 'nothing_left' && <Say>&quot;I&apos;ll be straight with you. If you don&apos;t want to keep the place, I don&apos;t see how selling it puts money in your pocket. If you&apos;d rather just be done with it, we&apos;ll buy it as it sits: no repairs, no showings, we clear it out, and it closes at a title company.&quot;</Say>}
           {s.kind === 'some_left' && <Say>&quot;Selling it the usual way, after the work, the agent and the months it takes, you&apos;d clear about {usd(m.walk_away)}. We can have it done in a few weeks, as it sits, with nothing for you to fix or clean out.&quot;</Say>}

@@ -604,7 +604,7 @@ function CallbackPlan({ item, caller, street, busy, live, onDone }: { item: Item
     title = 'Colin wants to walk it: book his walk'
     body = <>
       <blockquote className={say}>&ldquo;My partner and I went over everything you told me. He&apos;d like to come see it himself. He only puts a number on a place once he&apos;s walked it.&rdquo; Then: &ldquo;If his number works for you, are you ready to give him a yes or a no that day? A no is completely fine.&rdquo;</blockquote>
-      <p>A yes: {open} and tap <b>Book Colin&apos;s walk</b> (it closes the callback). Never a number on the phone.</p>
+      <p>A yes: {open} and tap <b>Book Colin&apos;s walk</b> (it closes the callback). The only number you say is the Deal sheet&apos;s.</p>
     </>
     doneLabel = ''
   } else if (p && p.colin_asks && !p.caller_answers) {

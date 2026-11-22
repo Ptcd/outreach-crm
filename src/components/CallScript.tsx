@@ -17,6 +17,9 @@ import { useAuth } from '@/providers/AuthProvider'
 import { useOnPhone, workerFor } from '@/lib/onPhone'
 import { NotNowPicker, saveSayNext } from '@/components/NextStep'
 import { CALL_LANES, type CallLane, type NotNowKind } from '@/lib/nextStep'
+import { greetedName } from '@/components/CallPanel'
+import { NO_NAME } from '@/lib/cardTop'
+import { personLabel } from '@/lib/wpie'
 import type { Contact, GateScore, Lead, Message } from '@/lib/types'
 
 const LABELS: Record<string, string> = Object.fromEntries(
@@ -26,14 +29,17 @@ const title = (s: string) => s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUp
 const ENTITY = /\b(LLC|INC|TRUST|ESTATE|CORP|COMPANY|PROPERTIES|HOLDINGS|BANK|CHURCH)\b/i
 
 /** Names for the script's {placeholders}: the street, the owner's first name, the signer. */
-function scriptVars(lead: Lead, facts: CallFacts, caller = 'thalia'): Record<string, string> {
+function scriptVars(lead: Lead, facts: CallFacts, caller = 'thalia', messages?: Message[]): Record<string, string> {
   const street = (lead.property_address ?? '').replace(/,.*$/, '').trim()
-  const first = ENTITY.test(lead.owner_name) || /^New caller/.test(lead.owner_name) ? '' : title(lead.owner_name.split(/\s+/)[0] ?? '')
+  // 0294: a roll's "NOT AVAILABLE" made the opener "Hi, is this Not?". The name our first text used, when there is one
+  const noName = NO_NAME.test((lead.owner_name ?? '').trim())
+  const greeted = greetedName(messages, noName ? '' : lead.owner_name)
+  const first = greeted || (noName || ENTITY.test(lead.owner_name) || /^New caller/.test(lead.owner_name) ? '' : title(lead.owner_name.split(/\s+/)[0] ?? ''))
   const dm = answerOf(facts, 'decision_makers')?.text?.trim()
   return { street: street ? title(street) : 'the property', first_name: first || 'there', signer: dm || 'everyone who signs',
     day: answerOf(facts, 'next_step')?.when ? new Date(answerOf(facts, 'next_step')!.when!).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/Chicago' }) : 'tomorrow',
     time: answerOf(facts, 'next_step')?.when ? new Date(answerOf(facts, 'next_step')!.when!).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' }) : '{a time that works}',
-    caller: caller.charAt(0).toUpperCase() + caller.slice(1) }
+    caller: personLabel(caller) || caller.charAt(0).toUpperCase() + caller.slice(1) }
 }
 
 // Read top to bottom while on the phone: what we already know, then each question to ask with the
@@ -77,7 +83,7 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
   const opener = messages.find((m) => m.is_opener && m.direction === 'out')
   const replies = messages.filter((m) => m.direction === 'in' && m.channel === 'sms')
   const known = SELLER_FACTS.map((f) => ({ ...f, v: replyFacts[f.id] })).filter((f) => typeof f.v === 'string' && (f.v as string).trim())
-  const vars = scriptVars(lead, facts, caller)
+  const vars = scriptVars(lead, facts, caller, messages)
   // which call this is (the packet's three): they called us just now, they texted us, or a cold call
   const callKind: CallKind = messages.some((m) => m.channel === 'call' && m.direction === 'in' && Date.now() - new Date(m.sent_at).getTime() < 3 * 3600_000)
     ? 'inbound' : replies.length > 0 ? 'hot_text' : 'cold'
@@ -107,7 +113,7 @@ export function CallScript({ lead, contacts, messages, replyFacts, latestGate, p
       <div className="rounded-md bg-muted p-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{CALL_KIND_LABEL[callKind]}: open with</p>
         <p className="mt-1 text-lg font-semibold">&ldquo;{pickupLine(caller, callKind, vars)}&rdquo;</p>
-        <p className="text-sm text-muted-foreground">{PHONE_SCRIPT.voice}</p>
+        <p className="text-sm text-muted-foreground">{PHONE_SCRIPT.voice.replace('This is Thalia.', `This is ${vars.caller}.`)}</p>
         {caller !== 'colin' && <details className="mt-1 text-sm">
           <summary className="cursor-pointer text-muted-foreground">The other openers</summary>
           <ul className="mt-1 space-y-1">
@@ -599,7 +605,7 @@ const CALL_KIND_LABEL: Record<CallKind, string> = { hot_text: 'They texted us', 
 export function pickupLine(caller: string, kind: CallKind = 'cold', vars: Record<string, string> = {}): string {
   // the openers live in the script (phoneScript.json "openers", twin of WPIE docs/phone_script.json): every caller, Colin
   // included, says their own name; we usually make the call, so "they called us" is only for a call that just came in
-  const name = caller.charAt(0).toUpperCase() + caller.slice(1)
+  const name = personLabel(caller) || caller.charAt(0).toUpperCase() + caller.slice(1)
   const first = vars.first_name && vars.first_name !== 'there' ? vars.first_name : 'the owner'
   const line = (PHONE_SCRIPT as unknown as { openers: Record<CallKind, string> }).openers[kind]
   return line.replace(/\{caller\}/g, name).replace(/\{first_name\}/g, first).replace(/\{street\}/g, vars.street ?? 'the property')

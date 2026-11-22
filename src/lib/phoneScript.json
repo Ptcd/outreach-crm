@@ -1,7 +1,7 @@
 {
   "version": "2026-10-28",
   "source": "docs/THALIA_PLAYBOOK.md",
-  "voice": "Your own name: \"This is Thalia.\" Colin is \"my partner\"; say his name only when they ask who texted them, or when you book his walk. Never a number on the phone, not even on the callback: Colin gives his number at the house. Never offer, price, investor, contract, cash, as-is, assistant or a company name: say a number, an agreement, the place.",
+  "voice": "Your own name: \"This is Thalia.\" Colin is \"my partner\"; say his name only when they ask who texted them, or when you book his walk. The only number you ever say is the one the Deal sheet on the card gives you, on a call, after its five steps. No number on the sheet: give none. Never text a price. Never offer, price, investor, contract, cash, as-is, assistant or a company name: say a number, an agreement, the place.",
   "gate_legend": {
     "1": "reason + clock",
     "2": "decision makers",

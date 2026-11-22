@@ -85,7 +85,7 @@ export default function LeadDetail() {
   const who = whoToAskFor(peopleQ.data, lead.owner_name)
   // an estate card with nobody marked yet (0289): the name on the record is very often the person who died
   const estateCard = why.includes('Estate') && who.died.length === 0
-  const heading = who.died.length ? (who.living.length ? who.living.join(' and ') : `Estate of ${who.died.join(' and ')}`) : (displayOwner(lead.owner_name) || lead.owner_name)
+  const heading = who.died.length ? (who.living.length ? who.living.join(' and ') : `Estate of ${who.died.join(' and ')}`) : (displayOwner(lead.owner_name) || who.living.join(' and ') || 'Owner name not on record')
 
   return (
     <div className="space-y-4">
