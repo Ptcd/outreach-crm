@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabaseClient'
+import { useAuth } from '@/providers/AuthProvider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { api, callTranscript, useCallNotes, type CallNote } from '@/lib/queries'
@@ -66,6 +68,17 @@ function NoteCard({ n, open, messages }: { n: CallNote; open: boolean; messages:
   const [until, setUntil] = useState(n.suggested_until ? day(n.suggested_until) : '')
   const [reason, setReason] = useState(n.suggested_reason ?? '')
   const [words, setWords] = useState<string | null>(null)
+  // 0292: Colin listens to the call itself (the audio is kept in our own storage, 0291)
+  const { isOwner } = useAuth()
+  const [audio, setAudio] = useState<string | null>(null)
+  const listen = async () => {
+    setErr(null)
+    const p = await supabase.rpc('call_audio_path', { p_call_sid: n.call_sid })
+    if (p.error || !p.data) { setErr(p.error?.message ?? 'No recording kept for this call'); return }
+    const u = await supabase.storage.from('calls').createSignedUrl(String(p.data), 600)
+    if (u.error || !u.data?.signedUrl) { setErr(u.error?.message ?? 'Could not open the recording'); return }
+    setAudio(u.data.signedUrl)
+  }
   const [expanded, setExpanded] = useState(open)
   const logged = loggedSince(n, messages)
   const when = n.started_at ?? n.created_at
@@ -95,6 +108,9 @@ function NoteCard({ n, open, messages }: { n: CallNote; open: boolean; messages:
       {expanded && (
         <>
           <p className="text-base">{n.summary}</p>
+          {isOwner && (audio
+            ? <audio controls src={audio} className="w-full" aria-label="The call recording" />
+            : <button type="button" className="text-sm underline" onClick={() => void listen()}>Listen to the call</button>)}
           {n.quote && <p className="text-sm italic text-muted-foreground">&ldquo;{n.quote}&rdquo;</p>}
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
             {PILLAR_ROWS.map(([k, label]) => (

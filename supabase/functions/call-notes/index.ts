@@ -51,6 +51,11 @@ function deps(): Deps {
     },
     findByCall: find('call_sid'),
     findByTranscript: find('transcript_sid'),
+    // 0291: the audio is kept in our own private bucket, not at Twilio
+    store: async (path, bytes, contentType) => {
+      const r = await sb.storage.from('calls').upload(path, bytes, { contentType, upsert: true })
+      if (r.error) throw new Error(`storage: ${r.error.message}`)
+    },
   }
 }
 

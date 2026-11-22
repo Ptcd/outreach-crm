@@ -330,6 +330,10 @@ export interface Intelligence {
   sentences(transcriptSid: string): Promise<Sentence[]>
   deleteTranscript(transcriptSid: string): Promise<void>
   deleteRecording(recordingSid: string): Promise<void>
+  /** 0291: the recording's audio, to keep in our own storage before Twilio's copy is deleted */
+  downloadRecording(recordingSid: string): Promise<Uint8Array>
+  /** 0291: the recordings on the account, oldest first, created before a date (voicemails, tests: anything) */
+  listRecordings(before: Date, limit: number): Promise<{ sid: string; call_sid: string | null; duration: number; date_created: string | null }[]>
   call(callSid: string): Promise<TwilioCall | null>
 }
 
@@ -380,6 +384,18 @@ export function twilioIntelligence(o: { accountSid: string; authToken: string; s
     async deleteTranscript(sid) {
       await req(`https://intelligence.twilio.com/v2/Transcripts/${sid}`, { method: 'DELETE' })
     },
+    async downloadRecording(sid) {
+      const res = await o.fetchFn(`https://api.twilio.com/2010-04-01/Accounts/${o.accountSid}/Recordings/${sid}.mp3`, { headers: { authorization: auth } })
+      if (!res.ok) throw new Error(`Twilio answered ${res.status} for the recording audio`)
+      return new Uint8Array(await res.arrayBuffer())
+    },
+    async listRecordings(before, limit) {
+      const day = before.toISOString().slice(0, 10)
+      const r = await req(`https://api.twilio.com/2010-04-01/Accounts/${o.accountSid}/Recordings.json?DateCreated%3C=${day}&PageSize=${Math.min(Math.max(limit, 1), 100)}`)
+      return ((r?.recordings ?? []) as Record<string, unknown>[]).map((x) => ({ sid: String(x.sid ?? ''), call_sid: x.call_sid ? String(x.call_sid) : null,
+        duration: Number.parseInt(String(x.duration ?? '0'), 10) || 0, date_created: x.date_created ? new Date(String(x.date_created)).toISOString() : null }))
+        .filter((x) => /^RE[0-9a-f]{32}$/i.test(x.sid))
+    },
     async deleteRecording(sid) {
       await req(`https://api.twilio.com/2010-04-01/Accounts/${o.accountSid}/Recordings/${sid}.json`, { method: 'DELETE' })
     },
@@ -399,6 +415,8 @@ export interface Deps {
   findByCall: (callSid: string) => Promise<{ call_sid: string; status: string; transcript_sid: string | null } | null>
   log?: (line: string) => void
   now?: () => Date
+  /** 0291: put a file in our own storage (the private calls bucket); resolves only once it is stored */
+  store?: (path: string, bytes: Uint8Array, contentType: string) => Promise<void>
 }
 
 const why = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 200)
@@ -428,8 +446,65 @@ export async function onRecording(p: Record<string, string>, direction: Directio
       return { ...ready, deleted: false }
     }
   }
-  if (ready.transcribe !== true) return ready
-  return { ...ready, ...(await transcribe(callSid, p.RecordingSid ?? '', direction, d)) }
+  // 0291: the audio is ours from the start; Twilio's copy goes once the notes are written (the sweep)
+  const saved = await saveAudio(callSid, p.RecordingSid ?? '', p.RecordingStartTime ? new Date(p.RecordingStartTime) : (d.now?.() ?? new Date()), d)
+  if (ready.transcribe !== true) return { ...ready, ...saved }
+  return { ...ready, ...saved, ...(await transcribe(callSid, p.RecordingSid ?? '', direction, d)) }
+}
+
+/** The path a call's audio is kept at: calls/<year>/<month>/<call id>.mp3 */
+export const audioPath = (callSid: string, at: Date) => `${at.toISOString().slice(0, 4)}/${at.toISOString().slice(5, 7)}/${callSid}.mp3`
+
+/** Copy one recording's audio into our storage and say where it is. Never throws: the sweep tries again. */
+export async function saveAudio(callSid: string, recordingSid: string, at: Date, d: Deps): Promise<{ audio_saved: boolean; audio_error?: string }> {
+  if (!d.store || !/^RE[0-9a-f]{32}$/i.test(recordingSid)) return { audio_saved: false, audio_error: 'no storage or no recording id' }
+  try {
+    const bytes = await d.twilio.downloadRecording(recordingSid)
+    if (!bytes.length) throw new Error('the audio was empty')
+    const path = audioPath(callSid, at)
+    await d.store(path, bytes, 'audio/mpeg')
+    await must(d, 'call_audio_saved', { p_call_sid: callSid, p_path: path, p_bytes: bytes.length })
+    return { audio_saved: true }
+  } catch (e) {
+    ;(d.log ?? console.warn)(`[call-notes] save audio ${callSid}: ${why(e)}`)
+    return { audio_saved: false, audio_error: why(e) }
+  }
+}
+
+/** The audio side of the sweep (0291): save what is not saved, delete Twilio's copy of what is saved and finished, and
+ *  move every other recording on the account (voicemails, tests) into the archive once it is 14 days old. */
+export async function sweepAudio(d: Deps): Promise<Record<string, number>> {
+  const out = { saved: 0, deleted: 0, archived: 0, errors: 0 }
+  const due = (await must(d, 'call_audio_due', {})) as { save?: { call_sid: string; recording_sid: string; started_at: string | null; created_at: string }[]; purge?: { call_sid: string; recording_sid: string }[] }
+  for (const r of due.save ?? []) {
+    const s = await saveAudio(r.call_sid, r.recording_sid, new Date(r.started_at ?? r.created_at), d)
+    if (s.audio_saved) out.saved++; else out.errors++
+  }
+  for (const r of due.purge ?? []) {
+    try { await d.twilio.deleteRecording(r.recording_sid) } catch (e) {
+      if (!/ 404 /.test(` ${why(e)} `)) { out.errors++; (d.log ?? console.warn)(`[call-notes] delete ${r.call_sid}: ${why(e)}`); continue }
+    }
+    await must(d, 'call_twilio_deleted', { p_call_sid: r.call_sid }); out.deleted++
+  }
+  if (!d.store) return out
+  const now = d.now?.() ?? new Date()
+  const old = await d.twilio.listRecordings(new Date(now.getTime() - 14 * 86400000), 20)
+  if (!old.length) return out
+  const known = (await must(d, 'twilio_archive_known', { p_recording_sids: old.map((x) => x.sid) })) as unknown as string[]
+  for (const x of old.filter((y) => !(Array.isArray(known) ? known : []).includes(y.sid)).slice(0, 10)) {
+    try {
+      const bytes = await d.twilio.downloadRecording(x.sid)
+      if (!bytes.length) throw new Error('the audio was empty')
+      const at = x.date_created ? new Date(x.date_created) : now
+      const path = `other/${at.toISOString().slice(0, 7)}/${x.sid}.mp3`
+      await d.store(path, bytes, 'audio/mpeg')
+      await must(d, 'twilio_archive_saved', { p_recording_sid: x.sid, p_call_sid: x.call_sid, p_duration: x.duration, p_recorded_at: x.date_created, p_path: path, p_bytes: bytes.length })
+      await d.twilio.deleteRecording(x.sid)
+      await must(d, 'twilio_archive_deleted', { p_recording_sid: x.sid })
+      out.archived++
+    } catch (e) { out.errors++; (d.log ?? console.warn)(`[call-notes] archive ${x.sid}: ${why(e)}`) }
+  }
+  return out
 }
 
 async function transcribe(callSid: string, recordingSid: string, direction: Direction, d: Deps) {
@@ -498,5 +573,7 @@ export async function sweep(d: Deps) {
       ? await transcribe(r.call_sid, r.recording_sid, r.direction, d)
       : await onTranscript(r.call_sid, d)) })
   }
-  return { ok: true, handled: out.length, results: out }
+  let audio: Record<string, number> | { error: string } = {}
+  try { audio = await sweepAudio(d) } catch (e) { audio = { error: why(e) } }
+  return { ok: true, handled: out.length, results: out, audio }
 }

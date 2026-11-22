@@ -11,7 +11,7 @@ import { SUPABASE_STUB } from './supabaseStub'
 import { CALL_SCRIPT } from '../src/lib/callScript'
 import { loggedSince, markText } from '../src/components/CallNotes'
 import {
-  FACT_KEYS, NOTES_SCHEMA, cleanNotes, noonCentral, noteBody, onRecording, onTranscriptWebhook, summarizeCall, sweep,
+  FACT_KEYS, NOTES_SCHEMA, cleanNotes, noonCentral, noteBody, onRecording, onTranscript, onTranscriptWebhook, summarizeCall, sweep,
   transcriptText, type CallContext, type CallNotes, type Deps, type Intelligence, type Rpc,
 } from '../supabase/functions/_shared/callNotes'
 
@@ -171,6 +171,8 @@ function fakeTwilio(over: Partial<Intelligence> = {}) {
     },
     async deleteTranscript(sid) { deleted.push(sid) },
     async deleteRecording(sid) { recordingsDeleted.push(sid) },
+    async downloadRecording() { return new Uint8Array([73, 68, 51, 4, 0, 0, 0, 0]) },
+    async listRecordings() { return [] },
     async call() { return { from: 'client:thalia', to: '', direction: 'inbound', start_time: null } },
     ...over,
   }
@@ -381,3 +383,35 @@ describe('call notes: the pipeline on the real migrations', () => {
     expect(await asThalia(`select count(*)::int r from public.call_transcripts`)).toBe(1)
   })
 })
+
+describe('0291: the audio is kept by us, and the Twilio copy is deleted after', () => {
+  it('saves the audio on the recording, deletes the Twilio copy only once the notes are written, and archives the rest', async () => {
+    const stored = new Map<string, number>()
+    const tw = fakeTwilio({ async listRecordings() { return [{ sid: RE(9), call_sid: null, duration: 31, date_created: '2026-10-01T15:00:00.000Z' }] } })
+    const d: Deps = { ...deps(tw.t), store: async (path, bytes) => { stored.set(path, bytes.length) } }
+    const r = await onRecording(recording(1), 'out', d)
+    expect(r).toMatchObject({ audio_saved: true })
+    const row = await one<{ audio_path: string; audio_bytes: number; twilio_deleted_at: string | null }>(
+      `select audio_path, audio_bytes, twilio_deleted_at from public.call_recordings where call_sid = $1`, [SID(1)])
+    expect(row).toMatchObject({ audio_bytes: 8, twilio_deleted_at: null })
+    expect(stored.get(row!.audio_path)).toBe(8)
+    expect(tw.recordingsDeleted).toEqual([])                     // not while the words are still being written
+    // the notes land: the next sweep deletes Twilio's copy, and moves the old voicemail into the archive
+    await onTranscript(SID(1), d)
+    const sw = await sweep(d) as { audio: Record<string, number> }
+    expect(sw.audio).toMatchObject({ deleted: 1, archived: 1, errors: 0 })
+    expect(tw.recordingsDeleted).toEqual([RE(1), RE(9)])
+    expect([...stored.keys()].some((k) => k.startsWith('other/2026-10/'))).toBe(true)
+    expect((await one<{ n: number }>(`select count(*)::int as n from public.twilio_recordings_archive where deleted_at is not null`))!.n).toBe(1)
+  })
+
+  it('never deletes the Twilio copy of a recording whose audio is not saved here', async () => {
+    const tw = fakeTwilio({ async downloadRecording() { throw new Error('Twilio answered 500 for the recording audio') } })
+    const d: Deps = { ...deps(tw.t), store: async () => undefined }
+    expect(await onRecording(recording(1), 'out', d)).toMatchObject({ audio_saved: false })
+    await db.query(`update public.call_recordings set created_at = now() - interval '2 days' where call_sid = $1`, [SID(1)])
+    await sweep(d)
+    expect(tw.recordingsDeleted).toEqual([])
+  })
+})
+

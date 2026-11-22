@@ -51,3 +51,20 @@ The notes carry at most one quote, under 15 words.
 
 - `select status, error, attempts from call_recordings order by created_at desc limit 10;`
 - Self-test: `net.http_post` to `call-notes?event=selftest` with the `send_openers_cron_secret` header.
+
+## The audio is ours, not Twilio's (0291, 0292, 2026-11-22)
+
+Colin: "Record calls on this program and then store with supa or vercel not with twilio, delete recordings from
+twilio. I want you to be able to review calls later." Recording is `CALL_RECORDING=on` in pm-phone production since
+2026-11-22 (all-party-consent sellers are still never recorded: `call_recording_allowed`).
+
+- The moment Twilio says a recording is done, `call-notes` copies the mp3 into the private storage bucket `calls`
+  (`YYYY/MM/<CallSid>.mp3`) and writes `audio_path`, `audio_bytes`, `audio_saved_at` on `call_recordings`.
+- The 5-minute sweep saves anything missed, then deletes Twilio's copy once the audio is saved here AND the notes
+  are finished (summarized, failed, too short, no card) or a day has passed (`call_audio_due`). Never before the
+  file is saved.
+- Every other recording on the Twilio account (voicemails, tests) is copied to `calls/other/YYYY-MM/` and deleted
+  from Twilio after 14 days (`twilio_recordings_archive`). A voicemail link already texted stops working then.
+- Colin plays a call from the card's Call notes ("Listen to the call"): `call_audio_path` (owner only) plus a
+  10-minute signed link; a caller login cannot read the bucket. The desk reads calls back with
+  `python tools/calls.py list | show <sid> | lead <id>` (laptop), from the `call_review` view (service role only).
