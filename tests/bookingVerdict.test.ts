@@ -82,9 +82,9 @@ describe('the booking verdict', () => {
     expect(ill.because).toEqual(['Health or age: her son Mark on the line before any visit'])
   })
 
-  it('hard stops win: a sale inside 14 days, listed, a tenant, asked to be removed', () => {
+  it('hard stops win: a sale inside 14 days, an agent on the line, a tenant, asked to be removed', () => {
     expect(bookingVerdict(facts({ ...EARNED, behind: { choices: ['sale_14'] } }), {}).because[0]).toMatch(/inside 14 days/)
-    expect(bookingVerdict(facts({ ...EARNED, identity: { choices: ['agent'] } }), {}).because).toEqual(['Listed, or signed with another buyer'])
+    expect(bookingVerdict(facts({ ...EARNED, identity: { choices: ['agent'] } }), {}).because).toEqual(['Signed with another buyer, or an agent on the line'])
     expect(bookingVerdict(facts({ ...EARNED, identity: { choices: ['tenant'] } }), {}).because).toEqual(["They're the tenant, not the owner"])
     const dnc = bookingVerdict(facts(EARNED), {}, { stage: 'dnc' })
     expect(dnc.verdict).toBe('no')

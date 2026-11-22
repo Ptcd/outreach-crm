@@ -495,3 +495,14 @@ describe('the opt-out line is on a first text only (0251, Colin 2026-11-18)', ()
     await expect(db.query(`update public.touch_templates set wording = wording || ' Reply STOP to opt out.' where key = 'reminder_visit'`)).rejects.toThrow(/touch_templates_no_stop_line/)
   })
 })
+
+describe('a seller who texts that it is listed is still a lead (0279, Colin 2026-11-22)', () => {
+  it('the text moves the card like any reply, not to "nothing until the listing ends"', async () => {
+    const id = (await db.query<{ id: string }>(`insert into public.leads (wpie_owner_id, owner_name, property_address, municipality, mailing_state, lane, stage)
+      values (90279, 'ELIZABETH LISTED', '1321 S Wilson Ave', 'Hartford', 'WI', 'flip', 'opener_sent') returning id`)).rows[0].id
+    const r = await one<{ r: { belt: string } }>(`select public.belt_event($1, 'inbound_text', $2::jsonb, 'reply agent', $3) as r`,
+      [id, JSON.stringify({ key: 'listed-0279', intent: 'listed', kind: 'candidate', outcome: '', said: 'Yes already listed' }), NOW])
+    expect(r.r.belt).not.toBe('too_high_or_listed')
+    expect(r.r.belt).not.toBe('dead')
+  })
+})

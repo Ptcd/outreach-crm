@@ -72,7 +72,8 @@ export function gateFromCall(facts: CallFacts | null | undefined, reply?: Record
 /** Hard stops the call turned up. */
 export function stopsFromCall(facts: CallFacts | null | undefined): string[] {
   const out: string[] = []
-  if (anyOf(answerOf(facts, 'other_buyer'), ['listed', 'signed']) || anyOf(answerOf(facts, 'identity'), ['agent'])) out.push('listed_active')
+  // listed with an agent is not a stop (Colin 2026-11-22, "We can still buy listed stuff"); signed with another buyer is
+  if (anyOf(answerOf(facts, 'other_buyer'), ['signed']) || anyOf(answerOf(facts, 'identity'), ['agent'])) out.push('listed_active')
   if (anyOf(answerOf(facts, 'behind'), ['sale_14'])) out.push('sheriff_inside_14_days')
   if (facts?.last_call && (facts.last_call.value === 'dnc')) out.push('dnc_or_no_contact')
   return out

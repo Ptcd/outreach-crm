@@ -16,7 +16,7 @@
     "Owner of record: names, owner type, mailing address, owned since (date only), other parcels",
     "Why they might sell: tax years, sheriff sale date, code/raze cases, death or estate filing, vacancy (years only, no amounts)",
     "What they said: their texts verbatim; reason, clock, who signs, their number (their words, never ours), flags; which text they are answering and when it went",
-    "Hard stops known: STOP/hostile on any phone; listed; signed elsewhere; sheriff sale inside 14 days; elderly/ill with no family named; estate with nobody who can sign",
+    "Hard stops known: STOP/hostile on any phone; signed elsewhere or an accepted offer; sheriff sale inside 14 days; elderly/ill with no family named; estate with nobody who can sign",
     "Gate box: six blank __/2 lines, filled after the call",
     "Rules: never a number, range, percentage or value; never a company name; never a closing date, tenant removal or what I will do with the house; never re-ask a number they already gave"
   ],
@@ -41,7 +41,7 @@
       ],
       "say": "And is it your place, or are you helping someone with it?",
       "listen_for": "Owner, spouse, adult child, tenant, manager, agent, wholesaler. Anyone but an owner or named family changes the call. Title is checked in records, not asked.",
-      "branch": "tenant -> reassure, no landlord plans discussed; agent -> stay out of the way, ask the listing end date; wholesaler -> polite exit; relative -> ask whether the owner would want to hear about it and how to reach them"
+      "branch": "tenant -> reassure, no landlord plans discussed; agent -> listed is still a buy: ask their date and who the agent is, never cut the agent out; wholesaler -> polite exit; relative -> ask whether the owner would want to hear about it and how to reach them"
     },
     {
       "id": "q3_motivation",
@@ -280,8 +280,8 @@
     {
       "id": "obj_listed",
       "trigger": "I have an agent / it's listed",
-      "say": "Then we'll leave it with your agent. Good luck with it.",
-      "note": "Hard stop. Log it."
+      "say": "That's fine, we buy listed houses too and I won't get in your agent's way. When do you need to be done by? If a sure close by then would help, that's worth a talk.",
+      "note": "Not a stop (Colin 2026-11-22: \"We can still buy listed stuff\"). Get their date, the list price and the agent's name. Never run the agent down or suggest cutting them out. An accepted offer with a buyer is a stop: ask when it closes and whether we can check in if it falls through. No number on the phone."
     },
     {
       "id": "obj_think",
@@ -464,7 +464,7 @@
     {
       "field": "flags",
       "gate_item": [],
-      "what": "elderly or ill, grief, capacity concern, listed, signed elsewhere, family said no"
+      "what": "elderly or ill, grief, capacity concern, signed elsewhere or an accepted offer, family said no"
     },
     {
       "field": "next_touch_at / next_touch_owner / reference_text",

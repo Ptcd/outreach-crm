@@ -155,14 +155,15 @@ describe('call answers -> walk gate', () => {
     expect(h.numbers_close).toBeUndefined()
   })
 
-  it('gives partial credit, reads the seller texts, and flags a listing as a hard stop', () => {
+  it('gives partial credit, reads the seller texts; signed elsewhere is a hard stop and listed is not (2026-11-22)', () => {
     const h = gateFromCall(f({ motivation: { choices: ['just_price'] }, timeline: { choices: ['no_rush'] }, price: { choices: ['online'], number: '200000' } }),
       { condition: 'roof is old' })
     expect(h.reason_and_clock?.score).toBe(0)
     expect(h.number_and_anchor?.score).toBe(1)
     expect(h.condition).toEqual({ score: 1, why: 'Condition known, occupancy not yet' })
     expect(gateFromCall(f({ price: { choices: ['refused'] } })).number_and_anchor?.score).toBe(0)
-    expect(stopsFromCall(f({ other_buyer: { choices: ['listed'] } }))).toEqual(['listed_active'])
+    expect(stopsFromCall(f({ other_buyer: { choices: ['listed'] } }))).toEqual([])
+    expect(stopsFromCall(f({ other_buyer: { choices: ['signed'] } }))).toEqual(['listed_active'])
     expect(gateFromCall({}, null)).toEqual({})
   })
 

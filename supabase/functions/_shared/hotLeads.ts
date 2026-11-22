@@ -33,7 +33,8 @@ const AFFIRM = new RegExp(B.AFFIRM_RE.source, B.AFFIRM_RE.flags)
 const NOT_SELLING = /\bnot\s+(?:\w+\s+){0,5}sell|\bno\s+(?:interest|intention|plans?)\b|\bnot\s+interested\b|\bnot\s+(?:quite\s+|really\s+|yet\s+)?ready\b|\bkeep\s+you\s+in\s+mind\b|\bnot\s+until\b|\bfor\s+the\s+right\s+(?:number|price)\b|\bonce\s+(?:probate|the\s+estate|\w+)\s+(?:closes|settles|is\s+(?:done|over|final))/i
 // A call request: hot whatever else the line says, unless it closes the thread.
 const CALL_ME = /(?<!\b(?:not|don'?t|dont|never|no)\s)\b(?:call|ring|buzz|phone)\s+(?:me|us)\b|\bgive\s+me\s+a\s+(?:call|ring|buzz)|\b(?:can|could)\s+(?:you|u|we|i)\s+(?:call|talk|speak)\b|\btalk\s+on\s+the\s+phone|\b(?:speak|talk)\s+by\s+(?:tele)?phone|\btry\s+me\s+on\s+the\s+phone|\bcall\s+(?:tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|whenever|at|after|between|anytime)\b|\bllamame\b|\bavailable\s+to\s+talk|\bcall\s+(?:me\s+)?back\b|\bcall\s+(?:him|her)\s+at\b|\byou\s+may\s+call\b|\bcan\s+talk\s+on\s+the\s+phone/i
-const CLOSES_THREAD = new Set(['opt_out', 'hostile', 'wrong_number', 'sold', 'not_interested', 'my_home', 'listed', 'signed_other',
+// 'listed' left this list 2026-11-22 (Colin: "We can still buy listed stuff"): a listed seller's thread stays open
+const CLOSES_THREAD = new Set(['opt_out', 'hostile', 'wrong_number', 'sold', 'not_interested', 'my_home', 'signed_other',
   'tenant', 'manager', 'middleman', 'annoyed', 'joke_number'])
 const DOUBLE_NEGATIVE_YES = /\bwouldn'?t\s+say\s+no\b|\bcan'?t\s+say\s+(?:i'?m\s+|im\s+)?not\s+interested|\bnot\s+not\s+interested|\bnot\s+against\s+it\b|\bi'?m\s+not\s+opposed/i
 // After the pitch question, a soft yes is a yes: "I'm listening", "I could be persuaded", "I wouldn't say no".

@@ -30,7 +30,7 @@ export const VERDICT_HEADLINE: Record<Verdict, string> = {
 }
 
 const STOP_WHY: Record<string, string> = {
-  listed_active: 'Listed, or signed with another buyer',
+  listed_active: 'Signed with another buyer, or an agent on the line',
   sheriff_inside_14_days: "A sale date inside 14 days: there isn't time for a sale to help",
   dnc_or_no_contact: 'Asked to be removed',
 }
