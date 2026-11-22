@@ -3,7 +3,7 @@
 // the seller's Real Estate Condition Report (Wis. Stat. 709.03) drawn from the statute text,
 // and the electronic-signature certificate. pdf-lib is passed in (npm:pdf-lib on the server,
 // node_modules in tests) so this file has no imports a Deno deploy has to resolve.
-import { PAGE_HEIGHT, WB11_BOXES, WB11_MAP, WB11_RECR_STRIKES, WB11_SIGN, WB11_STRIKES, type Blank } from './wb11Map.ts'
+import { PAGE_HEIGHT, WB11_BOXES, WB11_MAP, WB11_POF_STRIKES, WB11_RECR_STRIKES, WB11_SIGN, WB11_STRIKES, type Blank } from './wb11Map.ts'
 import { RECR } from './recrForm.generated.ts'
 import type { RecrAnswers } from './recr.ts'
 
@@ -200,7 +200,14 @@ export async function fillWb11(lib: PdfLib, template: Uint8Array, t: Wb11Terms,
     putLines(lib, pages, f.reg, t.inspectionComponents || 'N/A', M.inspectionComponents)
     put(lib, P(M.inspectionDays), f.reg, String(t.inspectionDays ?? 15), M.inspectionDays)
   }
-  put(lib, P(M.proofOfFundsDays), f.reg, String(t.proofOfFundsDays ?? 7), M.proofOfFundsDays)
+  if (t.proofOfFundsDays == null) {
+    // no proof of funds (0280): a blank reads "7" by the form's own words, so the provision is struck
+    for (const k of WB11_POF_STRIKES) {
+      pages[k.p].drawLine({ start: { x: k.x0, y: PAGE_HEIGHT - k.y }, end: { x: k.x1, y: PAGE_HEIGHT - k.y }, thickness: 1, color: lib.rgb(...INK) })
+    }
+  } else {
+    put(lib, P(M.proofOfFundsDays), f.reg, String(t.proofOfFundsDays), M.proofOfFundsDays)
+  }
   putLines(lib, pages, f.reg, t.leaseTerms, M.leaseTerms)
 
   // Additional provisions: shrunk a little to fit lines 570-590 when that is enough; what still does not fit

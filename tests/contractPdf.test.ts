@@ -67,6 +67,17 @@ describe('contract pdfs', () => {
     expect(r.rest).toBe('five')
   })
 
+  it('0280: no proof of funds strikes lines 296-303 and leaves the days blank (Colin 2026-11-22)', async () => {
+    const t = { ...TERMS, proofOfFundsDays: undefined, earnestDays: 21 }
+    const r = await fillWb11(lib, b64ToBytes(WB11_B64), t)
+    const d = await lib.PDFDocument.load(r.bytes)
+    expect(d.getPageCount()).toBe(11)
+    save('wb11-no-proof-of-funds.pdf', r.bytes)
+    // the same offer with days set is a different page 6: the strike lines are drawn only when there are no days
+    const withDays = await fillWb11(lib, b64ToBytes(WB11_B64), { ...t, proofOfFundsDays: 5 })
+    expect(Buffer.from(r.bytes).equals(Buffer.from(withDays.bytes))).toBe(false)
+  })
+
   it('fills the official 11-page WB-11 with signatures, and moves long terms to Addendum A', async () => {
     const short = await fillWb11(lib, b64ToBytes(WB11_B64), TERMS, {
       buyer: { name: 'Colin Merrill', date: '10/21/2026' },

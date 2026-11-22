@@ -131,7 +131,7 @@ export function checkSellers(raw: unknown): { sellers: Seller[]; problems: strin
 export type Standards = {
   buyer_name: string; signer_name: string; signer_title: string; buyer_email: string | null; buyer_address: string | null
   buyer_phone: string; earnest_money: number; earnest_days: number; earnest_holder: string; accept_days: number
-  proof_of_funds_days: number; included: string | null; excluded: string | null; additional: string; signature_png: string | null
+  proof_of_funds_days: number | null; included: string | null; excluded: string | null; additional: string; signature_png: string | null
 }
 export type LeadFacts = {
   id: string; owner_name: string; property_address: string | null; municipality: string | null; county: string | null
@@ -200,7 +200,7 @@ export function quickTerms(ctx: { standards: Standards; lead: LeadFacts }, ask: 
     price: ask.price, included: st.included ?? '', excluded: st.excluded ?? '',
     bindingDeadline: `${longDay(acceptBy)} at 11:59 p.m.`, acceptBy, closing: /^\d{4}-/.test(closingOn) ? longDay(closingOn) : '', closingOn,
     earnestMoney: st.earnest_money, earnestDays: st.earnest_days, earnestHolder: st.earnest_holder,
-    inspection: false, proofOfFundsDays: st.proof_of_funds_days, additional: st.additional, recrWithOffer: includeRecr,
+    inspection: false, proofOfFundsDays: st.proof_of_funds_days ?? undefined, additional: st.additional, recrWithOffer: includeRecr,
     sellerAddress: [l.mailing_street, l.mailing_city, [l.mailing_state, l.mailing_zip].filter(Boolean).join(' ')].filter(Boolean).join(', '),
     sellerEmail: sellers[0]?.email ?? '', buyerAddress: st.buyer_address ?? '', buyerEmail: st.buyer_email ?? '',
   }

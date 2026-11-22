@@ -752,7 +752,7 @@ export type ContractRow = {
 export type OfferStandards = {
   buyer_name: string; signer_name: string; signer_title: string; buyer_email: string | null; buyer_address: string | null
   buyer_phone: string; earnest_money: number; earnest_days: number; earnest_holder: string; accept_days: number
-  proof_of_funds_days: number; included: string | null; excluded: string | null; additional: string; has_signature: boolean
+  proof_of_funds_days: number | null; included: string | null; excluded: string | null; additional: string; has_signature: boolean
 }
 export type OfferSetup = {
   ok: boolean; reason?: string; standards: OfferStandards; signature_png: string | null; colin_number: number | null

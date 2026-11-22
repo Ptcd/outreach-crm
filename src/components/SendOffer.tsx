@@ -253,7 +253,8 @@ function SendOfferSheet({ lead, contacts, onClose }: { lead: Lead; contacts: Con
             <ul className="mt-2 space-y-1.5 text-sm">
               {[
                 `Buyer: ${st.buyer_name}, already signed by ${st.signer_name} and dated today`,
-                `${usd(Number(st.earnest_money))} earnest money to ${st.earnest_holder}`,
+                `${usd(Number(st.earnest_money))} earnest money to ${st.earnest_holder}, due ${st.earnest_days} days after the seller signs`,
+                st.proof_of_funds_days == null ? 'No proof of funds' : `Proof of funds within ${st.proof_of_funds_days} days`,
                 'Buyer pays the closing costs',
                 'Sold as is, where is: the seller makes no warranties on condition',
                 "Only out: the buyer's walk-through and approval of the condition, until closing",
@@ -372,7 +373,7 @@ function StandardsEditor({ setup, onBack, onClose }: { setup: OfferSetup; onBack
     const r = await api.offerStandardsSet({
       buyer_name: f.buyer_name, signer_name: f.signer_name, signer_title: f.signer_title, buyer_email: f.buyer_email ?? '', buyer_address: f.buyer_address ?? '',
       buyer_phone: f.buyer_phone, earnest_money: String(f.earnest_money), earnest_days: Number(f.earnest_days), earnest_holder: f.earnest_holder,
-      accept_days: Number(f.accept_days), proof_of_funds_days: Number(f.proof_of_funds_days), included: f.included ?? '', excluded: f.excluded ?? '',
+      accept_days: Number(f.accept_days), proof_of_funds_days: f.proof_of_funds_days == null || String(f.proof_of_funds_days).trim() === '' ? null : Number(f.proof_of_funds_days), included: f.included ?? '', excluded: f.excluded ?? '',
       additional: f.additional, ...(sig ? { signature_png: sig } : typed ? { signature_png: '' } : {}),
     })
     setBusy(false)
@@ -395,7 +396,7 @@ function StandardsEditor({ setup, onBack, onClose }: { setup: OfferSetup; onBack
           <Field label="Earnest money due" hint="days after acceptance"><Input inputMode="numeric" value={String(f.earnest_days)} onChange={set('earnest_days')} /></Field>
           <div className="sm:col-span-2"><Field label="Title company" hint="holds the earnest money, closes the sale"><Input value={f.earnest_holder} onChange={set('earnest_holder')} /></Field></div>
           <Field label="Days the seller has to sign"><Input inputMode="numeric" value={String(f.accept_days)} onChange={set('accept_days')} /></Field>
-          <Field label="Proof of funds within" hint="days"><Input inputMode="numeric" value={String(f.proof_of_funds_days)} onChange={set('proof_of_funds_days')} /></Field>
+          <Field label="Proof of funds within" hint="days; empty = none (lines 296-303 struck)"><Input inputMode="numeric" value={f.proof_of_funds_days == null ? '' : String(f.proof_of_funds_days)} onChange={set('proof_of_funds_days')} /></Field>
           <div className="sm:col-span-2"><Field label="Included items beyond fixtures" hint="blank = none"><Input value={f.included ?? ''} onChange={set('included')} /></Field></div>
           <div className="sm:col-span-2">
             <Field label="Additional provisions" hint="WB-11 lines 570-590">

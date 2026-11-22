@@ -186,7 +186,7 @@ function Signing({ view, token, who, phone }: { view: View; token: string; who: 
               <Fact icon={<CalendarDays className="h-4.5 w-4.5" aria-hidden />} label="Closing">{t.closing}</Fact>
               <Fact icon={<Landmark className="h-4.5 w-4.5" aria-hidden />} label="Earnest money">{usd(t.earnestMoney)}, held by {t.earnestHolder}</Fact>
               <Fact icon={<ShieldCheck className="h-4.5 w-4.5" aria-hidden />} label="Contingencies">
-                {t.inspection ? `Home inspection within ${t.inspectionDays ?? 15} days.` : 'No home-inspection contingency.'} No financing contingency: proof of funds within {t.proofOfFundsDays ?? 7} days.
+                {t.inspection ? `Home inspection within ${t.inspectionDays ?? 15} days.` : 'No home-inspection contingency.'} No financing contingency{t.proofOfFundsDays != null ? `: proof of funds within ${t.proofOfFundsDays} days` : ''}.
               </Fact>
               <Fact icon={<PenLine className="h-4.5 w-4.5" aria-hidden />} label="Sign by">{t.bindingDeadline}</Fact>
             </div>

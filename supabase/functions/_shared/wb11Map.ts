@@ -63,6 +63,19 @@ export const WB11_RECR_STRIKES = [
   { p: 1, x0: 36.0, x1: 97.3, y: 668.9 },    // this Offer and
 ] as const
 
+/** Lines 296-303, struck when the offer carries no proof of funds (0280, Colin 2026-11-22): from "Within ___ days"
+ *  on line 296 to "verification." on line 303; the rest of 303-304 (no financing needed) stays. */
+export const WB11_POF_STRIKES = [
+  { p: 5, x0: 366.5, x1: 575.8, y: 42.6 },   // 296 Within ___ days ("7" if left blank) after
+  { p: 5, x0: 36.0, x1: 244.3, y: 55.5 },    // 297 acceptance, Buyer shall deliver to Seller either:
+  { p: 5, x0: 45.0, x1: 575.9, y: 67.1 },    // 298 (1) reasonable written verification ... at
+  { p: 5, x0: 58.6, x1: 279.6, y: 78.6 },    // 299 the time of verification, sufficient funds to close; or
+  { p: 5, x0: 45.0, x1: 575.9, y: 90.0 },    // 300 (2) ____
+  { p: 5, x0: 36.0, x1: 574.2, y: 101.5 },   // 301 ____ [Specify documentation Buyer agrees to deliver to Seller].
+  { p: 5, x0: 36.0, x1: 575.9, y: 113.0 },   // 302 If such written verification ... written
+  { p: 5, x0: 36.0, x1: 436.2, y: 124.5 },   // 303 notice to Buyer ... Buyer's written verification.
+] as const
+
 /** Signature lines on page 11: the (x) line, its date, and "Print Name Here ►". */
 export const WB11_SIGN = {
   buyer: { p: 10, line: 492.1, x0: 50, x1: 475, dateX0: 480, dateX1: 576, nameX: 126, nameBase: 513.7 },     // 632-634
