@@ -145,3 +145,23 @@ describe('the room', () => {
     await expect(asUser('colin@example.com', `select public.room_mine(10)`)).rejects.toThrow(/callers' help line/)
   })
 })
+
+describe('a seat for Grok (0275)', () => {
+  const grok: Agent = { id: 'k9', name: 'Grok', role: 'agent', scopes: ['channel'], tools: null }
+  it('a key named Grok speaks as Grok, not as Muse, in the room and on the desk', async () => {
+    const said = await call(grok, 'chat_post', { body: 'Grok here. Starting on the foreclosure and probate pulls.', to: ['desk'] })
+    expect(said.isError).toBeFalsy()
+    const last = (await db.query<Json>(`select author, to_whom from public.room_messages order by id desc limit 1`)).rows[0]
+    expect(last).toEqual({ author: 'grok', to_whom: ['desk'] })
+    const d = await call(grok, 'desk_post', { for: 'desk', kind: 'note', topic: 'Grok: first report', body: 'Nothing banked yet.' })
+    expect(d.isError).toBeFalsy()
+    expect((await db.query<Json>(`select author from public.desk_messages order by id desc limit 1`)).rows[0]).toEqual({ author: 'grok' })
+  })
+  it('Grok is told about a line written to it, on its next tool call, and Muse is not', async () => {
+    await svc(`public.room_post('desk', 'Grok: Kenosha judgments are yours this week.', array['grok'], null)`)
+    expect(String((await svc<Json | null>(`public.agent_attention('Grok')`))?.room)).toMatch(/new lines? in the room \(1 to you by name\)/)
+    const r = await call(grok, 'chat_read', {})
+    expect(r.value.lines.at(-1)).toMatchObject({ from: 'desk', to: 'grok', for_you: true })
+    expect((await svc<Json | null>(`public.agent_attention('Grok')`))?.room).toBeUndefined()
+  })
+})
