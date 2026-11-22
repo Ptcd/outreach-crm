@@ -31,6 +31,7 @@ import { NextStep } from '@/components/NextStep'
 import { CardBrief } from '@/components/CardBrief'
 import { DealSheet } from '@/components/DealSheet'
 import { CallBrief } from '@/components/CallBrief'
+import { displayOwner, noteEntries, rankPhones, whyLine } from '@/lib/cardTop'
 import { handoffToColin } from '@/lib/apiExtra'
 import { BELT_LABEL, type Belt } from '@/lib/belts'
 import { useColinHere } from '@/components/OnPhonePicker'
@@ -73,6 +74,7 @@ export default function LeadDetail() {
   const email = contacts.find((c) => c.kind === 'email' && !c.dnc_app)?.value ?? null
   const callFacts = (lead.call_facts ?? {}) as CallFacts
   const verdict = bookingVerdict(callFacts, facts, lead)
+  const why = whyLine(lead.reasons_to_sell)
 
   return (
     <div className="space-y-4">
@@ -80,13 +82,19 @@ export default function LeadDetail() {
         <Link to={isCaller ? '/mine' : '/pipeline'} className="inline-flex min-h-11 items-center text-sm underline">
           {isCaller ? 'Back to My cards' : 'Back to pipeline'}
         </Link>
-        <h1 className={cn('mt-1 text-2xl font-bold tracking-tight', lead.stage === 'dnc' && 'text-red-700')}>{lead.owner_name}</h1>
+        {/* the top of the card (Colin 2026-11-22: "Do you see how bad of a mess the cards are"): a name to say, where,
+            and why in one line. The county's own spelling of the name is under More. */}
+        <h1 className={cn('mt-1 text-2xl font-bold tracking-tight', lead.stage === 'dnc' && 'text-red-700')}>{displayOwner(lead.owner_name) || lead.owner_name}</h1>
         {fullAddress(lead) && <p className="mt-0.5 text-base font-medium text-muted-foreground">{fullAddress(lead)}</p>}
-        <div className="mt-1 flex flex-wrap gap-2">
+        {why.length > 0 && (
+          <p className="mt-1.5 text-base" data-testid="card-why">
+            <span className="font-semibold">Why they might sell: </span>{why.join(' · ')}
+            <span className="block text-xs text-muted-foreground">For you, not for them. Never bring these up before they do.</span>
+          </p>
+        )}
+        <div className="mt-1.5 flex flex-wrap gap-2">
           <Badge tone={lead.stage === 'dnc' ? 'bad' : undefined}>{STAGE_LABEL[lead.stage]}</Badge>
           {verdict.verdict !== 'open' && <VerdictBadge v={verdict} />}
-          {lead.lane && <Badge tone="info">{lead.lane === 'hold' ? 'Hold lane' : 'Flip lane'}</Badge>}
-          {lead.county && <Badge>{lead.county} County</Badge>}
           {lead.locked_to && <Badge tone="good">{personLabel(lead.locked_to)}&apos;s card</Badge>}
         </div>
         <CardOwner lead={lead} />
@@ -123,43 +131,36 @@ export default function LeadDetail() {
       <CallBrief leadId={lead.id} />
       {/* the deal sheet (0270): the seller's own arithmetic and the one number to say; Colin only until he switches it on */}
       <DealSheet leadId={lead.id} />
-      <CallNotes leadId={lead.id} messages={messages} />
+      {/* Send offer (0217): the written offer follows the number; a caller sends at Colin's number, Colin at any */}
+      <ContractBlock lead={lead} contacts={contacts} colinHere={isOwner} />
       <TextThread leadId={lead.id} phone={bestPhone(contacts, q.data.inbound, lead.owner_name)} messages={messages} inbound={q.data.inbound}
         closed={lead.stage === 'dnc'} />
-      {/* the script sits right under the Call button, open on a hot card (someone just said they'd sell) */}
+      <CallNotes leadId={lead.id} messages={messages} />
+      {/* the script, open on a hot card (someone just said they'd sell) */}
       <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}
         phone={params.get('phone')} canOverride={isOwner}
         startOpen={params.get('call') === '1' || liveHere || lead.belt === 'yes_unbooked' || lead.belt === 'call_booked'} />
-      {/* the package to Colin, his number and the callback (migration 0085) */}
-      <DealPackage lead={lead} />
-      {/* Send offer (0217): the written offer follows the number; a caller sends at Colin's number, Colin at any */}
-      <ContractBlock lead={lead} contacts={contacts} colinHere={isOwner} />
-      {/* the closing track (0253): what happens between a signed offer and the closing; Colin's only */}
-      {isOwner && <ClosingTrack lead={lead} />}
-      <History leadId={lead.id} ownerName={lead.owner_name} messages={messages} inbound={q.data.inbound}
-        stageEvents={q.data.stageEvents} tasks={tasks} beltEvents={q.data.beltEvents} taskMoves={q.data.taskMoves} people={q.data.people} />
-      {/* the follow-up belt (what happens next on its own) sits under the history: callers start at the Call panel */}
-      <BeltStrip lead={lead} />
       {(lead.belt === 'visit_booked' || lead.stage === 'walkthrough_booked') && (
         <AppointmentPacket lead={lead} callFacts={callFacts} replyFacts={facts} latestGate={gates[0] ?? null} />
       )}
-      <Section title={`Tasks (${replyTasks.length})`}>
-        <p className="mb-2 text-sm text-muted-foreground">Things the seller asked for that a text can&apos;t do. Adil by default.</p>
-        {replyTasks.length === 0 && <Empty>No open tasks.</Empty>}
-        <ul className="space-y-3">
-          {replyTasks.map((t) => <ReplyTaskCard key={t.id} t={{ ...t, lead }} showLead={false} />)}
-        </ul>
-        <EmailAction leadId={lead.id} to={email} ownerName={lead.owner_name} address={lead.property_address} />
-      </Section>
-      <Tasks leadId={lead.id} tasks={tasks.filter((t) => t.source !== 'reply')} />
-      <Contacts contacts={contacts} leadId={lead.id} lead={lead} />
-      {isOwner && <DealBlock leadId={lead.id} />}
-      <Notes lead={lead} />
-      {/* older tools nobody uses day to day, folded away (Colin 2026-10-28: "theres old stuff on the card that we don't use");
-          nothing is removed, and the package, not a score, decides what reaches Colin */}
-      <details className="rounded-lg border p-3">
-        <summary className="cursor-pointer font-medium">More: the stage box, the visit score, checkpoints, record facts</summary>
+      {replyTasks.length > 0 && <ReplyTasks lead={lead} replyTasks={replyTasks} email={email} />}
+      {/* the closing track (0253): what happens between a signed offer and the closing; Colin's only */}
+      {isOwner && <ClosingTrack lead={lead} />}
+      {/* Everything a person does not need before dialing, in one fold (2026-11-22). Nothing is removed. */}
+      <details id="card-more" className="rounded-lg border p-3">
+        <summary className="cursor-pointer font-medium">Everything else on this card: history, all phones, notes, tasks, records</summary>
         <div className="mt-3 space-y-4">
+      <History leadId={lead.id} ownerName={lead.owner_name} messages={messages} inbound={q.data.inbound}
+        stageEvents={q.data.stageEvents} tasks={tasks} beltEvents={q.data.beltEvents} taskMoves={q.data.taskMoves} people={q.data.people} />
+      <Contacts contacts={contacts} leadId={lead.id} lead={lead} messages={messages} inbound={q.data.inbound} />
+      <Notes lead={lead} />
+      {/* the follow-up belt (what happens next on its own) */}
+      <BeltStrip lead={lead} />
+      {replyTasks.length === 0 && <ReplyTasks lead={lead} replyTasks={replyTasks} email={email} />}
+      <Tasks leadId={lead.id} tasks={tasks.filter((t) => t.source !== 'reply')} />
+      {/* the package to Colin (0085): the older way to a number; the deal sheet above is the one in use */}
+      <DealPackage lead={lead} />
+      {isOwner && <DealBlock leadId={lead.id} />}
       <NextAction lead={lead} />
       <SellerSaid facts={facts} />
       <Section title="Book the visit?">
@@ -178,6 +179,20 @@ export default function LeadDetail() {
         </div>
       </details>
     </div>
+  )
+}
+
+/** Things the seller asked for that a text cannot do, and the email box. At the top when there is one to do. */
+function ReplyTasks({ lead, replyTasks, email }: { lead: Lead; replyTasks: import('@/lib/types').Task[]; email: string | null }) {
+  return (
+    <Section title={`Tasks (${replyTasks.length})`}>
+      <p className="mb-2 text-sm text-muted-foreground">Things the seller asked for that a text can&apos;t do. Adil by default.</p>
+      {replyTasks.length === 0 && <Empty>No open tasks.</Empty>}
+      <ul className="space-y-3">
+        {replyTasks.map((t) => <ReplyTaskCard key={t.id} t={{ ...t, lead }} showLead={false} />)}
+      </ul>
+      <EmailAction leadId={lead.id} to={email} ownerName={lead.owner_name} address={lead.property_address} />
+    </Section>
   )
 }
 
@@ -278,6 +293,7 @@ function Facts({ lead }: { lead: Lead }) {
           {fullAddress(lead)}
         </Row>
         <Row label="County">{lead.county}</Row>
+        <Row label="Lane">{lead.lane === 'hold' ? 'Hold' : lead.lane === 'flip' ? 'Flip' : lead.lane}</Row>
         <Row label="Type">
           {[lead.property_type, lead.units ? `${lead.units} units` : null].filter(Boolean).join(', ')}
         </Row>
@@ -349,7 +365,16 @@ function contactFlags(c: Contact) {
   return flags
 }
 
-function Contacts({ contacts, leadId, lead }: { contacts: Contact[]; leadId: string; lead?: Lead | null }) {
+function Contacts({ contacts, leadId, lead, messages, inbound }: { contacts: Contact[]; leadId: string; lead?: Lead | null
+  messages?: import('@/lib/types').Message[]; inbound?: { from10: string }[] }) {
+  // the number to dial first at the top, each with what happened on it; past five, behind one tap (2026-11-22)
+  const ranked = rankPhones(contacts, lead?.owner_name, messages, inbound)
+  const noteOf = new Map(ranked.map((r) => [r.id, r.note]))
+  const ordered: Contact[] = [...ranked, ...contacts.filter((c) => c.kind !== 'phone')]
+  const [showAll, setShowAll] = useState(false)
+  const SHOWN = 5
+  const hidden = Math.max(ranked.length - SHOWN, 0)
+  const visible = showAll ? ordered : ordered.filter((c) => c.kind !== 'phone' || ranked.findIndex((r) => r.id === c.id) < SHOWN)
   const upd = useWrite(
     ({ id, patch }: { id: string; patch: Partial<Pick<Contact, 'status' | 'dnc_app'>> }) => api.updateContact(id, patch),
     [['lead', leadId]],
@@ -371,13 +396,13 @@ function Contacts({ contacts, leadId, lead }: { contacts: Contact[]; leadId: str
   const waitingForNamedDate = !!notBefore && new Date(notBefore).getTime() > Date.now()
   return (
     <Section title={`Phones and emails (${contacts.length})`}>
-      <p className="mb-2 text-xs text-muted-foreground">Red flags mean do not call or text that number.</p>
+      <p id="phones" className="mb-2 text-xs text-muted-foreground">The best number to try is first. Red flags mean do not call or text that number.</p>
       {waitingForNamedDate && <p className="mb-2 rounded-md border border-amber-400 bg-amber-50 p-2 text-sm">
         They asked us to wait until {fmtDateTime(notBefore)}. Outbound call controls return then; incoming calls can still be answered.
       </p>}
       {contacts.length === 0 && <Empty>No phones or emails on file.</Empty>}
       <ul className="divide-y">
-        {contacts.map((c) => (
+        {visible.map((c) => (
           <li key={c.id} className="py-2">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">{c.kind === 'phone' ? fmtPhone(c.value) : c.value}</span>
@@ -391,6 +416,7 @@ function Contacts({ contacts, leadId, lead }: { contacts: Contact[]; leadId: str
             <div className="text-xs text-muted-foreground">
               {[c.person_name, c.source].filter(Boolean).join(' - ')}
             </div>
+            {c.kind === 'phone' && noteOf.get(c.id) && <div className="text-xs font-medium">{noteOf.get(c.id)}</div>}
             <div className="mt-1 flex flex-wrap gap-2">
               {c.kind === 'phone' && (
                 <>
@@ -433,6 +459,11 @@ function Contacts({ contacts, leadId, lead }: { contacts: Contact[]; leadId: str
           </li>
         ))}
       </ul>
+      {hidden > 0 && (
+        <Button size="sm" variant="outline" className="mt-2" onClick={() => setShowAll(!showAll)}>
+          {showAll ? 'Show the best five only' : `Show ${hidden} more number${hidden === 1 ? '' : 's'}`}
+        </Button>
+      )}
       <ErrorNote error={upd.error} />
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Select value={addKind} onChange={(e) => setAddKind(e.target.value as 'phone' | 'email')} aria-label="Phone or email" className="w-28">
@@ -707,8 +738,10 @@ function Notes({ lead }: { lead: Lead }) {
   const [notes, setNotes] = useState(lead.notes ?? '')
   const [edit, setEdit] = useState(false)
   useEffect(() => setNotes(lead.notes ?? ''), [lead.notes])
+  const entries = noteEntries(lead.notes)
+  const log = noteEntries((lead as Lead & { notes_log?: string | null }).notes_log)
   const save = useWrite(() => api.updateLead(lead.id, { notes: notes.trim() || null }), [['lead', lead.id]])
-  if (!lead.notes && !isOwner) return null
+  if (!lead.notes && !(lead as Lead & { notes_log?: string | null }).notes_log && !isOwner) return null
   return (
     <Section title="Card notes (research and system)" right={isOwner && !edit ? <Button size="sm" variant="outline" onClick={() => setEdit(true)}>Edit</Button> : undefined}>
       {edit ? (
@@ -722,7 +755,27 @@ function Notes({ lead }: { lead: Lead }) {
         </>
       ) : (
         <>
-          {lead.notes ? <p className="whitespace-pre-wrap text-sm">{lead.notes}</p> : <Empty>Nothing from the import yet.</Empty>}
+          {entries.length ? (
+            <ul className="space-y-2 text-sm">
+              {entries.map((e, i) => (
+                <li key={i}>
+                  {e.rest ? (
+                    <details>
+                      <summary className="cursor-pointer">{e.head}</summary>
+                      <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{e.rest}</p>
+                    </details>
+                  ) : <p className="whitespace-pre-wrap">{e.head}</p>}
+                </li>
+              ))}
+            </ul>
+          ) : <Empty>Nothing from the import yet.</Empty>}
+          {log.length > 0 && (
+            <details className="mt-3 text-xs text-muted-foreground">
+              <summary className="cursor-pointer">Agent log ({log.length} line{log.length === 1 ? '' : 's'}): phones loaded, holds, releases</summary>
+              <ul className="mt-1 space-y-1">{log.map((e, i) => <li key={i} className="whitespace-pre-wrap">{e.head}{e.rest ? `
+${e.rest}` : ''}</li>)}</ul>
+            </details>
+          )}
           <p className="mt-2 text-xs text-muted-foreground">Your own notes go in the history above, with your name and the time.</p>
         </>
       )}

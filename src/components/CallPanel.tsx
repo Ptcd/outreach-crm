@@ -6,6 +6,7 @@ import { firstNameOf } from '@/lib/inbox'
 import { fmtDate, fmtPhone } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Contact, Lead, Message, TwilioInbound } from '@/lib/types'
+import { rankPhones } from '@/lib/cardTop'
 import { isOwnersPhone } from '@/lib/phoneOrder'
 
 /** The name our first text greeted ("Hi Laurie, Colin Merrill here ..."), else the owner's first name. A trust's
@@ -53,7 +54,16 @@ export function CallPanel({ lead, contacts, inbound, replyFacts, messages }: {
 }) {
   const nav = useNavigate()
   if (lead.stage === 'dnc') return null
-  const phone = bestPhone(contacts, inbound, lead.owner_name)
+  // the number to dial first, by what happened on each (lib/cardTop, 2026-11-22: a card had 16 numbers and nothing
+  // saying which to try); the next two sit under it, the rest are one tap away
+  const ranked = rankPhones(contacts, lead.owner_name, messages, inbound).filter((p) => !p.blocked)
+  const phone = ranked[0] ?? null
+  const others = ranked.slice(1, 3)
+  const openPhones = () => {
+    const d = document.getElementById('card-more') as HTMLDetailsElement | null
+    if (d) d.open = true
+    setTimeout(() => document.getElementById('phones')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+  }
   const done = pillarsDone((lead.call_facts ?? {}) as CallFacts, replyFacts)
   const first = greetedName(messages, lead.owner_name)
   const texted = !!phone && (inbound ?? []).some((t) => (phone.value_normalized ?? phone.value).replace(/\D/g, '').slice(-10) === t.from10)
@@ -76,6 +86,7 @@ export function CallPanel({ lead, contacts, inbound, replyFacts, messages }: {
           <div className="min-w-0 flex-1 basis-full sm:basis-0">
             <p className="text-sm text-muted-foreground">Call {first || 'them'}{texted ? ' on the number they texted from' : ''}</p>
             <p className="text-lg font-semibold">{fmtPhone(phone.value)}</p>
+            <p className="text-xs text-muted-foreground">{[phone.line_type, phone.owners ? null : phone.person_name ? `${phone.person_name}'s number` : null, texted ? null : phone.note].filter(Boolean).join(' · ')}</p>
           </div>
           <CallButton to={phone.value} name={phone.person_name || lead.owner_name} address={lead.property_address} leadId={lead.id}
             contactId={phone.id} notBefore={lead.belt === 'not_now_dated' ? lead.named_date : null}
@@ -84,6 +95,20 @@ export function CallPanel({ lead, contacts, inbound, replyFacts, messages }: {
             notBefore={lead.belt === 'not_now_dated' ? lead.named_date : null} />
         </div>
       ) : <p className="text-sm">No usable phone on this card.</p>}
+      {others.length > 0 && (
+        <div className="space-y-1.5 border-t border-emerald-200/70 pt-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">If that one does not work</p>
+          {others.map((o) => (
+            <div key={o.id} className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="font-medium">{fmtPhone(o.value)}</span>
+              <span className="min-w-0 flex-1 text-xs text-muted-foreground">{[o.line_type, o.owners ? null : o.person_name, o.note].filter(Boolean).join(' · ')}</span>
+              <CallButton to={o.value} name={o.person_name || lead.owner_name} address={lead.property_address} leadId={lead.id}
+                contactId={o.id} notBefore={lead.belt === 'not_now_dated' ? lead.named_date : null} />
+            </div>
+          ))}
+          {ranked.length > 3 && <button type="button" className="text-xs underline" onClick={openPhones}>All {ranked.length} numbers</button>}
+        </div>
+      )}
       <div className="flex flex-wrap gap-1.5" aria-label="The pillars">
         {PILLARS.map((p) => (
           <span key={p.id} className={cn('inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium',

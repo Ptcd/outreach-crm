@@ -1,0 +1,116 @@
+// The top of a card, for a person about to pick up the phone (Colin 2026-11-22: "Do you see how bad of a mess the cards
+// are", then "Figure out the best ux and way to fix it"). Three things the page could not say at a glance: who to ask
+// for (the county's "THOMPSON, RUSSEL J / HUTH, RACHAEL L" is not a name to say), why they might sell, in a line,
+// and which of sixteen numbers to dial. Pure functions; the page (LeadDetail, CallPanel) only lays them out.
+import type { Contact, Message } from './types'
+import { isOwnersPhone, phoneBlocked } from './phoneOrder'
+
+const COMPANY = /\b(LLC|L\.L\.C|INC|CORP|CO|COMPANY|HOLDINGS|PROPERTIES|INVESTMENTS?|GROUP|PARTNERS|REALTY|MANAGEMENT|BANK|CHURCH|TRUST|ESTATE|LP|LLP)\b/i
+const KEEP_UPPER = /^(LLC|INC|LP|LLP|II|III|IV|JR|SR|PO)$/i
+const cap = (w: string) => (KEEP_UPPER.test(w) ? w.toUpperCase().replace(/^JR$/, 'Jr').replace(/^SR$/, 'Sr')
+  : w.split(/([-'])/).map((p) => (p.length > 1 || /[a-z]/i.test(p) ? p[0].toUpperCase() + p.slice(1).toLowerCase() : p)).join(''))
+const title = (s: string) => s.split(/\s+/).filter(Boolean).map(cap).join(' ')
+
+/** The owner as a person would say it: "THOMPSON, RUSSEL J / HUTH, RACHAEL L" -> "Russel J Thompson and Rachael L Huth".
+ *  A name with no comma keeps its order (a roll's "BLAISDELL KAREN" may be either way round); a company keeps its words. */
+export function displayOwner(owner: string | null | undefined): string {
+  const s = (owner ?? '').trim()
+  if (!s) return ''
+  if (COMPANY.test(s) && !/,/.test(s)) return title(s)
+  const people = s.split(/\s*(?:\/|&|\band\b|;)\s*/i).map((p) => p.trim()).filter(Boolean)
+  const said = people.map((p) => {
+    const m = p.match(/^([^,]+),\s*(.+)$/)
+    return title(m ? `${m[2]} ${m[1]}` : p)
+  })
+  return said.length <= 1 ? (said[0] ?? '') : `${said.slice(0, -1).join(', ')} and ${said[said.length - 1]}`
+}
+
+const WHY: [RegExp, string][] = [
+  [/sheriff/i, 'Sheriff sale'],
+  [/foreclos/i, 'Foreclosure'],
+  [/probate|estate|inherit|owner died|deceased/i, 'Estate'],
+  [/tax warrant/i, 'State tax warrant'],
+  [/tax/i, 'Behind on taxes'],
+  [/bankrupt/i, 'Bankruptcy'],
+  [/evict/i, 'Evicting a tenant'],
+  [/judgment|court debt|lien/i, 'Court judgment'],
+  [/raze|condemn/i, 'Raze or condemn order'],
+  [/code|nuisance|violation/i, 'Code case'],
+  [/vacan/i, 'Vacant'],
+  [/divorce/i, 'Divorce'],
+  [/fire/i, 'Fire'],
+  [/utility|water/i, 'Unpaid utilities'],
+  [/absentee|out of state/i, 'Owner lives elsewhere'],
+  [/landlord|rental/i, 'Landlord'],
+]
+
+/** Why they might sell, each kind once, the heaviest first: "Foreclosure · Estate · Behind on taxes". */
+export function whyLine(reasons: string[] | null | undefined, max = 4): string[] {
+  const out: string[] = []
+  const rest: string[] = []
+  for (const r of reasons ?? []) {
+    const hit = WHY.find(([re]) => re.test(r))
+    if (hit) { if (!out.includes(hit[1])) out.push(hit[1]) } else if (r.trim() && !rest.includes(r.trim())) rest.push(r.trim())
+  }
+  const order = WHY.map(([, w]) => w)
+  out.sort((a, b) => order.indexOf(a) - order.indexOf(b))
+  return [...out, ...rest.map((r) => (r.length > 40 ? `${r.slice(0, 38)}...` : r))].slice(0, max)
+}
+
+const ten = (s: string | null | undefined) => (s ?? '').replace(/\D/g, '').slice(-10)
+const REACHED = new Set(['interested', 'not_interested', 'reached', 'reached_no_decision', 'not_now', 'booked', 'inbound_answered', 'callback', 'ai_answered'])
+
+export type RankedPhone = Contact & { owners: boolean; blocked: boolean; note: string; score: number }
+
+/** The card's phones, the one to dial first at the top, each with what happened on it. A number they texted or
+ *  answered on comes first; then the owner's own mobile; a number whose text bounced or that was a wrong number goes
+ *  to the bottom, above only the blocked ones. */
+export function rankPhones(contacts: Contact[], ownerName: string | null | undefined, messages: Message[] | undefined,
+  inbound: { from10: string }[] | undefined): RankedPhone[] {
+  const texted = new Set((inbound ?? []).map((t) => t.from10))
+  const seen: Record<string, { reached: number; noAnswer: number; wrong: number; delivered: number; bounced: number }> = {}
+  const at = (n: string) => (seen[n] ??= { reached: 0, noAnswer: 0, wrong: 0, delivered: 0, bounced: 0 })
+  for (const m of messages ?? []) {
+    if (m.channel === 'call') {
+      const n = ten(m.from_number) || ten(m.to_number)
+      if (!n) continue
+      const s = m.status ?? ''
+      if (REACHED.has(s)) at(n).reached++
+      else if (s === 'wrong_number') at(n).wrong++
+      else if (s === 'no_answer' || s === 'voicemail' || s === 'busy') at(n).noAnswer++
+    } else if (m.channel === 'sms' && m.direction === 'out') {
+      const n = ten(m.to_number)
+      if (!n) continue
+      if (m.status === 'delivered') at(n).delivered++
+      else if (m.status === 'undelivered' || m.status === 'failed') at(n).bounced++
+    }
+  }
+  return contacts.filter((c) => c.kind === 'phone').map((c) => {
+    const n = ten(c.value_normalized ?? c.value)
+    const h = seen[n] ?? { reached: 0, noAnswer: 0, wrong: 0, delivered: 0, bounced: 0 }
+    const owners = isOwnersPhone(c, ownerName)
+    const blocked = phoneBlocked(c)
+    const dead = h.wrong > 0 || (h.bounced > 0 && h.delivered === 0)
+    const score = (blocked ? 1000 : 0) + (dead ? 300 : 0)
+      + (texted.has(n) ? -200 : 0) + (h.reached > 0 ? -150 : 0) + (h.delivered > 0 ? -20 : 0)
+      + (owners ? 0 : 40) + (c.line_type === 'mobile' ? 0 : c.line_type === 'landline' ? 15 : 8)
+      + Math.min(h.noAnswer, 4) * 3
+    const note = blocked ? 'Blocked: do not call or text'
+      : texted.has(n) ? 'They texted us from this number'
+        : h.reached > 0 ? 'They picked up on this number'
+          : h.wrong > 0 ? 'Wrong number'
+            : h.bounced > 0 && h.delivered === 0 ? 'Our text did not go through'
+              : h.noAnswer > 0 ? `No answer ${h.noAnswer === 1 ? 'once' : `${h.noAnswer} times`}${h.delivered > 0 ? ', text delivered' : ''}`
+                : h.delivered > 0 ? 'Text delivered, no reply' : 'Not tried yet'
+    return { ...c, owners, blocked, note, score }
+  }).sort((a, b) => a.score - b.score)
+}
+
+/** Notes as entries a person can scan: the ' | ' the system joins them with, each with its first line. */
+export function noteEntries(notes: string | null | undefined): { head: string; rest: string }[] {
+  return (notes ?? '').split(' | ').map((p) => p.trim()).filter(Boolean).map((p) => {
+    const [first, ...more] = p.split('\n')
+    if (first.length > 220 && more.length === 0) return { head: `${first.slice(0, 200)}...`, rest: first }
+    return { head: first, rest: more.join('\n').trim() }
+  })
+}

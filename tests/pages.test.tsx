@@ -170,6 +170,13 @@ describe('pages render', () => {
     const panel = within(screen.getByLabelText('The pillars').closest('section')!)
     expect(panel.getByText(/No usable phone|^Call /)).toBeTruthy()      // this fixture's only phone texted STOP
     expect(panel.getByText(/Open the call script/)).toBeTruthy()
+    // the top of the card (2026-11-22): a name to say, and why in one line, before anything else
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Jane Roe')
+    expect(screen.getByTestId('card-why').textContent).toMatch(/Why they might sell: Landlord/)
+    // what a person does not need before dialing is in one fold; nothing was removed
+    const more = within(document.getElementById('card-more')!)
+    expect(more.getByText(/Phones and emails/)).toBeTruthy()
+    expect(more.getByText('What the seller told us')).toBeTruthy()
     expect(screen.getByText('tired landlord')).toBeTruthy()
     expect(screen.getByText('Texted STOP')).toBeTruthy()
     // once in the phone-style text log at the top, once in the history
