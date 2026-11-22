@@ -168,3 +168,40 @@ describe('the comp on a yes is Grok\'s first', () => {
     expect((await live('Muse', '2026-11-23T20:21:00Z')).live).toBe(1)
   })
 })
+
+// 0299 (Muse, after its first pass under the new rules: "the helper doesn't expose the call-booking tools"). The door did
+// offer them; Muse's own run calls a fixed set of tools. So the call offer rides on replies_waiting and send_reply.
+describe('the call offer from the tools a texting run already has', () => {
+  const LAST = '00000000-0000-0000-0000-00000000a704'
+  const sent: Json[] = []
+  const door = { records, sendReply: async (x: Json) => { sent.push(x); return { outcome: 'sent' } } } as unknown as DoorDb
+  const tool = async (name: string, args: Json) => (await callTool(name, args, muse, door)) as { value: any; isError?: boolean }
+
+  it('replies_waiting carries the call on the row; send_reply books the time, then sends the confirmation', async () => {
+    await db.exec(`insert into public.leads (id, wpie_owner_id, owner_name, lane, stage, property_address, municipality, county, mailing_state, locked_to, assigned_to)
+      values ('${LAST}', 9714, 'GEORGE SELLER', 'flip', 'reply_received', '432 W TEST ST', 'VILLAGE OF TEST', 'Pierce', 'WI', 'adil', 'adil');
+      insert into public.contacts (lead_id, kind, value, value_normalized, line_type) values ('${LAST}', 'phone', '6125550177', '6125550177', 'mobile');`)
+    await theySaid(LAST, '6125550177', "Yes I'll sell it. tomorrow afternoon is fine", new Date(Date.now() - 60_000).toISOString())
+    const times = await records('agent_call_times', { p_lead_id: LAST }) as Json
+    expect(times.ok).toBe(true)
+    const row = ((await records('agent_replies_waiting', { p_days: 7 })) as Json[]).find((r) => r.lead_id === LAST)
+    if (row) expect(row.call).toMatchObject({ ok: true, caller: 'Tyler' })
+    const at = times.suggest[times.suggest.length - 1].at as string
+    // a time with no offset is refused and nothing is sent
+    expect((await tool('send_reply', { lead_id: LAST, phone: '6125550177', body: 'sounds good, talk then', book_call_at: 'tomorrow 3pm' })).isError).toBe(true)
+    // a time the caller does not work: not booked, not sent, and the answer carries times to offer
+    const off = await tool('send_reply', { lead_id: LAST, phone: '6125550177', body: 'sounds good, talk then', book_call_at: '2026-12-25T03:00:00-06:00' })
+    expect(off.isError).toBe(true)
+    expect(off.value.reason).toMatch(/^the call was not booked, so the reply was not sent/)
+    expect(sent).toHaveLength(0)
+    const ok = await tool('send_reply', { lead_id: LAST, phone: '6125550177', body: 'sounds good, talk then', book_call_at: at })
+    expect(ok.isError).toBeFalsy()
+    expect(ok.value).toMatchObject({ outcome: 'sent', call: { ok: true, caller: 'Tyler' } })
+    expect(sent).toEqual([{ lead_id: LAST, phone: '6125550177', body: 'sounds good, talk then' }])
+    expect((await db.query<Json>(`select belt from public.leads where id = $1`, [LAST])).rows[0].belt).toBe('call_booked')
+    // the words that agree were the seller's latest text
+    const note = (await db.query<{ body: string }>(`select body from public.messages where lead_id = $1 and channel = 'note' and body like 'Call booked by text%'`, [LAST])).rows[0].body
+    expect(note).toMatch(/They wrote: "Yes I'll sell it\. tomorrow afternoon is fine"$/)
+    expect(TEXTING_RULES).toMatch(/send_reply takes book_call_at/)
+  })
+})
