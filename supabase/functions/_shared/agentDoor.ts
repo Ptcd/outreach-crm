@@ -380,7 +380,7 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
   // 0267 (Colin 2026-11-20: "figure out the story of what's going on with the house ahead of time and then make a
   // detailed script like I got for the Jason call where I got a contract"): the story, what is owed, and the words
   { role: 'any', name: 'live_work',
-    description: 'CALL THIS FIRST IN EVERY SCHEDULED RUN (Colin 2026-11-21). It says whether a seller who said yes is waiting on you. Nothing live is one short line: carry on. Something live returns the cards, the newest yes first, each with what is still owed on it (comp, call_prices, brief) and what to do, and the packet: the instructions for the whole job. Do those cards before anything else in the run. When your prices land on a card, and again when its story lands, the server tells the card\u2019s caller on their phone: you post nothing. Every other tool result also says so when one is waiting (attention.live).',
+    description: 'CALL THIS FIRST IN EVERY SCHEDULED RUN (Colin 2026-11-21). It says whether a seller who said yes is waiting on you. Nothing live is one short line: carry on. Something live returns the cards, the newest yes first, each with what is still owed on it (comp, call_prices, brief) and what to do, and the packet: the instructions for the whole job. Do those cards before anything else in the run. Since 2026-11-22 (0281) it also lists cards a caller asked for from the card (comps, angles and a number; that comp is never texted to the seller), and both Muse and Grok get them: call work_claim on a card before you start it, and take the next card when someone else has it. When your prices land on a card, and again when its story lands, the server tells the card\u2019s caller on their phone: you post nothing. Every other tool result also says so when one is waiting (attention.live).',
     inputSchema: { type: 'object', properties: {} } },
   { role: 'any', name: 'call_briefs_wanted',
     description: 'The cards a person is about to phone that need the story and a script from you, the most pressing first: a seller who just said yes (due 30 minutes after the yes; the comp comes first), and any card Colin or a caller asked for. Each row has the card, the caller, why it is wanted, when it is due, the reasons on the card, the seller\u2019s last words, what the records already hold (value, tax owed and years, judgment, the mortgage estimate, the last sale) and the comp if it is in. Every tool you call tells you when some are waiting (attention.briefs). Write each with call_brief_set.',
@@ -391,7 +391,17 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
       owed: { type: 'array', items: { type: 'object', required: ['kind', 'basis', 'follows_house'], properties: { kind: S('mortgage | tax | judgment | lien | estate_claim | utility | hoa | other'), creditor: S('who it is owed to'),
         amount: { type: 'number', description: 'dollars; leave out when not known' }, basis: S('where the figure was read, or that it is an estimate'), follows_house: S('yes | no | unknown'), note: S('anything else') } } },
       unknowns: { type: 'array', items: { type: 'string' }, description: 'what is not known yet and decides the number, most important first' },
+      angles: { type: 'array', items: { type: 'object', required: ['angle', 'why'], properties: { angle: S('what we can give that is not money: close on their date, stay after closing, take what is left in it, pay the back taxes at closing, handle the estate papers, no showings, moving money'), why: S('why it matters to THIS seller') } }, description: 'ranked, the strongest first (0281)' },
+      situation: S('one line: the kind of seller and what drives the number (a sale in 30 days is a need; an estate owing more than the house where only a small mortgage follows the house: the price clears the mortgage and fees; a mortgage more than we can pay: no deal)'),
       script: S('the words for the call, in sections'), sources: S('where each fact was read'), nothing_owed_found: { type: 'boolean', description: 'true only when you looked and found nothing owed; say where you looked in sources' } } } },
+  // 0281 (Colin 2026-11-22: "My goal is for grok to be able to set those numbers and then also fully realize the situation")
+  { role: 'any', name: 'work_claim',
+    description: 'Claim a card from live_work before you start its comps, brief or number, so Muse and Grok never both work it. You have it for 45 minutes; if the other agent has it, the answer says so: take the next card. Writing the brief (call_brief_set) releases it.',
+    inputSchema: { type: 'object', required: ['lead_id'], properties: { lead_id: S('the card') } } },
+  { role: 'any', name: 'deal_price',
+    description: 'Put the number on the card’s deal sheet: open (the first number the caller says) and top (the most the caller may go to). Work it from the seller’s math, not from a percentage: what it sells for finished, minus repairs, minus selling costs, minus what is owed = what they would walk away with. Only what FOLLOWS THE HOUSE has to be cleared at closing (mortgage, tax, liens); claims filed in an estate do not (991 Howard St: about $200,000 of estate claims, a $34,000 mortgage, signed at $60,000). Little or nothing left for them: the number clears what follows the house plus moving money. A sale date or a deadline soon is a need. The server refuses a number with no value on the card, a top over the most we pay (70% of the value minus repairs: Colin prices above it), or a number under what follows the house (it cannot close: that is not a deal, say so in the brief). note: the situation and why this number, in plain words. Colin’s own number on a card is above yours. Callers see it when the deal sheet is switched on.',
+    inputSchema: { type: 'object', required: ['lead_id', 'open', 'note'], properties: { lead_id: S('the card'), open: { type: 'number', description: 'the first number, dollars' },
+      top: { type: 'number', description: 'the most the caller may go to, dollars' }, note: S('the situation and why this number') } } },
   { role: 'any', name: 'call_brief_get',
     description: 'Read the story and script on a card, as the caller sees it: the story, what is owed, the total that has to be paid at closing, the unknowns and the script, with who wrote it and when.',
     inputSchema: { type: 'object', required: ['lead_id'], properties: { lead_id: S('the card') } } },
@@ -770,6 +780,19 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
     case 'call_briefs_wanted': return { value: await db.records('agent_call_briefs_wanted', { p_limit: args.limit === undefined || args.limit === null ? 20 : int(args.limit, 20, 50) }) }
     case 'call_brief_set': {
       const r = await db.records('agent_call_brief_set', { p: args, p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'work_claim': {
+      const id = String(args.lead_id ?? '')
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return { value: { ok: false, reason: 'lead_id is the card' }, isError: true }
+      const r = await db.records('agent_work_claim', { p_lead_id: id, p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'deal_price': {
+      const id = String(args.lead_id ?? '')
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return { value: { ok: false, reason: 'lead_id is the card' }, isError: true }
+      const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() && Number.isFinite(Number(v.replace(/[$,]/g, ''))) ? Number(v.replace(/[$,]/g, '')) : null)
+      const r = await db.records('agent_deal_price', { p_lead_id: id, p_open: num(args.open), p_top: num(args.top), p_note: String(args.note ?? ''), p_agent: agent.name }) as Json
       return { value: r, isError: r?.ok === false }
     }
     case 'call_brief_get': {

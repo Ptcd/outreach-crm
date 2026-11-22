@@ -19,7 +19,7 @@ type SaidEvent = { at: string; by: string | null; number: number; response: stri
 export type Sheet = {
   lead_id: string; mode: 'off' | 'owner' | 'on'; owner: boolean
   stage: 'ready' | 'needs_value' | 'needs_owed' | 'colin_prices' | 'no_fit' | 'no_number' | 'passed'
-  kind: 'nothing_left' | 'some_left' | 'a_lot' | null; why: string | null; source: 'math' | 'colin' | 'their_floor'
+  kind: 'nothing_left' | 'some_left' | 'a_lot' | null; why: string | null; source: 'math' | 'colin' | 'their_floor' | 'agent'
   missing: { what: string; who: string }[]; property_kind: string; gate?: string[]
   math: { finished: number | null; needs: number | null; needs_for: string | null; needs_assumed: boolean; selling_costs: number | null
     to_clear: number; other_owed: number; walk_away: number | null; owed_known: boolean; open_owed: Owed[]; cost_words: string }
@@ -135,6 +135,7 @@ export function DealSheet({ leadId }: { leadId: string }) {
         <h2 className="text-base font-semibold">Deal sheet</h2>
         {s.owner && s.mode !== 'on' && <Badge tone="warn">Only you see this</Badge>}
         {s.source === 'colin' && <Badge tone="info">Colin&apos;s number</Badge>}
+        {s.source === 'agent' && <Badge tone="info">{(s as unknown as { agent?: { by?: string } }).agent?.by ?? 'An agent'}&apos;s number</Badge>}
         {s.kind === 'nothing_left' && <Badge tone="good">The price cannot reach them</Badge>}
         {s.kind === 'some_left' && <Badge>Something left for them</Badge>}
         {s.kind === 'a_lot' && <Badge tone="warn">They keep the difference</Badge>}

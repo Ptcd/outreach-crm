@@ -13,7 +13,8 @@ import { cn } from '@/lib/utils'
 type Owed = { kind: string; creditor: string | null; amount: number | null; basis: string; follows_house: 'yes' | 'no' | 'unknown'; note: string | null }
 type Brief = { status: 'none' | 'wanted' | 'ready'; due_at?: string | null; late?: boolean; wanted_by?: string | null
   story?: string | null; owed?: Owed[]; owed_line?: string | null; to_clear?: number | null; owed_total?: number | null
-  unknowns?: string[]; script?: string | null; sources?: string | null; written_by?: string | null; written_at?: string | null }
+  unknowns?: string[]; script?: string | null; sources?: string | null; written_by?: string | null; written_at?: string | null
+  angles?: { angle: string; why: string }[]; situation?: string | null; claimed_by?: string | null }
 const usd = (n: number | null | undefined) => (n == null ? 'amount not known' : Number(n).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }))
 const clock = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '')
 const KIND: Record<string, string> = { mortgage: 'Mortgage', tax: 'Unpaid tax', judgment: 'Judgment', lien: 'Lien', estate_claim: 'Claim on the estate', utility: 'Utility', hoa: 'Association', other: 'Other' }
@@ -36,10 +37,12 @@ export function CallBrief({ leadId }: { leadId: string }) {
   const b = q.data
   const ask = async () => {
     setBusy(true); setErr(null)
-    const r = await supabase.rpc('call_brief_ask', { p_lead_id: leadId })
+    // 0281: comps, angles and a number, whichever agent (Muse or Grok) takes it first
+    const r = await supabase.rpc('card_work_ask', { p_lead_id: leadId })
     setBusy(false)
     if (r.error) { setErr(r.error.message); return }
     await qc.invalidateQueries({ queryKey: ['call_brief', leadId] })
+    await qc.invalidateQueries({ queryKey: ['deal_sheet', leadId] })
   }
   if (q.isLoading || !b) return q.error ? <ErrorNote error={q.error} /> : null
   if (!['none', 'wanted', 'ready'].includes(b.status)) return null   // an answer this page does not know: show nothing rather than half a brief
@@ -47,7 +50,7 @@ export function CallBrief({ leadId }: { leadId: string }) {
     return (
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-dashed border-border/70 px-4 py-3 text-sm">
         <span className="text-muted-foreground">No story or script for this call yet.</span>
-        <Button size="sm" variant="outline" disabled={busy} onClick={ask}>Ask Muse for the story and a script</Button>
+        <Button size="sm" variant="outline" disabled={busy} onClick={ask}>Get comps, angles and a script</Button>
         {err && <span className="text-red-700">{err}</span>}
       </div>
     )
@@ -56,7 +59,7 @@ export function CallBrief({ leadId }: { leadId: string }) {
     return (
       <Section title="Before you call" right={<Badge tone={b.late ? 'warn' : 'info'}>{b.late ? 'Late' : `By ${clock(b.due_at)}`}</Badge>}>
         <p className="text-sm">
-          {b.late ? 'Muse has not written the story yet.' : `Muse is writing the story and a script for this call, on the card by ${clock(b.due_at)}.`}{' '}
+          {b.late ? `${b.claimed_by ?? 'Nobody'} has not written it yet.` : `${b.claimed_by ? `${b.claimed_by} is` : 'Muse or Grok will be'} working up the comps, the angles and a script, on the card by ${clock(b.due_at)}.`}{' '}
           If you call first: ask what is owed on the house and to whom, and who has to sign.
         </p>
       </Section>
@@ -65,7 +68,16 @@ export function CallBrief({ leadId }: { leadId: string }) {
   const owed = b.owed ?? []
   return (
     <Section title="Before you call" right={<button type="button" className="text-xs font-medium underline" onClick={() => setOpen(!open)}>{open ? 'Hide the script' : 'Show the script'}</button>}>
+      {b.situation && <p className="mb-2 rounded-md bg-muted/60 p-2 text-sm font-semibold">{b.situation}</p>}
       {b.story && <p className="whitespace-pre-wrap text-sm">{b.story}</p>}
+      {(b.angles ?? []).length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Angles: what we can give besides money</p>
+          <ol className="mt-1 list-decimal space-y-1 pl-5 text-sm">
+            {(b.angles ?? []).map((a, i) => <li key={i}><span className="font-medium">{a.angle}</span><span className="text-muted-foreground"> · {a.why}</span></li>)}
+          </ol>
+        </div>
+      )}
       {owed.length > 0 && (
         <div className="mt-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What is owed</p>
