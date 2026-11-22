@@ -92,6 +92,8 @@ interface DialerApi {
   hangUp: () => void
   toggleMute: () => void
   dismiss: () => void
+  /** Put Colin on this call (0282): the seller stays on; null when he is being dialled, else why not. */
+  addColin: () => Promise<string | null>
 }
 
 type TwilioCall = import('@twilio/voice-sdk').Call
@@ -525,6 +527,18 @@ export function DialerProvider({ children }: { children: ReactNode }) {
 
   const dismiss = useCallback(() => setActive((a) => (a && (a.status === 'ended' || a.status === 'error') ? null : a)), [])
 
+  // 0282: Colin joins the live call; the phone server moves it into a conference and dials his phone
+  const addColin = useCallback(async (): Promise<string | null> => {
+    const c = callRef.current
+    const sid = (c?.parameters as Record<string, string> | undefined)?.CallSid
+    const leadId = active?.leadId ?? null
+    if (!c || !sid || !leadId || active?.inbound) return 'Only a call you placed from a card can add Colin.'
+    const r = await supabase.functions.invoke('call-add', { body: { callSid: sid, leadId } })
+    const d = (r.data ?? {}) as { ok?: boolean; error?: string }
+    if (r.error || !d.ok) return d.error ?? r.error?.message ?? 'Colin could not be added.'
+    return null
+  }, [active])
+
   useEffect(() => () => { deviceRef.current?.destroy(); sideDevs.current.forEach((d) => { try { d.destroy() } catch { /* gone */ } }) }, [])
 
   // The test call to the assistant (2026-11-07): the same softphone, To "assistant", no card, no authorization gate; the
@@ -548,8 +562,8 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     }
   }, [device, finish])
 
-  const value = useMemo<DialerApi>(() => ({ active, incoming, supported, ready, start, startLines, lineResults, takeLineResults, accept, decline, hangUp, toggleMute, dismiss, testAssistant }),
-    [active, incoming, supported, ready, start, startLines, lineResults, takeLineResults, accept, decline, hangUp, toggleMute, dismiss, testAssistant])
+  const value = useMemo<DialerApi>(() => ({ active, incoming, supported, ready, start, startLines, lineResults, takeLineResults, accept, decline, hangUp, toggleMute, dismiss, testAssistant, addColin }),
+    [active, incoming, supported, ready, start, startLines, lineResults, takeLineResults, accept, decline, hangUp, toggleMute, dismiss, testAssistant, addColin])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
@@ -557,6 +571,7 @@ const NO_DIALER: DialerApi = {
   active: null, incoming: null, supported: false, ready: false, start: async () => undefined, accept: async () => null,
   startLines: async () => undefined, lineResults: [], takeLineResults: () => [],
   decline: () => undefined, hangUp: () => undefined, toggleMute: () => undefined, dismiss: () => undefined, testAssistant: async () => undefined,
+  addColin: async () => 'The dialer is not available here.',
 }
 
 /** Outside DialerProvider (tests, previews) the dialer is simply unavailable: buttons render disabled. */

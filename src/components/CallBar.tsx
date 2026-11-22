@@ -10,11 +10,13 @@ import { api } from '@/lib/queries'
 const WORDS = { connecting: 'Connecting...', ringing: 'Ringing...', in_call: 'In call', ended: 'Call ended', error: 'Call failed', idle: '' }
 
 export function CallBar() {
-  const { active, hangUp, toggleMute, dismiss } = useDialer()
+  const { active, hangUp, toggleMute, dismiss, addColin } = useDialer()
+  const [adding, setAdding] = useState<'idle' | 'busy' | 'done'>('idle')
   const nav = useNavigate()
   const [, tick] = useState(0)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
+  useEffect(() => { if (active?.status !== 'in_call') setAdding('idle') }, [active?.status])
   useEffect(() => {
     if (active?.status !== 'in_call') return
     const t = setInterval(() => tick((n) => n + 1), 1000)
@@ -72,6 +74,14 @@ export function CallBar() {
         )}
         {active.status === 'in_call' && (
           <Button size="sm" variant="outline" onClick={toggleMute}>{active.muted ? 'Unmute' : 'Mute'}</Button>
+        )}
+        {active.status === 'in_call' && !active.inbound && active.leadId && (
+          // 0282: Colin joins the call; the seller stays on the line
+          <Button size="sm" variant="outline" disabled={adding !== 'idle'} onClick={async () => {
+            setAdding('busy'); setMsg(null)
+            const err = await addColin()
+            if (err) { setAdding('idle'); setMsg(err) } else setAdding('done')
+          }}>{adding === 'done' ? 'Calling Colin...' : adding === 'busy' ? 'Adding Colin...' : 'Add Colin'}</Button>
         )}
         {live ? (
           <Button size="sm" variant="destructive" onClick={hangUp}>Hang up</Button>
