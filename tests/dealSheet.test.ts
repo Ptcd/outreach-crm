@@ -90,36 +90,42 @@ describe('the deal sheet', () => {
     for (const k of ['ceiling', 'rule_opening', 'gap', 'gate']) expect(t).not.toHaveProperty(k)
   })
 
-  it('what is owed has to be known first: an open line on the brief waits for the caller to ask', async () => {
+  it('what is owed is asked first, but the comp already gives a number for each shape of the inside (0296)', async () => {
     const before = (await sheet(TYLER, EQUITY))!
-    expect(before).toMatchObject({ stage: 'needs_owed', number: null })
+    // 65% of 200,000 minus the heaviest row's 40,000, until they say what the inside is like; half way to the 100,000 ceiling
+    expect(before).toMatchObject({ stage: 'ready', source: 'rule', number: 90000, steps: [90000, 92500, 95000] })
+    expect(before.by_condition).toEqual([{ i: 0, inside: 'Inside light', number: 105000, stage: 'ready', picked: false },
+      { i: 1, inside: 'Inside heavy', number: 90000, stage: 'ready', picked: false }])
+    expect(before.heads_up).toEqual(['What they owe is not known yet. Ask it (step 3) before you say the number: it can come down.'])
     expect(before.missing).toEqual([{ what: 'what is owed: ask them on the call, then tap the answer', who: 'caller' }])
     expect(before.math.open_owed).toEqual([{ kind: 'mortgage', creditor: null, basis: 'none on record, never confirmed' }])
     // they say they owe 60,000: 200,000 - 40,000 - 20,000 - 60,000 = 80,000 left for them; we open at 80% of that
     const said = await call(TYLER, `public.deal_sheet_fact($1, 'owed_said', '60000'::jsonb)`, [EQUITY])
     expect(said.sheet).toMatchObject({ stage: 'ready', kind: 'some_left', number: 64000, steps: [64000, 73000, 82000] })
     expect(said.sheet.math).toMatchObject({ to_clear: 60000, walk_away: 80000 })
+    expect(said.sheet.by_condition.map((x: Json) => x.number)).toEqual([76000, 64000])       // every row comes down with what is owed
+    expect(said.sheet.heads_up).toEqual([])
     // the inside is lighter than assumed: less work, more left for them, and a number the rule's opening now caps
     const lighter = await call(TYLER, `public.deal_sheet_inside($1, 0)`, [EQUITY])
     expect(lighter.sheet.math).toMatchObject({ needs: 25000, needs_assumed: false, walk_away: 95000 })
     expect(lighter.sheet).toMatchObject({ kind: 'some_left', number: 76000 })
+    expect(lighter.sheet.by_condition.map((x: Json) => x.picked)).toEqual([true, false])
     await call(TYLER, `public.deal_sheet_inside($1, 1)`, [EQUITY])
   })
 
-  it('a seller who keeps the difference gets no number, unless their own floor is under the rule\'s opening', async () => {
+  it('a seller who keeps the difference gets the rule\'s opening, and their own floor when it is lower (0296)', async () => {
     await call(TYLER, `public.deal_sheet_fact($1, 'owed_said', null)`, [EQUITY])
     await call(TYLER, `public.deal_sheet_fact($1, 'owed_nothing', 'true'::jsonb)`, [EQUITY])
     // owes only the 20,000 of taxes: 120,000 left for them, more than the 100,000 we could ever pay
     const a = (await sheet(COLIN, EQUITY))!
-    expect(a).toMatchObject({ stage: 'no_number', kind: 'a_lot', number: null, ceiling: 100000 })
-    expect(a.why).toMatch(/^Selling it the usual way leaves them more than we can pay/)
+    expect(a).toMatchObject({ stage: 'ready', kind: 'a_lot', source: 'rule', number: 90000, ceiling: 100000 })
+    expect(a.heads_up).toEqual(['Selling it with an agent could leave them more than we pay, so expect a no. Ask the number they would not go under (step 5).'])
     // they say they would not go under 55,000: far under, so the card takes theirs
     const f = await call(TYLER, `public.deal_sheet_fact($1, 'floor', '55000'::jsonb)`, [EQUITY])
     expect(f.sheet).toMatchObject({ stage: 'ready', source: 'their_floor', number: 55000, steps: [55000, 66000, 77500] })
-    // a floor that leaves too little room under the ceiling is Colin's, not a caller's
-    const thin = await call(TYLER, `public.deal_sheet_fact($1, 'floor', '85000'::jsonb)`, [EQUITY])
-    expect(thin.sheet).toMatchObject({ stage: 'colin_prices', number: null })
-    expect(thin.sheet.why).toBe('Thin: the number would be only $15,000 under the most we can pay.')
+    // a floor just under the rule's opening is taken too: the rule's own opening is never "thin"
+    const near = await call(TYLER, `public.deal_sheet_fact($1, 'floor', '85000'::jsonb)`, [EQUITY])
+    expect(near.sheet).toMatchObject({ stage: 'ready', source: 'their_floor', number: 85000, steps: [85000, 88500, 92500] })
     await call(TYLER, `public.deal_sheet_fact($1, 'floor', '55000'::jsonb)`, [EQUITY])
   })
 
@@ -197,29 +203,40 @@ describe('the sheet says what to do about price', () => {
     await offer(SOMERS, { arv: 395000, comps: comps([373750, 383000, 432000]), rows: ROWS(20000, 85000) })
     await brief(SOMERS, [{ kind: 'mortgage', creditor: 'unknown', amount: null, basis: 'deed index not searched', follows_house: 'yes' }], 0, 0)
     const w = await work()
-    expect(w).toMatchObject({ stage: 'needs_owed', number: null })
-    expect(w.verdict.say).toBe('You have no number for this house. Do not say or text any price.')
-    expect(w.verdict.next).toMatch(/Ask what is owed \(step 3\)/)
+    // 0296: the mortgage is not known, and the comp still says what to offer for each shape of the inside
+    expect(w).toMatchObject({ stage: 'ready', source: 'rule', number: 171500, steps: [171500, 176500, 181500] })
+    expect(w.verdict.say).toBe('Your number is $171,500. Say it once, on a call, after step 5.')
+    expect(w.by_condition.map((x: Json) => [x.inside, x.number])).toEqual([['Inside light', 236500], ['Inside heavy', 171500]])
+    expect(w.heads_up[0]).toMatch(/What they owe is not known yet/)
+    // a card with no value has no number, and says so
+    const none = await work(THALIAS)
+    expect(none).toMatchObject({ stage: 'needs_value', number: null, by_condition: [] })
+    expect(none.verdict.say).toBe('You have no number for this house. Do not say or text any price.')
     // a card with a number says the number
     const h = await work(HOWARD)
     expect(h.stage).toBe('ready')
     expect(h.verdict.say).toBe(`Your number is $${Number(h.number).toLocaleString('en-US')}. Say it once, on a call, after step 5.`)
   })
 
-  it('what the seller texted counts: a number over the finished price means no number, whatever is owed', async () => {
+  it('what the seller texted counts: over the finished price the caller is told to expect a no; under ours, theirs is the number', async () => {
     await db.query(`insert into public.reply_drafts (lead_id, phone10, inbound_at, kind, status, facts)
                     values ($1, '2625550100', now(), 'routine', 'sent', $2::jsonb)`,
       [SOMERS, JSON.stringify({ price_expectation: '$500,000', condition: '2 new bathrooms, new kitchen', decision_makers: 'Only her on title', occupancy: 'owner' })])
     const w = await work()
-    expect(w).toMatchObject({ stage: 'apart', number: null, theirs: { number: 500000, number_from: 'text' } })
-    expect(w.verdict.say).toBe('You have no number for this house. Do not say or text any price.')
-    expect(w.verdict.next).toMatch(/They want \$500,000\. Finished, houses like it sell for about \$395,000/)
-    expect(w.verdict.next).toMatch(/rest the card/)
+    expect(w).toMatchObject({ stage: 'ready', apart: true, number: 171500, theirs: { number: 500000, number_from: 'text' } })
+    expect(w.heads_up[1]).toBe('They want $500,000. Finished, houses like it sell for about $395,000, so expect a no. Say your number once, then ask why they would sell and by when.')
     expect(w.texted).toMatchObject({ condition: '2 new bathrooms, new kitchen', who_signs: 'Only her on title' })
     // a floor under the finished price, said on a call, takes the card back to the sheet's own arithmetic
     await db.query(`insert into public.deal_sheets (lead_id, facts) values ($1, '{"floor": 150000}'::jsonb)
                     on conflict (lead_id) do update set facts = excluded.facts`, [SOMERS])
-    expect((await work()).stage).toBe('needs_owed')
+    expect(await work()).toMatchObject({ stage: 'ready', apart: false, source: 'their_floor', number: 150000 })
+    await db.query(`update public.deal_sheets set facts = '{}'::jsonb, inside = 0 where lead_id = $1`, [SOMERS])
+    expect(await work()).toMatchObject({ number: 236500, math: { needs_assumed: false } })
+    // a later text asks for less than we would open at: never open above what they asked for
+    await db.query(`insert into public.reply_drafts (lead_id, phone10, inbound_at, kind, status, facts)
+                    values ($1, '2625550100', now() + interval '1 minute', 'routine', 'sent', '{"price_expectation": "about 150k"}'::jsonb)`, [SOMERS])
+    expect(await work()).toMatchObject({ stage: 'ready', source: 'their_number', number: 150000 })
+    await db.query(`update public.deal_sheets set inside = null where lead_id = $1`, [SOMERS])
   })
 
   it('money as people write it: "$500,000", "140k", "1.2 million"; a bare small figure is not guessed at', async () => {

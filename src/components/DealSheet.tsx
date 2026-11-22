@@ -19,7 +19,7 @@ type SaidEvent = { at: string; by: string | null; number: number; response: stri
 export type Sheet = {
   lead_id: string; mode: 'off' | 'owner' | 'on'; owner: boolean
   stage: 'ready' | 'needs_value' | 'needs_owed' | 'colin_prices' | 'no_fit' | 'no_number' | 'passed' | 'apart'
-  kind: 'nothing_left' | 'some_left' | 'a_lot' | null; why: string | null; source: 'math' | 'colin' | 'their_floor' | 'agent'
+  kind: 'nothing_left' | 'some_left' | 'a_lot' | null; why: string | null; source: 'math' | 'colin' | 'their_floor' | 'agent' | 'rule' | 'their_number'
   missing: { what: string; who: string }[]; property_kind: string; gate?: string[]
   math: { finished: number | null; needs: number | null; needs_for: string | null; needs_assumed: boolean; selling_costs: number | null
     to_clear: number; other_owed: number; walk_away: number | null; owed_known: boolean; open_owed: Owed[]; cost_words: string }
@@ -30,6 +30,9 @@ export type Sheet = {
   // 0294: the one thing to do about price, in plain words, and what the seller already texted
   verdict?: { say: string | null; next: string | null }
   texted?: { condition?: string | null; who_signs?: string | null; lives_there?: string | null }
+  // 0296: the number for each shape of the inside (what the comp check is for), and what to expect on the call
+  by_condition?: { i: number; inside: string; number: number | null; stage: string; picked: boolean }[]
+  heads_up?: string[]; apart?: boolean
   facts: Record<string, unknown>; said: SaidEvent[]
   colin: { open: number | null; top: number | null; note: string | null; pass: boolean; at: string | null; asked_at: string | null; asked_words: string | null }
   owner_name: string | null; address: string | null; caller: string | null
@@ -128,12 +131,20 @@ export function DealSheet({ leadId }: { leadId: string }) {
   const comp = s.comps[0]
   // the top line: with a number, the one to say now (it moves up a step after a no); with none, the server's plain words
   const NO_NUMBER = 'You have no number for this house. Do not say or text any price.'
-  const verdictSay = s.stage !== 'ready' ? (s.verdict?.say ?? NO_NUMBER)
+  // 0296 (Colin 2026-11-22: "Why didn't it show what to offer depending on condition"): the comp's number for each
+  // shape of the inside, side by side, until a number has been said. Tapping a row picks it.
+  const byCond = s.by_condition ?? []
+  const showRows = byCond.some((r) => r.number != null) && !lastSaid && !absent
+  const pickFirst = showRows && byCond.length > 1 && !byCond.some((r) => r.picked)
+  const heads = s.stage === 'ready' && agreed == null && !absent ? (s.heads_up ?? []) : []
+  const verdictSay = pickFirst ? 'Your number depends on the inside. Ask what it is like, then tap the row that fits.'
+    : s.stage !== 'ready' ? (s.verdict?.say ?? NO_NUMBER)
     : agreed != null ? `They said yes to ${usd(agreed)}. Send the offer now.`
     : absent ? 'No number today: the other person who decides is not on the call.'
     : current != null ? `Your number is ${usd(current)}. Say it once, on a call, after step 5.`
     : 'No further number. Anything more is Colin’s.'
-  const verdictNext = s.stage !== 'ready' ? (s.verdict?.next ?? s.why)
+  const verdictNext = pickFirst ? 'One number, said once, on a call, after step 5. Never text it.'
+    : s.stage !== 'ready' ? (s.verdict?.next ?? s.why)
     : agreed != null ? 'Send offer is below. Stay on the call until it comes back signed.'
     : absent ? 'Book the call with both of them on the line.'
     : current != null ? 'Walk steps 1 to 5 with them first. One number, one reason, then wait. Never text it.'
@@ -159,10 +170,26 @@ export function DealSheet({ leadId }: { leadId: string }) {
       {/* 0294 (Colin 2026-11-22, 226 60th Ave: "Tyler can't figure out wtf is going on"): the first thing on the sheet is
           what to do about price, in one line a person cannot misread. Tyler took the seller's walk-away total for the
           offer and texted it. */}
-      <div className={cn('mt-2 rounded-md border-2 p-3', s.stage === 'ready' ? 'border-primary' : 'border-red-400 bg-red-50 dark:bg-red-950/30')} aria-label="What to do about price">
+      <div className={cn('mt-2 rounded-md border-2 p-3', s.stage === 'ready' || showRows ? 'border-primary' : 'border-red-400 bg-red-50 dark:bg-red-950/30')} aria-label="What to do about price">
         <p className="text-lg font-bold leading-snug">{verdictSay}</p>
+        {showRows && (
+          <div className="mt-2" role="group" aria-label="What to offer, by the shape of the inside">
+            <p className="text-xs font-semibold uppercase text-muted-foreground">What to offer, by the shape of the inside</p>
+            {s.texted?.condition && <p className="text-sm">They texted: {s.texted.condition}</p>}
+            <div className="mt-1 space-y-1">
+              {byCond.map((r) => (
+                <button key={r.i} type="button" disabled={busy} onClick={() => run('deal_sheet_inside', { p_row: r.i })}
+                  className={cn('flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm hover:bg-accent', r.picked && 'border-primary bg-primary/10')}>
+                  <span>{r.inside}{r.picked && <span className="ml-2 text-xs font-semibold uppercase text-primary">picked</span>}</span>
+                  <span className="shrink-0 text-base font-bold tabular-nums">{r.number != null ? usd(r.number) : 'No offer'}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {verdictNext && <p className="mt-1 text-sm">{verdictNext}</p>}
-        {s.stage !== 'ready' && <p className="mt-1 text-sm font-semibold">Every dollar figure below is the seller&apos;s side of the math. None of them is our offer.</p>}
+        {heads.map((h) => <p key={h} className="mt-1 text-sm font-medium text-amber-800 dark:text-amber-200">{h}</p>)}
+        {s.stage !== 'ready' && !showRows && <p className="mt-1 text-sm font-semibold">Every dollar figure below is the seller&apos;s side of the math. None of them is our offer.</p>}
       </div>
 
       <ol className="mt-3 space-y-2">
@@ -250,7 +277,7 @@ export function DealSheet({ leadId }: { leadId: string }) {
           )}
           {s.kind === 'nothing_left' && <Say>&quot;I&apos;ll be straight with you. If you don&apos;t want to keep the place, I don&apos;t see how selling it puts money in your pocket. If you&apos;d rather just be done with it, we&apos;ll buy it as it sits: no repairs, no showings, we clear it out, and it closes at a title company.&quot;</Say>}
           {s.kind === 'some_left' && <Say>&quot;Selling it the usual way, after the work, the agent and the months it takes, you&apos;d clear about {usd(m.walk_away)}. We can have it done in a few weeks, as it sits, with nothing for you to fix or clean out.&quot;</Say>}
-          {(s.kind === 'a_lot' || s.stage === 'no_number') && (
+          {(s.kind === 'a_lot' || s.source === 'rule') && s.stage === 'ready' && (
             <>
               <Say>&quot;Honestly, an agent may do better for you than I can. Is there a number you would not go under, if it were done in a few weeks with no repairs?&quot;</Say>
               <div className="flex flex-wrap items-center gap-2">
@@ -274,6 +301,7 @@ export function DealSheet({ leadId }: { leadId: string }) {
             <>
               <p className="text-xs font-semibold uppercase text-muted-foreground">{lastSaid ? 'Next step, once' : 'Say this, once'}</p>
               <p className="text-3xl font-bold tabular-nums" aria-label="The number to say">{usd(current)}</p>
+              {byCond.length > 1 && m.needs_for && <p className="text-xs text-muted-foreground">For the inside as: {m.needs_for}{m.needs_assumed ? ' (not picked yet: tap the row at the top of this sheet)' : ''}</p>}
               <p className="text-sm">{s.why && s.source !== 'agent' ? `${s.why.replace(/\.+$/, '')}. ` : ''}One number, one reason, then <strong>wait. Count to five.</strong> Do not explain it, do not give a range, do not say you might go higher.</p>
               {s.why && s.source === 'agent' && (
                 <p className="mt-1 rounded-md bg-muted/60 p-2 text-xs text-muted-foreground"><span className="font-semibold">Why this number (for you, never to say): </span>{s.why}</p>

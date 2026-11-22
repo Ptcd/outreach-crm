@@ -104,6 +104,31 @@ describe('the deal sheet on the card', () => {
     await waitFor(() => expect(rpc).toHaveBeenCalledWith('deal_sheet_ask_colin', { p_lead_id: 'L1', p_words: 'he wants a number today' }))
   })
 
+  it('what to offer for each shape of the inside is the first thing on the sheet; tapping a row picks it (0296)', async () => {
+    const rows = (picked: number | null) => [{ i: 0, inside: 'Inside light', number: 105000, stage: 'ready', picked: picked === 0 },
+      { i: 1, inside: 'Inside heavy', number: 90000, stage: 'ready', picked: picked === 1 }]
+    current = base({ kind: null, source: 'rule', number: 90000, steps: [90000, 92500, 95000], limit: 95000, by_condition: rows(null),
+      texted: { condition: 'new kitchen, 2 new baths' }, heads_up: ['What they owe is not known yet. Ask it (step 3) before you say the number: it can come down.'] })
+    show()
+    const top = await screen.findByLabelText('What to do about price')
+    expect(top.textContent).toContain('Your number depends on the inside. Ask what it is like, then tap the row that fits.')
+    const table = screen.getByLabelText('What to offer, by the shape of the inside').textContent!
+    expect(table).toContain('They texted: new kitchen, 2 new baths')
+    expect(table).toContain('Inside light$105,000')
+    expect(table).toContain('Inside heavy$90,000')
+    expect(top.textContent).toContain('What they owe is not known yet')
+    expect(top.textContent).not.toContain('None of them is our offer')
+    fireEvent.click(screen.getByText('Inside light'))
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('deal_sheet_inside', { p_lead_id: 'L1', p_row: 0 }))
+    // picked: the top line is the number
+    cleanup()
+    current = base({ kind: null, source: 'rule', number: 105000, steps: [105000, 108500, 112500], limit: 112500, by_condition: rows(0), inside: 0,
+      math: { ...(base().math as object), needs_for: 'Inside light', needs_assumed: false } })
+    show()
+    expect((await screen.findByLabelText('What to do about price')).textContent).toContain('Your number is $105,000. Say it once, on a call, after step 5.')
+    expect(screen.getByLabelText('The number to say').textContent).toBe('$105,000')
+  })
+
   it('Colin sees the ceiling, why there is no formula number, and sets his own', async () => {
     owner = true
     current = base({ owner: true, mode: 'owner', stage: 'colin_prices', number: null, steps: [], limit: null, kind: null, why: 'No formula number: it is a manufactured home.',
