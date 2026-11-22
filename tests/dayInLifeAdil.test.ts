@@ -27,7 +27,9 @@ afterAll(async () => { await db.close() })
 describe("Adil's weekend", () => {
   it('never releases a seller text on Sunday, while a Sunday hot reply still pings the on-duty caller', async () => {
     await db.exec(`
-      update public.campaign_control set sending_enabled = true, paused = false, laptop_paused = false, daily_cap = 100;
+      -- 0277: Sundays are open by default since 2026-11-22; this test is about the rule switched back on
+      update public.campaign_control set sending_enabled = true, paused = false, laptop_paused = false, daily_cap = 100,
+        sundays_closed = true, no_sundays = true;
       insert into public.planned_openers
         (plan_date, wpie_owner_id, attempt, lead_id, lane, template_lane, variant, phone, body, body_sha256,
          segments, scheduled_at, window_start_utc, window_end_utc, dnc_state, per_hour, decision, send_status)

@@ -92,7 +92,12 @@ describe('seller-to-appointment conveyor baseline', () => {
     const slide = await one<{ at: string }>(`
       select to_char(public.belt_slide('2026-10-25T18:00:00Z', 'America/Chicago', 'text', null)
         at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') at`)
-    expect(slide.at).toBe('2026-10-26T14:00:00Z')
+    // 0277 (Colin 2026-11-22): a text stays on the Sunday; a call still slides to Monday 8 AM
+    expect(slide.at).toBe('2026-10-25T18:00:00Z')
+    const call = await one<{ at: string }>(`
+      select to_char(public.belt_slide('2026-10-25T18:00:00Z', 'America/Chicago', 'call', null)
+        at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') at`)
+    expect(call.at).toBe('2026-10-26T13:00:00Z')
     await db.query(`insert into public.belt_health (at, kind, ok, checks, summary)
       values ('2026-10-25T15:00:00Z', 'run', true, '{"no_stop":0}', 'old run')`)
     const watch = await one<{ r: { alerted: string[] } }>(`select public.belt_watch('2026-10-25T18:00:00Z') as r`)

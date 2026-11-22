@@ -140,10 +140,11 @@ describe('the belt table', () => {
 describe('sliding', () => {
   const slide = async (at: string, kind: 'text' | 'call', hour: number | null = null) =>
     (await one<{ r: string }>(`select public.belt_slide($1::timestamptz, 'America/Chicago', $2, $3) as r`, [at, kind, hour])).r
-  it('never Sunday, never before 8am (texts 9am), never after 8pm, never earlier', async () => {
-    expect(central(await slide('2026-10-25T18:00:00Z', 'text'))).toBe('Mon 09:00')       // Sunday 1 PM -> Monday 9 AM
+  it('texts any day (0277), calls never Sunday; never before 8am (texts 9am), never after 8pm, never earlier', async () => {
+    expect(central(await slide('2026-10-25T18:00:00Z', 'text'))).toBe('Sun 13:00')       // Sunday 1 PM stays (0277, Colin 2026-11-22)
     expect(central(await slide('2026-10-24T20:30:00Z', 'text'))).toBe('Sat 15:30')       // Saturday 3:30 PM stays
-    expect(central(await slide('2026-10-25T02:30:00Z', 'text'))).toBe('Mon 09:00')       // Saturday 9:30 PM -> Monday (Sunday skipped)
+    expect(central(await slide('2026-10-25T02:30:00Z', 'text'))).toBe('Sun 09:00')       // Saturday 9:30 PM -> Sunday 9 AM
+    expect(central(await slide('2026-10-25T18:00:00Z', 'call'))).toBe('Mon 08:00')       // a call on Sunday 1 PM -> Monday 8 AM
     expect(central(await slide('2026-10-22T11:30:00Z', 'call'))).toBe('Thu 08:00')       // 6:30 AM -> 8 AM
     expect(central(await slide('2026-10-22T11:30:00Z', 'call', 14))).toBe('Thu 14:00')   // a day-anchored call at 2 PM
     expect(central(await slide('2026-10-25T11:30:00Z', 'call', 9))).toBe('Mon 09:00')    // Sunday 9 AM -> Monday 9 AM

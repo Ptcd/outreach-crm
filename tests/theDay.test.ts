@@ -173,7 +173,8 @@ describe('the day', () => {
     expect(posts[0].topic).toContain('NEW PEOPLE RUN OUT')
     expect(posts[0].body).toContain('weak_distress')
     expect(await one<Record<string, unknown>>('public.text_day_tick($1)', [evening])).toEqual({})     // once a day
-    expect(await one<Record<string, unknown>>('public.text_day_tick($1)', ['2026-11-15T16:00:00Z'])).toMatchObject({ why: 'Sunday' })
+    // 0277: a Sunday is a day like any other (Colin 2026-11-22)
+    expect((await one<Record<string, unknown>>('public.text_day_tick($1)', ['2026-11-15T16:00:00Z'])).why).toBeUndefined()
   })
 
   it('the backstop, switched on, writes the day: settled wording, the sale text, spaced out, a stretch at a time (0236)', async () => {

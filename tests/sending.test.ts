@@ -276,11 +276,13 @@ describe('follow-ups (texts 2 and 3)', () => {
 })
 
 describe('time', () => {
-  it('sends only 10:00-19:00 Central, never on Sunday', async () => {
+  it('sends only 10:00-19:00 Central; Sunday only when the standing rule is switched back on (0277)', async () => {
     await opener(await lead(), { scheduled_at: T('14:00'), window_start: T('14:00') })
     expect(await claim(T('14:59'))).toMatchObject({ outcome: 'idle', reason: 'outside_window' })     // 9:59 CT
     expect(await claim('2026-10-23T00:00:00Z')).toMatchObject({ outcome: 'idle', reason: 'outside_window' })  // 19:00 CT
+    await db.exec(`update public.campaign_control set sundays_closed = true, no_sundays = true where id = 1`)
     expect(await claim('2026-10-25T16:00:00Z')).toMatchObject({ outcome: 'idle', reason: 'sunday' })
+    await db.exec(`update public.campaign_control set sundays_closed = false, no_sundays = false where id = 1`)
     expect(await claim(T('23:30'))).toMatchObject({ outcome: 'send' })                                // 18:30 CT
   })
 

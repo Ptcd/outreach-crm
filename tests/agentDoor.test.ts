@@ -290,7 +290,7 @@ describe('on the real migrations', () => {
       .toMatchObject({ status: 'refused', reason: expect.stringContaining('not a usable phone') })
     const late = await r(`public.agent_queue_text($1, '4145550143', $2, 2, '2026-10-25T00:30:00Z', 'Muse sender', $3::timestamptz)`, [lid, OPENER, sat])
     expect(late.status).toBe('queued')
-    expect(new Date(late.goes_after as string).toISOString()).toBe('2026-10-26T15:00:00.000Z')    // 7:30 PM Sat is past the window -> Monday 10 AM, no Sunday
+    expect(new Date(late.goes_after as string).toISOString()).toBe('2026-10-25T15:00:00.000Z')    // 7:30 PM Sat is past the window -> Sunday 10 AM (0277, Colin 2026-11-22: Sunday is a texting day)
     const claim = await r(`public.claim_next_opener(true, $1::timestamptz)`, [sat])
     expect(claim).toMatchObject({ outcome: 'would_send' })
     expect((claim.opener as { body: string }).body).toBe(OPENER)

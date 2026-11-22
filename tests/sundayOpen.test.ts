@@ -47,7 +47,31 @@ beforeAll(async () => {
   thalias = await card(304, 'TINA THALIACARD', 'thalia', '4145560304')
 }, 120_000)
 
-describe('a Sunday', () => {
+describe('0277: Sunday is a texting day (Colin 2026-11-22)', () => {
+  it('builds a list like any other day; the state law and the caller off still hold', async () => {
+    expect(await noSundays()).toBe(false)
+    await one('public.text_day_tick($1)', [SUN_10AM])
+    expect(await noSundays()).toBe(false)
+    expect(await listed(SUNDAY)).toEqual([tylers])
+    expect(await block(tylersPa, SUN_10AM)).toBe('state_bars_sunday')
+    expect(await block(tylersTx, SUN_10AM)).toBe('state_bars_sunday')
+    expect(await block(thalias, SUN_10AM)).toBe('caller_off_today')
+    // nothing special is said to the agent: a Sunday is a weekday (the rules text says so)
+    expect((await one<Record<string, unknown> | null>(`public.agent_attention('Muse', $1)`, [SUN_10AM]))?.sunday).toBeUndefined()
+    // an older setting that says Sunday is shut is put right by the tick
+    await db.exec(`update public.campaign_control set no_sundays = true where id = 1`)
+    await one('public.text_day_tick($1)', [SUN_10AM])
+    expect(await noSundays()).toBe(false)
+    // a belt text no longer slides to Monday; a belt call still does
+    expect(await one<string>(`(public.belt_slide('2099-11-15T16:00:00Z'::timestamptz, 'America/Chicago', 'text') at time zone 'America/Chicago')::date::text`)).toBe('2099-11-15')
+    expect(await one<string>(`(public.belt_slide('2099-11-15T16:00:00Z'::timestamptz, 'America/Chicago', 'call') at time zone 'America/Chicago')::date::text`)).toBe('2099-11-16')
+    // the standing rule's switch, for the old tests below
+    await db.exec(`delete from public.text_day where day = '${SUNDAY}'`)
+    await db.exec(`update public.campaign_control set sundays_closed = true, no_sundays = true, day_last_build_at = null where id = 1`)
+  })
+})
+
+describe('a Sunday, with the standing rule switched back on (sundays_closed)', () => {
   it('is shut unless it was opened: no list, whatever the cards', async () => {
     expect(await noSundays()).toBe(true)
     expect(await one<Record<string, unknown>>('public.text_day_tick($1)', [SUN_10AM])).toMatchObject({ why: 'Sunday' })
