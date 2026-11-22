@@ -83,6 +83,8 @@ export default function LeadDetail() {
   const verdict = bookingVerdict(callFacts, facts, lead)
   const why = whyLine(lead.reasons_to_sell)
   const who = whoToAskFor(peopleQ.data, lead.owner_name)
+  // an estate card with nobody marked yet (0289): the name on the record is very often the person who died
+  const estateCard = why.includes('Estate') && who.died.length === 0
   const heading = who.died.length ? (who.living.length ? who.living.join(' and ') : `Estate of ${who.died.join(' and ')}`) : (displayOwner(lead.owner_name) || lead.owner_name)
 
   return (
@@ -102,6 +104,12 @@ export default function LeadDetail() {
           </p>
         )}
         {fullAddress(lead) && <p className="mt-0.5 text-base font-medium text-muted-foreground">{fullAddress(lead)}</p>}
+        {estateCard && (
+          <p role="note" className="mt-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-sm text-amber-950" data-testid="card-estate">
+            <span className="font-semibold">This is an estate.</span> The name above may be the person who died. Do not ask for them by name:
+            ask who is handling the house for the family, and let them tell you what happened.
+          </p>
+        )}
         {why.length > 0 && (
           <p className="mt-1.5 text-base" data-testid="card-why">
             <span className="font-semibold">Why they might sell: </span>{why.join(' · ')}
@@ -141,7 +149,7 @@ export default function LeadDetail() {
         </div>
       )}
       <CallPanel lead={lead} contacts={contacts} inbound={q.data.inbound} replyFacts={facts} messages={messages}
-        askFor={who.died.length ? (who.askFor || 'the family') : undefined} />
+        askFor={who.died.length ? (who.askFor || 'the family') : estateCard ? 'the family' : undefined} />
       {/* the card in plain words (0186): what happens next, what to say, why, the touches, a rest, heads-ups; above
           everything a caller reads after the call (Thalia 2026-11-04: "the one thing I must do is below everything") */}
       <CardBrief lead={lead} tasks={tasks} />
