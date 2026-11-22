@@ -65,7 +65,7 @@ beforeAll(async () => {
 
 describe('the live work packet', () => {
   it('nothing live is one short line, and no note rides on the other tools', async () => {
-    expect((await call('live_work')).value).toEqual({ live: 0, say: 'Nothing live: no card is waiting on you. Carry on with this run.' })
+    expect((await call('live_work')).value).toEqual({ live: 0, with_grok: 0, say: 'Nothing live: no card is waiting on you. Carry on with this run.' })
     expect((await records('agent_attention', { p_agent: 'Muse' }) as Json | null)?.live).toBeUndefined()
   })
 
