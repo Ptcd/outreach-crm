@@ -49,8 +49,9 @@ export function bestPhone(contacts: Contact[], inbound: TwilioInbound[], ownerNa
 // The top of a card (Colin 2026-10-24: "Where is the place to call", "figuring out how to do the pillars on a call is
 // hard"): one big Call for the number they texted from, the pillars as a checklist that fills in as the call script is
 // answered, and one tap to the script.
-export function CallPanel({ lead, contacts, inbound, replyFacts, messages }: {
+export function CallPanel({ lead, contacts, inbound, replyFacts, messages, askFor }: {
   lead: Lead; contacts: Contact[]; inbound: TwilioInbound[]; replyFacts: Record<string, unknown>; messages?: Message[]
+  askFor?: string   // set when someone on the card has died: the living person to ask for, never the name the texts used
 }) {
   const nav = useNavigate()
   if (lead.stage === 'dnc') return null
@@ -65,7 +66,7 @@ export function CallPanel({ lead, contacts, inbound, replyFacts, messages }: {
     setTimeout(() => document.getElementById('phones')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
   }
   const done = pillarsDone((lead.call_facts ?? {}) as CallFacts, replyFacts)
-  const first = greetedName(messages, lead.owner_name)
+  const first = askFor ?? greetedName(messages, lead.owner_name)
   const texted = !!phone && (inbound ?? []).some((t) => (phone.value_normalized ?? phone.value).replace(/\D/g, '').slice(-10) === t.from10)
   // a date the seller gave (0229): say so on the card, where the Call button is
   const waitUntil = lead.belt === 'not_now_dated' && lead.named_date && new Date(lead.named_date).getTime() > Date.now() ? lead.named_date : null

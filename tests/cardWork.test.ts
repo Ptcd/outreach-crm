@@ -105,7 +105,7 @@ describe('0281: comps, angles and a number on any card', () => {
     // a mortgage more than we can pay: not a deal, whatever number is tried
     await valued(UNDER)
     await brief(UNDER, [{ kind: 'mortgage', creditor: 'the lender', amount: 170000, basis: 'register of deeds', follows_house: 'yes' }])
-    expect((await one(`public.agent_deal_price($1, 100000, 115000, $2, 'Grok')`, [UNDER, note])).reason).toMatch(/cannot close/)
+    expect((await one(`public.agent_deal_price($1, 100000, 105000, $2, 'Grok')`, [UNDER, note])).reason).toMatch(/cannot close/)
   })
 
   it("Colin's own number is still above the agent's", async () => {
@@ -131,5 +131,39 @@ describe('0283: the button goes to Grok only, and the caller is told when it is 
     // the seller says yes: the card is the yes path again, which Muse works too
     await one(`public.agent_offer_open($1, 'yes_to_selling', 'yes', '4145550101', 'Muse')`, [id])
     expect(await one(`public.card_asked_for_grok($1)`, [id])).toBe(false)
+  })
+})
+
+describe('0288: rules from the first real run (74 Pioneer Ct, 2026-11-22)', () => {
+  it('a script whose opening raises their trouble first is refused; the same words later, for when they bring it up, are fine', async () => {
+    const base = { lead_id: ESTATE, story: 'The owner died last year; the son is the personal representative and lives out of state. The house is empty.',
+      owed: [{ kind: 'mortgage', creditor: 'the lender', amount: 34000, basis: 'register of deeds', follows_house: 'yes' }] }
+    const body = 'Is now an okay time for a couple of minutes? '.repeat(8)
+    const bad = await one(`public.agent_call_brief_set($1::jsonb, 'Grok')`, [JSON.stringify({ ...base,
+      script: `**Open**\nHi, this is Tyler. I understand there may have been a loss in the family. ${body}\n**Close**\nThanks.` })])
+    expect(bad.reason).toMatch(/the opening raises "loss in the family" before the seller does/)
+    const ok = await one(`public.agent_call_brief_set($1::jsonb, 'Grok')`, [JSON.stringify({ ...base,
+      script: `**Open**\nHi, this is Tyler. We buy houses around here and I am calling about the house. ${body}\n**If they bring it up**\nIf they say someone passed away: I am sorry. Who is handling things?\n**Close**\nThanks.` })])
+    expect(ok.ok).toBe(true)
+  })
+
+  it('an agent top stops part way to the most we pay', async () => {
+    const note = 'Estate: claims do not follow the house; only the 34k mortgage does. The son wants it gone and lives out of state.'
+    await db.query(`update public.deal_sheets set colin_open = null, colin_top = null where lead_id = $1`, [ESTATE])
+    expect((await one(`public.agent_deal_price($1, 40000, 119000, $2, 'Grok')`, [ESTATE, note])).reason).toMatch(/top is at most \$80,000/)
+    expect((await one(`public.agent_deal_price($1, 40000, 80000, $2, 'Grok')`, [ESTATE, note])).ok).toBe(true)
+  })
+
+  it('one ready alert a card: the prices wait for the brief', async () => {
+    await db.query(`delete from public.yes_ready_alerts`)
+    expect(await one(`public.card_asked_for_grok($1)`, [ESTATE])).toBe(true)
+    await db.query(`insert into public.yes_ready_alerts (lead_id, kind, ref, at) values ($1, 'prices', 't1', now())`, [ESTATE])
+    const noon = `(date_trunc('day', now() at time zone 'America/Chicago') + interval '12 hours') at time zone 'America/Chicago'`
+    await db.query(`update public.yes_ready_alerts set at = ${noon}`)
+    expect((await one(`public.yes_ready_claim(${noon} + interval '1 minute')`)) as unknown as Json[]).toHaveLength(0)
+    await db.query(`insert into public.yes_ready_alerts (lead_id, kind, ref, at) values ($1, 'brief', 't2', ${noon} + interval '1 minute')`, [ESTATE])
+    const both = (await one(`public.yes_ready_claim(${noon} + interval '2 minutes')`)) as unknown as Json[]
+    expect(both).toHaveLength(1)
+    expect(both[0].landed.sort()).toEqual(['brief', 'prices'])
   })
 })

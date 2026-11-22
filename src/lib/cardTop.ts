@@ -128,3 +128,27 @@ export function noteEntries(notes: string | null | undefined): { head: string; r
     return { head: first, rest: more.join('\n').trim() }
   })
 }
+
+export type CardPerson = { name: string; kind?: string | null; role?: string | null; status?: string | null }
+const nameKey = (s: string) => displayOwner(s).toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter((w) => w.length > 1)
+const same = (a: string, b: string) => { const x = nameKey(a); const y = new Set(nameKey(b)); return x.length > 0 && x[0] !== undefined && y.has(x[0]) && y.has(x[x.length - 1]) }
+
+/** Who to ask for (2026-11-22: a card said "Call Russel" and three texts opened "Hi Russel" while its own probate note
+ *  named Russel as the one who died). The living people on the card, a person marked deceased never among them; a
+ *  county name that joins two owners ("THOMPSON, RUSSEL J / HUTH, RACHAEL L") is split and the dead one left out. */
+export function whoToAskFor(people: CardPerson[] | null | undefined, ownerName: string | null | undefined): { living: string[]; died: string[]; askFor: string } {
+  const ps = (Array.isArray(people) ? people : []).filter((p) => p && p.name && (p.kind ?? 'person') === 'person')
+  const died = [...new Set(ps.filter((p) => p.status === 'deceased').map((p) => displayOwner(p.name)))]
+  const out = (n: string) => died.some((d) => same(n, d) || same(d, n))
+  const parts = (s: string) => s.split(/\s*(?:\/|&|;)\s*/).map((x) => x.trim()).filter(Boolean)
+  const living: string[] = []
+  const add = (n: string) => { const d = displayOwner(n); if (d && !out(d) && !living.some((l) => same(l, d) || same(d, l))) living.push(d) }
+  const REPS = ['personal_representative', 'special_administrator', 'trustee', 'heir', 'spouse', 'co_owner']
+  for (const p of [...ps].sort((a, b) => (REPS.includes(a.role ?? '') ? 0 : 1) - (REPS.includes(b.role ?? '') ? 0 : 1))) {
+    if (p.status && p.status !== 'active') continue
+    for (const n of parts(p.name)) add(n)
+  }
+  if (!living.length) for (const n of parts(ownerName ?? '')) add(n)
+  const first = living[0]?.split(' ')[0] ?? ''
+  return { living, died, askFor: first }
+}

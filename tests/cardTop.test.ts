@@ -65,3 +65,19 @@ describe('the page as Tyler saw it, 2026-11-22', () => {
     expect(plainTaskNote(null)).toBe('')
   })
 })
+
+describe('who to ask for', () => {
+  it('never the person the card says has died; the living co-owner instead', async () => {
+    const { whoToAskFor } = await import('@/lib/cardTop')
+    const people = [{ name: 'Russel J Thompson', kind: 'person', role: 'owner_of_record', status: 'deceased' },
+      { name: 'THOMPSON, RUSSEL J / HUTH, RACHAEL L', kind: 'person', role: 'owner_of_record', status: 'active' },
+      { name: 'Rachael L. Huth', kind: 'person', role: 'co_owner', status: 'active' }]
+    expect(whoToAskFor(people, 'THOMPSON, RUSSEL J / HUTH, RACHAEL L')).toEqual({ living: ['Rachael L. Huth'], died: ['Russel J Thompson'], askFor: 'Rachael' })
+    // nobody marked: the county's name, as said
+    expect(whoToAskFor([], 'THOMPSON, RUSSEL J / HUTH, RACHAEL L').living).toEqual(['Russel J Thompson', 'Rachael L Huth'])
+    // everyone on the card has died: nobody to ask for by name
+    expect(whoToAskFor([{ name: 'JANE ROE', status: 'deceased' }], 'JANE ROE')).toEqual({ living: [], died: ['Jane Roe'], askFor: '' })
+    // a personal representative comes first
+    expect(whoToAskFor([{ name: 'JANE ROE', status: 'deceased' }, { name: 'Sam Roe', role: 'personal_representative', status: 'active' }], 'JANE ROE').askFor).toBe('Sam')
+  })
+})

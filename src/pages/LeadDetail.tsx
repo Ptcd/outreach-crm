@@ -31,7 +31,9 @@ import { NextStep } from '@/components/NextStep'
 import { CardBrief } from '@/components/CardBrief'
 import { DealSheet } from '@/components/DealSheet'
 import { CallBrief } from '@/components/CallBrief'
-import { displayOwner, noteEntries, rankPhones, whyLine } from '@/lib/cardTop'
+import { displayOwner, noteEntries, rankPhones, whoToAskFor, whyLine, type CardPerson } from '@/lib/cardTop'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabaseClient'
 import { handoffToColin } from '@/lib/apiExtra'
 import { BELT_LABEL, type Belt } from '@/lib/belts'
 import { useColinHere } from '@/components/OnPhonePicker'
@@ -49,6 +51,11 @@ export default function LeadDetail() {
   // caller shouldn't see it"). The other caller gets whose it is and nothing of the seller; the database returns them
   // nothing for it either, and every card action refuses.
   const wall = useCardNotYours(id, isCaller)
+  // the people on the card and whether each is alive (0153): the top never says to ask for someone who has died
+  const peopleQ = useQuery({ queryKey: ['card_interests', id], enabled: !!id, queryFn: async () => {
+    const r = await supabase.rpc('card_interests', { p_lead: id })
+    return (Array.isArray(r.data) ? r.data : []) as CardPerson[]
+  } })
 
   if (isCaller && wall.isLoading) return <Empty>Loading...</Empty>
   if (isCaller && wall.error) return <ErrorNote error={wall.error} />
@@ -75,6 +82,8 @@ export default function LeadDetail() {
   const callFacts = (lead.call_facts ?? {}) as CallFacts
   const verdict = bookingVerdict(callFacts, facts, lead)
   const why = whyLine(lead.reasons_to_sell)
+  const who = whoToAskFor(peopleQ.data, lead.owner_name)
+  const heading = who.died.length ? (who.living.length ? who.living.join(' and ') : `Estate of ${who.died.join(' and ')}`) : (displayOwner(lead.owner_name) || lead.owner_name)
 
   return (
     <div className="space-y-4">
@@ -84,7 +93,14 @@ export default function LeadDetail() {
         </Link>
         {/* the top of the card (Colin 2026-11-22: "Do you see how bad of a mess the cards are"): a name to say, where,
             and why in one line. The county's own spelling of the name is under More. */}
-        <h1 className={cn('mt-1 text-2xl font-bold tracking-tight', lead.stage === 'dnc' && 'text-red-700')}>{displayOwner(lead.owner_name) || lead.owner_name}</h1>
+        <h1 className={cn('mt-1 text-2xl font-bold tracking-tight', lead.stage === 'dnc' && 'text-red-700')}>{heading}</h1>
+        {who.died.length > 0 && (
+          <p role="note" className="mt-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-sm text-amber-950" data-testid="card-died">
+            <span className="font-semibold">{who.died.join(' and ')} {who.died.length === 1 ? 'has' : 'have'} died.</span>{' '}
+            {who.askFor ? `Ask for ${who.askFor}. ` : 'Nobody living is named on this card yet: ask who is handling things for the family. '}
+            Do not ask for {who.died.length === 1 ? 'them' : 'either'} by name, and do not bring it up first.
+          </p>
+        )}
         {fullAddress(lead) && <p className="mt-0.5 text-base font-medium text-muted-foreground">{fullAddress(lead)}</p>}
         {why.length > 0 && (
           <p className="mt-1.5 text-base" data-testid="card-why">
@@ -124,7 +140,8 @@ export default function LeadDetail() {
           )}
         </div>
       )}
-      <CallPanel lead={lead} contacts={contacts} inbound={q.data.inbound} replyFacts={facts} messages={messages} />
+      <CallPanel lead={lead} contacts={contacts} inbound={q.data.inbound} replyFacts={facts} messages={messages}
+        askFor={who.died.length ? (who.askFor || 'the family') : undefined} />
       {/* the card in plain words (0186): what happens next, what to say, why, the touches, a rest, heads-ups; above
           everything a caller reads after the call (Thalia 2026-11-04: "the one thing I must do is below everything") */}
       <CardBrief lead={lead} tasks={tasks} />
