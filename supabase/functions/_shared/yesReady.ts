@@ -12,6 +12,7 @@ export type PushTo = (person: string, message: { title: string; body: string; ur
 export interface YesReady {
   alert_ids: string[]; lead_id: string; person: string; email: string | null; owner_name: string | null; address: string | null
   municipality: string | null; landed: string[]; prices: boolean; brief: boolean; has_caller: boolean
+  asked?: boolean   // 0283: asked for from the card's button, not a seller's yes
 }
 export interface YesReadySummary { cards: number; pushes: number; emails: number; nothing: number; errors: string[]; off?: string }
 
@@ -22,7 +23,11 @@ export function yesReadyMessage(t: YesReady, appUrl: string): { title: string; b
   const where = [t.address, t.municipality].filter(Boolean).join(', ')
   const url = `${appUrl.replace(/\/+$/, '')}/lead/${t.lead_id}`
   const title = `${t.prices ? 'Ready to call' : 'Story is in'}: ${who}${t.address ? `, ${t.address}` : ''}${t.has_caller ? '' : ' (no caller on this card)'}`
-  const body = t.prices && t.brief ? 'They said yes. The value, the prices and the script are on the card. Read it and call.'
+  const body = t.asked
+    ? (t.prices && t.brief ? 'Your comps, the angles and the script are on the card. Read it and call.'
+      : t.prices ? 'Your comps and prices are on the card; the script is still being written.'
+      : 'The story, the angles and the script are on the card. No prices yet: give no number.')
+    : t.prices && t.brief ? 'They said yes. The value, the prices and the script are on the card. Read it and call.'
     : t.prices ? 'They said yes. The value and the prices are on the card; the story is still being written. Call now.'
     : 'They said yes. The story and the script are on the card. No prices yet: give no number.'
   return {

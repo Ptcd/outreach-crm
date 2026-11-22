@@ -107,3 +107,23 @@ describe('0281: comps, angles and a number on any card', () => {
     expect(await one(`public.deal_sheet_work($1)`, [ESTATE])).toMatchObject({ source: 'colin', number: 38000 })
   })
 })
+
+describe('0283: the button goes to Grok only, and the caller is told when it is ready (Colin 2026-11-22)', () => {
+  it('Muse does not see or claim a card asked for from the button; Grok does; a prices alert says it was asked for', async () => {
+    const id = '00000000-0000-0000-0000-00000000e284'
+    await db.query(`insert into public.leads (id, wpie_owner_id, owner_name, lane, stage, property_address, municipality, county, mailing_state, locked_to, assigned_to)
+      values ($1, 9814, 'BUTTON OWNER', 'flip', 'opener_sent', '4 ASK ST', 'CITY OF TEST', 'Brown', 'WI', 'adil', 'adil')`, [id])
+    expect((await asUser<{ r: Json }>(TYLER, `select public.card_work_ask($1) as r`, [id]))[0].r.ok).toBe(true)
+    const ids = async (who: string) => ((await one(`public.agent_live_work(now(), $1)`, [who])).cards ?? []).map((c: Json) => c.lead_id)
+    expect(await ids('Muse')).not.toContain(id)
+    expect(await ids('Grok')).toContain(id)
+    expect((await one(`public.agent_work_claim($1, 'Muse')`, [id])).reason).toMatch(/Grok/)
+    expect((await one(`public.agent_work_claim($1, 'Grok')`, [id])).ok).toBe(true)
+    await db.query(`update public.text_offers set arv = 200000, comps = $2::jsonb, call_prices = $3::jsonb, valued_at = now() where lead_id = $1`,
+      [id, JSON.stringify(comps([195000, 200000, 210000])), JSON.stringify(ROWS)])
+    expect((await db.query(`select 1 from public.yes_ready_alerts where lead_id = $1 and kind = 'prices'`, [id])).rows).toHaveLength(1)
+    // the seller says yes: the card is the yes path again, which Muse works too
+    await one(`public.agent_offer_open($1, 'yes_to_selling', 'yes', '4145550101', 'Muse')`, [id])
+    expect(await one(`public.card_asked_for_grok($1)`, [id])).toBe(false)
+  })
+})

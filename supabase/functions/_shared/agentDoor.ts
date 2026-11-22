@@ -776,7 +776,7 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
         p_agent: agent.name }) as Json
       return { value: r, isError: r?.ok === false }
     }
-    case 'live_work': return { value: await db.records('agent_live_work', {}) }
+    case 'live_work': return { value: await db.records('agent_live_work', { p_who: agent.name }) }   // 0283: a button's card is Grok's
     case 'call_briefs_wanted': return { value: await db.records('agent_call_briefs_wanted', { p_limit: args.limit === undefined || args.limit === null ? 20 : int(args.limit, 20, 50) }) }
     case 'call_brief_set': {
       const r = await db.records('agent_call_brief_set', { p: args, p_agent: agent.name }) as Json
