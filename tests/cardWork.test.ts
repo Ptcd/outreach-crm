@@ -96,6 +96,10 @@ describe('0281: comps, angles and a number on any card', () => {
     const w = await one(`public.deal_sheet_work($1)`, [ESTATE])
     expect(w).toMatchObject({ stage: 'ready', source: 'agent', number: 40000, limit: 45000 })
     expect(w.agent.by).toBe('Grok')
+    // 0287: something that may follow the house has no amount: no number until it does
+    await db.query(`update public.call_briefs set owed = owed || '[{"kind":"mortgage","creditor":"a lender","amount":null,"basis":"not found","follows_house":"unknown"}]'::jsonb where lead_id = $1`, [ESTATE])
+    expect((await one(`public.agent_deal_price($1, 41000, 45000, $2, 'Grok')`, [ESTATE, note])).reason).toMatch(/no number yet: a lender may follow the house/)
+    await db.query(`update public.call_briefs set owed = owed - 2 where lead_id = $1`, [ESTATE])
     // no value on the card yet: comp it first
     expect((await one(`public.agent_deal_price($1, 40000, 45000, $2, 'Grok')`, [UNDER, note])).reason).toMatch(/comp it first/)
     // a mortgage more than we can pay: not a deal, whatever number is tried
