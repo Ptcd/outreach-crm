@@ -5,6 +5,8 @@ import { api, useWrite } from '@/lib/queries'
 import { FollowUpPanel } from '@/components/TextFollowUp'
 import { fmtDateTime, fmtPhone } from '@/lib/format'
 import { textThreadOf } from '@/lib/textThread'
+import { phonesInText } from '@/lib/cardTop'
+import { AddNumber } from '@/components/AddNumber'
 import { cn } from '@/lib/utils'
 import type { Contact, Message, TwilioInbound } from '@/lib/types'
 
@@ -12,9 +14,12 @@ import type { Contact, Message, TwilioInbound } from '@/lib/types'
 // top and the newest at the bottom, with the box to text them right under it (Adil: "unable to figure out where to
 // send the text from"). A typed text goes from the number that texted them, through the same checks as an approved
 // reply: no business name, nobody who opted out, held until morning in quiet hours.
-export function TextThread({ leadId, phone, messages, inbound, closed }: {
+export function TextThread({ leadId, phone, messages, inbound, closed, contacts }: {
   leadId: string; phone: Contact | null; messages: Message[]; inbound: TwilioInbound[]; closed: boolean
+  contacts?: Contact[]   // the card's numbers, so a number in a text of theirs that is not on the card can be added in one tap
 }) {
+  const onCard = useMemo(() => (contacts ?? []).filter((c) => c.kind === 'phone').map((c) => c.value_normalized ?? c.value), [contacts])
+  const [adding, setAdding] = useState<string | null>(null)
   const items = useMemo(() => textThreadOf(messages, inbound), [messages, inbound])
   const box = useRef<HTMLDivElement>(null)
   const [text, setText] = useState('')
@@ -43,6 +48,16 @@ export function TextThread({ leadId, phone, messages, inbound, closed }: {
             <span className="mt-0.5 px-1 text-[11px] text-muted-foreground">
               {fmtDateTime(t.at)}{!t.mine && phone && t.phone10 !== phone.value.replace(/\D/g, '').slice(-10) ? ` - from ${fmtPhone(t.phone10)}` : ''}
             </span>
+            {/* a number in their text that is not on the card: one tap puts it there, with the name the text gave */}
+            {!t.mine && contacts && !closed && phonesInText(t.body, onCard).map((n) => adding === `${t.key}:${n.phone10}` ? (
+              <div key={n.phone10} className="mt-1 w-full">
+                <AddNumber leadId={leadId} initial={{ phone: n.phone10, name: n.name }} note="given by text" onClose={() => setAdding(null)} />
+              </div>
+            ) : (
+              <Button key={n.phone10} size="sm" variant="outline" className="mt-1" onClick={() => setAdding(`${t.key}:${n.phone10}`)}>
+                + Add {fmtPhone(n.phone10)}{n.name ? ` (${n.name})` : ''} to this card
+              </Button>
+            ))}
           </div>
         ))}
       </div>

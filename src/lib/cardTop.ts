@@ -109,8 +109,10 @@ export function rankPhones(contacts: Contact[], ownerName: string | null | undef
     const owners = isOwnersPhone(c, ownerName)
     const blocked = phoneBlocked(c)
     const dead = h.wrong > 0 || (h.bounced > 0 && h.delivered === 0)
+    // a number someone on the team typed in (the seller gave it): right under the one they texted from
+    const given = /added by/i.test(c.source ?? '')
     const score = (blocked ? 1000 : 0) + (dead ? 300 : 0)
-      + (texted.has(n) ? -200 : 0) + (h.reached > 0 ? -150 : 0) + (h.delivered > 0 ? -20 : 0)
+      + (texted.has(n) ? -200 : 0) + (h.reached > 0 ? -150 : 0) + (h.delivered > 0 ? -20 : 0) + (given ? -120 : 0)
       + (owners ? 0 : 40) + (c.line_type === 'mobile' ? 0 : c.line_type === 'landline' ? 15 : 8)
       + Math.min(h.noAnswer, 4) * 3
     const note = blocked ? 'Blocked: do not call or text'
@@ -119,7 +121,7 @@ export function rankPhones(contacts: Contact[], ownerName: string | null | undef
           : h.wrong > 0 ? 'Wrong number'
             : h.bounced > 0 && h.delivered === 0 ? 'Our text did not go through'
               : h.noAnswer > 0 ? `No answer ${h.noAnswer === 1 ? 'once' : `${h.noAnswer} times`}${h.delivered > 0 ? ', text delivered' : ''}`
-                : h.delivered > 0 ? 'Text delivered, no reply' : 'Not tried yet'
+                : h.delivered > 0 ? 'Text delivered, no reply' : given ? 'A number they gave us, not tried yet' : 'Not tried yet'
     return { ...c, owners, blocked, note, score }
   }).sort((a, b) => a.score - b.score)
     // one row a number: a card can hold the same number twice (two traces, two names); the better row stands
@@ -157,4 +159,24 @@ export function whoToAskFor(people: CardPerson[] | null | undefined, ownerName: 
   if (!living.length) for (const n of parts(ownerName ?? '')) add(n)
   const first = living[0]?.split(' ')[0] ?? ''
   return { living, died, askFor: first }
+}
+
+/** Phone numbers in a text of theirs that are not on the card yet, each with the name the text gives for it, if any
+ *  ("Name: Ellie Tel: 1 (920) 728-1490", "call my son Mark at 920-555-0100"). The name is a guess the caller can fix. */
+export function phonesInText(body: string | null | undefined, onCard: Iterable<string>): { phone10: string; name: string | null }[] {
+  if (!body) return []
+  const have = new Set([...onCard].map((p) => ten(p)))
+  const out: { phone10: string; name: string | null }[] = []
+  const re = /(?:\+?1[\s.-]*)?\(?([2-9]\d{2})\)?[\s.-]*(\d{3})[\s.-]*(\d{4})(?!\d)/g
+  for (const m of body.matchAll(re)) {
+    const phone10 = `${m[1]}${m[2]}${m[3]}`
+    if (have.has(phone10) || out.some((o) => o.phone10 === phone10)) continue
+    const before = body.slice(0, m.index ?? 0)
+    const named = before.match(/name\s*(?:is|:|-)?\s*([A-Z][A-Za-z'.-]+(?:[ \t]+(?!tel\b|phone\b|cell\b|number\b|mobile\b|at\b)[A-Z][A-Za-z'.-]+)?)[^A-Za-z]*(?:tel|phone|cell|number|#|at|:|\s)*$/i)
+      ?? before.match(/(?:call|text|reach|contact|ask for|talk to|speak (?:to|with)|try)\s+(?:my\s+[a-z-]+\s+)?([A-Z][a-z'.-]+(?:\s+[A-Z][a-z'.-]+)?)\b[^.!?\n]{0,25}$/)
+      ?? before.match(/([A-Z][a-z'.-]+)(?:'s)?\s+(?:number|cell|phone)\s*(?:is|:|-)?\s*$/)
+    const name = named?.[1]?.trim().replace(/['’]s$/i, '') ?? null
+    out.push({ phone10, name: name && !/^(Tel|Phone|Cell|Number|Call|Text|My|The|Is|At)$/i.test(name) ? name : null })
+  }
+  return out
 }

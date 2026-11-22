@@ -159,7 +159,7 @@ export default function LeadDetail() {
       {/* Send offer (0217): the written offer follows the number; a caller sends at Colin's number, Colin at any */}
       <ContractBlock lead={lead} contacts={contacts} colinHere={isOwner} />
       <TextThread leadId={lead.id} phone={rankPhones(contacts, lead.owner_name, messages, q.data.inbound).find((p) => !p.blocked) ?? bestPhone(contacts, q.data.inbound, lead.owner_name)} messages={messages} inbound={q.data.inbound}
-        closed={lead.stage === 'dnc'} />
+        closed={lead.stage === 'dnc'} contacts={contacts} />
       <CallNotes leadId={lead.id} messages={messages} />
       {/* the script, open on a hot card (someone just said they'd sell) */}
       <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}

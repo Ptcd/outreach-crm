@@ -10,11 +10,20 @@ import { fmtPhone } from '@/lib/format'
 // remark ("Interested 9209053042 Adam's phone number", Hayes Street 10/29), where nothing could dial or text it.
 // Saved through contact_add (0172), the card page's own door: ten digits, never a duplicate, the name as whose it is, a
 // note that it was given on a call. Then one tap makes it the number the big Dial button calls next.
-export function AddNumber({ leadId, live, onAdded }: { leadId: string; live?: boolean; onAdded?: (phone10: string, name: string | null) => void }) {
+// 2026-11-22 (Colin: "Tyler needs an easy way to add in phone numbers and names for contacts for cards"): on the card
+// page this lived only in the fold, under "all phones", and in Power hour as a grey link. A seller texted "Name: Ellie
+// Tel: 1 (920) 728-1490" and Tyler had to ask Colin to put it in. Now it is a real button at the top of the card by
+// the numbers (`button`), and under any text of theirs that holds a number, already filled in (`initial`).
+export function AddNumber({ leadId, live, onAdded, button, initial, note, onClose }: {
+  leadId: string; live?: boolean; onAdded?: (phone10: string, name: string | null) => void
+  button?: boolean                                   // a real button, not the small link
+  initial?: { phone: string; name: string | null }   // opens filled in: a number read out of a text
+  note?: string; onClose?: () => void
+}) {
   const qc = useQueryClient()
-  const [open, setOpen] = useState(false)
-  const [value, setValue] = useState('')
-  const [who, setWho] = useState('')
+  const [open, setOpen] = useState(!!initial)
+  const [value, setValue] = useState(initial ? fmtPhone(initial.phone) : '')
+  const [who, setWho] = useState(initial?.name ?? '')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [saved, setSaved] = useState<{ phone10: string; name: string | null } | null>(null)
@@ -24,7 +33,7 @@ export function AddNumber({ leadId, live, onAdded }: { leadId: string; live?: bo
   const save = async () => {
     if (!ok || busy) return
     setBusy(true); setErr(null)
-    const r = await api.contactAdd(leadId, 'phone', digits, who.trim() || null, 'given on a call')
+    const r = await api.contactAdd(leadId, 'phone', digits, who.trim() || null, note ?? 'given on a call')
     setBusy(false)
     const d = r.data as { ok?: boolean; reason?: string } | null
     if (r.error || d?.ok === false) { setErr(r.error?.message ?? d?.reason ?? 'Not saved'); return }
@@ -38,11 +47,12 @@ export function AddNumber({ leadId, live, onAdded }: { leadId: string; live?: bo
       <div className="flex flex-wrap items-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 p-2 text-sm dark:bg-emerald-950/30">
         <span className="flex-1">Added {fmtPhone(saved.phone10)}{saved.name ? ` (${saved.name})` : ''} to the card.</span>
         {onAdded && <Button size="sm" onClick={() => { onAdded(saved.phone10, saved.name); setSaved(null) }}>{live ? 'Dial it after this call' : 'Dial it next'}</Button>}
-        <Button size="sm" variant="ghost" onClick={() => setSaved(null)}>OK</Button>
+        <Button size="sm" variant="ghost" onClick={() => { setSaved(null); onClose?.() }}>OK</Button>
       </div>
     )
   }
   if (!open) {
+    if (button) return <Button variant="outline" className="h-11 w-full" onClick={() => setOpen(true)}>+ Add a person or a number</Button>
     return <button type="button" className="text-left text-xs text-muted-foreground underline underline-offset-2" onClick={() => setOpen(true)}>Add a number they gave you</button>
   }
   return (
@@ -53,9 +63,9 @@ export function AddNumber({ leadId, live, onAdded }: { leadId: string; live?: bo
         <Input value={who} onChange={(e) => setWho(e.target.value)} placeholder="Whose it is (name)" aria-label="Whose number it is" className="h-10 w-44"
           onKeyDown={(e) => { if (e.key === 'Enter') void save() }} />
         <Button className="h-10" disabled={!ok || busy} onClick={() => void save()}>Save to card</Button>
-        <Button className="h-10" variant="ghost" onClick={() => { setOpen(false); setErr(null) }}>Cancel</Button>
+        <Button className="h-10" variant="ghost" onClick={() => { setOpen(false); setErr(null); onClose?.() }}>Cancel</Button>
       </div>
-      <p className="text-xs text-muted-foreground">Their cell, a son or daughter, the person who handles the house: the number and whose it is. It goes on the card with your name and today.</p>
+      <p className="text-xs text-muted-foreground">Their cell, a son or daughter, the person who handles the house: the number and whose it is. It goes on the card with your name and today, and you can call it from the top of the card.</p>
       {err && <p className="text-sm text-red-700">{err}</p>}
     </div>
   )

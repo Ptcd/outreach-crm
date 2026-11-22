@@ -1,3 +1,4 @@
+import { AddNumber } from '@/components/AddNumber'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { CallButton, PersonalCallButton } from '@/components/CallButton'
@@ -110,6 +111,8 @@ export function CallPanel({ lead, contacts, inbound, replyFacts, messages, askFo
           {ranked.length > 3 && <button type="button" className="text-xs underline" onClick={openPhones}>All {ranked.length} numbers</button>}
         </div>
       )}
+      {/* a number or a person the seller gives (Colin 2026-11-22: "Tyler needs an easy way to add in phone numbers and names") */}
+      <AddNumber leadId={lead.id} button note="given by the seller" />
       <div className="flex flex-wrap gap-1.5" aria-label="The pillars">
         {PILLARS.map((p) => (
           <span key={p.id} className={cn('inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium',
