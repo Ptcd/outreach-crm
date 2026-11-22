@@ -76,6 +76,8 @@ describe('a caller who is off', () => {
     const fri = '2026-11-20T16:00:00Z'
     const blockAt = async (lead: string, at: string) => (await rows<{ block: string | null }>(`select block from public.text_pool($1) where lead_id = $2`, [at, lead]))[0].block
     await db.exec(`update public.text_fitness set as_of = '2026-11-20'`)
+    // this test is the days-off rule by itself: the weekend caller rule (0278) is switched off for it
+    await db.exec(`update public.campaign_control set weekend_text_caller = null where id = 1`)
     // a text waiting for Saturday on her card, queued before anyone said she is off
     const q = await one<{ status: string }>(`public.agent_queue_text($1, $2, $3, 1, null, 'Muse', $4)`,
       [thalias2, await phoneOf(thalias2), 'Hi Todd, this is Thalia. Are you the current owner of 202 Off St? Reply STOP to opt out.', sat])
@@ -90,6 +92,7 @@ describe('a caller who is off', () => {
     expect(await one<Record<string, unknown>>(`public.caller_off_weekly_set('thalia', '{8}')`)).toMatchObject({ ok: false })
     expect(await one<Record<string, unknown>>(`public.caller_off_weekly_set('thalia', '{}')`)).toMatchObject({ ok: true, days: [] })
     expect(await blockAt(thalias, sat)).toBeNull()
+    await db.exec(`update public.campaign_control set weekend_text_caller = 'adil' where id = 1`)
   })
 
   it('no text goes out in an off caller\'s name, whoever owns the card now (0272, Colin 2026-11-21)', async () => {
