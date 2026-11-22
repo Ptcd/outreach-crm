@@ -69,6 +69,18 @@ beforeAll(async () => {
 }, 120_000)
 
 describe('the day', () => {
+  it('a card\'s number in a wireless block is texted before an older one in a landline block (0301)', async () => {
+    const first = async () => (await rows<{ phone: string }>(`select phone from public.text_pool($1) where lead_id = $2 and kind = 'first'`, [NOW, C.best]))[0]?.phone
+    const mine = await phoneOf(C.best)
+    await db.query(`insert into public.contacts (lead_id, kind, value, value_normalized, line_type, person_name, created_at)
+                    values ($1, 'phone', '4145550999', '4145550999', 'mobile', 'PAT A BEST', now() - interval '30 days')`, [C.best])
+    expect(await first()).toBe('4145550999')                                  // as it was: the oldest
+    await db.query(`update public.contacts set block_rank = case value_normalized when '4145550999' then 3 else 0 end where lead_id = $1`, [C.best])
+    expect(await first()).toBe(mine)
+    await db.query(`delete from public.contacts where lead_id = $1 and value_normalized = '4145550999'`, [C.best])
+    await db.query(`update public.contacts set block_rank = null where lead_id = $1`, [C.best])
+  })
+
   it('every first-text card is ready or carries the one reason it is not', async () => {
     const p = await pool()
     const by = Object.fromEntries(p.filter((r) => r.kind === 'first').map((r) => [r.lead_id, r.block]))
