@@ -65,7 +65,7 @@ beforeAll(async () => {
 
 describe('the live work packet', () => {
   it('nothing live is one short line, and no note rides on the other tools', async () => {
-    expect((await call('live_work')).value).toEqual({ live: 0, say: 'Nothing live: no seller who said yes is waiting on you. Carry on with this run.' })
+    expect((await call('live_work')).value).toEqual({ live: 0, say: 'Nothing live: no card is waiting on you. Carry on with this run.' })
     expect((await records('agent_attention', { p_agent: 'Muse' }) as Json | null)?.live).toBeUndefined()
   })
 
@@ -75,14 +75,14 @@ describe('the live work packet', () => {
     await db.exec(`update public.leads set belt = 'yes_unbooked', belt_step = 1 where id = '${LATER}'`)
     const w = (await call('live_work')).value
     expect(w.live).toBe(2)
-    expect(w.say).toMatch(/^2 sellers said yes and are waiting on you.*before anything else in this run, the newest yes first\.$/)
+    expect(w.say).toMatch(/^2 cards are waiting on you.*before anything else in this run, the newest first\.$/)
     expect(w.packet).toMatch(/^WHEN A SELLER HAS SAID YES/)
     expect(w.packet).toMatch(/a roof you can see is in every row/)
     expect(w.cards.map((c: Json) => c.address)).toEqual(['7 LATER LN', '1208 RACINE ST'])
     expect(w.cards[1]).toMatchObject({ lead_id: YES, owner_name: 'PAT SELLER', caller: 'tyler' })
     expect(w.cards[1].todo.map((t: Json) => t.what)).toEqual(['comp', 'call_prices', 'brief'])
     expect(w.cards[1].todo[0].do).toMatch(/^They said YES and a caller is being told to phone them\. Comp it NOW/)
-    expect(String((await records('agent_attention', { p_agent: 'Muse' }) as Json).live)).toMatch(/^2 sellers said yes and are waiting on you/)
+    expect(String((await records('agent_attention', { p_agent: 'Muse' }) as Json).live)).toMatch(/^2 cards are waiting on you/)
     expect((await records('agent_attention', { p_agent: 'Muse 2' }) as Json | null)?.live).toBeUndefined()   // the texting agent's job only
   })
 
