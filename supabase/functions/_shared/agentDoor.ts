@@ -395,6 +395,14 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
       situation: S('one line: the kind of seller and what drives the number (a sale in 30 days is a need; an estate owing more than the house where only a small mortgage follows the house: the price clears the mortgage and fees; a mortgage more than we can pay: no deal)'),
       script: S('the words for the call, in sections'), sources: S('where each fact was read'), nothing_owed_found: { type: 'boolean', description: 'true only when you looked and found nothing owed; say where you looked in sources' } } } },
   // 0281 (Colin 2026-11-22: "My goal is for grok to be able to set those numbers and then also fully realize the situation")
+  // 0290 (Colin 2026-11-22: "You could look up obits"): who died and who to talk to, on the probate cards
+  { role: 'intake', name: 'estate_people',
+    description: 'Claim a batch of probate cards that say nothing about who is alive: each is in the name of someone a probate case names. Returns the cards (address, town, the owner on record, the probate subject and case, the people already on the card with their interest_id, how many texts went out) and how: the method, step by step. Find the obituary, CONFIRM it is the same person (a name alone is not a match), read who survives, put it on the card with add_prospects (the person who died as status deceased with the date and the obituary link; each survivor or the personal representative with a role), then estate_people_done. Never contact anyone.',
+    inputSchema: { type: 'object', properties: { count: { type: 'integer', description: 'how many (default 15, at most 50)' } } } },
+  { role: 'intake', name: 'estate_people_done',
+    description: 'Close a card from estate_people. outcome: found (the card now shows who died or who survives: add_prospects first, or this is refused), not_found, not_the_owner (the probate is another person’s, not this owner), unsure. source: where you read it (required for found and not_the_owner). note: where you looked and what you saw (required for not_found and unsure).',
+    inputSchema: { type: 'object', required: ['lead_id', 'outcome'], properties: { lead_id: S('the card'), outcome: S('found | not_found | not_the_owner | unsure'),
+      source: S('the obituary link or the court record'), note: S('where you looked and what you saw') } } },
   { role: 'any', name: 'work_claim',
     description: 'Claim a card from live_work before you start its comps, brief or number, so Muse and Grok never both work it. You have it for 45 minutes; if the other agent has it, the answer says so: take the next card. Writing the brief (call_brief_set) releases it.',
     inputSchema: { type: 'object', required: ['lead_id'], properties: { lead_id: S('the card') } } },
@@ -780,6 +788,11 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
     case 'call_briefs_wanted': return { value: await db.records('agent_call_briefs_wanted', { p_limit: args.limit === undefined || args.limit === null ? 20 : int(args.limit, 20, 50) }) }
     case 'call_brief_set': {
       const r = await db.records('agent_call_brief_set', { p: args, p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'estate_people': return { value: await db.records('agent_estate_people', { p_agent: agent.name, p_count: args.count === undefined || args.count === null ? 15 : int(args.count, 15, 50) }) }
+    case 'estate_people_done': {
+      const r = await db.records('agent_estate_people_done', { p: args, p_agent: agent.name }) as Json
       return { value: r, isError: r?.ok === false }
     }
     case 'work_claim': {
