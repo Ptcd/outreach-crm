@@ -17,6 +17,7 @@ import { personLabel } from '@/lib/wpie'
 import { useAuth } from '@/providers/AuthProvider'
 import type { Lead, Task } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { plainTaskNote } from '@/lib/cardTop'
 
 type Brief = {
   ok: boolean; reason?: string
@@ -109,7 +110,7 @@ export function CardBrief({ lead, tasks }: { lead: Lead; tasks: Task[] }) {
         {b && (
           <p className="mt-0.5 text-base font-medium">
             {b.mine_next
-              ? `${b.mine_next.owner === me ? 'Your' : `${personLabel(b.mine_next.owner ?? 'colin')}'s`} ${b.mine_next.kind === 'callback' ? 'callback' : b.mine_next.kind} ${fmtDateTime(b.mine_next.due_at)}${b.mine_next.note ? `: ${b.mine_next.note}` : ''}. `
+              ? `${b.mine_next.owner === me ? 'Your' : `${personLabel(b.mine_next.owner ?? 'colin')}'s`} ${b.mine_next.kind === 'callback' ? 'callback' : b.mine_next.kind} ${fmtDateTime(b.mine_next.due_at)}${plainTaskNote(b.mine_next.note) ? `: ${plainTaskNote(b.mine_next.note).replace(/[.\s]+$/, '')}` : ''}. `
               : ''}
             <span className={cn(b.mine_next && 'font-normal text-muted-foreground')}>{b.next_plain}</span>
           </p>
@@ -149,11 +150,13 @@ export function CardBrief({ lead, tasks }: { lead: Lead; tasks: Task[] }) {
       {b && (
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Why this card</p>
-          <div className="mt-0.5 flex flex-wrap gap-1">
-            {(b.why.reasons ?? []).map((r) => <Badge key={r} tone="warn">{r}</Badge>)}
-            {!(b.why.reasons ?? []).length && <span className="text-sm text-muted-foreground">No reason on record yet.</span>}
-          </div>
-          {!!b.why.motivation?.length && <p className="mt-1 text-sm">{b.why.motivation.join(' · ')}</p>}
+          {/* the detail line when there is one (case numbers, years, the value); the reasons themselves are at the top */}
+          {b.why.motivation?.length ? <p className="mt-0.5 text-sm">{b.why.motivation.join(' · ')}</p> : (
+            <div className="mt-0.5 flex flex-wrap gap-1">
+              {(b.why.reasons ?? []).map((r) => <Badge key={r} tone="warn">{r}</Badge>)}
+              {!(b.why.reasons ?? []).length && <span className="text-sm text-muted-foreground">No reason on record yet.</span>}
+            </div>
+          )}
           {b.why.last_words && <p className="mt-1 text-sm"><span className="font-medium">Their last text:</span> &ldquo;{b.why.last_words}&rdquo;</p>}
           {b.why.last_call && <p className="mt-1 text-sm"><span className="font-medium">Last call:</span> {b.why.last_call.replace(/\s+/g, ' ')}</p>}
           {b.why.promise && <p className="mt-1 text-sm"><span className="font-medium">Promised:</span> {b.why.promise}</p>}
@@ -172,7 +175,7 @@ export function CardBrief({ lead, tasks }: { lead: Lead; tasks: Task[] }) {
           {b.planned.length > 0 && (
             <ul className="mt-1 space-y-0.5 text-sm">
               {b.planned.map((p) => (
-                <li key={`${p.at}-${p.what}`}><span className="font-medium">Next:</span> {fmtDateTime(p.at)} · {p.what === 'belt' ? 'the machine' : p.what}{p.who ? ` (${personLabel(p.who.replace(/_call|_visit/, ''))})` : ''}{p.words ? `: ${p.words}` : ''}</li>
+                <li key={`${p.at}-${p.what}`}><span className="font-medium">Next:</span> {fmtDateTime(p.at)} · {p.what === 'belt' ? 'the machine' : p.what}{p.who ? ` (${personLabel(p.who.replace(/_call|_visit/, ''))})` : ''}{plainTaskNote(p.words) ? `: ${plainTaskNote(p.words)}` : ''}</li>
               ))}
             </ul>
           )}

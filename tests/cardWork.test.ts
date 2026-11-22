@@ -58,6 +58,8 @@ describe('0281: comps, angles and a number on any card', () => {
     expect(r.ok).toBe(true)
     const o = (await db.query<Json>(`select trigger, status from public.text_offers where lead_id = $1`, [FRESH])).rows[0]
     expect(o).toMatchObject({ trigger: 'caller_asked', status: 'open' })
+    // 0285: due in 30 minutes, any day (the text-offer clock would push a Sunday to Monday)
+    expect((await db.query<{ ok: boolean }>(`select comp_due_at <= now() + interval '31 minutes' as ok from public.text_offers where lead_id = $1`, [FRESH])).rows[0].ok).toBe(true)
     const live = await one(`public.agent_live_work()`)
     expect(live.cards.map((c: Json) => c.lead_id)).toContain(FRESH)
     expect((await one(`public.agent_attention('Grok')`))?.live).toBeTruthy()

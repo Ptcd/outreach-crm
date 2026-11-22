@@ -48,3 +48,20 @@ describe('the top of a card', () => {
     expect(e).toEqual([{ head: 'STEP 6 PACK - imported', rest: 'Case: 2026PR000012\nParcel: 039' }, { head: 'Seller said the roof leaks', rest: '' }])
   })
 })
+
+describe('the page as Tyler saw it, 2026-11-22', () => {
+  it('a number on the card twice is listed once', async () => {
+    const { rankPhones } = await import('@/lib/cardTop')
+    const c = (id: string, value: string) => ({ id, lead_id: 'L', kind: 'phone', value, value_normalized: value, line_type: 'mobile', status: 'ok',
+      dnc_app: false, suppressed: false, dnc_vendor: false, dnc_scrub: 'clear', person_name: 'Russel Thompson', source: 'fps' }) as never
+    expect(rankPhones([c('a', '7155747260'), c('b', '7155747260'), c('c', '7155510753')], 'THOMPSON, RUSSEL J', [], []).map((p) => p.value))
+      .toEqual(['7155747260', '7155510753'])
+  })
+  it('an agent task note is read as a person would write it', async () => {
+    const { plainTaskNote } = await import('@/lib/cardTop')
+    expect(plainTaskNote('Muse (Muse) 2026-11-18: Schmid book #1 (Tyler). Ask for Russel J Thompson. Estate / owner died: Probate / estate - Fond du Lac County case 2026PR000012; Foreclosure: Foreclosure - Fond du Lac County case 2026CV000496; Back taxes: 2 years delinquent, $8,478. Dial (715) 574-7260. call list (#1) A logged call closes this task.'))
+      .toBe('Schmid book #1 (Tyler). Ask for Russel J Thompson.')
+    expect(plainTaskNote('Call back after 5, she is at work')).toBe('Call back after 5, she is at work')
+    expect(plainTaskNote(null)).toBe('')
+  })
+})

@@ -33,7 +33,7 @@ export function CallBrief({ leadId }: { leadId: string }) {
   } })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)   // closed: the story, the angles and what is owed are read first (2026-11-22)
   const b = q.data
   const ask = async () => {
     setBusy(true); setErr(null)
@@ -67,7 +67,7 @@ export function CallBrief({ leadId }: { leadId: string }) {
   }
   const owed = b.owed ?? []
   return (
-    <Section title="Before you call" right={<button type="button" className="text-xs font-medium underline" onClick={() => setOpen(!open)}>{open ? 'Hide the script' : 'Show the script'}</button>}>
+    <Section title="Before you call">
       {b.situation && <p className="mb-2 rounded-md bg-muted/60 p-2 text-sm font-semibold">{b.situation}</p>}
       {b.story && <p className="whitespace-pre-wrap text-sm">{b.story}</p>}
       {(b.angles ?? []).length > 0 && (
@@ -103,6 +103,11 @@ export function CallBrief({ leadId }: { leadId: string }) {
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Find out on the call</p>
           <ul className="mt-1 list-disc pl-5 text-sm">{(b.unknowns ?? []).map((u, i) => <li key={i}>{u}</li>)}</ul>
         </div>
+      )}
+      {b.script && (
+        <Button variant="outline" className="mt-3 h-auto min-h-11 w-full whitespace-normal py-2" onClick={() => setOpen(!open)}>
+          {open ? 'Hide the script' : 'Show the script for this call'}
+        </Button>
       )}
       {open && b.script && (
         <div className="mt-3">

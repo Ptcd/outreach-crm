@@ -60,6 +60,18 @@ export function whyLine(reasons: string[] | null | undefined, max = 4): string[]
 const ten = (s: string | null | undefined) => (s ?? '').replace(/\D/g, '').slice(-10)
 const REACHED = new Set(['interested', 'not_interested', 'reached', 'reached_no_decision', 'not_now', 'booked', 'inbound_answered', 'callback', 'ai_answered'])
 
+/** A task note an agent wrote for a list, as a person reads it: no agent stamp, no list bookkeeping, no number to dial
+ *  (the call panel has it), no repeat of the reasons (the top of the card has them). */
+export function plainTaskNote(note: string | null | undefined): string {
+  return (note ?? '')
+    .replace(/^\s*(Muse( 2)?|Grok|Desk)\s*(\([^)]*\))?\s*\d{4}-\d{2}-\d{2}\s*:\s*/i, '')
+    .replace(/A logged call closes this task\.*/gi, '')
+    .replace(/call list \(#\d+\)/gi, '')
+    .replace(/Dial \(?\d{3}\)?[ .-]?\d{3}[ .-]?\d{4}\.?/gi, '')
+    .replace(/(Estate \/ owner died|Foreclosure|Back taxes|Probate \/ estate|Sheriff sale|Code case|Eviction|Judgment)\s*:[^.;]*[.;]?/gi, '')
+    .replace(/\s+/g, ' ').replace(/\s+([.;,])/g, '$1').replace(/[.;,]\s*[.;,]+/g, '.').trim()
+}
+
 export type RankedPhone = Contact & { owners: boolean; blocked: boolean; note: string; score: number }
 
 /** The card's phones, the one to dial first at the top, each with what happened on it. A number they texted or
@@ -104,6 +116,8 @@ export function rankPhones(contacts: Contact[], ownerName: string | null | undef
                 : h.delivered > 0 ? 'Text delivered, no reply' : 'Not tried yet'
     return { ...c, owners, blocked, note, score }
   }).sort((a, b) => a.score - b.score)
+    // one row a number: a card can hold the same number twice (two traces, two names); the better row stands
+    .filter((p, i, all) => all.findIndex((q) => ten(q.value_normalized ?? q.value) === ten(p.value_normalized ?? p.value)) === i)
 }
 
 /** Notes as entries a person can scan: the ' | ' the system joins them with, each with its first line. */

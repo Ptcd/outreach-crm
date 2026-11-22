@@ -256,7 +256,10 @@ export function DealSheet({ leadId }: { leadId: string }) {
             <>
               <p className="text-xs font-semibold uppercase text-muted-foreground">{lastSaid ? 'Next step, once' : 'Say this, once'}</p>
               <p className="text-3xl font-bold tabular-nums" aria-label="The number to say">{usd(current)}</p>
-              <p className="text-sm">{s.why ? `${s.why}. ` : ''}One number, one reason, then <strong>wait. Count to five.</strong> Do not explain it, do not give a range, do not say you might go higher.</p>
+              <p className="text-sm">{s.why && s.source !== 'agent' ? `${s.why.replace(/\.+$/, '')}. ` : ''}One number, one reason, then <strong>wait. Count to five.</strong> Do not explain it, do not give a range, do not say you might go higher.</p>
+              {s.why && s.source === 'agent' && (
+                <p className="mt-1 rounded-md bg-muted/60 p-2 text-xs text-muted-foreground"><span className="font-semibold">Why this number (for you, never to say): </span>{s.why}</p>
+              )}
               <p className="mt-2 text-xs font-semibold uppercase text-muted-foreground">What came back</p>
               <div className="mt-1 flex flex-wrap gap-1.5">
                 <Button size="sm" disabled={busy} onClick={() => record('yes')}>They said yes</Button>
