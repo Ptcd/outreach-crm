@@ -211,6 +211,42 @@ describe('the day', () => {
     expect(await one<Record<string, unknown>>('public.text_day_backstop($1)', [tue])).toMatchObject({ ran: true, queued: 0, left: 0 })
   })
 
+  it('the opener test, switched on, writes one of three first texts to a living owner at a plain address; the rest keep theirs (0300)', async () => {
+    const tue = '2026-11-17T17:10:00Z'
+    const street = async (x: string) => one<string | null>('public.text_street_name($1)', [x])
+    expect(await street('33 S CONCORD RD')).toBe('S Concord Rd')
+    expect(await street('515 KASE ST')).toBe('Kase St')
+    expect(await street('W5436 LAKEWOOD CT')).toBe('Lakewood Ct')
+    expect(await street('N52W37031 Washington St')).toBe('Washington St')
+    expect(await street('S 7325 STATE ROAD 27')).toBe('State Road 27')
+    expect(await street('1011 19TH STREET')).toBe('19th Street')
+    expect(await street('8715 STH 42')).toBe('Hwy 42')
+    expect(await street('6060 CTH K')).toBe('County Rd K')
+    expect(await street('7201 FLAGSHIP DR UNIT 2')).toBeNull()                      // "the house" is wrong for a unit
+    expect(await street('LOT 4')).toBeNull()
+    for (const [m, c] of [['CITY OF OSHKOSH', 'Oshkosh'], ['Village of Mt Pleasant', 'Mt Pleasant'], ['Fond Du Lac', 'Fond du Lac'], ['TOWN OF PINE LAKE', 'Pine Lake'], ['mcfarland', 'McFarland'], ['', null], [null, null]] as const)
+      expect(await one<string | null>('public.text_city($1)', [m])).toBe(c)
+    // the texts already written that day are taken back, the switch goes on, and the server writes them again
+    await db.exec(`delete from public.planned_openers where decided_by_name = 'Muse (the day)' and plan_date = '2026-11-17';
+                   update public.leads set municipality = 'CITY OF TESTVILLE' where property_address in ('101 Test St', '110 Test St', '6 Test St');
+                   update public.campaign_control set opener_test = true where id = 1`)
+    expect(await one<Record<string, unknown>>('public.text_day_backstop($1)', [tue])).toMatchObject({ ran: true })
+    const sent = await rows<{ body: string; variant: string; template_lane: string }>(
+      `select body, variant, template_lane from public.planned_openers where decided_by_name = 'Muse (the day)' and plan_date = '2026-11-17' order by body`)
+    const test = sent.filter((x) => x.template_lane === 'opener_test_1')
+    expect(test.length).toBeGreaterThanOrEqual(1)
+    const ARMS: Record<string, RegExp> = {
+      OA: /^Hi (Sam|Stan), this is Thalia\. Do you still own the house on Test St in Testville\? Reply STOP to opt out\.$/,
+      OB: /^Hi (Sam|Stan), Thalia here\. I'm a local buyer looking around Testville\. Would you ever consider selling the house on Test St\? Reply STOP to opt out\.$/,
+      OC: /^Hi (Sam|Stan), this is Thalia\. Are you the right person to talk to about the house on Test St in Testville\? No rush at all\. Reply STOP to opt out\.$/,
+    }
+    for (const x of test) { expect(Object.keys(ARMS)).toContain(x.variant); expect(x.body).toMatch(ARMS[x.variant]); expect(x.body.length).toBeLessThanOrEqual(160) }
+    // the estate card and the sale-date card are not in the test
+    expect(sent.map((x) => x.body)).toContain('Hi there, this is Thalia. Are you the right person to ask about 6 Test St? Reply STOP to opt out.')
+    expect(sent.find((x) => x.variant === 'S')?.template_lane).toBe('sale_date')
+    await db.exec(`update public.campaign_control set opener_test = false where id = 1`)
+  })
+
   it('the kill switch turns the rule gate off', async () => {
     await db.exec(`update public.campaign_control set day_rules_on = false where id = 1`)
     expect(await one<string | null>('public.card_record_block($1, $2)', [C.weak, TODAY])).toBeNull()
