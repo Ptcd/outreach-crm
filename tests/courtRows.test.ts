@@ -125,11 +125,22 @@ describe('court rows', () => {
     expect(p).toMatchObject({ ok: true, added: 1 })
     expect(p.refused[0].reason).toMatch(/needs class_code/)
     expect((p as unknown as { next: string }).next).toMatch(/no rule for this kind yet/)
-    const w = await deposit('will', [{ county: 'Dane', case_number: '2026WL000055', defendant: 'Doe, John' }, { county: 'Dane', case_number: '2026WL000056' }])
+    // 0304: a will is WL and class 50111 only (a safekeeping deposit is a living person), and is tied like a probate
+    const w = await deposit('will', [
+      { county: 'Dane', case_number: '2026WL000055', defendant: 'Doe, John', class_code: 'Wills Filed - No Probate (50111)' },
+      { county: 'Dane', case_number: '2026WL000056', class_code: '50111' },
+      { county: 'Dane', case_number: '2026WL000057', defendant: 'Roe, Ann', class_code: 'Will Deposited for Safekeeping (50110)' },
+      { county: 'Dane', case_number: '2026PR000058', defendant: 'Roe, Ann', class_code: '50111' }])
     expect(w).toMatchObject({ ok: true, added: 1 })
-    expect(w.refused[0].reason).toMatch(/whose will it is/)
+    expect(w.refused.map((r) => r.reason)).toEqual([expect.stringMatching(/whose will it is/), expect.stringMatching(/safekeeping is a living person/), expect.stringMatching(/WL in it/)])
+    expect((w as unknown as { next: string }).next).toMatch(/exactly like a probate/)
     for (const k of ['land_contract', 'lien', 'quiet_title', 'receivership'])
       expect(await deposit(k, [{ county: 'Rock', case_number: '2026CV00099' + k.length, defendant: 'X', class_code: 'Other Real Property (30799)' }])).toMatchObject({ ok: true, added: 1 })
     expect((await rows(`select count(*)::int n from public.court_rows where kind in ('partition','will','land_contract','lien','quiet_title','receivership') and state = 'waiting'`))[0]).toEqual({ n: 6 })
+    // 0304: the three that file under 30405 are closed and never flagged behind
+    expect(await rows(`select key from public.research_jobs where closed_at is not null order by key`)).toEqual([{ key: 'partition' }, { key: 'quiet_title' }, { key: 'receivership' }])
+    const behind = (await rows(`select public.research_behind(timestamptz '2027-01-05 12:00+00') b`))[0].b as { key: string }[]
+    expect(behind.some((x) => x.key === 'partition')).toBe(false)
+    expect(behind.some((x) => x.key === 'wills_wl')).toBe(true)
   })
 })
