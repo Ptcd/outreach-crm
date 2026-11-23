@@ -115,6 +115,21 @@ describe('court rows', () => {
     expect(d.refused[0].reason).toMatch(/co-petitioner in defendant/)
     const d2 = await deposit('divorce', [{ county: 'Dane', case_number: '2026FA000777', plaintiff: 'Smith, Ann', defendant: 'Smith, Bob', caption: 'Joint petition: Smith, Ann and Smith, Bob' }])
     expect(d2).toMatchObject({ ok: true, added: 1, refused: [] })
-    expect((await deposit('bankruptcy', [])).reason).toMatch(/divorce, guardianship, foreclosure, probate or tax_warrant/)
+    expect((await deposit('bankruptcy', [])).reason).toMatch(/divorce, guardianship, foreclosure, probate, tax_warrant, partition, will, land_contract, lien, quiet_title or receivership/)
+  })
+
+  it('0303: the six new categories are banked and wait; each says what it needs', async () => {
+    const p = await deposit('partition', [
+      { county: 'Racine', case_number: '2026CV000901', caption: 'Ann Roe vs. Bob Roe et al', class_code: 'Partition (30703)', filed: '2026-11-18' },
+      { county: 'Racine', case_number: '2026CV000902', caption: 'Ann Roe vs. Carl Roe' }])
+    expect(p).toMatchObject({ ok: true, added: 1 })
+    expect(p.refused[0].reason).toMatch(/needs class_code/)
+    expect((p as unknown as { next: string }).next).toMatch(/no rule for this kind yet/)
+    const w = await deposit('will', [{ county: 'Dane', case_number: '2026WL000055', defendant: 'Doe, John' }, { county: 'Dane', case_number: '2026WL000056' }])
+    expect(w).toMatchObject({ ok: true, added: 1 })
+    expect(w.refused[0].reason).toMatch(/whose will it is/)
+    for (const k of ['land_contract', 'lien', 'quiet_title', 'receivership'])
+      expect(await deposit(k, [{ county: 'Rock', case_number: '2026CV00099' + k.length, defendant: 'X', class_code: 'Other Real Property (30799)' }])).toMatchObject({ ok: true, added: 1 })
+    expect((await rows(`select count(*)::int n from public.court_rows where kind in ('partition','will','land_contract','lien','quiet_title','receivership') and state = 'waiting'`))[0]).toEqual({ n: 6 })
   })
 })

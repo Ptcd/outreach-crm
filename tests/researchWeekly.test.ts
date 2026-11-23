@@ -74,7 +74,8 @@ describe('behind is two whole weeks with no tick', () => {
     expect(b.map((x) => x.key)).toEqual(['evictions', 'bankruptcy', 'money_judgments', 'divorce_fa', 'guardianship_gn', 'water_shutoff', 'fire_damage', 'vacant_registry', 'code_raze'])
     expect(b[0]).toMatchObject({ last_ran_week_of: null, weeks_with_no_tick: 2 })
     const later = await one<Json[]>(`public.research_behind($1)`, [plus(14)])   // Tuesday Dec 1
-    expect(later.length).toBe(20)
+    expect(later.length).toBe(21)                                                // 0303: tax warrants, counted from Nov 16
+    expect(later.some((x) => x.key === 'partition')).toBe(false)                 // a job made 2026-11-22 counts from Nov 23
     expect(later.find((x) => x.key === 'foreclosure_cv')).toMatchObject({ last_ran_week_of: '2026-11-09', weeks_with_no_tick: 2 })
   })
   it('a tick takes the job off the list', async () => {
