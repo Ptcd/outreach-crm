@@ -198,9 +198,24 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
         zip: S('ZIP'), amount: { type: 'number', description: 'dollars, if any' }, extra: { type: 'object', description: 'anything else worth keeping with the row' } },
         required: ['county', 'case_number'] } } }, required: ['kind', 'rows'] } },
   { role: 'intake', name: 'court_rows_status',
-    description: 'What became of the court rows you deposited: counts by kind (waiting, matched, unmatched, ambiguous), how many properties the matched rows landed on, why rows did not match, and counts by county. rows: true adds the rows themselves (filter with kind, state, county; page with after = the updated_at of the last row you saw; limit up to 500).',
+    description: 'What became of the court rows you deposited: counts by kind (waiting, matched, unmatched, ambiguous), how many properties the matched rows landed on, why rows did not match, and counts by county. rows: true adds the rows themselves (filter with kind, state, county; page with after = the updated_at of the last row you saw; limit up to 500). Each row comes whole: the parties, caption, city, filing date, the note saying why it did not tie, and on_card (the card its house is on, if any). To fix a row that did not tie, deposit it again corrected (same kind, county, case number): it goes back in line.',
     inputSchema: { type: 'object', properties: { kind: S('eviction | money_judgment | divorce | guardianship | foreclosure | probate | tax_warrant | partition | will | land_contract | lien | quiet_title | receivership'), state: S('waiting | matched | unmatched | ambiguous | skipped'), county: S('one county'),
       rows: { type: 'boolean' }, after: S('ISO time: rows updated after this'), limit: { type: 'integer' } } } },
+  { role: 'intake', name: 'court_row_parcel',
+    description: 'Settle a court row the laptop left ambiguous by naming the parcel (what on the court record decides it goes in why: the unit, the address on the filing). The row goes back in line; the laptop accepts the pick only when that parcel is one of those it already found under that name or at that address, so a pick settles a tie and never makes one. A matched row is settled; a skipped row is corrected with court_rows_deposit.',
+    inputSchema: { type: 'object', properties: { kind: S('the kind you deposited it as'), county: S('the county of the case'), case_number: S('e.g. 2026SC007476'),
+      parcel_id: S('the parcel, as the county prints it'), why: S('what on the court record settles it') }, required: ['kind', 'county', 'case_number', 'parcel_id', 'why'] } },
+  { role: 'intake', name: 'court_row_to_card',
+    description: 'Put a court case the laptop has tied to a house on the card for that same house: the reason is stacked on the card and one "Court: ..." line goes in its notes. Refused unless the row is matched and the card is that house (same laptop property, or the same parcel in the county). Use this instead of writing a case number in a note. Kinds: foreclosure, probate, will, tax_warrant, money_judgment, eviction, divorce.',
+    inputSchema: { type: 'object', properties: { kind: S('foreclosure | probate | will | tax_warrant | money_judgment | eviction | divorce'), county: S('the county of the case'),
+      case_number: S('e.g. 2026CV001234'), lead_id: S('the card') }, required: ['kind', 'county', 'case_number', 'lead_id'] } },
+  { role: 'intake', name: 'card_fix',
+    description: 'Correct the owner type or owner name on a card: an organisation typed as a person (owner_type: individual, couple, trust, llc, corporation, partnership, estate, nonprofit, government, bank_lender, other; a church or a lodge is nonprofit), or a misspelled owner name. reason says where you read the right value. The correction is kept: the county record cannot write over it. To park a card use mark_card (held with a date, or dead). A registered agent is added with add_prospects as a person with role other and a note saying so, never as the owner.',
+    inputSchema: { type: 'object', properties: { lead_id: S('the card'), owner_type: S('the right owner type'), owner_name: S('the right owner name'),
+      reason: S('where you read it: the county record, the state business record') }, required: ['lead_id', 'reason'] } },
+  { role: 'intake', name: 'cards_missing_facts',
+    description: 'Live cards with no square feet, bedrooms, baths or basement on record, with counts. missing narrows it (any of sqft, beds, baths, basement); county narrows it; cards a seller said yes on come first; page with after = the last created_at. has_laptop_record false means the card has no parcel tied yet. These facts are read from the assessor by the laptop; the door has no tool that writes them.',
+    inputSchema: { type: 'object', properties: { missing: { type: 'array', items: { type: 'string' } }, county: S('one county'), after: S('ISO time: cards created after this'), limit: { type: 'integer' } } } },
   { role: 'intake', name: 'handoff_deposit',
     description: 'Hand a set of verified rows to the loading agent in one deposit, with no row data on the desk. First call: title (what the rows are), instructions (how to load them, once, for the whole set) and rows[]. Each row: key (your own id for the row; the same key is the same row, so sending it again replaces it while it waits), prospect (exactly what add_prospects takes for one prospect: address, owner_name or interests[], city, county, zip, parcel, mailing, reasons[], notes, phones) and optionally caller (thalia or tyler: who a NEW card goes to) and note. Up to 250 rows a call: send the rest with the batch_id you got back. final: true on the last call makes the batch ready to load. Then post ONE line on the desk naming the batch, never the rows.',
     inputSchema: { type: 'object', properties: { batch_id: S('the batch to add to (from your first call); leave out to start a new one'), title: S('what these rows are, for a new batch'),
@@ -586,6 +601,12 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       return { value: r, isError: r?.ok === false }
     }
     case 'court_rows_status': return { value: await db.records('agent_court_rows_status', { p: args, p_agent: agent.name }) }
+    case 'court_row_parcel': case 'court_row_to_card': case 'card_fix': {
+      const fn = { court_row_parcel: 'agent_court_row_parcel', court_row_to_card: 'agent_court_row_to_card', card_fix: 'agent_card_fix' }[name as 'court_row_parcel' | 'court_row_to_card' | 'card_fix']
+      const r = await db.records(fn, { p: args, p_agent: agent.name }) as Json
+      return { value: r, isError: r?.ok === false }
+    }
+    case 'cards_missing_facts': return { value: await db.records('agent_cards_missing_facts', { p: args, p_agent: agent.name }) }
     case 'handoff_deposit': {
       const r = await db.records('agent_handoff_deposit', { p: args, p_agent: agent.name }) as Json
       return { value: r, isError: r?.ok === false }
