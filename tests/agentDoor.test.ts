@@ -138,7 +138,8 @@ describe('the MCP routing', () => {
       ['court_row_parcel', 'agent_court_row_parcel', { kind: 'eviction', county: 'Dane', case_number: '2026SC007717', parcel_id: '0709-1', why: 'unit 4' }],
       ['court_row_to_card', 'agent_court_row_to_card', { kind: 'eviction', county: 'Dane', case_number: '2026SC007717', lead_id: 'L1' }],
       ['card_fix', 'agent_card_fix', { lead_id: 'L1', owner_type: 'nonprofit', reason: 'county record' }],
-      ['cards_missing_facts', 'agent_cards_missing_facts', { limit: 5 }]] as const) {
+      ['cards_missing_facts', 'agent_cards_missing_facts', { limit: 5 }],
+      ['card_facts_set', 'agent_card_facts_set', { lead_id: 'L1', sqft: 1200, source: 'county assessor record' }]] as const) {
       expect((await call(grok, tool, args, db)).value).toEqual({ fn, args: { p: args, p_agent: 'Grok' } })
     }
   })

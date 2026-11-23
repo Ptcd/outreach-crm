@@ -214,8 +214,13 @@ export const TOOLS: { role: ToolRole; name: string; description: string; inputSc
     inputSchema: { type: 'object', properties: { lead_id: S('the card'), owner_type: S('the right owner type'), owner_name: S('the right owner name'),
       reason: S('where you read it: the county record, the state business record') }, required: ['lead_id', 'reason'] } },
   { role: 'intake', name: 'cards_missing_facts',
-    description: 'Live cards with no square feet, bedrooms, baths or basement on record, with counts. missing narrows it (any of sqft, beds, baths, basement); county narrows it; cards a seller said yes on come first; page with after = the last created_at. has_laptop_record false means the card has no parcel tied yet. These facts are read from the assessor by the laptop; the door has no tool that writes them.',
+    description: 'Live cards with no square feet, bedrooms, baths or basement on record, with counts. missing narrows it (any of sqft, beds, baths, basement); county narrows it; cards a seller said yes on come first; page with after = the last created_at. has_laptop_record false means the card has no parcel tied yet. They come from the assessor record (the laptop) or from card_facts_set. None of them is needed to make a card.',
     inputSchema: { type: 'object', properties: { missing: { type: 'array', items: { type: 'string' } }, county: S('one county'), after: S('ISO time: cards created after this'), limit: { type: 'integer' } } } },
+  { role: 'intake', name: 'card_facts_set',
+    description: 'Put square feet, bedrooms, baths, basement or year built on a card, read from a source you name (Colin 2026-11-23: none of these is needed to make a card; they are filled in later, card by card). Send only the fields you read: sqft (finished living area), beds, baths_full, baths_half, basement (a short statement: full, partial, none, crawl space, slab, finished), year_built. source is where you read them (the county assessor record and its URL, a listing site, the seller) and date the day it showed them. Never estimate a number. A field the county assessor record already has on the card is kept and you are told so. cards_missing_facts lists the cards to work.',
+    inputSchema: { type: 'object', properties: { lead_id: S('the card'), sqft: { type: 'integer' }, beds: { type: 'integer' }, baths_full: { type: 'integer' }, baths_half: { type: 'integer' },
+      basement: S('full | partial | none | crawl space | slab | finished ...'), year_built: { type: 'integer' }, source: S('where you read it'), date: S('YYYY-MM-DD the source showed it') },
+      required: ['lead_id', 'source'] } },
   { role: 'intake', name: 'handoff_deposit',
     description: 'Hand a set of verified rows to the loading agent in one deposit, with no row data on the desk. First call: title (what the rows are), instructions (how to load them, once, for the whole set) and rows[]. Each row: key (your own id for the row; the same key is the same row, so sending it again replaces it while it waits), prospect (exactly what add_prospects takes for one prospect: address, owner_name or interests[], city, county, zip, parcel, mailing, reasons[], notes, phones) and optionally caller (thalia or tyler: who a NEW card goes to) and note. Up to 250 rows a call: send the rest with the batch_id you got back. final: true on the last call makes the batch ready to load. Then post ONE line on the desk naming the batch, never the rows.',
     inputSchema: { type: 'object', properties: { batch_id: S('the batch to add to (from your first call); leave out to start a new one'), title: S('what these rows are, for a new batch'),
@@ -607,6 +612,7 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       return { value: r, isError: r?.ok === false }
     }
     case 'cards_missing_facts': return { value: await db.records('agent_cards_missing_facts', { p: args, p_agent: agent.name }) }
+    case 'card_facts_set': { const r = await db.records('agent_card_facts_set', { p: args, p_agent: agent.name }) as Json; return { value: r, isError: r?.ok === false } }
     case 'handoff_deposit': {
       const r = await db.records('agent_handoff_deposit', { p: args, p_agent: agent.name }) as Json
       return { value: r, isError: r?.ok === false }
