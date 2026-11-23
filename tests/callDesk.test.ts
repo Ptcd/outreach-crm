@@ -109,7 +109,8 @@ describe('call desk', () => {
     expect(await outcome('interested', 'wants Colin to call')).toBe('colin_call')
     expect(await outcome('not_now')).toBe('follow_up')
     expect(await outcome('not_interested')).toBe('dead')
-    expect(await outcome('wrong_number')).toBe('data_fix')
+    // 0312: a wrong number parks the card only when no number is left; this card still has 4145550001
+    expect(await outcome('wrong_number')).toBe('dead')
     expect((await one<{ status: string }>(`select status::text from public.contacts where value_normalized = '4144776435'`)).status).toBe('bad')
     const m = (await db.query<{ body: string; channel: string; seen_at: string | null }>(
       `select body, channel::text, seen_at::text from public.messages where lead_id = '${A}' order by sent_at, body`)).rows
