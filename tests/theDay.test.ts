@@ -267,3 +267,20 @@ describe('the day', () => {
     expect(await one<string | null>('public.card_record_block($1, $2)', [C.weak, TODAY])).toBe('weak_distress')
   })
 })
+
+describe('500 delivered a day (0310, Colin 2026-11-23)', () => {
+  it('a dead-number bounce gives the day its slot back, a filtered one does not, never past the ceiling', async () => {
+    await db.query(`update public.campaign_control set daily_cap = 500, day_send_ceiling = 700 where id = 1`)
+    const before = await one<number>(`public.day_cap_now($1::timestamptz)`, [NOW])
+    const mk = async (i: number, code: string) => db.query(
+      `insert into public.planned_openers (plan_date, wpie_owner_id, attempt, lane, phone, body, send_status, error_code, send_updated_at)
+       values ($1::date, $2::int, 1, 'agent', $5::text, 'x', 'undelivered', $3, $4::timestamptz)`, [TODAY, 990000 + i, code, NOW, '+141455500' + String(10 + i)])
+    await mk(1, '30005'); await mk(2, '30003'); await mk(3, '30006'); await mk(4, '30007'); await mk(5, '30008')
+    expect(await one<number>(`public.day_dead_bounces($1::date)`, [TODAY])).toBe(3)                  // 30007 and 30008 are not dead numbers
+    expect(await one<number>(`public.day_cap_now($1::timestamptz)`, [NOW])).toBe(before + 3)
+    await db.query(`update public.campaign_control set day_send_ceiling = 502 where id = 1`)
+    expect(await one<number>(`public.day_cap_now($1::timestamptz)`, [NOW])).toBe(502)
+    await db.query(`delete from public.planned_openers where wpie_owner_id between 990001 and 990005`)
+    await db.query(`update public.campaign_control set daily_cap = 400, day_send_ceiling = 700 where id = 1`)
+  })
+})

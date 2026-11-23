@@ -138,7 +138,7 @@ describe('court rows', () => {
       expect(await deposit(k, [{ county: 'Rock', case_number: '2026CV00099' + k.length, defendant: 'X', class_code: 'Other Real Property (30799)' }])).toMatchObject({ ok: true, added: 1 })
     expect((await rows(`select count(*)::int n from public.court_rows where kind in ('partition','will','land_contract','lien','quiet_title','receivership') and state = 'waiting'`))[0]).toEqual({ n: 6 })
     // 0304: the three that file under 30405 are closed and never flagged behind
-    expect(await rows(`select key from public.research_jobs where closed_at is not null order by key`)).toEqual([{ key: 'partition' }, { key: 'quiet_title' }, { key: 'receivership' }])
+    expect(await rows(`select key from public.research_jobs where closed_at is not null order by key`)).toEqual([{ key: 'guardianship_gn' }, { key: 'partition' }, { key: 'quiet_title' }, { key: 'receivership' }])   // 0309: guardianships closed
     const behind = (await rows(`select public.research_behind(timestamptz '2027-01-05 12:00+00') b`))[0].b as { key: string }[]
     expect(behind.some((x) => x.key === 'partition')).toBe(false)
     expect(behind.some((x) => x.key === 'wills_wl')).toBe(true)

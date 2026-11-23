@@ -86,6 +86,7 @@ describe('a first text that bounced', () => {
 describe('what is waiting on the agent', () => {
   it('nothing to say when nothing waits', async () => {
     await db.query(`insert into public.agent_keys (name, role, key_sha256, key_hint, created_by) values ('Muse', 'agent', 'x', 'x', 'test')`)
+    await db.query(`update public.research_jobs set behind_weeks = 1000`)   // the board runs on the real date: not what this test is about
     await db.query(`insert into public.agent_calls (key_id, tool, scope, ok, ms, at) select id, 'desk_inbox', 'channel', true, 1, now() from public.agent_keys where name = 'Muse'`)
     expect(await one<unknown>(`public.agent_attention('Muse', now() + interval '1 minute')`)).toBeNull()
   })

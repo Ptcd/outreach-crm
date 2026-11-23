@@ -41,8 +41,8 @@ beforeAll(async () => {
 describe('category instructions', () => {
   it('the folder lists every board job; an agent writes one whole and reads it back', async () => {
     const f = (await call('category_instructions', {})).value.folder as Json[]
-    expect(f).toHaveLength(20)
-    expect(f.every((r) => r.written === false)).toBe(true)
+    expect(f).toHaveLength(27)                                              // 0303: seven more jobs, each with its how-to
+    expect(f.filter((r) => Number(r.id) <= 20).every((r) => r.written === false)).toBe(true)
     const w = await call('category_instructions_set', { job: 'money_judgments', body: '# Money judgments\nRead this first.', base_version: 0 })
     expect(w.value).toMatchObject({ ok: true, job: 'money_judgments', version: 1 })
     const r = (await call('category_instructions', { job: 8 })).value
@@ -56,7 +56,7 @@ describe('category instructions', () => {
     expect(stale.value).toMatchObject({ ok: false, version: 1, updated_by: 'Muse' })
     expect((await call('category_instructions_set', { job: 'money_judgments', body: '# Money judgments\nRead this first.' })).value).toMatchObject({ ok: true, unchanged: true, version: 1 })
     expect((await call('category_instructions_set', { job: 'money_judgments', body: '# Money judgments\nSection 7A added.', base_version: 1 })).value).toMatchObject({ ok: true, version: 2 })
-    const v = (await db.query<Json>(`select version, by, body from public.research_doc_versions order by version`)).rows
+    const v = (await db.query<Json>(`select version, by, body from public.research_doc_versions where job_id = 8 order by version`)).rows
     expect(v.map((x) => [x.version, x.by])).toEqual([[1, 'Muse'], [2, 'Muse']])
     expect(v[0].body).toBe('# Money judgments\nRead this first.')
     expect((await call('category_instructions_set', { job: 'nope', body: 'x' })).isError).toBe(true)
