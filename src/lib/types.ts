@@ -129,6 +129,7 @@ export interface Contact {
   value: string
   value_normalized: string | null
   person_name: string | null
+  person_id?: string | null
   line_type: string | null
   dnc_vendor: boolean
   dnc_scrub: 'unknown' | 'clear' | 'dnc'

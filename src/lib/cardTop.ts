@@ -137,7 +137,31 @@ export function noteEntries(notes: string | null | undefined): { head: string; r
   })
 }
 
-export type CardPerson = { name: string; kind?: string | null; role?: string | null; status?: string | null }
+export type CardPerson = { name: string; kind?: string | null; role?: string | null; status?: string | null; person_id?: string | null }
+
+/** A role in a caller's words (Colin 2026-11-23: "Like phone numbers for different heirs labelled that way?" The card
+ *  kept every person's role and showed only the name). */
+const ROLE_WORDS: Record<string, string> = { owner_of_record: 'owner', co_owner: 'co-owner', personal_representative: 'personal representative',
+  special_administrator: 'special administrator', heir: 'heir', trustee: 'trustee', spouse: 'spouse', occupant: 'lives there', other: '' }
+export function roleWords(role: string | null | undefined, status?: string | null): string {
+  const r = ROLE_WORDS[role ?? ''] ?? (role ?? '').replace(/_/g, ' ')
+  if (status === 'deceased') return r ? `${r}, died` : 'died'
+  if (status === 'wrong_person') return 'wrong person'
+  return r
+}
+
+/** Whose number this is and what they are to the house: "Lisa Smith, heir", "Russel Thompson, owner, died". The
+ *  number's own person first; a number with no person on it is matched by the name it carries. Null when the card
+ *  has nobody for it. */
+export function personTag(people: CardPerson[] | null | undefined, c: { person_id?: string | null; person_name?: string | null }): string | null {
+  const ps = Array.isArray(people) ? people.filter((p) => p && p.name) : []
+  const hit = (c.person_id ? ps.find((p) => p.person_id === c.person_id) : undefined)
+    ?? (c.person_name ? ps.find((p) => same(p.name, c.person_name!) || same(c.person_name!, p.name)) : undefined)
+  if (!hit) return null
+  const words = roleWords(hit.role, hit.status)
+  const name = displayOwner(c.person_name || hit.name) || hit.name
+  return words ? `${name}, ${words}` : name
+}
 const nameKey = (s: string) => displayOwner(s).toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter((w) => w.length > 1)
 const same = (a: string, b: string) => { const x = nameKey(a); const y = new Set(nameKey(b)); return x.length > 0 && x[0] !== undefined && y.has(x[0]) && y.has(x[x.length - 1]) }
 

@@ -7,7 +7,7 @@ import { firstNameOf } from '@/lib/inbox'
 import { fmtDate, fmtPhone } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Contact, Lead, Message, TwilioInbound } from '@/lib/types'
-import { rankPhones } from '@/lib/cardTop'
+import { rankPhones, personTag, type CardPerson } from '@/lib/cardTop'
 import { isOwnersPhone } from '@/lib/phoneOrder'
 
 /** The name our first text greeted ("Hi Laurie, Colin Merrill here ..."), else the owner's first name. A trust's
@@ -50,8 +50,9 @@ export function bestPhone(contacts: Contact[], inbound: TwilioInbound[], ownerNa
 // The top of a card (Colin 2026-10-24: "Where is the place to call", "figuring out how to do the pillars on a call is
 // hard"): one big Call for the number they texted from, the pillars as a checklist that fills in as the call script is
 // answered, and one tap to the script.
-export function CallPanel({ lead, contacts, inbound, replyFacts, messages, askFor }: {
+export function CallPanel({ lead, contacts, inbound, replyFacts, messages, askFor, people }: {
   lead: Lead; contacts: Contact[]; inbound: TwilioInbound[]; replyFacts: Record<string, unknown>; messages?: Message[]
+  people?: CardPerson[]   // the card's people with their roles: each number says whose it is and what they are
   askFor?: string   // set when someone on the card has died: the living person to ask for, never the name the texts used
 }) {
   const nav = useNavigate()
@@ -88,7 +89,7 @@ export function CallPanel({ lead, contacts, inbound, replyFacts, messages, askFo
           <div className="min-w-0 flex-1 basis-full sm:basis-0">
             <p className="text-sm text-muted-foreground">Call {first || 'them'}{texted ? ' on the number they texted from' : ''}</p>
             <p className="text-lg font-semibold">{fmtPhone(phone.value)}</p>
-            <p className="text-xs text-muted-foreground">{[phone.line_type, phone.owners ? null : phone.person_name ? `${phone.person_name}'s number` : null, texted ? null : phone.note].filter(Boolean).join(' · ')}</p>
+            <p className="text-xs text-muted-foreground">{[phone.line_type, personTag(people, phone) ?? (phone.owners ? null : phone.person_name ? `${phone.person_name}'s number` : null), texted ? null : phone.note].filter(Boolean).join(' · ')}</p>
           </div>
           <CallButton to={phone.value} name={phone.person_name || lead.owner_name} address={lead.property_address} leadId={lead.id}
             contactId={phone.id} notBefore={lead.belt === 'not_now_dated' ? lead.named_date : null}
@@ -103,7 +104,7 @@ export function CallPanel({ lead, contacts, inbound, replyFacts, messages, askFo
           {others.map((o) => (
             <div key={o.id} className="flex flex-wrap items-center gap-2 text-sm">
               <span className="font-medium">{fmtPhone(o.value)}</span>
-              <span className="min-w-0 flex-1 text-xs text-muted-foreground">{[o.line_type, o.owners ? null : o.person_name, o.note].filter(Boolean).join(' · ')}</span>
+              <span className="min-w-0 flex-1 text-xs text-muted-foreground">{[o.line_type, personTag(people, o) ?? (o.owners ? null : o.person_name), o.note].filter(Boolean).join(' · ')}</span>
               <CallButton to={o.value} name={o.person_name || lead.owner_name} address={lead.property_address} leadId={lead.id}
                 contactId={o.id} notBefore={lead.belt === 'not_now_dated' ? lead.named_date : null} />
             </div>

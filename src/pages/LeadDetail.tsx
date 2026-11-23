@@ -31,7 +31,7 @@ import { NextStep } from '@/components/NextStep'
 import { CardBrief } from '@/components/CardBrief'
 import { DealSheet } from '@/components/DealSheet'
 import { CallBrief } from '@/components/CallBrief'
-import { displayOwner, noteEntries, rankPhones, whoToAskFor, whyLine, type CardPerson } from '@/lib/cardTop'
+import { displayOwner, noteEntries, personTag, rankPhones, whoToAskFor, whyLine, type CardPerson } from '@/lib/cardTop'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabaseClient'
 import { handoffToColin } from '@/lib/apiExtra'
@@ -148,7 +148,7 @@ export default function LeadDetail() {
           )}
         </div>
       )}
-      <CallPanel lead={lead} contacts={contacts} inbound={q.data.inbound} replyFacts={facts} messages={messages}
+      <CallPanel lead={lead} contacts={contacts} inbound={q.data.inbound} replyFacts={facts} messages={messages} people={peopleQ.data}
         askFor={who.died.length ? (who.askFor || 'the family') : estateCard ? 'the family' : undefined} />
       {/* the card in plain words (0186): what happens next, what to say, why, the touches, a rest, heads-ups; above
           everything a caller reads after the call (Thalia 2026-11-04: "the one thing I must do is below everything") */}
@@ -177,7 +177,7 @@ export default function LeadDetail() {
         <div className="mt-3 space-y-4">
       <History leadId={lead.id} ownerName={lead.owner_name} messages={messages} inbound={q.data.inbound}
         stageEvents={q.data.stageEvents} tasks={tasks} beltEvents={q.data.beltEvents} taskMoves={q.data.taskMoves} people={q.data.people} />
-      <Contacts contacts={contacts} leadId={lead.id} lead={lead} messages={messages} inbound={q.data.inbound} />
+      <Contacts contacts={contacts} leadId={lead.id} lead={lead} messages={messages} inbound={q.data.inbound} people={peopleQ.data} />
       <Notes lead={lead} />
       {/* the follow-up belt (what happens next on its own) */}
       <BeltStrip lead={lead} />
@@ -390,8 +390,8 @@ function contactFlags(c: Contact) {
   return flags
 }
 
-function Contacts({ contacts, leadId, lead, messages, inbound }: { contacts: Contact[]; leadId: string; lead?: Lead | null
-  messages?: import('@/lib/types').Message[]; inbound?: { from10: string }[] }) {
+function Contacts({ contacts, leadId, lead, messages, inbound, people }: { contacts: Contact[]; leadId: string; lead?: Lead | null
+  messages?: import('@/lib/types').Message[]; inbound?: { from10: string }[]; people?: CardPerson[] }) {
   // the number to dial first at the top, each with what happened on it; past five, behind one tap (2026-11-22)
   const ranked = rankPhones(contacts, lead?.owner_name, messages, inbound)
   const noteOf = new Map(ranked.map((r) => [r.id, r.note]))
@@ -439,7 +439,7 @@ function Contacts({ contacts, leadId, lead, messages, inbound }: { contacts: Con
               ))}
             </div>
             <div className="text-xs text-muted-foreground">
-              {[c.person_name, c.source].filter(Boolean).join(' - ')}
+              {[personTag(people, c) ?? c.person_name, c.source].filter(Boolean).join(' - ')}
             </div>
             {c.kind === 'phone' && noteOf.get(c.id) && <div className="text-xs font-medium">{noteOf.get(c.id)}</div>}
             <div className="mt-1 flex flex-wrap gap-2">

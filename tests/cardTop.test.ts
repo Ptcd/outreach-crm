@@ -81,3 +81,20 @@ describe('who to ask for', () => {
     expect(whoToAskFor([{ name: 'JANE ROE', status: 'deceased' }, { name: 'Sam Roe', role: 'personal_representative', status: 'active' }], 'JANE ROE').askFor).toBe('Sam')
   })
 })
+
+describe('whose number it is', () => {
+  it('says the person and what they are to the house (Colin 2026-11-23)', async () => {
+    const { personTag, roleWords } = await import('@/lib/cardTop')
+    const people = [{ person_id: 'p1', name: 'LISA RAWLEY', role: 'owner_of_record', status: 'deceased' },
+      { person_id: 'p2', name: 'Mark Rawley', role: 'heir', status: 'active' },
+      { person_id: 'p3', name: 'Ann Rawley', role: 'personal_representative', status: 'active' }]
+    expect(personTag(people, { person_id: 'p2', person_name: 'Mark Rawley' })).toBe('Mark Rawley, heir')
+    expect(personTag(people, { person_id: 'p1', person_name: 'LISA RAWLEY' })).toBe('Lisa Rawley, owner, died')
+    // a number with no person on it is matched by the name it carries
+    expect(personTag(people, { person_name: 'Ann Rawley' })).toBe('Ann Rawley, personal representative')
+    expect(personTag(people, { person_name: 'Somebody Else' })).toBeNull()
+    expect(personTag([], { person_id: 'p2', person_name: 'Mark Rawley' })).toBeNull()
+    expect(roleWords('other')).toBe('')
+    expect(roleWords('special_administrator')).toBe('special administrator')
+  })
+})
