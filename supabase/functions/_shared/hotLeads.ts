@@ -102,8 +102,15 @@ export function alertText(a: HotAlert, appUrl: string): string {
     return `${a.is_test ? 'TEST ' : ''}${a.n === 2 ? 'STILL WAITING (15 min) - ' : ''}HANDED TO YOU: ${who}. ${caller}: "${trimQuote(note ?? '')}".${call}${link}`
   }
   const head = `${a.is_test ? 'TEST ' : ''}${a.n === 2 ? 'STILL NOT CALLED (15 min) - HOT' : 'HOT'}`
+  // an agent's mark (mark_card hot) carries the agent's words, never the seller's (Colin 2026-11-23: a HOT text quoted
+  // Muse's trace note as what the seller "said")
+  const agent = AGENT_NOTE.exec(a.body ?? '')
+  if (agent) return `${head}: ${who}. Marked hot by ${agent[1]}: "${trimQuote(a.body.slice(agent[0].length))}". Call: ${fmtPhone10(a.phone10)}${link}`
   return `${head}: ${who} said: "${trimQuote(a.body)}". Call: ${fmtPhone10(a.phone10)}${link}`
 }
+
+/** The words an agent's hot mark starts with (agent_mark_card writes 'Muse: ' + the reason). */
+const AGENT_NOTE = /^\s*(Muse(?: 2)?|Grok|Dots)\s*:\s*/
 
 export type PushMessage = { title: string; body: string; url: string; tag: string }
 
@@ -113,7 +120,8 @@ export function alertPush(a: HotAlert, appUrl: string): PushMessage {
   const head = a.n === 2 ? 'Still not called (15 min)' : 'Hot lead'
   return {
     title: `${a.is_test ? 'TEST ' : ''}${head}: ${who}`.slice(0, 90),
-    body: `"${trimQuote(a.body, 90)}" Call ${fmtPhone10(a.phone10)}`,
+    body: AGENT_NOTE.test(a.body ?? '') ? `${(AGENT_NOTE.exec(a.body) ?? ['', 'An agent'])[1]} marked it: "${trimQuote(a.body.replace(AGENT_NOTE, ''), 80)}" Call ${fmtPhone10(a.phone10)}`
+      : `"${trimQuote(a.body, 90)}" Call ${fmtPhone10(a.phone10)}`,
     url: leadLink(a, appUrl),
     tag: `hot-${a.id}`,
   }

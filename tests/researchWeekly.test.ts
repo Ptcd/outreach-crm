@@ -71,10 +71,11 @@ describe('behind is two whole weeks with no tick', () => {
   })
   it('a job never ticked is behind a week before one that ran in the first week', async () => {
     const b = await one<Json[]>(`public.research_behind($1)`, [plus(7)])     // Tuesday Nov 24
-    expect(b.map((x) => x.key)).toEqual(['evictions', 'bankruptcy', 'money_judgments', 'divorce_fa', 'guardianship_gn', 'water_shutoff', 'fire_damage', 'vacant_registry', 'code_raze'])
+    expect(b.map((x) => x.key)).toEqual(['evictions', 'bankruptcy', 'money_judgments', 'divorce_fa'])
+    // 0309: guardianships are closed; the municipal records jobs follow the records clocks (14 weeks; water 56)
     expect(b[0]).toMatchObject({ last_ran_week_of: null, weeks_with_no_tick: 2 })
     const later = await one<Json[]>(`public.research_behind($1)`, [plus(14)])   // Tuesday Dec 1
-    expect(later.length).toBe(21)                                                // 0303: tax warrants, counted from Nov 16
+    expect(later.length).toBe(16)                                                // 0303: tax warrants, counted from Nov 16; 0309: guardianship closed, the four municipal jobs on their own clocks
     expect(later.some((x) => x.key === 'partition')).toBe(false)                 // a job made 2026-11-22 counts from Nov 23
     expect(later.find((x) => x.key === 'foreclosure_cv')).toMatchObject({ last_ran_week_of: '2026-11-09', weeks_with_no_tick: 2 })
   })
@@ -93,9 +94,9 @@ describe('the Monday flag', () => {
   it('one text to Colin and one desk post a week, naming the jobs', async () => {
     const before = await one<number>(`(select count(*)::int from public.ops_alerts)`)
     const r = await one<Json>(`public.research_behind_flag($1)`, [plus(6)])     // Monday Nov 23
-    expect(r).toMatchObject({ ok: true, week: '2026-11-23', behind: 8 })
+    expect(r).toMatchObject({ ok: true, week: '2026-11-23', behind: 3 })
     const text = await one<string>(`(select text from public.ops_alerts order by id desc limit 1)`)
-    expect(text).toMatch(/^Research behind: 8 jobs have had no tick for more than two weeks: Bankruptcy \(job 7, never ticked\)/)
+    expect(text).toMatch(/^Research behind: 3 jobs have had no tick for more than two weeks: Bankruptcy \(job 7, never ticked\)/)
     expect(text).toMatch(/The Research page has the list\.$/)
     const post = (await db.query<Json>(`select * from public.desk_messages where id = $1`, [Number(r.desk_id)])).rows[0]
     expect(post).toMatchObject({ author: 'desk', for_whom: 'all', kind: 'note' })
@@ -106,8 +107,8 @@ describe('the Monday flag', () => {
   })
   it('Muse is told on every tool call until the job is ticked; Muse 2 is not', async () => {
     const a = await one<Json | null>(`public.agent_attention('Muse', $1)`, [plus(7)])
-    expect(a?.research.behind.length).toBe(8)
-    expect(a?.research.say).toMatch(/8 research jobs have had no tick/)
+    expect(a?.research.behind.length).toBe(3)
+    expect(a?.research.say).toMatch(/3 research jobs have had no tick/)
     expect((await one<Json | null>(`public.agent_attention('Muse 2', $1)`, [plus(7)]))?.research).toBeUndefined()
     expect((await one<Json | null>(`public.agent_attention('Muse', $1)`, [NOW]))?.research).toBeUndefined()
   })

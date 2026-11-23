@@ -407,6 +407,9 @@ describe('on the real migrations', () => {
     expect(await r(`public.agent_mark_card($1, 'dnc', 'said never text me', null, '4145550303', 'Muse sender')`, [c])).toMatchObject({ mark: 'dnc' })
     expect((await card(c)).stage).toBe('dnc')
     expect(await one(`select count(*)::int n from public.suppressed_phones where phone10 = '4145550303'`)).toEqual({ n: 1 })
+    // 0309: hot needs a seller who wrote back
+    expect(await r(`public.agent_mark_card($1, 'hot', 'wants to sell by spring', null, null, 'Muse sender')`, [h])).toMatchObject({ ok: false })
+    await db.query(`insert into public.messages (lead_id, direction, channel, body, from_number, to_number, status, sent_at) values ($1, 'in', 'sms', 'Maybe by spring', '+14145550304', '+12624180202', 'received', now())`, [h])
     expect(await r(`public.agent_mark_card($1, 'hot', 'wants to sell by spring', null, null, 'Muse sender')`, [h])).toMatchObject({ mark: 'hot' })
     expect(await card(h)).toMatchObject({ stage: 'colin_call', belt: 'yes_unbooked' })
     // the ping to Colin comes from the agent's mark, with its reason; the reply agent's own hot read pings nothing while the agent runs texting

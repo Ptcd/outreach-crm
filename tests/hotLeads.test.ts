@@ -219,3 +219,15 @@ describe('alert timing', () => {
     expect(await run(T('15:11'))).toMatchObject({ alerts: 1 })
   })
 })
+
+describe('an agent marked it hot (2026-11-23)', () => {
+  it('says whose words they are, never that the seller said them', async () => {
+    const { alertText, alertPush } = await import('../supabase/functions/_shared/hotLeads')
+    const a = { id: 'x', n: 1 as const, lead_id: 'L1', phone10: '2624447358', first_name: 'Theoniel', address: '33 S Concord Rd', body: 'Muse: sale Dec 9, call before Nov 24', is_test: false }
+    const t = alertText(a, 'https://app.example')
+    expect(t).toContain('Marked hot by Muse: "sale Dec 9, call before Nov 24"')
+    expect(t).not.toContain('said:')
+    expect(alertPush(a, 'https://app.example').body).toContain('Muse marked it')
+    expect(alertText({ ...a, body: 'Yes I would sell' }, 'https://app.example')).toContain('said: "Yes I would sell"')
+  })
+})
