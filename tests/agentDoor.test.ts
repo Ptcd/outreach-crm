@@ -117,6 +117,10 @@ describe('the MCP routing', () => {
     expect(log[0].error).toMatch(/no prospects scope/)
     const all: Agent = { id: 'k8', name: 'Muse', role: 'agent' }        // no scopes given: all five
     expect((await call(all, 'mark_card', { lead_id: 'L1', mark: 'hot' })).isError).toBe(false)
+    // an owner with no card is marked through phones_wanted, and the refusal says so (2026-11-22, Muse 2's batch 9)
+    const blank = await call(all, 'mark_card', { lead_id: '', mark: 'note', reason: 'no number found' })
+    expect(blank.isError).toBe(true)
+    expect(JSON.stringify(blank.value)).toMatch(/phones_wanted \{no_number/)
   })
   it('set_text_template and records_set_request reach the database with the agent name', async () => {
     const muse: Agent = { id: 'k9', name: 'Muse', role: 'agent' }

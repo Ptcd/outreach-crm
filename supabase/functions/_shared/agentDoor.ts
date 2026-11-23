@@ -128,7 +128,7 @@ const REASON = { type: 'object', properties: {
 
 export const TOOLS: { role: ToolRole; name: string; description: string; inputSchema: Record<string, unknown> }[] = [
   { role: 'intake', name: 'add_prospects',
-    description: 'Load prospects: the property, the people on it and why they are motivated. You have already applied the prospect rules; every one is accepted unless the address or a name is missing. One card per property: a prospect for an address we already have (any owner, ranges like 2825-2827 included) updates that card, adding new people, new numbers and stacking reasons. Give the people as interests[] (each with a role, THEIR address and THEIR phones); the old owner_name + phones shape still works as one owner of record. A number already on another card is attached anyway, to the person it belongs to, and comes back as also_on. Up to 200 per call. Returns one result per prospect: created / updated / already_have / rejected, the card id, each person with their interest_id and phones added, phones skipped and why, the parcel on the card, and parcel_conflict when your card already has a different one (it is kept).',
+    description: 'Load prospects: the property, the people on it and why they are motivated. You have already applied the prospect rules; every one is accepted unless the address or a name is missing (a prospect naming wpie_owner_id from phones_wanted needs no address: the server takes it from that owner). One card per property: a prospect for an address we already have (any owner, ranges like 2825-2827 included) updates that card, adding new people, new numbers and stacking reasons. Give the people as interests[] (each with a role, THEIR address and THEIR phones); the old owner_name + phones shape still works as one owner of record. A number already on another card is attached anyway, to the person it belongs to, and comes back as also_on. Up to 200 per call. Returns one result per prospect: created / updated / already_have / rejected, the card id, each person with their interest_id and phones added, phones skipped and why, the parcel on the card, and parcel_conflict when your card already has a different one (it is kept).',
     inputSchema: { type: 'object', properties: { prospects: { type: 'array', maxItems: 200, items: { type: 'object', properties: {
       owner_name: S('the owner (or the person to ask for)'), owner_type: S('individual, trust, llc, estate'),
       address: S('property street address'), city: S('city / village / town'), zip: S('ZIP'), county: S('county'),
@@ -762,6 +762,11 @@ export async function callTool(name: string, args: Json, agent: Agent, db: DoorD
       p_to_email: args.to_email ? String(args.to_email) : null, p_reply_id: args.reply_id ? String(args.reply_id) : null, p_agent: agent.name }) }
     case 'mark_card': {
       const mark = String(args.mark ?? '')
+      // 2026-11-22: Muse 2 marked owners it traced and found no number for with mark_card and an empty lead_id,
+      // and read the database's uuid error as an outage. An owner with no card is marked through phones_wanted.
+      if (!String(args.lead_id ?? '').trim()) {
+        return { value: { ok: false, reason: 'lead_id is empty. An owner you traced and found no number for is marked with phones_wanted {no_number: [wpie_owner_id, ...], note}; a card id comes from find_prospects or add_prospects.' }, isError: true }
+      }
       if (mark === 'deceased' || mark === 'wrong_person' || (mark === 'dnc' && (args.interest_id || args.phone))) {
         const r = await db.markPerson({ lead_id: String(args.lead_id ?? ''), mark, interest_id: args.interest_id ? String(args.interest_id) : null,
           phone: args.phone ? String(args.phone) : null, reason: args.reason ? String(args.reason) : null }, agent.name)
