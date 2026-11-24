@@ -335,8 +335,8 @@ export interface Intelligence {
   /** 0291: the recordings on the account, oldest first, created before a date (voicemails, tests: anything) */
   listRecordings(before: Date, limit: number): Promise<{ sid: string; call_sid: string | null; duration: number; date_created: string | null }[]>
   call(callSid: string): Promise<TwilioCall | null>
-  /** 0317: the parent calls that came in to the account since a day (UTC), newest first, up to 200 */
-  listInboundCalls?(sinceDay: string): Promise<InboundCall[]>
+  /** 0317: the calls on the account since a day (UTC), newest first, paged back to `since` */
+  listInboundCalls?(sinceDay: string, since?: Date): Promise<InboundCall[]>
 }
 export interface InboundCall { sid: string; from: string; to: string; status: string; duration: number; start_time: string | null; end_time: string | null; parent: string | null; direction: string }
 
@@ -399,9 +399,18 @@ export function twilioIntelligence(o: { accountSid: string; authToken: string; s
         duration: Number.parseInt(String(x.duration ?? '0'), 10) || 0, date_created: x.date_created ? new Date(String(x.date_created)).toISOString() : null }))
         .filter((x) => /^RE[0-9a-f]{32}$/i.test(x.sid))
     },
-    async listInboundCalls(sinceDay) {
-      const r = await req(`https://api.twilio.com/2010-04-01/Accounts/${o.accountSid}/Calls.json?StartTime%3E=${sinceDay}&PageSize=200`)
-      return ((r?.calls ?? []) as Record<string, unknown>[]).map((x) => ({
+    async listInboundCalls(sinceDay, since) {
+      // newest first, page by page until the page reaches back past `since` (a dialing hour alone can fill a page)
+      const rows: Record<string, unknown>[] = []
+      let url: string | null = `https://api.twilio.com/2010-04-01/Accounts/${o.accountSid}/Calls.json?StartTime%3E=${sinceDay}&PageSize=500`
+      for (let page = 0; url && page < 20; page++) {
+        const r = await req(url)
+        const got = (r?.calls ?? []) as Record<string, unknown>[]
+        rows.push(...got)
+        const oldest = got.length ? new Date(String(got[got.length - 1].start_time ?? '')).getTime() : 0
+        url = r?.next_page_uri && (!since || !oldest || oldest >= since.getTime()) ? `https://api.twilio.com${r.next_page_uri}` : null
+      }
+      return rows.map((x) => ({
         sid: String(x.sid ?? ''), from: String(x.from ?? ''), to: String(x.to ?? ''), status: String(x.status ?? ''),
         duration: Number.parseInt(String(x.duration ?? '0'), 10) || 0, direction: String(x.direction ?? ''),
         start_time: x.start_time ? new Date(String(x.start_time)).toISOString() : null,
@@ -602,7 +611,7 @@ export async function sweepRings(d: Deps, opts: { hours?: number; backfill?: boo
   const hours = Math.min(Math.max(opts.hours ?? 2, 1), 24 * 7)
   const since = new Date(now.getTime() - hours * 3600_000)
   const settled = now.getTime() - 90_000
-  const calls = (await d.twilio.listInboundCalls(since.toISOString().slice(0, 10)))
+  const calls = (await d.twilio.listInboundCalls(since.toISOString().slice(0, 10), since))
     .filter((c) => c.direction === 'inbound' && !c.parent && c.from.startsWith('+') && FINAL.has(c.status))
     .filter((c) => c.start_time && new Date(c.start_time) >= since && (!c.end_time || new Date(c.end_time).getTime() <= settled))
     .map((c) => ({ sid: c.sid, from: c.from, to: c.to, start_time: c.start_time, duration: c.duration }))
