@@ -4,7 +4,7 @@
 // (stop, wrong person, listed, wholesaler), the four answers captured where the persona gave them, a clean ending in a
 // sane number of turns, no "lost you" errors. Results land in voice_sim_runs and show in Settings.
 
-export type PersonaCard = { owner_name?: string; address?: string; municipality?: string; reasons?: string[]; owner_type?: string; say_next?: string }
+export type PersonaCard = { owner_name?: string; address?: string; municipality?: string; reasons?: string[]; owner_type?: string; say_next?: string; lang?: string }
 export type Persona = {
   id: string; name: string; card: boolean | PersonaCard       // card: the number is on a file (the assistant knows the house); an object overrides the test card
   brief: string                                               // who the seller is and how they talk, for the seller model
@@ -65,6 +65,11 @@ export const PERSONAS: Persona[] = [
     brief: 'Maria, speaks only Spanish. Says in Spanish that she received a text about her house and asks who this is. Does not understand English.',
     opening: 'Hola, recibí un mensaje sobre mi casa. ¿Quién habla? No hablo inglés.',
     expect: { language: 'es', ended: true, max_turns: 6 } },
+  // 2026-11-24 (Juan, 3524 Buckingham Rd): a seller whose texts are Spanish is greeted and heard in Spanish (app 0316)
+  { id: 'spanish_card', name: 'Spanish-speaking son on a Spanish card (whole call in Spanish)', card: { lang: 'es', owner_name: 'Ellen Kupper', address: '3524 Buckingham Rd', municipality: 'Sturtevant' },
+    brief: 'Juan, 30s, speaks Spanish only. His mother Ellen owned the house and passed away; his father decides about the house and Juan is helping. The house needs work, nobody lives there. He texted with us before and is calling back. Will not name a number; asks once what we would pay. Friendly but careful.',
+    opening: 'Hola, me llamaron sobre la casa de mi mamá. ¿Quién habla?',
+    expect: { language: 'es', ended: true, max_turns: 14 } },
   { id: 'rambler', name: 'The rambler', card: true,
     brief: 'Earl, 74. Every answer becomes a ten-sentence story about his late wife, the neighbors, the 1998 flood. Underneath: he is alone, the house is too much, taxes are behind a year, his son in Arizona wants him to move. Kind, slow.',
     opening: 'Well now, let me tell you, that house has been in the family since my wife Dorothy and I bought it in seventy-nine, and back then the whole street was...',
@@ -265,6 +270,8 @@ export const SELLER_SYSTEM = (p: Persona) => `You are role-playing a homeowner o
 Your character: ${p.brief}`
 
 export type Check = { name: string; ok: boolean; detail?: string }
+const ES_WORD = /\b(?:usted|gracias|casa|que|qué|el|la|de|por|para|con|su|sí|muy|bien|hola|cuándo|quién|está|llamada|equipo)\b/i
+const ES_MONEY = /\$\s?\d|\bmil\b|\bmill[oó]n|\b(?:cien|ciento|doscientos|trescientos|cuatrocientos|quinientos|seiscientos|setecientos|ochocientos|novecientos)\b|\bd[oó]lares\b/i
 
 const MONEY = /\$\s?\d|\b\d{2,3}(?:,\d{3})+\b|\b\d{2,3}\s?(?:k|grand|thousand)\b|\b(?:one|two|three|four|five|six|seven|eight|nine)\s+(?:hundred\s+)?(?:thousand|hundred\s+(?:and\s+)?(?:ten|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety))\b|\bhundred (?:and )?(?:ten|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\b/i
 
@@ -289,6 +296,13 @@ export function grade(p: Persona, transcript: { role: string; text: string }[], 
   if (p.expect.wrong_person !== undefined) out.push({ name: `wrong person = ${p.expect.wrong_person}`, ok: Boolean(x.wrong_person) === p.expect.wrong_person })
   if (p.expect.listed !== undefined) out.push({ name: `listed = ${p.expect.listed}`, ok: Boolean(x.listed) === p.expect.listed })
   if (p.expect.wholesaler !== undefined) out.push({ name: `wholesaler = ${p.expect.wholesaler}`, ok: Boolean(x.wholesaler) === p.expect.wholesaler })
+  // a Spanish card (0316): every reply in Spanish, and no figure in Spanish words either
+  if (typeof p.card === 'object' && p.card.lang === 'es') {
+    const english = agent.filter((t, i) => i > 0 && t.trim() && !ES_WORD.test(t))
+    out.push({ name: 'spoke Spanish the whole call', ok: english.length === 0, detail: english[0]?.slice(0, 120) })
+    const esMoney = agent.filter((t) => ES_MONEY.test(t))
+    out.push({ name: 'never a money figure (Spanish)', ok: esMoney.length === 0, detail: esMoney[0]?.slice(0, 120) })
+  }
   if (p.expect.language) out.push({ name: `language ${p.expect.language}`, ok: String(x.language ?? '').startsWith(p.expect.language), detail: String(x.language ?? 'none') })
   for (const f of p.expect.fields ?? []) out.push({ name: `captured ${f}`, ok: x[f] !== null && x[f] !== undefined && String(x[f]).trim() !== '', detail: x[f] ? String(x[f]).slice(0, 80) : 'missing' })
   if (p.expect.address) out.push({ name: 'address captured for an unknown caller', ok: new RegExp(p.expect.address_match ?? 'oak', 'i').test(String(x.property_address ?? '')), detail: String(x.property_address ?? 'none') })

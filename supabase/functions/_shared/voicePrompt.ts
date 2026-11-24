@@ -2,11 +2,12 @@
 // compressed for speech and for a caller who rang us and got no human. If the sheet and this file disagree, fix this
 // file: the sheet is the source of truth. One static block (cached across turns and calls) plus a small per-call block.
 export const END_CALL = '[END_CALL]'
-export const PROMPT_VERSION = '2026-11-07i'
+export const PROMPT_VERSION = '2026-11-24a'
 
 export type CallCard = {
   lead_id?: string | null; owner_name?: string | null; address?: string | null; municipality?: string | null
   reasons?: string[] | null; stage?: string | null; locked_to?: string | null; say_next?: string | null; owner_type?: string | null
+  lang?: string | null
 }
 
 export const STATIC_PROMPT = `You are the automated phone assistant for Colin's team, a small local company in southeastern Wisconsin that buys a few houses a year directly from owners, with its own money, as-is. You are on a live phone call. The caller rang one of our numbers, the people who work the phones were on other calls, and you picked up so they are not sent to voicemail. A real person on the team calls them back; your whole job is to make that callback a good one.
@@ -39,7 +40,8 @@ export const STATIC_PROMPT = `You are the automated phone assistant for Colin's 
 - "Can you text me instead": yes; say the person who calls back can text too, take the number to text, ask one question if they will allow it, and book the text for a time. Note it as the callback.
 - "Is Colin there" / "I only want Colin": Colin walks houses and gives numbers himself; the callback comes from his team and he is the one who comes out. Take the details anyway, short.
 - "Call me back right now": say someone will call within the hour, take the number, and end quickly after the one or two most useful questions.
-- A language you cannot hold a conversation in (Spanish, Hmong): in English, slowly, say you only speak English and ask whether they can continue in English, or would rather have a person who speaks their language call them back. Many can switch; if they do, go on with the four steps in English. If they continue in the other language, say a person who speaks it will call back, and end the call.
+- Spanish: when "This call" says to speak Spanish, the greeting was in Spanish, the line hears Spanish, and the whole call is in Spanish (usted, short sentences, the same steps and rules, the same ending marker). Never mix the two languages in one sentence.
+- Otherwise, a language you cannot hold a conversation in (Spanish on an English call, Hmong): in English, slowly, say you only speak English and ask whether they can continue in English, or would rather have a person who speaks their language call them back. Many can switch; if they do, go on with the four steps in English. If they continue in the other language, say a person who speaks it will call back, and end the call.
 - Silence: "Are you still there?" once; if nothing, say goodbye and end.
 - If the address they give does not match the house on file, do not argue: take theirs, say the team will sort out which house, and go on.
 
@@ -72,14 +74,25 @@ export function callBlock(card: CallCard | null, from: string, greeting: string)
   } else {
     parts.push(`This number is not on a file we know. Ask which property this is about and their name, then go on.`)
   }
+  if (card?.lang === 'es') parts.push(`This caller has texted with us in Spanish. Speak Spanish for the whole call.`)
   parts.push(`The caller's number: ${from}.`)
   parts.push(`The call has connected and this greeting has already been spoken to the caller: "${greeting}" Continue from there.`)
   return parts.join('\n')
 }
 
+// 2026-11-24 (Colin, after Juan hung up on the English greeting in five seconds): the house first, then who they reached;
+// "automated" is still said, in the second sentence. Spanish when the card's thread is Spanish (phone_lang, app 0316).
+// The phone server's agentGreeting (pm-phone lib/agentHandoff) speaks the same words: change both together.
 export function greetingFor(card: CallCard | null): string {
-  const street = card?.address ? ` about ${card.address.replace(/\s+/g, ' ').trim()}` : ''
-  return `Hi, this is the automated assistant for Colin's team. Sorry, everyone is on another call right now. I can take a few details so the right person calls you back. Is this${street || ' about a house you own'}?`
+  const street = card?.address ? card.address.replace(/\s+/g, ' ').trim() : ''
+  if (card?.lang === 'es') {
+    return street
+      ? `Hola, gracias por llamar sobre la casa en ${street}. Todos en el equipo de Colin están en otra llamada, así que le atiende el asistente automático del equipo. ¿Con quién hablo?`
+      : `Hola, gracias por llamar al equipo de Colin. Todos están en otra llamada, así que le atiende el asistente automático del equipo. ¿Sobre qué casa nos llama?`
+  }
+  return street
+    ? `Hi, thanks for calling about the house on ${street}. Everyone on Colin's team is on another call, so you've got the team's automated assistant. Who am I speaking with?`
+    : `Hi, thanks for calling Colin's team. Everyone's on another call, so you've got the team's automated assistant. Which house are you calling about?`
 }
 
 export const EXTRACTION_PROMPT = `You read a transcript of a phone call between our automated assistant and a caller and return one JSON object, nothing else, with these fields:

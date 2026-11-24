@@ -387,7 +387,7 @@ ${callBlock(null, '+15555550100', greetingFor(null))}`
       const custom = (msg.customParameters ?? {}) as Record<string, string>
       test = custom.test === '1'
       if (!Deno.env.get('ANTHROPIC_API_KEY')) { log('no_key'); endCall('no-key'); return }
-      card = custom.lead_id ? { lead_id: custom.lead_id, owner_name: custom.owner_name, address: custom.address, municipality: custom.municipality } : null
+      card = custom.lead_id ? { lead_id: custom.lead_id, owner_name: custom.owner_name, address: custom.address, municipality: custom.municipality, lang: custom.lang || null } : null
       const full = await cardFor(from)
       if (full) card = { ...card, ...full }
       const greeting = custom.greeting || greetingFor(card)

@@ -9,6 +9,7 @@ import { testNotification } from '../_shared/notify.ts'
 import { notifyDeps } from '../_shared/notifyDeno.ts'
 import { bodyHtml, checkEmail } from '../_shared/emailSend.ts'
 import { sendMail } from '../_shared/smtp.ts'
+import { greetingFor } from '../_shared/voicePrompt.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -60,7 +61,7 @@ Deno.serve(async (req) => {
     if ((me.data as { role?: string }).role !== 'owner') return json({ outcome: 'refused', reason: 'owner only' }, 403)
     const to10 = String(body.to ?? '').replace(/\D/g, '').slice(-10)
     if (!/^[2-9]\d{9}$/.test(to10)) return json({ outcome: 'refused', reason: 'a 10-digit US number to call' })
-    const mode = body.mode === 'known' ? 'known' : 'unknown'
+    const mode = body.mode === 'known' ? 'known' : body.mode === 'spanish' ? 'spanish' : 'unknown'
     const sid = Deno.env.get('TWILIO_ACCOUNT_SID') ?? ''
     const tok = Deno.env.get('TWILIO_AUTH_TOKEN') ?? ''
     const secret = (Deno.env.get('ALERT_SECRET') ?? '').trim()
@@ -68,13 +69,12 @@ Deno.serve(async (req) => {
     if (!sid || !tok || !secret) return json({ outcome: 'refused', reason: 'Twilio or the alert secret is not set up on the server' })
     const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     const ws = `${url.replace(/^https:\/\//, 'wss://')}/functions/v1/voice-agent?s=${encodeURIComponent(secret)}`
-    const card = mode === 'known' ? { owner_name: 'Pat Tester', address: '123 Test St', municipality: 'West Bend' } : null
-    const greeting = card
-      ? `Hi, this is the automated assistant for Colin's team. Sorry, everyone is on another call right now. I can take a few details so the right person calls you back. Is this about 123 Test St?`
-      : `Hi, this is the automated assistant for Colin's team. Sorry, everyone is on another call right now. I can take a few details so the right person calls you back. Is this about a house you own?`
-    const params = [['test', '1'], ['greeting', greeting], ...(card ? [['owner_name', card.owner_name], ['address', card.address], ['municipality', card.municipality]] : [])]
+    // 'spanish' (0316): the known test card as a Spanish-speaking seller's, so the Spanish greeting and call can be heard
+    const card = mode === 'unknown' ? null : { owner_name: 'Pat Tester', address: '123 Test St', municipality: 'West Bend', lang: mode === 'spanish' ? 'es' : 'en' }
+    const greeting = greetingFor(card)
+    const params = [['test', '1'], ['greeting', greeting], ...(card ? [['owner_name', card.owner_name], ['address', card.address], ['municipality', card.municipality], ['lang', card.lang]] : [])]
       .map(([k, v]) => `<Parameter name="${k}" value="${esc(v)}"/>`).join('')
-    const twiml = `<Response><Say voice="Polly.Joanna">Test call. The assistant is coming on the line.</Say><Connect><ConversationRelay url="${esc(ws)}" welcomeGreeting="${esc(greeting)}" language="en-US" interruptible="true">${params}</ConversationRelay></Connect></Response>`
+    const twiml = `<Response><Say voice="Polly.Joanna">Test call. The assistant is coming on the line.</Say><Connect><ConversationRelay url="${esc(ws)}" welcomeGreeting="${esc(greeting)}" language="${card?.lang === 'es' ? 'es-US' : 'en-US'}" interruptible="true">${params}</ConversationRelay></Connect></Response>`
     const form = new URLSearchParams({ From: from, To: `+1${to10}`, Twiml: twiml, Timeout: '45' })
     const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Calls.json`, { method: 'POST',
       headers: { authorization: 'Basic ' + btoa(`${sid}:${tok}`), 'content-type': 'application/x-www-form-urlencoded' }, body: form })
