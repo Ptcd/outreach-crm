@@ -29,7 +29,7 @@ export function AssistantTest() {
   })
   useEffect(() => { if (!watch) return; const t = setTimeout(() => setWatch(false), 6 * 60_000); return () => clearTimeout(t) }, [watch])
   const busy = !!dialer.active && ['connecting', 'ringing', 'in_call'].includes(dialer.active.status)
-  const run = async (mode: 'known' | 'unknown') => {
+  const run = async (mode: 'known' | 'unknown' | 'spanish') => {
     setNote('Connecting. When the assistant greets, hold the phone with Muse in voice mode up to this speaker and let Muse answer. Hang up from the call bar when done; the transcript shows here.')
     setWatch(true)
     await dialer.testAssistant(mode)
@@ -43,9 +43,10 @@ export function AssistantTest() {
       <div className="flex flex-wrap items-center gap-2">
         <Button className="h-10" disabled={busy || !dialer.supported} onClick={() => void run('known')}>{busy ? 'On the call...' : 'Start as a known seller'}</Button>
         <Button variant="outline" className="h-10" disabled={busy || !dialer.supported} onClick={() => void run('unknown')}>{busy ? 'On the call...' : 'Start as an unknown number'}</Button>
+        <Button variant="outline" className="h-10" disabled={busy || !dialer.supported} onClick={() => void run('spanish')}>{busy ? 'On the call...' : 'Start as a Spanish-speaking seller'}</Button>
         {busy && <Button variant="outline" className="h-10" onClick={() => dialer.hangUp()}>Hang up</Button>}
       </div>
-      <p className="text-xs text-muted-foreground">Known seller: the assistant believes the card is Pat Tester at 123 Test St, West Bend, and says the address. Unknown number: it asks for the house, the town and a name.</p>
+      <p className="text-xs text-muted-foreground">Known seller: the assistant believes the card is Pat Tester at 123 Test St, West Bend, and says the address. Unknown number: it asks for the house, the town and a name. Spanish-speaking seller: the same card as a seller whose texts are in Spanish; the assistant greets, listens and talks in Spanish.</p>
       {note && <p className="text-sm">{note}</p>}
       {dialer.active?.error && <ErrorNote error={new Error(dialer.active.error)} />}
       <div className="space-y-2">

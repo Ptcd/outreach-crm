@@ -86,7 +86,7 @@ interface DialerApi {
   lineResults: LineResult[]
   takeLineResults: () => LineResult[]
   /** Settings, "Test the assistant": this browser calls the inbound assistant as a test; Muse plays the seller on the speaker. */
-  testAssistant: (mode: 'known' | 'unknown') => Promise<void>
+  testAssistant: (mode: 'known' | 'unknown' | 'spanish') => Promise<void>
   accept: () => Promise<{ leadId: string | null; phone: string } | null>
   decline: () => void
   hangUp: () => void
@@ -543,8 +543,8 @@ export function DialerProvider({ children }: { children: ReactNode }) {
 
   // The test call to the assistant (2026-11-07): the same softphone, To "assistant", no card, no authorization gate; the
   // phone system puts the assistant on the line at once as a test, so the browser's speaker and microphone are the call.
-  const testAssistant = useCallback(async (mode: 'known' | 'unknown') => {
-    setActive({ status: 'connecting', to: 'assistant', label: `Assistant test (${mode === 'known' ? 'known seller' : 'unknown number'})`, leadId: null,
+  const testAssistant = useCallback(async (mode: 'known' | 'unknown' | 'spanish') => {
+    setActive({ status: 'connecting', to: 'assistant', label: `Assistant test (${mode === 'known' ? 'known seller' : mode === 'spanish' ? 'Spanish-speaking seller' : 'unknown number'})`, leadId: null,
       startedAt: null, muted: false, error: null, answered: false, inbound: false, line: null })
     try {
       const dev = await device()
