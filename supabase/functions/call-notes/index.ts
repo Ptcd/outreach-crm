@@ -3,11 +3,12 @@
 //   POST ?event=transcript Voice Intelligence's "transcript available" webhook. Only the ids in it are used: the
 //                          transcript's state and words are fetched from Twilio with our own credentials.
 //   POST ?event=sweep      pg_cron every 5 minutes (shared secret): whatever a lost callback left behind.
+//   POST ?event=rings      pg_cron every minute (shared secret): a seller who hung up while it rang is a missed call (0317).
 // Twilio gets its answer at once; the work carries on in the background (EdgeRuntime.waitUntil). Nothing about what
 // was said is ever logged: failures log the call id and a reason.
 import { createClient } from 'npm:@supabase/supabase-js@2.56.1'
 import { validTwilioSignature } from '../_shared/sending.ts'
-import { onRecording, onTranscriptWebhook, summarizeCall, sweep, twilioIntelligence, type CallContext, type Deps, type Rpc } from '../_shared/callNotes.ts'
+import { onRecording, onTranscriptWebhook, summarizeCall, sweep, sweepRings, twilioIntelligence, type CallContext, type Deps, type Rpc } from '../_shared/callNotes.ts'
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined
 
@@ -72,6 +73,13 @@ Deno.serve(async (req) => {
   const raw = await req.text()
   const d = deps()
 
+  if (q.get('event') === 'rings') {
+    // 0317: pg_cron every minute; ?hours=N&backfill=1 is a one-off look back (calls written at the time they were made)
+    const ok = await d.rpc('cron_secret_ok', { p_secret: req.headers.get('x-wpie-cron-secret') })
+    if (ok.error || ok.data !== true) return new Response('forbidden', { status: 403 })
+    const hours = Number.parseInt(q.get('hours') ?? '', 10)
+    return Response.json(await sweepRings(d, { hours: Number.isFinite(hours) ? hours : undefined, backfill: q.get('backfill') === '1' }))
+  }
   if (q.get('event') === 'sweep' || q.get('event') === 'selftest') {
     const ok = await d.rpc('cron_secret_ok', { p_secret: req.headers.get('x-wpie-cron-secret') })
     if (ok.error || ok.data !== true) return new Response('forbidden', { status: 403 })

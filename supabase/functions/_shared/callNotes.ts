@@ -335,7 +335,10 @@ export interface Intelligence {
   /** 0291: the recordings on the account, oldest first, created before a date (voicemails, tests: anything) */
   listRecordings(before: Date, limit: number): Promise<{ sid: string; call_sid: string | null; duration: number; date_created: string | null }[]>
   call(callSid: string): Promise<TwilioCall | null>
+  /** 0317: the parent calls that came in to the account since a day (UTC), newest first, up to 200 */
+  listInboundCalls?(sinceDay: string): Promise<InboundCall[]>
 }
+export interface InboundCall { sid: string; from: string; to: string; status: string; duration: number; start_time: string | null; end_time: string | null; parent: string | null; direction: string }
 
 /** Twilio REST for the subaccount the seller lines and the app dialer live on. The Voice Intelligence service is found
  *  by its unique name (one-time setup: tools in docs/CALL_NOTES.md). */
@@ -395,6 +398,15 @@ export function twilioIntelligence(o: { accountSid: string; authToken: string; s
       return ((r?.recordings ?? []) as Record<string, unknown>[]).map((x) => ({ sid: String(x.sid ?? ''), call_sid: x.call_sid ? String(x.call_sid) : null,
         duration: Number.parseInt(String(x.duration ?? '0'), 10) || 0, date_created: x.date_created ? new Date(String(x.date_created)).toISOString() : null }))
         .filter((x) => /^RE[0-9a-f]{32}$/i.test(x.sid))
+    },
+    async listInboundCalls(sinceDay) {
+      const r = await req(`https://api.twilio.com/2010-04-01/Accounts/${o.accountSid}/Calls.json?StartTime%3E=${sinceDay}&PageSize=200`)
+      return ((r?.calls ?? []) as Record<string, unknown>[]).map((x) => ({
+        sid: String(x.sid ?? ''), from: String(x.from ?? ''), to: String(x.to ?? ''), status: String(x.status ?? ''),
+        duration: Number.parseInt(String(x.duration ?? '0'), 10) || 0, direction: String(x.direction ?? ''),
+        start_time: x.start_time ? new Date(String(x.start_time)).toISOString() : null,
+        end_time: x.end_time ? new Date(String(x.end_time)).toISOString() : null,
+        parent: x.parent_call_sid ? String(x.parent_call_sid) : null }))
     },
     async deleteRecording(sid) {
       await req(`https://api.twilio.com/2010-04-01/Accounts/${o.accountSid}/Recordings/${sid}.json`, { method: 'DELETE' })
@@ -576,4 +588,25 @@ export async function sweep(d: Deps) {
   let audio: Record<string, number> | { error: string } = {}
   try { audio = await sweepAudio(d) } catch (e) { audio = { error: why(e) } }
   return { ok: true, handled: out.length, results: out, audio }
+}
+
+const FINAL = new Set(['completed', 'busy', 'no-answer', 'canceled', 'failed'])
+
+/** 0317: a seller who hung up while it was still ringing is a missed call (Juan, 2026-11-24: three calls, one logged).
+ *  Twilio's finished inbound calls of the last two hours (or `hours` for a one-off look back) go to inbound_rings_missed,
+ *  which logs the ones nothing else did. Calls that ended under 90 seconds ago are left for the phone server and the
+ *  assistant to finish writing up. */
+export async function sweepRings(d: Deps, opts: { hours?: number; backfill?: boolean } = {}) {
+  if (!d.twilio.listInboundCalls) return { ok: false, reason: 'no call listing' }
+  const now = d.now?.() ?? new Date()
+  const hours = Math.min(Math.max(opts.hours ?? 2, 1), 24 * 7)
+  const since = new Date(now.getTime() - hours * 3600_000)
+  const settled = now.getTime() - 90_000
+  const calls = (await d.twilio.listInboundCalls(since.toISOString().slice(0, 10)))
+    .filter((c) => c.direction === 'inbound' && !c.parent && c.from.startsWith('+') && FINAL.has(c.status))
+    .filter((c) => c.start_time && new Date(c.start_time) >= since && (!c.end_time || new Date(c.end_time).getTime() <= settled))
+    .map((c) => ({ sid: c.sid, from: c.from, to: c.to, start_time: c.start_time, duration: c.duration }))
+  if (!calls.length) return { ok: true, finished_calls: 0 }
+  const r = await must(d, 'inbound_rings_missed', { p_calls: calls, p_backfill: !!opts.backfill })
+  return { ok: true, finished_calls: calls.length, ...r }
 }
