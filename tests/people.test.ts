@@ -159,6 +159,28 @@ describe('people and interests', () => {
     expect((await rows(`select stage::text from public.leads where id = $1`, [card]))[0]).toEqual({ stage: 'dnc' })
   })
 
+  it('right_person takes back a wrong_person mark on that card, never a death or a stop (0318, 8408 S Tuckaway Shores Dr)', async () => {
+    const card = await add({ owner_name: 'OLGA RIGHTTEST', owner_type: 'individual', address: '19 Right Test St',
+      phones: [{ number: '4145561901', name: 'OLGA RIGHTTEST' }, { number: '4145561902', name: 'Dee Gone' }, { number: '4145561903', name: 'Stu Stop' }] })
+    const olga = (await rows<{ id: string }>(`select id from public.interests where lead_id = $1 and role = 'owner_of_record'`, [card]))[0].id
+    await r1(`public.agent_mark_person($1, 'wrong_person', $2, null, 'someone on an old number said she is not the owner', 'Muse')`, [card, olga])
+    await r1(`public.agent_mark_person($1, 'deceased', null, '4145561902', 'obituary', 'Muse')`, [card])
+    await r1(`public.agent_mark_person($1, 'dnc', null, '4145561903', 'stop', 'Muse')`, [card])
+    await db.query(`update public.leads set stage = 'data_fix' where id = $1`, [card])
+    expect(await r1(`public.agent_mark_person($1, 'right_person', $2, null, 'trace', 'Grok')`, [card, olga]))
+      .toMatchObject({ ok: false, reason: expect.stringContaining('reason') })
+    const m = await r1(`public.agent_mark_person($1, 'right_person', $2, null, 'trace 2026-11-24: owner is current at the property', 'Grok')`, [card, olga])
+    expect(m).toMatchObject({ ok: true, was: 'not_the_contact', has_usable_phone: true })
+    expect((await rows(`select status from public.interests where id = $1`, [olga]))[0]).toEqual({ status: 'active' })
+    expect((await rows(`select stage::text from public.leads where id = $1`, [card]))[0]).toEqual({ stage: 'opener_queued' })
+    expect(await r1(`public.agent_queue_text($1, '4145561901', $2, 1, null, 'Muse', $3::timestamptz)`, [card, OPENER, tue])).toMatchObject({ status: 'queued' })
+    await db.exec(`update public.planned_openers set send_status = 'withdrawn' where send_status in ('planned', 'would_send')`)
+    expect(await r1(`public.agent_mark_person($1, 'right_person', null, '4145561902', 'I think she is alive after all', 'Grok')`, [card]))
+      .toMatchObject({ ok: false, reason: expect.stringContaining('deceased') })
+    expect(await r1(`public.agent_mark_person($1, 'right_person', null, '4145561903', 'he did not mean the stop', 'Grok')`, [card]))
+      .toMatchObject({ ok: false, reason: expect.stringContaining('do_not_contact') })
+  })
+
   it('a text names its person; a number shared by one person on two cards passes the send check', async () => {
     const owner = { owner_name: 'TOM TWOCARDS', owner_type: 'individual', city: 'Milwaukee', mailing_street: '17 Home Test St', mailing_zip: '53204' }
     const a = await add({ ...owner, address: '17 One Test St', phones: [{ number: '4145561701', name: 'TOM TWOCARDS', type: 'mobile' }] })
