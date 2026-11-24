@@ -44,7 +44,8 @@ export const PERSONAS: Persona[] = [
   { id: 'listed', name: 'Already listed with an agent', card: true,
     brief: 'Sue, 50. The house went on the market with an agent last week. Polite, tells you right away.',
     opening: 'Hi, I think you texted me, but we actually just listed the house with a realtor last week.',
-    expect: { listed: true, lanes: ['never'], ended: true, max_turns: 6 } },
+    // 0279 (Colin 2026-11-22: "We can still buy listed stuff"): listed is a lead, booked like anyone else, never 'never'
+    expect: { listed: true, lanes: ['1', '2', '3'], ended: true, max_turns: 12 } },
   { id: 'hostile_stop', name: 'Hostile, stop calling', card: true,
     brief: 'Angry man. Says this is harassment, he never asked for texts, take him off the list and never contact him again. Swears once. Hangs up after that.',
     opening: 'Who the hell is this? Stop texting me and stop calling me. Take me off your damn list.',
@@ -223,7 +224,8 @@ export const PERSONAS: Persona[] = [
   { id: 'realtor_for_client', name: 'A real estate agent calling for the owner', card: true,
     brief: "Sandra, a licensed agent. She represents the owner on file; the house is going on the MLS next week and she wants to know if we want to make an offer before it lists. Professional.",
     opening: "Hi, this is Sandra with Shorewest, I represent the owner. We're listing next week, are you interested in an early offer?",
-    expect: { listed: true, lanes: ['never'], ended: true, max_turns: 6 } },
+    // 0279 (Colin 2026-11-22: "We can still buy listed stuff"): listed is a lead, booked like anyone else, never 'never'
+    expect: { listed: true, lanes: ['1', '2', '3'], ended: true, max_turns: 12 } },
   { id: 'estate_attorney', name: "The estate's attorney calling", card: true,
     brief: "Paul, an attorney for the estate of the owner on file. The estate is in probate; he is gathering offers for the personal representative. The house is vacant and in fair shape. He will not name a number. Formal, brief.",
     opening: "This is Paul Weber, I'm the attorney handling the estate of Pat Tester. You contacted the estate about the property.",
