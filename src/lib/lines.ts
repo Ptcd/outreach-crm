@@ -22,9 +22,13 @@
 //
 // This file is only the deciding. It knows nothing of Twilio: lib/dialer hands it call objects.
 
-/** How long an answered line is listened to before it is taken for a person. The phone server gives its machine
- *  verdict in at most five seconds and hangs a machine up. */
-export const SCREEN_MS = 5500
+/** How long an answered line is listened to before it is taken for a person. The phone server's machine check has
+ *  eight seconds from the answer (pm-phone clientDial machineDetectionTimeout) and then ends a machine's line, which
+ *  takes it about a second more. Until 2026-11-25 this was 5.5 seconds against a five-second check: on the first real
+ *  rounds the check said "unknown" on every voicemail at five seconds and recognised one at 5.1, so each voicemail
+ *  was kept as a person and the other two lines were dropped. The caller still hears, and can talk to, whoever
+ *  answers from the first moment; the wait only decides when the other lines are let go. Change the two together. */
+export const SCREEN_MS = 10_000
 
 export type LineOutcome = 'won' | 'machine' | 'no_answer' | 'other_line_answered' | 'dropped_after_pickup' | 'failed'
 
