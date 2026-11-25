@@ -9,7 +9,7 @@ import { SUPABASE_STUB } from './supabaseStub'
 const MIGRATIONS_DIR = path.resolve(__dirname, '../supabase/migrations')
 const MIGRATIONS = readdirSync(MIGRATIONS_DIR).filter((f) => f.endsWith('.sql')).sort()
   .map((f) => readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8')).join('\n')
-const POOL = ['+12623812196', '+12624767158', '+12626675223', '+12629996513', '+14144200081', '+14144200843', '+14146778472']
+const POOL = ['+12623812196', '+12624767158', '+12626675223', '+12629996513', '+14144200081', '+14144200843', '+14146778472', '+12624409051', '+12622289462']
 let db: PGlite
 let n = 0
 const line = async (lead: string, phone?: string) => (await db.query<{ r: string | null }>(`select public.card_call_line($1, $2) as r`, [lead, phone ?? null])).rows[0].r

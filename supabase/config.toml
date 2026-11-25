@@ -57,3 +57,7 @@ verify_jwt = false
 # team row itself) and by the desk through public.ring_test() with the shared secret, so no gateway check.
 [functions.ring-test]
 verify_jwt = false
+
+[functions.line-release]
+# pg_cron calls it with the cron secret (0326); the function checks that itself
+verify_jwt = false
