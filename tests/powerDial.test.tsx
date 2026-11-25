@@ -355,16 +355,26 @@ describe('Power hour, owed calls first', () => {
       expect(screen.queryByText(/Dial \(414\) 555-0909/)).toBeTruthy()
     } finally { items.pop(); sessionStorage.clear() }
   })
-  it('Skip on the only owed call leaves it up and says why; it never goes behind the cold cards', async () => {
-    items.push(replied as unknown as typeof items[number])
+  // Thalia 2026-11-25, four call-backs on top: "when I go to Power Hour and skip the first four numbers, the skip
+  // button stops working". Skip must always move on, through every owed call and into the list.
+  it('Skip always moves on: through every owed call, into the list, and round again in the order skipped', async () => {
+    const other = { ...replied, lead_id: 'L8', task_id: 'T8', source: 'callback', owner_name: 'OTTO OWED', address: '8 OWED ST', phone: '4145550808' }
+    items.push(replied as unknown as typeof items[number], other as unknown as typeof items[number])
     try {
       wrap()
+      const top = () => screen.queryByText('Olive Owed') ? 'olive' : screen.queryByText('Otto Owed') ? 'otto'
+        : screen.queryByText('Jane Q Sample') ? 'jane' : screen.queryByText('Robert Example') ? 'robert' : '?'
       await screen.findByText('Olive Owed')
-      fireEvent.keyDown(window, { key: 's' })
-      expect(await screen.findByText(/They are waiting on this call, so it stays first/)).toBeTruthy()
-      expect(screen.getByText('Olive Owed')).toBeTruthy()
-      fireEvent.keyDown(window, { key: '3' })
-      await waitFor(() => expect(logCall).toHaveBeenCalledWith('L9', '4145550909', 'wrong_number', 'Not them (Power hour).', null))
-    } finally { items.pop() }
+      const seen: string[] = [top()]
+      for (let i = 0; i < 5; i++) {
+        fireEvent.keyDown(window, { key: 's' })
+        await waitFor(() => expect(top()).not.toBe(seen[seen.length - 1]))
+        seen.push(top())
+      }
+      expect(seen.slice(0, 2)).toEqual(['olive', 'otto'])
+      expect(new Set(seen.slice(2, 4))).toEqual(new Set(['jane', 'robert']))
+      expect(seen[4]).toBe('olive')
+      expect(seen[5]).toBe('otto')
+    } finally { items.pop(); items.pop() }
   })
 })

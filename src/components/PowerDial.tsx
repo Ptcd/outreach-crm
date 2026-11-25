@@ -65,6 +65,8 @@ const OUTCOMES = [
 ] as const
 
 /** A call somebody is waiting on: they called us, were promised a call back, or wrote back interested. */
+/** A skipped owed call comes back to the top after this many more logged calls. */
+const OWED_BACK = 5
 const OWED = (x: { source: string }) => x.source === 'missed_call' || x.source === 'callback' || x.source === 'replied'
 
 // a list handed over from Today ("Dial these", 2026-11-04): those cards first, in Today's order, for this sitting
@@ -100,6 +102,8 @@ export function PowerDial({ caller }: { caller: string }) {
   const refetch = q.refetch
   const [stats, setStats] = useState<Stats>(loadStats)
   const [skipped, setSkipped] = useState<string[]>([])
+  // how many calls were logged when each card was skipped: a skipped call-back comes back first after OWED_BACK more
+  const [skipAt, setSkipAt] = useState<Record<string, number>>({})
   const [talking, setTalking] = useState<string | null>(null)
   // the card she dialed or is talking to stays on screen while a refresh brings a texter to the top, and stays even
   // when the refresh no longer lists it (a card with a call open drops out of the queue: Thalia 2026-10-28, "their info
@@ -156,15 +160,19 @@ export function PowerDial({ caller }: { caller: string }) {
     // owed calls first (a seller who called, a promised callback, a seller who wrote back interested); then Today's
     // list in its order; then the queue's own order. Until 2026-11-25 a reply call sat behind a list handed over from
     // Today, and Skip sent it behind every cold card (Colin: interested cards "aren't getting the action they need").
-    // Skip now sends a card to the back of its own group, so an owed call is never behind the list.
-    const front = all.filter(OWED)
+    // A skipped owed call steps aside for OWED_BACK logged calls, then is first again. (The same day's first try sent
+    // it to the back of the owed calls only, and once every one was skipped Skip brought card one straight back:
+    // Thalia, four call-backs, "the skip button stops working".) Skipped cards line up in the order they were skipped.
+    const order = (xs: Item[]) => [...xs].sort((a, b) => skipped.indexOf(a.lead_id) - skipped.indexOf(b.lead_id))
+    const stepped = (x: Item) => skipped.includes(x.lead_id) && !(OWED(x) && stats.done.length - (skipAt[x.lead_id] ?? 0) >= OWED_BACK)
+    const front = all.filter((x) => OWED(x) && !stepped(x))
     const listed = all.filter((x) => inList(x) && !front.includes(x)).sort(byList)
     const rest = all.filter((x) => !front.includes(x) && !listed.includes(x))
-    const back = (xs: Item[]) => [...xs.filter((x) => !skipped.includes(x.lead_id)), ...xs.filter((x) => skipped.includes(x.lead_id))]
-    const ordered = [...back(front), ...back([...listed, ...rest])]
+    const others = [...listed, ...rest]
+    const ordered = [...front, ...others.filter((x) => !stepped(x)), ...order(others.filter(stepped))]
     const held = pin ? (ordered.find((x) => x.lead_id === pin) ?? (pinItem.current?.lead_id === pin && !stats.done.includes(pin) ? pinItem.current : undefined)) : undefined
     return held ? [held, ...ordered.filter((x) => x.lead_id !== held.lead_id)] : ordered
-  }, [q.data, stats.done, skipped, pin, swap, dialList])
+  }, [q.data, stats.done, skipped, skipAt, pin, swap, dialList])
   const cur = list[0] ?? null
   const onThis = !!active && !!cur && active.leadId === cur.lead_id
   const live = onThis && ['connecting', 'ringing', 'in_call'].includes(active!.status)
@@ -325,13 +333,13 @@ export function PowerDial({ caller }: { caller: string }) {
   const skip = useCallback(() => {
     if (!cur || live) return
     if (onThis) dismiss()
-    // an owed call goes to the back of the owed calls only; when it is the last one it stays up
-    setNextNote(OWED(cur) && !list.slice(1).some((x) => OWED(x) && !skipped.includes(x.lead_id))
-      ? 'They are waiting on this call, so it stays first: dial it, or log what happened.' : null)
+    // an owed call steps aside and comes back first after OWED_BACK more logged calls
+    setNextNote(OWED(cur) ? `Skipped ${cur.owner_name ?? 'this card'}. They are waiting on a call, so it comes back to the top after your next ${OWED_BACK} calls.` : null)
     setSkipped((s) => [...s.filter((x) => x !== cur.lead_id), cur.lead_id])
+    setSkipAt((m) => ({ ...m, [cur.lead_id]: stats.done.length }))
     setTalking(null)
     setPin(null)
-  }, [cur, live, onThis, dismiss, list, skipped])
+  }, [cur, live, onThis, dismiss, stats.done.length])
 
   // what happened to the call on this card, for double dial: placed, answered (by anyone or anything), ended
   useEffect(() => {
