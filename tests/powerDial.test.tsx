@@ -26,6 +26,7 @@ vi.mock('@/lib/dialer', () => ({ useDialer: () => ({ active: dialer.active, inco
 vi.mock('@/components/CallScript', () => ({ CallScript: () => null, pickupLine: (c: string, k?: string) => `Hi, this is ${c} (${k ?? "cold"})` }))
 
 import { PowerDial } from '@/components/PowerDial'
+import { didNotReach } from '@/lib/doubleDial'
 
 const wrap = () => render(<QueryClientProvider client={new QueryClient()}><PowerDial caller="thalia" /></QueryClientProvider>)
 afterEach(() => { cleanup(); localStorage.clear(); logCall.mockClear(); start.mockClear(); hangUp.mockClear(); dialer.active = null; dialer.incoming = null; vi.useRealTimers() })
@@ -220,37 +221,95 @@ describe('Power hour', () => {
   })
 })
 
-// double dial (Colin 2026-11-25): no answer calls the same number once more at once, then the card moves on as before
+// double dial (Colin 2026-11-25): only when the first call never reached them (voicemail took it within seconds, or it
+// ended before ringing out); a call that rang its full time is not called twice
+type Act = { status: string; leadId: string; to: string; startedAt?: number | null; answered?: boolean }
 describe('Power hour, double dial', () => {
-  it('on by default: no answer logs, says it is calling again, and dials the same number once more; the second no answer moves on', async () => {
-    wrap()
-    await screen.findByText('Robert Example').catch(() => null)
+  const step = (view: ReturnType<typeof wrap>, a: Act | null) => {
+    dialer.active = a as typeof dialer.active
+    view.rerender(<QueryClientProvider client={new QueryClient()}><PowerDial caller="thalia" /></QueryClientProvider>)
+  }
+  const L1 = { leadId: 'L1', to: '4145550101' }
+  it('voicemail took it within seconds: no answer calls the same number once more, and the second no answer moves on', async () => {
+    const view = wrap()
     await screen.findByText('Jane Q Sample')
     expect((screen.getByTestId('double-dial') as HTMLInputElement).checked).toBe(true)
-    fireEvent.keyDown(window, { key: 'd' })
-    expect(start).toHaveBeenCalledTimes(1)
+    step(view, { status: 'connecting', ...L1 })
+    step(view, { status: 'ringing', ...L1 })
+    step(view, { status: 'in_call', ...L1, startedAt: Date.now() + 4000, answered: true })
+    step(view, { status: 'ended', ...L1, startedAt: Date.now() + 4000, answered: true })
     fireEvent.keyDown(window, { key: '1' })
-    await waitFor(() => expect(logCall).toHaveBeenCalledWith('L1', '4145550101', 'no_answer', 'No answer (Power hour). Calling again at once (double dial).', null))
+    await waitFor(() => expect(logCall).toHaveBeenCalledWith('L1', '4145550101', 'no_answer',
+      'No answer (Power hour). Voicemail took it after 4 s, before it could ring through. Calling again at once (double dial).', null))
     expect(screen.getByText(/Calling the same number again now/)).toBeTruthy()
-    await waitFor(() => expect(start).toHaveBeenCalledTimes(2), { timeout: 3000 })
-    expect(start).toHaveBeenLastCalledWith(expect.objectContaining({ to: '4145550101', leadId: 'L1' }))
+    step(view, null)
+    await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ to: '4145550101', leadId: 'L1' })), { timeout: 3000 })
+    expect(start).toHaveBeenCalledTimes(1)
+    step(view, { status: 'connecting', ...L1 })
+    step(view, { status: 'in_call', ...L1, startedAt: Date.now() + 3000, answered: true })
+    step(view, { status: 'ended', ...L1, startedAt: Date.now() + 3000, answered: true })
     fireEvent.keyDown(window, { key: '1' })
     await waitFor(() => expect(logCall).toHaveBeenLastCalledWith('L1', '4145550101', 'no_answer', 'No answer (Power hour).', null))
+    step(view, null)
     expect(await screen.findByText('Robert Example')).toBeTruthy()
     await new Promise((r) => setTimeout(r, 1500))
-    expect(start).toHaveBeenCalledTimes(2)
+    expect(start).toHaveBeenCalledTimes(1)
   })
-  it('a left voicemail is not called again, and switched off a no answer moves straight on', async () => {
-    wrap()
+  it('it ended in seconds without being answered (declined): called once more', async () => {
+    const view = wrap()
     await screen.findByText('Jane Q Sample')
-    fireEvent.click(screen.getByText('Left voicemail'))
-    await waitFor(() => expect(logCall).toHaveBeenCalledWith('L1', '4145550101', 'no_answer', 'Left a voicemail (Power hour).', null))
-    expect(await screen.findByText('Robert Example')).toBeTruthy()
-    fireEvent.click(screen.getByTestId('double-dial'))
-    expect(localStorage.getItem('power:double')).toBe('0')
+    step(view, { status: 'connecting', ...L1 })
+    step(view, { status: 'ended', ...L1, answered: false })
     fireEvent.keyDown(window, { key: '1' })
-    await waitFor(() => expect(logCall).toHaveBeenLastCalledWith('L2', '4145550144', 'no_answer', 'No answer (Power hour).', null))
+    await waitFor(() => expect(logCall).toHaveBeenCalledWith('L1', '4145550101', 'no_answer',
+      'No answer (Power hour). It ended after 0 s without ringing out (declined or blocked). Calling again at once (double dial).', null))
+    step(view, null)
+    await waitFor(() => expect(start).toHaveBeenCalledTimes(1), { timeout: 3000 })
+  })
+  it('a call that rang and was picked up late, and a left voicemail, are not called twice', async () => {
+    const view = wrap()
+    await screen.findByText('Jane Q Sample')
+    step(view, { status: 'connecting', ...L1 })
+    step(view, { status: 'in_call', ...L1, startedAt: Date.now() + 20_000, answered: true })
+    step(view, { status: 'ended', ...L1, startedAt: Date.now() + 20_000, answered: true })
+    fireEvent.keyDown(window, { key: '1' })
+    await waitFor(() => expect(logCall).toHaveBeenCalledWith('L1', '4145550101', 'no_answer', 'No answer (Power hour).', null))
+    step(view, null)
+    expect(await screen.findByText('Robert Example')).toBeTruthy()
+    const L2 = { leadId: 'L2', to: '4145550144' }
+    step(view, { status: 'connecting', ...L2 })
+    step(view, { status: 'in_call', ...L2, startedAt: Date.now() + 2000, answered: true })
+    step(view, { status: 'ended', ...L2, startedAt: Date.now() + 2000, answered: true })
+    step(view, null)
+    fireEvent.click(screen.getByText('Left voicemail'))
+    await waitFor(() => expect(logCall).toHaveBeenLastCalledWith('L2', '4145550144', 'no_answer', 'Left a voicemail (Power hour).', null))
     await new Promise((r) => setTimeout(r, 1500))
     expect(start).not.toHaveBeenCalled()
+  })
+  it('switched off, a call that went straight to voicemail is not called twice, and the choice is remembered', async () => {
+    const view = wrap()
+    await screen.findByText('Jane Q Sample')
+    fireEvent.click(screen.getByTestId('double-dial'))
+    expect(localStorage.getItem('power:double')).toBe('0')
+    step(view, { status: 'connecting', ...L1 })
+    step(view, { status: 'in_call', ...L1, startedAt: Date.now() + 2000, answered: true })
+    step(view, { status: 'ended', ...L1, startedAt: Date.now() + 2000, answered: true })
+    fireEvent.keyDown(window, { key: '1' })
+    await waitFor(() => expect(logCall).toHaveBeenCalledWith('L1', '4145550101', 'no_answer', 'No answer (Power hour).', null))
+    await new Promise((r) => setTimeout(r, 1500))
+    expect(start).not.toHaveBeenCalled()
+  })
+})
+
+describe('didNotReach: the signs a call never reached them', () => {
+  const f = (answeredAfter: number | null, endedAfter: number | null, errored = false) => ({ key: 'L1:4145550101', placedAt: 0, answeredAfter, endedAfter, errored })
+  it('voicemail inside 10 s, or an end inside 18 s with no answer; never a call still going, a failed call, or one that rang out', () => {
+    expect(didNotReach(f(6000, 20_000))).toMatch(/Voicemail took it after 6 s/)
+    expect(didNotReach(f(null, 4000))).toMatch(/ended after 4 s/)
+    expect(didNotReach(f(12_000, 40_000))).toBeNull()
+    expect(didNotReach(f(null, 22_500))).toBeNull()
+    expect(didNotReach(f(null, 3000, true))).toBeNull()
+    expect(didNotReach(f(3000, null))).toBeNull()
+    expect(didNotReach(null)).toBeNull()
   })
 })
