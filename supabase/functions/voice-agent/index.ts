@@ -237,7 +237,18 @@ async function finish(x: { callSid: string; from: string; to: string; card: Call
   const r = await db.rpc('voice_agent_result', { p: { call_sid: x.callSid, from: x.from, to: x.to, lead_id: x.card?.lead_id ?? null,
     transcript: x.transcript, extraction, seconds, outcome: x.outcome ?? (extraction ? null : 'hung_up') } })
   const d = (r.data ?? {}) as { ok?: boolean; outcome?: string; owner?: string; owner_whatsapp?: string | null; owner_name?: string; address?: string; municipality?: string; lead_id?: string; due_at?: string }
-  if (r.error) { console.error('[voice-agent] result:', r.error.message); x.events.push({ at: Date.now() - x.startedAt, type: 'result_error', detail: r.error.message.slice(0, 160) }) }
+  if (r.error) {
+    console.error('[voice-agent] result:', r.error.message); x.events.push({ at: Date.now() - x.startedAt, type: 'result_error', detail: r.error.message.slice(0, 160) })
+    // 0322: a write-up that could not be saved must not lose the conversation (the first real end-to-end call,
+    // 2026-11-25: voice_agent_result failed on every booked call back since it shipped, and nothing at all was kept).
+    // The plain path keeps the transcript and gives the caller the task with the thread's tail.
+    if (callerTurns >= 1) {
+      const r1 = await db.rpc('voice_agent_talked_no_extraction', { p: { call_sid: x.callSid, from: x.from, to: x.to, lead_id: x.card?.lead_id ?? null,
+        transcript: x.transcript, seconds, events: x.events } })
+      if (r1.error) console.error('[voice-agent] result fallback:', r1.error.message)
+      else return (r1.data ?? {}) as Record<string, unknown>
+    }
+  }
   await db.from('voice_calls').update({ events: x.events }).eq('call_sid', x.callSid)
   // buzz the caller who owns the card: push to their phones, WhatsApp through pm-phone
   if (d.ok && d.owner && ['callback_booked', 'not_now', 'never_callback'].includes(d.outcome ?? '')) {
