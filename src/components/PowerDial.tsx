@@ -348,7 +348,7 @@ export function PowerDial({ caller }: { caller: string }) {
     if (active.status === 'connecting' && dialedAt.current === null) dialedAt.current = Date.now()
     if (!ringLimit || !(active.status === 'connecting' || active.status === 'ringing')) return
     const left = RING_SECONDS * 1000 - (Date.now() - (dialedAt.current ?? Date.now()))
-    const t = setTimeout(() => { if (!groupOn.current) pendingNoAnswer.current = cur?.lead_id ?? null; hangUp() }, Math.max(0, left))
+    const t = setTimeout(() => { if (!groupOn.current) pendingNoAnswer.current = cur?.lead_id ?? null; if (lastCall.current) lastCall.current.byUs = true; hangUp() }, Math.max(0, left))
     return () => clearTimeout(t)
   }, [onThis, active, ringLimit, hangUp, cur])
   useEffect(() => {
@@ -372,6 +372,15 @@ export function PowerDial({ caller }: { caller: string }) {
     vmLogged.current = key
     void log({ ...OUTCOMES[1], note: 'Left the recorded voicemail, one tap at the beep (Power hour).' })
   }, [cur, onThis, active, log])
+  // No answer during the call (Colin 2026-11-25, "Sure do it"): one tap hangs up and logs it, so a voicemail that took
+  // the call in seconds is redialed at once (double dial) without a Hang up first. Logged when the call has ended.
+  const noAnswerNow = useCallback(() => {
+    if (!cur || !onThis || !live || groupOn.current) return
+    pendingNoAnswer.current = cur.lead_id
+    noAnswerNote.current = OUTCOMES[0].note
+    if (lastCall.current && lastCall.current.answeredAfter === null) lastCall.current.byUs = true
+    hangUp()
+  }, [cur, onThis, live, hangUp])
   const vmKey = useCallback(async () => {
     if (!onThis || active?.status !== 'in_call' || !active.vm?.ok || active.vmLeft) return
     const e = await dropVoicemail()
@@ -426,8 +435,8 @@ export function PowerDial({ caller }: { caller: string }) {
   }, [countdown, dial])
 
   // keys on a computer: D / Enter dial, 1-4 outcomes, 5 we talked, S skip, Esc cancels auto-dial
-  const keys = useRef({ dial, log, skip, cur, live, incoming: !!incoming, vmKey })
-  keys.current = { dial, log, skip, cur, live, incoming: !!incoming, vmKey }
+  const keys = useRef({ dial, log, skip, cur, live, incoming: !!incoming, vmKey, noAnswerNow })
+  keys.current = { dial, log, skip, cur, live, incoming: !!incoming, vmKey, noAnswerNow }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
@@ -439,6 +448,7 @@ export function PowerDial({ caller }: { caller: string }) {
       if (e.key === 'Escape') { setCountdown(null); return }
       if ((e.key === 'h' || e.key === 'H') && k.live) { hangUp(); return }
       if ((e.key === 'v' || e.key === 'V') && k.live) { void k.vmKey(); return }
+      if (e.key === '1' && k.live && !talking && !k.incoming) { k.noAnswerNow(); return }
       if (talking || k.incoming) return   // a call coming in: the keys wait for the bar at the top
       if (e.key === 'd' || e.key === 'D' || e.key === 'Enter') { e.preventDefault(); k.dial() }
       else if (e.key === 's' || e.key === 'S') k.skip()
@@ -580,7 +590,8 @@ export function PowerDial({ caller }: { caller: string }) {
               onChange={(e) => setRemark(e.target.value)} aria-label="Remark" />
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {OUTCOMES.map((o) => (
-                <Button key={o.id} variant="outline" className="h-12" disabled={live || busy} onClick={() => void log(o)}>
+                <Button key={o.id} variant="outline" className="h-12" disabled={(live && o.id !== 'no_answer') || busy}
+                  onClick={() => { if (o.id === 'no_answer' && live) noAnswerNow(); else void log(o) }}>
                   {o.label}<span className="ml-1 hidden text-xs text-muted-foreground sm:inline">({o.key})</span>
                 </Button>
               ))}
@@ -615,7 +626,7 @@ export function PowerDial({ caller }: { caller: string }) {
             </div>
           )}
           {err && <p className="text-sm text-red-700">{err}</p>}
-          <p className="hidden text-xs text-muted-foreground sm:block">Keys: D or Enter dials · H hangs up · V recorded voicemail · 1 no answer · 2 voicemail · 3 wrong number · 4 not interested · 5 we talked · 6 disconnected · S skip · Esc stops auto-dial</p>
+          <p className="hidden text-xs text-muted-foreground sm:block">Keys: D or Enter dials · H hangs up · V recorded voicemail · 1 no answer (hangs up too) · 2 voicemail · 3 wrong number · 4 not interested · 5 we talked · 6 disconnected · S skip · Esc stops auto-dial</p>
         </section>
       )}
     </div>
