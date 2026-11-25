@@ -1,6 +1,6 @@
 // The in-call bar: who you're talking to, how long, mute, hang up. Sits above the bottom nav on phones.
 // A call that came in from a number the list does not know offers the call desk's "New caller" card.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { callerDigits, fmtDuration, likelyDisconnected, useDialer } from '@/lib/dialer'
@@ -10,8 +10,9 @@ import { api } from '@/lib/queries'
 const WORDS = { connecting: 'Connecting...', ringing: 'Ringing...', in_call: 'In call', ended: 'Call ended', error: 'Call failed', idle: '' }
 
 export function CallBar() {
-  const { active, hangUp, toggleMute, dismiss, addColin } = useDialer()
+  const { active, hangUp, toggleMute, dismiss, addColin, dropVoicemail } = useDialer()
   const [adding, setAdding] = useState<'idle' | 'busy' | 'done'>('idle')
+  const [dropping, setDropping] = useState(false)
   const nav = useNavigate()
   const [, tick] = useState(0)
   const [busy, setBusy] = useState(false)
@@ -22,8 +23,21 @@ export function CallBar() {
     const t = setInterval(() => tick((n) => n + 1), 1000)
     return () => clearInterval(t)
   }, [active?.status])
+  // 0319: the recorded voicemail was left and the call has ended: it logs itself (Power hour logs its own, on its card)
+  const vmLogged = useRef<string | null>(null)
+  useEffect(() => {
+    if (!active?.vmLeft || active.quiet || !active.leadId) return
+    if (active.status !== 'ended' && active.status !== 'error') return
+    const key = `${active.leadId}:${active.to}:${active.startedAt ?? ''}`
+    if (vmLogged.current === key) return
+    vmLogged.current = key
+    void api.logCall(active.leadId, callerDigits(active.to) || null, 'no_answer', 'Left the recorded voicemail (one tap at the beep).').then((r) => {
+      if (r.error) setMsg(`The voicemail was left, but the call was not logged: ${r.error.message}`)
+      else dismiss()
+    })
+  }, [active, dismiss])
   if (!active) return null
-  const live = active.status === 'connecting' || active.status === 'ringing' || active.status === 'in_call'
+  const live =active.status === 'connecting' || active.status === 'ringing' || active.status === 'in_call'
   const digits = callerDigits(active.to)
   const unknownCaller = active.inbound && !active.leadId && digits.length === 10
 
@@ -50,7 +64,7 @@ export function CallBar() {
     if (r.error) { setMsg(r.error.message); return }
     dismiss()
   }
-  const askOutcome = !live && !!active.leadId && !active.inbound && !active.quiet
+  const askOutcome = !live && !!active.leadId && !active.inbound && !active.quiet && !active.vmLeft
 
   const where = active.inbound
     ? `calling in from ${fmtPhone(active.to) || 'a withheld number'}${active.line ? ` on ${fmtPhone(active.line)}` : ''}`
@@ -58,8 +72,8 @@ export function CallBar() {
   return (
     <div role="status" aria-live="polite"
       className="pb-safe fixed inset-x-0 bottom-[4.5rem] z-40 border-t bg-background shadow-lg md:bottom-0">
-      <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-2">
-        <div className="min-w-0 flex-1">
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-end gap-x-3 gap-y-1.5 px-4 py-2">
+        <div className="min-w-[9rem] flex-1">
           <p className="truncate font-medium">{active.label}</p>
           <p className="text-xs text-muted-foreground">
             {WORDS[active.status]}{active.status === 'in_call' && active.startedAt ? ` ${fmtDuration(Date.now() - active.startedAt)}` : ''}
@@ -82,6 +96,16 @@ export function CallBar() {
             const err = await addColin()
             if (err) { setAdding('idle'); setMsg(err) } else setAdding('done')
           }}>{adding === 'done' ? 'Calling Colin...' : adding === 'busy' ? 'Adding Colin...' : 'Add Colin'}</Button>
+        )}
+        {active.status === 'in_call' && !active.inbound && active.leadId && active.vm?.ok && !active.vmLeft && adding === 'idle' && (
+          // 0319: their voicemail picked up; one tap at the beep leaves the recorded message and ends the call
+          <Button size="sm" variant="outline" disabled={dropping} title="Wait for the beep, then tap: the recorded message is left and the call ends"
+            onClick={async () => {
+              setDropping(true); setMsg(null)
+              const err = await dropVoicemail()
+              setDropping(false)
+              if (err) setMsg(err)
+            }}>{dropping ? 'Leaving it...' : 'Voicemail'}</Button>
         )}
         {live ? (
           <Button size="sm" variant="destructive" onClick={hangUp}>Hang up</Button>

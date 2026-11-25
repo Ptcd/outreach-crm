@@ -62,6 +62,9 @@ export interface ActiveCall {
   line: string | null    // the seller number they called (inbound only)
   quiet?: boolean        // Power hour asks the outcome on its own card, so the call bar does not
   lines?: number         // three lines at once (lib/lines): how many lines are still up
+  /** The recorded voicemail (0319): may this number get one (null while the app is still asking), and was it left on this call. */
+  vm?: { ok: boolean; why: string | null } | null
+  vmLeft?: boolean
 }
 
 /** A call ringing in, before Accept / Decline. `matches` is null while the call desk is still looking. */
@@ -94,6 +97,8 @@ interface DialerApi {
   dismiss: () => void
   /** Put Colin on this call (0282): the seller stays on; null when he is being dialled, else why not. */
   addColin: () => Promise<string | null>
+  /** Leave the recorded voicemail on this call (0319) and end it; null when it was left, else why not. */
+  dropVoicemail: () => Promise<string | null>
 }
 
 type TwilioCall = import('@twilio/voice-sdk').Call
@@ -315,6 +320,11 @@ export function DialerProvider({ children }: { children: ReactNode }) {
       const line = callerLineFor(to, (thread.data ?? []) as Parameters<typeof callerLineFor>[1], cold)
       const call = await dev.connect({ params: humanCallProviderParams(to, line, leadId, takeoverKey) })
       callRef.current = call
+      // 0319: may this number get the recorded voicemail? Asked now so the button is there (or not) before the beep
+      void supabase.rpc('voicemail_drop_check', { p_lead_id: leadId, p_phone: to }).then((r) => {
+        const d = r.data as { ok?: boolean; reason?: string } | null
+        if (callRef.current === call) setActive((a) => (a ? { ...a, vm: { ok: !r.error && !!d?.ok, why: d?.ok ? null : d?.reason ?? null } } : a))
+      })
       // hasEarlyMedia false: the line is silent while it rings, so the app plays the ring (set before the status flips)
       call.on('ringing', (hasEarlyMedia?: boolean) => { ownRing.current = hasEarlyMedia !== true; setActive((a) => (a ? { ...a, status: 'ringing' } : a)) })
       call.on('accept', () => {
@@ -539,6 +549,19 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     return null
   }, [active])
 
+  // 0319: one tap at the beep; the phone server speaks the message to their voicemail and ends this call
+  const dropVoicemail = useCallback(async (): Promise<string | null> => {
+    const c = callRef.current
+    const sid = (c?.parameters as Record<string, string> | undefined)?.CallSid
+    const leadId = active?.leadId ?? null
+    if (!c || !sid || !leadId || active?.inbound) return 'Only a call you placed from a card.'
+    const r = await supabase.functions.invoke('call-voicemail', { body: { callSid: sid, leadId, phone: active?.to ?? '' } })
+    const d = (r.data ?? {}) as { ok?: boolean; error?: string }
+    if (r.error || !d.ok) return d.error ?? r.error?.message ?? 'The message could not be left.'
+    setActive((a) => (a ? { ...a, vmLeft: true } : a))
+    return null
+  }, [active])
+
   useEffect(() => () => { deviceRef.current?.destroy(); sideDevs.current.forEach((d) => { try { d.destroy() } catch { /* gone */ } }) }, [])
 
   // The test call to the assistant (2026-11-07): the same softphone, To "assistant", no card, no authorization gate; the
@@ -562,8 +585,8 @@ export function DialerProvider({ children }: { children: ReactNode }) {
     }
   }, [device, finish])
 
-  const value = useMemo<DialerApi>(() => ({ active, incoming, supported, ready, start, startLines, lineResults, takeLineResults, accept, decline, hangUp, toggleMute, dismiss, testAssistant, addColin }),
-    [active, incoming, supported, ready, start, startLines, lineResults, takeLineResults, accept, decline, hangUp, toggleMute, dismiss, testAssistant, addColin])
+  const value = useMemo<DialerApi>(() => ({ active, incoming, supported, ready, start, startLines, lineResults, takeLineResults, accept, decline, hangUp, toggleMute, dismiss, testAssistant, addColin, dropVoicemail }),
+    [active, incoming, supported, ready, start, startLines, lineResults, takeLineResults, accept, decline, hangUp, toggleMute, dismiss, testAssistant, addColin, dropVoicemail])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
 
@@ -572,6 +595,7 @@ const NO_DIALER: DialerApi = {
   startLines: async () => undefined, lineResults: [], takeLineResults: () => [],
   decline: () => undefined, hangUp: () => undefined, toggleMute: () => undefined, dismiss: () => undefined, testAssistant: async () => undefined,
   addColin: async () => 'The dialer is not available here.',
+  dropVoicemail: async () => 'The dialer is not available here.',
 }
 
 /** Outside DialerProvider (tests, previews) the dialer is simply unavailable: buttons render disabled. */

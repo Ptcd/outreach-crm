@@ -77,7 +77,7 @@ export function PowerDial({ caller }: { caller: string }) {
   const qc = useQueryClient()
   const [dialList, setDialList] = useState<DialList | null>(loadDialList)
   const clearDialList = () => { try { sessionStorage.removeItem('power:list') } catch { /* fine */ } setDialList(null) }
-  const { active, incoming, start, startLines, lineResults = [], takeLineResults, dismiss, hangUp, supported } = useDialer()
+  const { active, incoming, start, startLines, lineResults = [], takeLineResults, dismiss, hangUp, supported, dropVoicemail } = useDialer()
   const q = useQuery({
     // a missed call has to reach the screen fast (Colin 2026-10-29: Adil could not see a seller who called back during
     // Power hour): refresh on coming back to the tab and right after a call is logged. The poll stays at 30 s and
@@ -319,6 +319,23 @@ export function PowerDial({ caller }: { caller: string }) {
     }
   }, [cur, onThis, active, log])
 
+  // 0319: the recorded voicemail was left from the call bar (or with V): when the call has ended it logs itself as a
+  // voicemail and the card moves on, with no outcome tap
+  const vmLogged = useRef<string | null>(null)
+  useEffect(() => {
+    if (!cur || !onThis || !active?.vmLeft) return
+    if (active.status !== 'ended' && active.status !== 'error') return
+    const key = `${cur.lead_id}:${cur.phone}:${active.startedAt ?? ''}`
+    if (vmLogged.current === key) return
+    vmLogged.current = key
+    void log({ ...OUTCOMES[1], note: 'Left the recorded voicemail, one tap at the beep (Power hour).' })
+  }, [cur, onThis, active, log])
+  const vmKey = useCallback(async () => {
+    if (!onThis || active?.status !== 'in_call' || !active.vm?.ok || active.vmLeft) return
+    const e = await dropVoicemail()
+    if (e) setErr(e)
+  }, [onThis, active, dropVoicemail])
+
   // two callers at once (0120): the card on my screen is mine for a few minutes, renewed while it stays up; when
   // someone else already has it, the list is fetched again and their card drops out of mine
   const claimed = useRef<string | null>(null)
@@ -367,8 +384,8 @@ export function PowerDial({ caller }: { caller: string }) {
   }, [countdown, dial])
 
   // keys on a computer: D / Enter dial, 1-4 outcomes, 5 we talked, S skip, Esc cancels auto-dial
-  const keys = useRef({ dial, log, skip, cur, live, incoming: !!incoming })
-  keys.current = { dial, log, skip, cur, live, incoming: !!incoming }
+  const keys = useRef({ dial, log, skip, cur, live, incoming: !!incoming, vmKey })
+  keys.current = { dial, log, skip, cur, live, incoming: !!incoming, vmKey }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null
@@ -379,6 +396,7 @@ export function PowerDial({ caller }: { caller: string }) {
       const k = keys.current
       if (e.key === 'Escape') { setCountdown(null); return }
       if ((e.key === 'h' || e.key === 'H') && k.live) { hangUp(); return }
+      if ((e.key === 'v' || e.key === 'V') && k.live) { void k.vmKey(); return }
       if (talking || k.incoming) return   // a call coming in: the keys wait for the bar at the top
       if (e.key === 'd' || e.key === 'D' || e.key === 'Enter') { e.preventDefault(); k.dial() }
       else if (e.key === 's' || e.key === 'S') k.skip()
@@ -535,6 +553,12 @@ export function PowerDial({ caller }: { caller: string }) {
           ) : (
             <p className="rounded-md bg-muted p-2 text-sm text-muted-foreground"><span className="font-semibold">Try {(cur.dials_total ?? 0) + 1}: no voicemail.</span> If it goes to voicemail, hang up and tap No answer. Leave one short voicemail on the third try; the first two make them curious.</p>
           )}
+          {onThis && active?.status === 'in_call' && active.vm?.ok && !active.vmLeft && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border-2 border-sky-300 bg-sky-50 p-2 text-sm dark:bg-sky-950/30">
+              <span className="flex-1"><span className="font-semibold">Their voicemail?</span> Wait for the beep, then tap. The recorded message is left with their name and street, the call ends and logs itself. Or just talk to leave your own.</span>
+              <Button size="sm" onClick={() => void vmKey()}>Leave recorded voicemail<span className="ml-1 hidden text-xs sm:inline">(V)</span></Button>
+            </div>
+          )}
           <details className="rounded-md border p-2 text-sm">
             <summary className="cursor-pointer font-medium">If they say... (the first 30 seconds)</summary>
             <ul className="mt-1 space-y-1">
@@ -548,7 +572,7 @@ export function PowerDial({ caller }: { caller: string }) {
             </div>
           )}
           {err && <p className="text-sm text-red-700">{err}</p>}
-          <p className="hidden text-xs text-muted-foreground sm:block">Keys: D or Enter dials · H hangs up · 1 no answer · 2 voicemail · 3 wrong number · 4 not interested · 5 we talked · 6 disconnected · S skip · Esc stops auto-dial</p>
+          <p className="hidden text-xs text-muted-foreground sm:block">Keys: D or Enter dials · H hangs up · V recorded voicemail · 1 no answer · 2 voicemail · 3 wrong number · 4 not interested · 5 we talked · 6 disconnected · S skip · Esc stops auto-dial</p>
         </section>
       )}
     </div>
