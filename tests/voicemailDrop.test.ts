@@ -60,8 +60,9 @@ describe('who may get the recorded message', () => {
     await as(THALIA)
     const a = await check(card, '(414) 555-9801')
     expect(a).toMatchObject({ ok: true, person: 'thalia', voice: 'Polly.Joanna-Neural' })
-    expect(a.say).toBe("Hi Olivia, this is a recorded message from Thalia, with Colin Merrill's team. I had a quick question about the place on South Tuckaway Shores Drive. "
-      + "You can call or text me back at {number}. Again, that's {number}. Thanks, and have a good day.")
+    // 0320, Colin's wording: no "recorded message", no team, just Thalia asking whether they would sell that address
+    expect(a.say).toBe("Hi Olivia, this is Thalia. I'm calling to see if you'd be interested in selling the place on South Tuckaway Shores Drive. "
+      + 'You can call or text me back at {number}. Thanks.')
     expect(await check(card, '4145559802')).toMatchObject({ ok: true })
   })
   it('a cold number is left in the caller\'s own voice until Colin opens it to everyone', async () => {
@@ -81,7 +82,7 @@ describe('who may get the recorded message', () => {
   it('an estate card is not greeted by name', async () => {
     const e = await check(estate, '4145559804')
     expect(e.ok).toBe(true)
-    expect(e.say!.startsWith('Hi, this is a recorded message from Thalia')).toBe(true)
+    expect(e.say!.startsWith('Hi, this is Thalia.')).toBe(true)
     expect(e.say).toContain('the place on Pioneer Court')
   })
   it('refuses a blocked number, a number not on the card, and the other caller\'s card', async () => {
