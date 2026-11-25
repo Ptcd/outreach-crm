@@ -19,6 +19,7 @@ import { CallButton, PersonalCallButton } from '@/components/CallButton'
 import { AppointmentPacket } from '@/components/AppointmentPacket'
 import { CallPanel, bestPhone } from '@/components/CallPanel'
 import { CallNotes } from '@/components/CallNotes'
+import { AssistantCalls } from '@/components/AssistantCalls'
 import { TextThread } from '@/components/TextThread'
 import { DealPackage, PackageDecisionBanner } from '@/components/DealPackage'
 import { api, useCardNotYours, useDeals, useLead, useWrite } from '@/lib/queries'
@@ -161,6 +162,8 @@ export default function LeadDetail() {
       <TextThread leadId={lead.id} phone={rankPhones(contacts, lead.owner_name, messages, q.data.inbound).find((p) => !p.blocked) ?? bestPhone(contacts, q.data.inbound, lead.owner_name)} messages={messages} inbound={q.data.inbound}
         closed={lead.stage === 'dnc'} contacts={contacts} />
       <CallNotes leadId={lead.id} messages={messages} />
+      {/* what the phone assistant and the seller said, when it took their call (2026-11-25) */}
+      <AssistantCalls leadId={lead.id} />
       {/* the script, open on a hot card (someone just said they'd sell) */}
       <CallScript lead={lead} contacts={contacts} messages={messages} replyFacts={facts} latestGate={gates[0] ?? null}
         phone={params.get('phone')} canOverride={isOwner}
