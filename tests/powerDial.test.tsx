@@ -341,3 +341,30 @@ describe('didNotReach: the signs a call never reached them', () => {
     expect(didNotReach(null)).toBeNull()
   })
 })
+
+// 2026-11-25: an owed call (they called, a promised callback, they wrote back interested) is first and stays first
+describe('Power hour, owed calls first', () => {
+  const replied = { lead_id: 'L9', task_id: 'T9', source: 'replied', why: 'Wrote back interested: call today', owner_name: 'OLIVE OWED', address: '9 OWED ST', municipality: 'Franklin',
+    reasons: [], lane: 'flip', texts_sent: 1, first_text_at: null, last_text_at: null, dials_7d: 0, last_dial: null, phone: '4145550909', line_type: 'mobile', phone_person: null, other_phones: 0 }
+  it('a seller who wrote back interested comes before a list handed over from Today', async () => {
+    items.push(replied as unknown as typeof items[number])
+    sessionStorage.setItem('power:list', JSON.stringify({ label: 'Dial these', ids: ['L2', 'L1'], at: Date.now() }))
+    try {
+      wrap()
+      expect(await screen.findByText('Olive Owed')).toBeTruthy()
+      expect(screen.queryByText(/Dial \(414\) 555-0909/)).toBeTruthy()
+    } finally { items.pop(); sessionStorage.clear() }
+  })
+  it('Skip on the only owed call leaves it up and says why; it never goes behind the cold cards', async () => {
+    items.push(replied as unknown as typeof items[number])
+    try {
+      wrap()
+      await screen.findByText('Olive Owed')
+      fireEvent.keyDown(window, { key: 's' })
+      expect(await screen.findByText(/They are waiting on this call, so it stays first/)).toBeTruthy()
+      expect(screen.getByText('Olive Owed')).toBeTruthy()
+      fireEvent.keyDown(window, { key: '3' })
+      await waitFor(() => expect(logCall).toHaveBeenCalledWith('L9', '4145550909', 'wrong_number', 'Not them (Power hour).', null))
+    } finally { items.pop() }
+  })
+})

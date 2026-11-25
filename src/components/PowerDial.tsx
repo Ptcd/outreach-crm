@@ -64,6 +64,9 @@ const OUTCOMES = [
   { key: '6', id: 'disconnected', label: 'Disconnected', note: 'Disconnected number (Power hour).' },
 ] as const
 
+/** A call somebody is waiting on: they called us, were promised a call back, or wrote back interested. */
+const OWED = (x: { source: string }) => x.source === 'missed_call' || x.source === 'callback' || x.source === 'replied'
+
 // a list handed over from Today ("Dial these", 2026-11-04): those cards first, in Today's order, for this sitting
 type DialList = { label: string; ids: string[]; at: number }
 function loadDialList(): DialList | null {
@@ -150,12 +153,15 @@ export function PowerDial({ caller }: { caller: string }) {
     const rank = new Map((dialList?.ids ?? []).map((id, i) => [id, i]))
     const inList = (x: Item) => rank.has(x.lead_id)
     const byList = (a: Item, b: Item) => (rank.get(a.lead_id) ?? 0) - (rank.get(b.lead_id) ?? 0)
-    // a missed call or a promised callback still comes first; then Today's list in its order; then the queue's own order
-    const front = all.filter((x) => x.source === 'missed_call' || x.source === 'callback')
+    // owed calls first (a seller who called, a promised callback, a seller who wrote back interested); then Today's
+    // list in its order; then the queue's own order. Until 2026-11-25 a reply call sat behind a list handed over from
+    // Today, and Skip sent it behind every cold card (Colin: interested cards "aren't getting the action they need").
+    // Skip now sends a card to the back of its own group, so an owed call is never behind the list.
+    const front = all.filter(OWED)
     const listed = all.filter((x) => inList(x) && !front.includes(x)).sort(byList)
     const rest = all.filter((x) => !front.includes(x) && !listed.includes(x))
-    const live = [...front, ...listed, ...rest]
-    const ordered = [...live.filter((x) => !skipped.includes(x.lead_id)), ...live.filter((x) => skipped.includes(x.lead_id))]
+    const back = (xs: Item[]) => [...xs.filter((x) => !skipped.includes(x.lead_id)), ...xs.filter((x) => skipped.includes(x.lead_id))]
+    const ordered = [...back(front), ...back([...listed, ...rest])]
     const held = pin ? (ordered.find((x) => x.lead_id === pin) ?? (pinItem.current?.lead_id === pin && !stats.done.includes(pin) ? pinItem.current : undefined)) : undefined
     return held ? [held, ...ordered.filter((x) => x.lead_id !== held.lead_id)] : ordered
   }, [q.data, stats.done, skipped, pin, swap, dialList])
@@ -319,10 +325,13 @@ export function PowerDial({ caller }: { caller: string }) {
   const skip = useCallback(() => {
     if (!cur || live) return
     if (onThis) dismiss()
+    // an owed call goes to the back of the owed calls only; when it is the last one it stays up
+    setNextNote(OWED(cur) && !list.slice(1).some((x) => OWED(x) && !skipped.includes(x.lead_id))
+      ? 'They are waiting on this call, so it stays first: dial it, or log what happened.' : null)
     setSkipped((s) => [...s.filter((x) => x !== cur.lead_id), cur.lead_id])
     setTalking(null)
     setPin(null)
-  }, [cur, live, onThis, dismiss])
+  }, [cur, live, onThis, dismiss, list, skipped])
 
   // what happened to the call on this card, for double dial: placed, answered (by anyone or anything), ended
   useEffect(() => {
