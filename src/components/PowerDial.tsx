@@ -109,6 +109,13 @@ export function PowerDial({ caller }: { caller: string }) {
   const [three, setThree] = useState<boolean>(() => { try { return localStorage.getItem('power:lines') === '3' } catch { return false } })
   const setLines = (on: boolean) => { setThree(on); try { localStorage.setItem('power:lines', on ? '3' : '1') } catch { /* private window */ } }
   const groupOn = useRef(false)                       // a three-line round is in progress, or its winner is on the call
+  // double dial (Colin 2026-11-25: "can we do something that double dials"): when nobody answers a one-line call, the
+  // same number is called once more at once, from the same number (the card's, 0325). An iPhone on Do Not Disturb or
+  // another Focus lets a second call from the same number inside three minutes ring through. On unless switched off,
+  // remembered on this phone; once per number per sitting; never on a three-line round or when a seller is calling in.
+  const [double, setDouble] = useState<boolean>(() => { try { return localStorage.getItem('power:double') !== '0' } catch { return true } })
+  const setDoubleOn = (on: boolean) => { setDouble(on); try { localStorage.setItem('power:double', on ? '1' : '0') } catch { /* private window */ } }
+  const doubled = useRef<Set<string>>(new Set())
   const groupItems = useRef<Map<string, Item>>(new Map())
   const RING_SECONDS = 22
   const pendingNoAnswer = useRef<string | null>(null)
@@ -244,7 +251,10 @@ export function PowerDial({ caller }: { caller: string }) {
     if (!cur || live || busy) return
     setBusy(true)
     setErr(null)
-    const r = await api.logCall(cur.lead_id, cur.phone, o.id === 'voicemail' ? 'no_answer' : o.id, remark.trim() ? `${o.note} ${remark.trim()}` : o.note, null)
+    const dkey = `${cur.lead_id}:${cur.phone}`
+    const again = double && o.id === 'no_answer' && !groupOn.current && !incoming && !doubled.current.has(dkey)
+    const said = remark.trim() ? `${o.note} ${remark.trim()}` : o.note
+    const r = await api.logCall(cur.lead_id, cur.phone, o.id === 'voicemail' ? 'no_answer' : o.id, again ? `${said} Calling again at once (double dial).` : said, null)
     setBusy(false)
     const d = r.data as { ok?: boolean; reason?: string } | null
     if (r.error || d?.ok === false) { setErr(r.error?.message ?? d?.reason ?? 'Not logged'); return }
@@ -252,6 +262,14 @@ export function PowerDial({ caller }: { caller: string }) {
     setRemark('')
     update((s) => ({ ...s, voicemails: s.voicemails + (o.id === 'voicemail' ? 1 : 0), reached: s.reached + (['wrong_number', 'not_interested'].includes(o.id) ? 1 : 0) }))
     void qc.invalidateQueries({ queryKey: ['tasks'] })
+    if (again) {
+      doubled.current.add(dkey)
+      pinItem.current = cur
+      setPin(cur.lead_id)
+      setNextNote('No answer. Calling the same number again now: an iPhone on Do Not Disturb lets a second call inside 3 minutes ring through.')
+      setCountdown(1)
+      return
+    }
     // nobody on that number: the card stays, with its next good number, for at most four numbers a sitting (Thalia
     // 2026-11-04: "limit it to 4 numbers per lead ... try the remaining numbers the following day"); the queue (0184)
     // brings the card back the next day at its next untried number
@@ -289,7 +307,7 @@ export function PowerDial({ caller }: { caller: string }) {
     }
     setNextNote(null)
     next(cur.lead_id, true)
-  }, [cur, live, busy, onThis, dismiss, update, qc, next, remark, tried, auto])
+  }, [cur, live, busy, onThis, dismiss, update, qc, next, remark, tried, auto, double, incoming])
 
   const skip = useCallback(() => {
     if (!cur || live) return
@@ -424,6 +442,7 @@ export function PowerDial({ caller }: { caller: string }) {
         <label className="ml-auto flex items-center gap-1.5"><input type="checkbox" checked={auto} onChange={(e) => { setAuto(e.target.checked); setCountdown(null) }} /> Auto-dial next</label>
         <label className="flex items-center gap-1.5"><input type="checkbox" checked={ringLimit} onChange={(e) => setRingLimit(e.target.checked)} /> Hang up after 5 rings</label>
         <label className="flex items-center gap-1.5" title="Rings this card and the next two together. The first person to pick up is your call. A voicemail that picks up is left the recorded message by itself when that number may have one."><input type="checkbox" checked={three} onChange={(e) => setLines(e.target.checked)} data-testid="three-lines" /> 3 lines</label>
+        <label className="flex items-center gap-1.5" title="When nobody answers, calls the same number once more right away. An iPhone on Do Not Disturb lets a second call from the same number within 3 minutes ring through. One line only."><input type="checkbox" checked={double} onChange={(e) => setDoubleOn(e.target.checked)} data-testid="double-dial" /> Double dial</label>
       </div>
       <ErrorNote error={q.error} />
       {incoming && <p role="status" className="rounded-lg border-2 border-emerald-400 bg-emerald-50 p-2 text-sm font-medium dark:bg-emerald-950/30">A seller is calling in: press the green Answer button. Power hour waits; their card opens when you answer.</p>}

@@ -3,7 +3,7 @@
 // the outcome, not the call bar); keys work on a computer (Colin 2026-10-28: "rapid click through").
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const items = [
   { lead_id: 'L1', task_id: null, source: 'texted_silent', why: null, owner_name: 'JANE Q SAMPLE', address: '100 SAMPLE ST', municipality: 'Milwaukee',
@@ -31,6 +31,8 @@ const wrap = () => render(<QueryClientProvider client={new QueryClient()}><Power
 afterEach(() => { cleanup(); localStorage.clear(); logCall.mockClear(); start.mockClear(); hangUp.mockClear(); dialer.active = null; dialer.incoming = null; vi.useRealTimers() })
 
 describe('Power hour', () => {
+  // double dial has its own tests below; these are the one-call flow
+  beforeEach(() => { localStorage.setItem('power:double', '0') })
   it('dials the card quietly, logs a voicemail in one tap, and brings the next card', async () => {
     wrap()
     expect(await screen.findByText('Jane Q Sample')).toBeTruthy()
@@ -218,3 +220,37 @@ describe('Power hour', () => {
   })
 })
 
+// double dial (Colin 2026-11-25): no answer calls the same number once more at once, then the card moves on as before
+describe('Power hour, double dial', () => {
+  it('on by default: no answer logs, says it is calling again, and dials the same number once more; the second no answer moves on', async () => {
+    wrap()
+    await screen.findByText('Robert Example').catch(() => null)
+    await screen.findByText('Jane Q Sample')
+    expect((screen.getByTestId('double-dial') as HTMLInputElement).checked).toBe(true)
+    fireEvent.keyDown(window, { key: 'd' })
+    expect(start).toHaveBeenCalledTimes(1)
+    fireEvent.keyDown(window, { key: '1' })
+    await waitFor(() => expect(logCall).toHaveBeenCalledWith('L1', '4145550101', 'no_answer', 'No answer (Power hour). Calling again at once (double dial).', null))
+    expect(screen.getByText(/Calling the same number again now/)).toBeTruthy()
+    await waitFor(() => expect(start).toHaveBeenCalledTimes(2), { timeout: 3000 })
+    expect(start).toHaveBeenLastCalledWith(expect.objectContaining({ to: '4145550101', leadId: 'L1' }))
+    fireEvent.keyDown(window, { key: '1' })
+    await waitFor(() => expect(logCall).toHaveBeenLastCalledWith('L1', '4145550101', 'no_answer', 'No answer (Power hour).', null))
+    expect(await screen.findByText('Robert Example')).toBeTruthy()
+    await new Promise((r) => setTimeout(r, 1500))
+    expect(start).toHaveBeenCalledTimes(2)
+  })
+  it('a left voicemail is not called again, and switched off a no answer moves straight on', async () => {
+    wrap()
+    await screen.findByText('Jane Q Sample')
+    fireEvent.click(screen.getByText('Left voicemail'))
+    await waitFor(() => expect(logCall).toHaveBeenCalledWith('L1', '4145550101', 'no_answer', 'Left a voicemail (Power hour).', null))
+    expect(await screen.findByText('Robert Example')).toBeTruthy()
+    fireEvent.click(screen.getByTestId('double-dial'))
+    expect(localStorage.getItem('power:double')).toBe('0')
+    fireEvent.keyDown(window, { key: '1' })
+    await waitFor(() => expect(logCall).toHaveBeenLastCalledWith('L2', '4145550144', 'no_answer', 'No answer (Power hour).', null))
+    await new Promise((r) => setTimeout(r, 1500))
+    expect(start).not.toHaveBeenCalled()
+  })
+})
