@@ -423,7 +423,7 @@ export function PowerDial({ caller }: { caller: string }) {
         <span className="text-muted-foreground">{list.length} left{minutes ? ` · ${minutes} min` : ''}</span>
         <label className="ml-auto flex items-center gap-1.5"><input type="checkbox" checked={auto} onChange={(e) => { setAuto(e.target.checked); setCountdown(null) }} /> Auto-dial next</label>
         <label className="flex items-center gap-1.5"><input type="checkbox" checked={ringLimit} onChange={(e) => setRingLimit(e.target.checked)} /> Hang up after 5 rings</label>
-        <label className="flex items-center gap-1.5" title="Rings this card and the next two together. The first person to pick up is your call."><input type="checkbox" checked={three} onChange={(e) => setLines(e.target.checked)} data-testid="three-lines" /> 3 lines</label>
+        <label className="flex items-center gap-1.5" title="Rings this card and the next two together. The first person to pick up is your call. A voicemail that picks up is left the recorded message by itself when that number may have one."><input type="checkbox" checked={three} onChange={(e) => setLines(e.target.checked)} data-testid="three-lines" /> 3 lines</label>
       </div>
       <ErrorNote error={q.error} />
       {incoming && <p role="status" className="rounded-lg border-2 border-emerald-400 bg-emerald-50 p-2 text-sm font-medium dark:bg-emerald-950/30">A seller is calling in: press the green Answer button. Power hour waits; their card opens when you answer.</p>}

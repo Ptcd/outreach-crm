@@ -106,3 +106,34 @@ describe('who may get the recorded message', () => {
     expect(await check(card, '4145559801')).toMatchObject({ ok: true })
   })
 })
+
+// 0321: on a three-line round nobody hears the beep, so the phone server asks for the caller whose line it is
+describe('the phone server, for a voicemail that answered a three-line line', () => {
+  const auto = (lead: string, phone: string, who: string) => one<Check>(`public.voicemail_drop_auto($1, $2, $3)`, [lead, phone, who])
+  it('reads the same rule as the button, in the name of the caller whose line it is', async () => {
+    await as(null)
+    await db.exec(`delete from public.voicemail_drops`)
+    const a = await auto(card, '4145559801', 'thalia')
+    expect(a).toMatchObject({ ok: true, person: 'thalia', voice: 'Polly.Joanna-Neural' })
+    expect(a.say).toContain('Hi Olivia, this is Thalia.')
+    expect(await auto(card, '4145559803', 'thalia')).toMatchObject({ ok: false, code: 'cold' })
+    expect(await auto(card, '4145559802', 'thalia')).toMatchObject({ ok: false, code: 'blocked' })
+  })
+  it('refuses the other caller\'s card and someone not on the team', async () => {
+    expect(await auto(card, '4145559801', 'adil')).toMatchObject({ ok: false, code: 'card' })
+    expect(await auto(card, '4145559801', 'nobody')).toMatchObject({ ok: false, code: 'who' })
+  })
+  it('keeps the row and corrects the note the app wrote when the line ended', async () => {
+    await as(THALIA)
+    await one(`public.log_call($1, '4145559801', 'no_answer', 'No answer: voicemail picked up, no message left (three lines, Power hour).')`, [card])
+    await as(null)
+    expect(await one(`public.voicemail_drop_auto_done($1, '4145559801', 'thalia', $2, 'Hi Olivia')`, [card, SID(21)])).toMatchObject({ ok: true, note_fixed: true })
+    const body = (await db.query<{ body: string }>(`select body from public.messages where lead_id = $1 and channel = 'call' order by sent_at desc limit 1`, [card])).rows[0].body
+    expect(body).toContain('voicemail picked up, the recorded message was left (three lines, Power hour).')
+    expect(await auto(card, '4145559801', 'thalia')).toMatchObject({ ok: false, code: 'recent' })
+    // a caller's login cannot run the phone server's functions
+    await db.exec(`set role authenticated`)
+    await expect(auto(card, '4145559801', 'thalia')).rejects.toThrow()
+    await db.exec(`reset role`)
+  })
+})
